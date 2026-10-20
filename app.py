@@ -1546,16 +1546,15 @@ elif page == "Model Insights":
         })
         try:
 
-            sensitivity_results = assess_members(scenarios)
+                        sensitivity_results = sensitivity_results.sort_values(
+                "days_since_last_visit"
+            )
 
-            sensitivity_results = sensitivity_results.sort_values(
-    "days_since_last_visit"
-)
             st.markdown("---")
             st.markdown("### Experimental response")
 
             chart_data = sensitivity_results.set_index(
-                "days since last visit"
+                "days_since_last_visit"
             )[["cancellation_probability"]].rename(
                 columns={
                     "cancellation_probability":
@@ -1580,9 +1579,9 @@ elif page == "Model Insights":
                     ]
                 ].rename(
                     columns={
-                        "days since last visit": "Days since last visit",
-                        "cancellation probability": "Estimated probability",
-                        "risk category": "Provisional risk category"
+                        "days_since_last_visit": "Days since last visit",
+                        "cancellation_probability": "Estimated probability",
+                        "risk_category": "Provisional risk category"
                     }
                 ),
                 hide_index=True,
