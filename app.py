@@ -400,17 +400,17 @@ with st.sidebar:
     st.markdown("---")
 
     page = st.radio(
-        "WORKSPACE",
-        [
-            "Dashboard",
-            "Member Assessment",
-            "Batch Assessment",
-            "Model Insights",
-            "About the Model"
-        ],
-        label_visibility="visible"
-    )
-
+    "WORKSPACE",
+    [
+        "Dashboard",
+        "Member Assessment",
+        "Batch Assessment",
+        "Model Insights",
+        "About the Model"
+    ],
+    key="selected_page",
+    label_visibility="visible"
+)
     st.markdown("---")
 
     st.markdown(
