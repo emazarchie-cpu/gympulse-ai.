@@ -595,7 +595,116 @@ unsafe_allow_html=True
 # =========================================================
 # 5. MODEL PREDICTION FUNCTIONS
 # =========================================================
+# =========================================================
+# MODEL INITIALIZATION
+# =========================================================
 
+import numpy as np
+
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.pipeline import Pipeline
+from sklearn.linear_model import LogisticRegression
+
+
+@st.cache_resource
+def load_model():
+    """Train a demonstration model using synthetic fitness data."""
+
+    rng = np.random.default_rng(42)
+
+    sample_size = 1000
+
+    membership_type = rng.choice(
+        ["Monthly", "Quarterly", "Annual"],
+        size=sample_size,
+        p=[0.55, 0.25, 0.20]
+    )
+
+    days_since_last_visit = rng.integers(
+        0, 31, size=sample_size
+    )
+
+    visits_previous_30_days = rng.integers(
+        0, 21, size=sample_size
+    )
+
+    visits_last_30_days = rng.integers(
+        0, 21, size=sample_size
+    )
+
+    renewal_due_days = rng.integers(
+        0, 91, size=sample_size
+    )
+
+    pt_sessions_attended = rng.integers(
+        0, 13, size=sample_size
+    )
+
+    attendance_change = (
+        visits_last_30_days
+        - visits_previous_30_days
+    )
+
+    training_data = pd.DataFrame({
+        "membership_type": membership_type,
+        "days_since_last_visit": days_since_last_visit,
+        "attendance_change": attendance_change,
+        "renewal_due_days": renewal_due_days,
+        "pt_sessions_attended": pt_sessions_attended
+    })
+
+    # Demonstration labels generated from assumed risk patterns.
+    # These are synthetic labels, not real member outcomes.
+    risk_score = (
+        0.09 * days_since_last_visit
+        - 0.12 * attendance_change
+        - 0.18 * pt_sessions_attended
+        - 0.025 * renewal_due_days
+        + np.where(membership_type == "Monthly", 0.8, 0)
+        + np.where(membership_type == "Annual", -0.5, 0)
+        + rng.normal(0, 1.5, sample_size)
+    )
+
+    cancellation_label = (
+        risk_score > np.median(risk_score)
+    ).astype(int)
+
+    categorical_features = ["membership_type"]
+
+    numeric_features = [
+        "days_since_last_visit",
+        "attendance_change",
+        "renewal_due_days",
+        "pt_sessions_attended"
+    ]
+
+    preprocessing = ColumnTransformer(
+        transformers=[
+            (
+                "membership",
+                OneHotEncoder(handle_unknown="ignore"),
+                categorical_features
+            ),
+            (
+                "numeric",
+                StandardScaler(),
+                numeric_features
+            )
+        ]
+    )
+
+    pipeline = Pipeline([
+        ("preprocessing", preprocessing),
+        ("classifier", LogisticRegression(max_iter=1000))
+    ])
+
+    pipeline.fit(training_data, cancellation_label)
+
+    return pipeline
+
+
+model = load_model()
 def prepare_member_data(data):
     """Validate member records and prepare model features."""
 
