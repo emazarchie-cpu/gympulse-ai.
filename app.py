@@ -599,7 +599,7 @@ unsafe_allow_html=True
 def prepare_member_data(data):
     """Validate member records and prepare model features."""
 
-       data = data.copy()
+    data = data.copy()
 
     required_columns = [
         "membership_type",
@@ -667,7 +667,6 @@ def prepare_member_data(data):
     ]
 
     return data[model_features]
-
 
 def assess_members(data):
     """Generate cancellation probabilities and provisional risk labels."""
