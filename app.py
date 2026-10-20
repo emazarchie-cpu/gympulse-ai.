@@ -246,9 +246,294 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+# =========================================================
+# 3. USER AUTHENTICATION
+# =========================================================
+
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+
+# Connect to Supabase once per user session
+if "supabase_client" not in st.session_state:
+    st.session_state.supabase_client = create_client(
+        st.secrets["SUPABASE_URL"],
+        st.secrets["SUPABASE_KEY"]
+    )
+
+supabase = st.session_state.supabase_client
+
+
+# Initialise login state
+if "auth_user" not in st.session_state:
+    st.session_state.auth_user = None
+
+if "user_profile" not in st.session_state:
+    st.session_state.user_profile = None
+
+
+# Show login and registration until authenticated
+if st.session_state.auth_user is None:
+
+    st.markdown(
+        """
+        <div style="text-align:center; padding:45px 0 20px;">
+            <div style="font-size:42px;font-weight:800;">
+                GYM<span style="color:#B7F34A;">PULSE</span> AI
+            </div>
+            <p style="color:#9AA8BD;font-size:16px;">
+                Smarter insights. Stronger member retention.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    login_tab, signup_tab = st.tabs(
+        ["Log In", "Create Account"]
+    )
+
+    # -------------------------
+    # LOGIN
+    # -------------------------
+    with login_tab:
+
+        st.subheader("Welcome back")
+
+        with st.form("login_form"):
+
+            login_email = st.text_input("Email address")
+            login_password = st.text_input(
+                "Password",
+                type="password"
+            )
+
+            login_submitted = st.form_submit_button(
+                "Log In",
+                use_container_width=True
+            )
+
+        if login_submitted:
+
+            if not login_email or not login_password:
+                st.warning("Enter your email and password.")
+
+            else:
+                try:
+                    result = supabase.auth.sign_in_with_password(
+                        {
+                            "email": login_email.strip(),
+                            "password": login_password
+                        }
+                    )
+
+                    if result.user:
+
+                        st.session_state.auth_user = {
+                            "id": str(result.user.id),
+                            "email": result.user.email
+                        }
+
+                        profile_result = (
+                            supabase.table("profiles")
+                            .select("*")
+                            .eq("id", str(result.user.id))
+                            .execute()
+                        )
+
+                        if profile_result.data:
+                            st.session_state.user_profile = (
+                                profile_result.data[0]
+                            )
+                        else:
+                            st.session_state.user_profile = {
+                                "full_name": "User",
+                                "business_name": "My Gym"
+                            }
+
+                        st.rerun()
+
+                except Exception:
+                    st.error(
+                        "Login failed. Check your credentials "
+                        "and confirm your email address."
+                    )
+
+    # -------------------------
+    # SIGNUP
+    # -------------------------
+    with signup_tab:
+
+        st.subheader("Create your workspace")
+
+        with st.form("signup_form"):
+
+            full_name = st.text_input("Your full name")
+
+            business_name = st.text_input(
+                "Gym or company name",
+                placeholder="e.g. Nuelarch Gym"
+            )
+
+            signup_email = st.text_input(
+                "Email address",
+                key="signup_email"
+            )
+
+            signup_password = st.text_input(
+                "Create password",
+                type="password",
+                key="signup_password"
+            )
+
+            confirm_password = st.text_input(
+                "Confirm password",
+                type="password"
+            )
+
+            signup_submitted = st.form_submit_button(
+                "Create Free Account",
+                use_container_width=True
+            )
+
+        if signup_submitted:
+
+            if not all([
+                full_name.strip(),
+                business_name.strip(),
+                signup_email.strip(),
+                signup_password,
+                confirm_password
+            ]):
+                st.warning("Please complete every field.")
+
+            elif signup_password != confirm_password:
+                st.error("Your passwords do not match.")
+
+            elif len(signup_password) < 8:
+                st.warning(
+                    "Your password must contain at least 8 characters."
+                )
+
+            else:
+                try:
+                    result = supabase.auth.sign_up(
+                        {
+                            "email": signup_email.strip(),
+                            "password": signup_password,
+                            "options": {
+                                "data": {
+                                    "full_name": full_name.strip(),
+                                    "business_name": business_name.strip(),
+                                    "account_type": "gym_owner"
+                                }
+                            }
+                        }
+                    )
+
+                    if result.session and result.user:
+
+                        st.session_state.auth_user = {
+                            "id": str(result.user.id),
+                            "email": result.user.email
+                        }
+
+                        profile_result = (
+                            supabase.table("profiles")
+                            .select("*")
+                            .eq("id", str(result.user.id))
+                            .execute()
+                        )
+
+                        if profile_result.data:
+                            st.session_state.user_profile = (
+                                profile_result.data[0]
+                            )
+                        else:
+                            st.session_state.user_profile = {
+                                "full_name": full_name.strip(),
+                                "business_name": business_name.strip()
+                            }
+
+                        st.success("Account created successfully!")
+                        st.rerun()
+
+                    else:
+                        st.success(
+                            "Registration submitted! Check your email "
+                            "for a confirmation link, then return here "
+                            "to log in."
+                        )
+
+                except Exception:
+                    st.error(
+                        "Registration failed. Your email may already "
+                        "be registered, or the request may have failed. "
+                        "Please check your details and try again."
+                    )
+
+    st.stop()
+
 
 # =========================================================
-# 3. LOAD EXISTING TRAINED MODEL
+# 4. PERSONALIZED WORKSPACE HEADER
+# =========================================================
+
+profile = st.session_state.user_profile or {}
+
+user_name = profile.get("full_name", "User")
+business_name = profile.get("business_name", "My Gym")
+
+try:
+    current_hour = datetime.now(
+        ZoneInfo("Africa/Lagos")
+    ).hour
+except Exception:
+    current_hour = datetime.now().hour
+
+if current_hour < 12:
+    greeting = "Good morning"
+elif current_hour < 17:
+    greeting = "Good afternoon"
+else:
+    greeting = "Good evening"
+
+header_col, logout_col = st.columns([4, 1])
+
+with header_col:
+    st.markdown(
+        f"""
+        <div style="padding:12px 0;">
+            <div style="font-size:13px;color:#9AA8BD;">
+                {business_name}
+            </div>
+            <div style="font-size:25px;font-weight:800;color:#F4F7FB;">
+                {greeting}, {user_name}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+with logout_col:
+    st.write("")
+    st.write("")
+
+    if st.button("Log Out", use_container_width=True):
+
+        try:
+            supabase.auth.sign_out()
+        except Exception:
+            pass
+
+        st.session_state.auth_user = None
+        st.session_state.user_profile = None
+
+        st.rerun()
+
+
+# =========================================================
+# 5. LOAD EXISTING TRAINED MODEL
 # =========================================================
 
 MODEL_PATH = os.path.join(
