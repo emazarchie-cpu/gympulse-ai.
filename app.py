@@ -1072,12 +1072,12 @@ elif page == "Member Assessment":
 
         with col2:
 
-            visits last 30 days = st.number_input(
-                "Visits in the most recent 30 days",
-                min_value=0,
-                max_value=100,
-                value=5
-            )
+            visits_last_30_days = st.number_input(
+    "Visits in the most recent 30 days",
+    min_value=0,
+    max_value=100,
+    value=5
+)
 
             pt_sessions_attended = st.number_input(
                 "Personal-training sessions attended",
