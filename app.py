@@ -546,12 +546,12 @@ import html
 current_hour = datetime.now(ZoneInfo("Africa/Lagos")).hour
 
 if current_hour < 12:
-greeting = "Good morning"
+    greeting = "Good morning"
 elif current_hour < 17:
-greeting = "Good afternoon"
+    greeting = "Good afternoon"
 else:
-greeting = "Good evening"
-
+    greeting = "Good evening"
+    
 safe_user_name = html.escape(str(user_name))
 safe_business_name = html.escape(str(business_name))
 
