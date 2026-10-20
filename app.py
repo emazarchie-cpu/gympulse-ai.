@@ -5,20 +5,251 @@ import pandas as pd
 import streamlit as st
 
 
-# -----------------------------------------
+# =========================================================
 # 1. PAGE CONFIGURATION
-# -----------------------------------------
+# =========================================================
 
 st.set_page_config(
-    page_title="GymPulse AI",
-    page_icon="💪",
-    layout="wide"
+    page_title="GymPulse AI | Member Intelligence",
+    page_icon="馃挌",
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
 
-# -----------------------------------------
-# 2. LOAD TRAINED MODEL
-# -----------------------------------------
+# =========================================================
+# 2. PREMIUM FITNESS-TECH DESIGN
+# =========================================================
+
+st.markdown(
+    """
+    <style>
+    @import url(
+        'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap'
+    );
+
+    :root {
+        --background: #0B1020;
+        --surface: #151D30;
+        --surface-light: #1B263B;
+        --lime: #B7F34A;
+        --cyan: #35D6ED;
+        --white: #F4F7FB;
+        --muted: #9AA8BD;
+        --border: rgba(255,255,255,0.09);
+    }
+
+    .stApp {
+        background: var(--background);
+        color: var(--white);
+        font-family: 'Inter', sans-serif;
+    }
+
+    [data-testid="stHeader"] {
+        background: rgba(11,16,32,0.95);
+    }
+
+    [data-testid="stSidebar"] {
+        background: #10182A;
+        border-right: 1px solid var(--border);
+    }
+
+    [data-testid="stSidebar"] * {
+        font-family: 'Inter', sans-serif;
+    }
+
+    h1, h2, h3 {
+        color: var(--white) !important;
+        font-weight: 800 !important;
+        letter-spacing: -0.5px;
+    }
+
+    p, label, .stMarkdown {
+        color: var(--white);
+    }
+
+    .brand-logo {
+        font-size: 27px;
+        font-weight: 800;
+        letter-spacing: -1px;
+        color: var(--white);
+        margin-bottom: 2px;
+    }
+
+    .brand-accent {
+        color: var(--lime);
+    }
+
+    .brand-tagline {
+        color: var(--muted);
+        font-size: 12px;
+        margin-bottom: 28px;
+    }
+
+    .hero {
+        padding: 28px 30px;
+        background: linear-gradient(
+            115deg,
+            #17243A 0%,
+            #142033 55%,
+            #202D37 100%
+        );
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        margin-bottom: 25px;
+    }
+
+    .hero-eyebrow {
+        color: var(--lime);
+        text-transform: uppercase;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 2px;
+        margin-bottom: 10px;
+    }
+
+    .hero-title {
+        font-size: 34px;
+        font-weight: 800;
+        line-height: 1.2;
+        color: var(--white);
+        margin-bottom: 10px;
+    }
+
+    .hero-description {
+        color: #BCC8D8;
+        font-size: 14px;
+        line-height: 1.7;
+        max-width: 720px;
+    }
+
+    .section-label {
+        color: var(--lime);
+        text-transform: uppercase;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 1.5px;
+        margin-top: 22px;
+        margin-bottom: 12px;
+    }
+
+    [data-testid="stMetric"] {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        padding: 20px 22px;
+        border-radius: 16px;
+    }
+
+    [data-testid="stMetricLabel"] {
+        color: var(--muted) !important;
+        font-size: 12px !important;
+    }
+
+    [data-testid="stMetricValue"] {
+        color: var(--lime) !important;
+        font-weight: 800 !important;
+    }
+
+    div[data-testid="stForm"],
+    div[data-testid="stFileUploader"] {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 20px;
+    }
+
+    .stButton > button,
+    .stFormSubmitButton > button {
+        background: var(--lime);
+        color: #10182A;
+        border: none;
+        border-radius: 10px;
+        font-weight: 800;
+        min-height: 43px;
+        transition: 0.2s ease;
+    }
+
+    .stButton > button:hover,
+    .stFormSubmitButton > button:hover {
+        background: #D0FF7A;
+        color: #10182A;
+        border: none;
+    }
+
+    .stDownloadButton > button {
+        background: var(--cyan);
+        color: #0B1020;
+        border: none;
+        border-radius: 10px;
+        font-weight: 800;
+    }
+
+    .stProgress > div > div > div > div {
+        background: var(--lime);
+    }
+
+    [data-testid="stDataFrame"] {
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    div[data-baseweb="select"] > div,
+    div[data-baseweb="input"] > div {
+        background: #111B2D;
+        border-color: var(--border);
+    }
+
+    [data-testid="stAlert"] {
+        border-radius: 12px;
+    }
+
+    hr {
+        border-color: var(--border);
+    }
+
+    .risk-card {
+        background: var(--surface);
+        padding: 22px;
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        min-height: 130px;
+    }
+
+    .risk-label {
+        font-size: 12px;
+        color: var(--muted);
+        margin-bottom: 10px;
+    }
+
+    .risk-number {
+        font-size: 29px;
+        font-weight: 800;
+        color: var(--lime);
+    }
+
+    .risk-note {
+        color: var(--muted);
+        font-size: 12px;
+        margin-top: 6px;
+    }
+
+    .footer {
+        text-align: center;
+        color: var(--muted);
+        font-size: 11px;
+        padding: 20px 0;
+    }
+
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+
+# =========================================================
+# 3. LOAD EXISTING TRAINED MODEL
+# =========================================================
 
 MODEL_PATH = os.path.join(
     os.path.dirname(__file__),
@@ -34,24 +265,26 @@ def load_model():
 
 try:
     model = load_model()
+
 except Exception as error:
     st.error(
         "The trained model could not be loaded. "
         "Check that models/gympulse_model.joblib exists "
-        "in your repository."
+        "and that your installed package versions are compatible."
     )
+
+    with st.expander("Technical details"):
+        st.code(str(error))
+
     st.stop()
 
 
-# -----------------------------------------
-# 3. PREDICTION FUNCTION
-# -----------------------------------------
+# =========================================================
+# 4. MODEL PREDICTION FUNCTIONS
+# =========================================================
 
 def prepare_member_data(data):
-    """
-    Prepare raw membership records for the trained model.
-    Accepts either a single record or a DataFrame.
-    """
+    """Validate member records and prepare model features."""
 
     data = data.copy()
 
@@ -65,7 +298,8 @@ def prepare_member_data(data):
     ]
 
     missing_columns = [
-        column for column in required_columns
+        column
+        for column in required_columns
         if column not in data.columns
     ]
 
@@ -73,6 +307,37 @@ def prepare_member_data(data):
         raise ValueError(
             "Missing required columns: "
             + ", ".join(missing_columns)
+        )
+
+    numeric_columns = [
+        "days_since_last_visit",
+        "visits_previous_30_days",
+        "visits_last_30_days",
+        "renewal_due_days",
+        "pt_sessions_attended"
+    ]
+
+    for column in numeric_columns:
+        data[column] = pd.to_numeric(
+            data[column],
+            errors="raise"
+        )
+
+        if data[column].isna().any():
+            raise ValueError(
+                f"{column} contains missing values."
+            )
+
+        if (data[column] < 0).any():
+            raise ValueError(
+                f"{column} cannot contain negative values."
+            )
+
+    if not data["membership_type"].isin(
+        ["Monthly", "Quarterly", "Annual"]
+    ).all():
+        raise ValueError(
+            "Membership type must be Monthly, Quarterly, or Annual."
         )
 
     data["attendance_change"] = (
@@ -92,10 +357,10 @@ def prepare_member_data(data):
 
 
 def assess_members(data):
-    """
-    Return cancellation probabilities and
-    provisional risk categories.
-    """
+    """Generate cancellation probabilities and provisional risk labels."""
+
+    if data.empty:
+        raise ValueError("The uploaded dataset contains no members.")
 
     features = prepare_member_data(data)
 
@@ -115,80 +380,205 @@ def assess_members(data):
     return results
 
 
-# -----------------------------------------
-# 4. APPLICATION HEADER
-# -----------------------------------------
+# =========================================================
+# 5. BRANDING AND SIDEBAR
+# =========================================================
 
-st.title("💪 GymPulse AI")
+with st.sidebar:
 
-st.subheader(
-    "Experimental Gym Membership Cancellation-Risk Assessment"
+    st.markdown(
+        """
+        <div class="brand-logo">
+            GYM<span class="brand-accent">PULSE</span> AI
+        </div>
+        <div class="brand-tagline">
+            Smarter insights. Stronger member retention.
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.markdown("---")
+
+    page = st.radio(
+        "WORKSPACE",
+        [
+            "Dashboard",
+            "Member Assessment",
+            "Batch Assessment",
+            "Model Insights",
+            "About the Model"
+        ],
+        label_visibility="visible"
+    )
+
+    st.markdown("---")
+
+    st.markdown(
+        """
+        <div style="font-size:12px;color:#9AA8BD;">
+            <b style="color:#B7F34A;">PROTOTYPE STATUS</b><br><br>
+            Educational ML application<br>
+            Synthetic training data<br>
+            Not validated for real-world use
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+
+# =========================================================
+# 6. SHARED HEADER
+# =========================================================
+
+st.markdown(
+    """
+    <div class="hero">
+        <div class="hero-eyebrow">
+            FITNESS INTELLIGENCE PLATFORM
+        </div>
+        <div class="hero-title">
+            Smarter insights.<br>Stronger member retention.
+        </div>
+        <div class="hero-description">
+            Explore experimental machine-learning estimates
+            using gym membership and attendance information.
+            Turn member activity data into opportunities for
+            further investigation.
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True
 )
 
-st.info(
-    "Educational prototype using a model trained on synthetic data. "
-    "Its predictions have not been validated on real gym members."
+st.warning(
+    "Research prototype: predictions come from a model trained "
+    "on synthetic data. They are not validated forecasts of "
+    "real members' behaviour."
 )
 
 
-# -----------------------------------------
-# 5. SIDEBAR NAVIGATION
-# -----------------------------------------
-
-page = st.sidebar.radio(
-    "Navigation",
-    [
-        "Dashboard",
-        "Member Assessment",
-        "Batch Assessment",
-        "About the Model"
-    ]
-)
-
-
-# -----------------------------------------
-# 6. DASHBOARD
-# -----------------------------------------
+# =========================================================
+# 7. DASHBOARD
+# =========================================================
 
 if page == "Dashboard":
 
-    st.header("Cancellation-Risk Dashboard")
+    st.markdown("## Dashboard")
 
     st.write(
-        "Assess an individual member or upload a CSV file "
-        "to explore cancellation-risk estimates."
+        "Your starting point for exploring membership "
+        "cancellation-risk estimates."
     )
 
     col1, col2, col3 = st.columns(3)
 
-    col1.metric("Model", "Logistic Regression")
-    col2.metric("Risk Threshold", "30%")
-    col3.metric("Input Features", "5")
+    col1.metric(
+        "ML Algorithm",
+        "Logistic Regression"
+    )
 
-    st.markdown("### How it works")
+    col2.metric(
+        "Medium-Risk Threshold",
+        "30%"
+    )
+
+    col3.metric(
+        "Model Features",
+        "5"
+    )
 
     st.markdown(
-        """
-        1. Enter membership and attendance information.
-        2. GymPulse AI processes the member's features.
-        3. The trained model estimates cancellation probability.
-        4. The app assigns a provisional risk category.
-        """
+        '<div class="section-label">HOW IT WORKS</div>',
+        unsafe_allow_html=True
     )
 
-    st.warning(
-        "A risk category is an experimental model output, "
-        "not a confirmed prediction of a member's future behaviour."
+    step1, step2, step3 = st.columns(3)
+
+    with step1:
+        st.markdown("### 01 路 Input")
+
+        st.write(
+            "Provide membership, attendance, renewal, "
+            "and personal-training information."
+        )
+
+    with step2:
+        st.markdown("### 02 路 Analyse")
+
+        st.write(
+            "The existing model processes five features "
+            "to estimate cancellation probability."
+        )
+
+    with step3:
+        st.markdown("### 03 路 Explore")
+
+        st.write(
+            "Review the experimental estimate and investigate "
+            "attendance patterns."
+        )
+
+    st.markdown(
+        '<div class="section-label">GET STARTED</div>',
+        unsafe_allow_html=True
+    )
+
+    left, right = st.columns(2)
+
+    with left:
+        st.markdown("### Individual assessment")
+
+        st.write(
+            "Explore an estimate for one hypothetical member."
+        )
+
+        if st.button(
+            "Open Member Assessment",
+            use_container_width=True
+        ):
+            st.session_state["selected_page"] = "Member Assessment"
+            st.rerun()
+
+    with right:
+        st.markdown("### Batch assessment")
+
+        st.write(
+            "Explore a CSV of membership records and "
+            "download the resulting estimates."
+        )
+
+        if st.button(
+            "Open Batch Assessment",
+            use_container_width=True
+        ):
+            st.session_state["selected_page"] = "Batch Assessment"
+            st.rerun()
+
+    st.markdown("---")
+
+    st.markdown("### Important interpretation")
+
+    st.info(
+        "The risk labels are provisional categories applied to "
+        "model probabilities. They do not establish that a member "
+        "will cancel, and they should not be used to make decisions "
+        "about real members without appropriate validation."
     )
 
 
-# -----------------------------------------
-# 7. INDIVIDUAL MEMBER ASSESSMENT
-# -----------------------------------------
+# =========================================================
+# 8. INDIVIDUAL MEMBER ASSESSMENT
+# =========================================================
 
 elif page == "Member Assessment":
 
-    st.header("Individual Member Assessment")
+    st.markdown("## Member Assessment")
+
+    st.write(
+        "Enter a hypothetical member's details to explore "
+        "the output of the trained model."
+    )
 
     with st.form("member_assessment_form"):
 
@@ -200,6 +590,7 @@ elif page == "Member Assessment":
         col1, col2 = st.columns(2)
 
         with col1:
+
             days_since_last_visit = st.number_input(
                 "Days since last visit",
                 min_value=0,
@@ -222,6 +613,7 @@ elif page == "Member Assessment":
             )
 
         with col2:
+
             visits_last_30_days = st.number_input(
                 "Visits in the most recent 30 days",
                 min_value=0,
@@ -237,7 +629,8 @@ elif page == "Member Assessment":
             )
 
         submitted = st.form_submit_button(
-            "Assess Member"
+            "Generate Assessment",
+            use_container_width=True
         )
 
     if submitted:
@@ -252,11 +645,16 @@ elif page == "Member Assessment":
         }])
 
         try:
+
             result = assess_members(member).iloc[0]
 
-            probability = result["cancellation_probability"]
+            probability = float(
+                result["cancellation_probability"]
+            )
+
             risk = result["risk_category"]
 
+            st.markdown("---")
             st.markdown("### Assessment Results")
 
             col1, col2 = st.columns(2)
@@ -271,64 +669,113 @@ elif page == "Member Assessment":
                 risk
             )
 
-            st.progress(float(probability))
+            st.progress(
+                max(0.0, min(1.0, probability))
+            )
 
             attendance_change = (
                 visits_last_30_days
                 - visits_previous_30_days
             )
 
-            st.write(
-                f"Attendance change: {attendance_change:+} visits"
+            st.markdown(
+                '<div class="section-label">ATTENDANCE ANALYSIS</div>',
+                unsafe_allow_html=True
+            )
+
+            a, b, c = st.columns(3)
+
+            a.metric(
+                "Previous 30 Days",
+                int(visits_previous_30_days)
+            )
+
+            b.metric(
+                "Recent 30 Days",
+                int(visits_last_30_days)
+            )
+
+            c.metric(
+                "Attendance Change",
+                f"{attendance_change:+}"
             )
 
             if attendance_change < 0:
-                st.write(
-                    "Attendance has declined compared with "
-                    "the previous 30-day period."
+
+                st.warning(
+                    "Recorded attendance has decreased "
+                    "compared with the previous 30-day period."
                 )
+
             elif attendance_change > 0:
-                st.write(
-                    "Attendance has increased compared with "
-                    "the previous 30-day period."
+
+                st.success(
+                    "Recorded attendance has increased "
+                    "compared with the previous 30-day period."
                 )
+
             else:
-                st.write(
-                    "Attendance is unchanged between the two periods."
+
+                st.info(
+                    "Recorded attendance is unchanged "
+                    "between the two periods."
+                )
+
+            if risk == "High":
+
+                st.error(
+                    "The model's estimated probability falls "
+                    "in the provisional high-risk category."
+                )
+
+            elif risk == "Medium":
+
+                st.warning(
+                    "The model's estimated probability falls "
+                    "in the provisional medium-risk category."
+                )
+
+            else:
+
+                st.success(
+                    "The model's estimated probability falls "
+                    "in the provisional low-risk category."
                 )
 
             st.caption(
-                "This estimate is generated by an experimental model "
-                "trained on synthetic data."
+                "These are experimental model outputs, not "
+                "validated estimates of an individual's actual "
+                "cancellation probability."
             )
 
         except Exception as error:
+
             st.error(f"Assessment failed: {error}")
 
 
-# -----------------------------------------
-# 8. BATCH CSV ASSESSMENT
-# -----------------------------------------
+# =========================================================
+# 9. BATCH CSV ASSESSMENT
+# =========================================================
 
 elif page == "Batch Assessment":
 
-    st.header("Batch Member Assessment")
+    st.markdown("## Batch Assessment")
 
     st.write(
-        "Upload a CSV containing membership and attendance records."
+        "Upload a CSV file to explore model outputs for "
+        "multiple membership records."
     )
 
-    st.markdown(
-        """
-        **Required columns:**
+    st.markdown("### Required columns")
 
-        - `membership_type`
-        - `days_since_last_visit`
-        - `visits_previous_30_days`
-        - `visits_last_30_days`
-        - `renewal_due_days`
-        - `pt_sessions_attended`
-        """
+    st.code(
+        "membership_type\n"
+        "days_since_last_visit\n"
+        "visits_previous_30_days\n"
+        "visits_last_30_days\n"
+        "renewal_due_days\n"
+        "pt_sessions_attended",
+        language="text"
     )
 
     uploaded_file = st.file_uploader(
@@ -339,44 +786,73 @@ elif page == "Batch Assessment":
     if uploaded_file is not None:
 
         try:
+
             uploaded_data = pd.read_csv(uploaded_file)
 
-            st.write("Uploaded data preview")
+            if uploaded_data.empty:
+                st.error("The uploaded CSV contains no records.")
+                st.stop()
+
+            st.markdown("### Uploaded data preview")
+
             st.dataframe(
-                uploaded_data.head(),
-                use_container_width=True
+                uploaded_data.head(10),
+                use_container_width=True,
+                hide_index=True
             )
 
-            if st.button("Assess All Members"):
+            if st.button(
+                "Assess All Members",
+                use_container_width=True
+            ):
 
                 results = assess_members(uploaded_data)
 
                 total_members = len(results)
 
-                high_risk = (
-                    results["risk_category"] == "High"
-                ).sum()
+                high_risk = int(
+                    (results["risk_category"] == "High").sum()
+                )
 
-                medium_risk = (
-                    results["risk_category"] == "Medium"
-                ).sum()
+                medium_risk = int(
+                    (results["risk_category"] == "Medium").sum()
+                )
 
-                low_risk = (
-                    results["risk_category"] == "Low"
-                ).sum()
+                low_risk = int(
+                    (results["risk_category"] == "Low").sum()
+                )
+
+                st.markdown("---")
+                st.markdown("### Assessment Summary")
 
                 col1, col2, col3, col4 = st.columns(4)
 
-                col1.metric("Members Assessed", total_members)
-                col2.metric("High Risk", int(high_risk))
-                col3.metric("Medium Risk", int(medium_risk))
-                col4.metric("Low Risk", int(low_risk))
+                col1.metric(
+                    "Records Assessed",
+                    total_members
+                )
 
-                st.markdown("### Assessment Results")
+                col2.metric(
+                    "High Risk",
+                    high_risk
+                )
+
+                col3.metric(
+                    "Medium Risk",
+                    medium_risk
+                )
+
+                col4.metric(
+                    "Low Risk",
+                    low_risk
+                )
+
+                st.markdown("### Results")
 
                 st.dataframe(
                     results,
-                    use_container_width=True
+                    use_container_width=True,
+                    hide_index=True
                 )
 
                 csv_output = results.to_csv(
@@ -387,42 +863,257 @@ elif page == "Batch Assessment":
                     label="Download Assessment Results",
                     data=csv_output,
                     file_name="gympulse_assessment_results.csv",
-                    mime="text/csv"
+                    mime="text/csv",
+                    use_container_width=True
+                )
+
+                st.caption(
+                    "Assessment results are generated for this session. "
+                    "The application does not save them to a permanent "
+                    "member database."
                 )
 
         except Exception as error:
+
             st.error(
                 "Could not process the uploaded file. "
-                f"Check its columns and values. Details: {error}"
+                "Check the required columns and values."
             )
 
+            with st.expander("Technical details"):
+                st.code(str(error))
 
-# -----------------------------------------
-# 9. MODEL INFORMATION
-# -----------------------------------------
+
+# =========================================================
+# 10. MODEL INSIGHTS
+# =========================================================
+
+elif page == "Model Insights":
+
+    st.markdown("## Model Insights")
+
+    st.write(
+        "Explore how the existing model's estimates change "
+        "when a single input is varied while the other inputs "
+        "remain constant."
+    )
+
+    st.info(
+        "This is a controlled sensitivity experiment. It shows "
+        "how the model responds to different inputs; it does not "
+        "establish causation or real-world predictive accuracy."
+    )
+
+    st.markdown("### Set the baseline member")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+
+        insight_membership = st.selectbox(
+            "Membership type",
+            ["Monthly", "Quarterly", "Annual"],
+            key="insight_membership"
+        )
+
+        insight_previous = st.number_input(
+            "Previous 30-day visits",
+            min_value=0,
+            max_value=100,
+            value=10,
+            key="insight_previous"
+        )
+
+        insight_recent = st.number_input(
+            "Recent 30-day visits",
+            min_value=0,
+            max_value=100,
+            value=5,
+            key="insight_recent"
+        )
+
+    with col2:
+
+        insight_renewal = st.number_input(
+            "Days until renewal",
+            min_value=0,
+            max_value=365,
+            value=14,
+            key="insight_renewal"
+        )
+
+        insight_pt = st.number_input(
+            "PT sessions attended",
+            min_value=0,
+            max_value=100,
+            value=2,
+            key="insight_pt"
+        )
+
+        max_days = st.slider(
+            "Maximum days since last visit to explore",
+            min_value=7,
+            max_value=90,
+            value=30,
+            step=1
+        )
+
+    if st.button(
+        "Run Sensitivity Experiment",
+        use_container_width=True
+    ):
+
+        scenario_days = list(
+            range(0, max_days + 1, max(1, max_days // 10))
+        )
+
+        if max_days not in scenario_days:
+            scenario_days.append(max_days)
+
+        scenarios = pd.DataFrame({
+            "membership_type": [insight_membership] * len(scenario_days),
+            "days_since_last_visit": scenario_days,
+            "visits_previous_30_days": [insight_previous] * len(scenario_days),
+            "visits_last_30_days": [insight_recent] * len(scenario_days),
+            "renewal_due_days": [insight_renewal] * len(scenario_days),
+            "pt_sessions_attended": [insight_pt] * len(scenario_days)
+        })
+
+        try:
+
+            sensitivity_results = assess_members(scenarios)
+
+            sensitivity_results = sensitivity_results.sort_values(
+                "days_since_last_visit"
+            )
+
+            st.markdown("---")
+            st.markdown("### Experimental response")
+
+            chart_data = sensitivity_results.set_index(
+                "days_since_last_visit"
+            )[["cancellation_probability"]].rename(
+                columns={
+                    "cancellation_probability":
+                    "Estimated cancellation probability"
+                }
+            )
+
+            st.line_chart(
+                chart_data,
+                y="Estimated cancellation probability",
+                x_label="Days since last visit",
+                y_label="Estimated probability",
+                use_container_width=True
+            )
+
+            st.dataframe(
+                sensitivity_results[
+                    [
+                        "days_since_last_visit",
+                        "cancellation_probability",
+                        "risk_category"
+                    ]
+                ].rename(
+                    columns={
+                        "days_since_last_visit": "Days since last visit",
+                        "cancellation_probability": "Estimated probability",
+                        "risk_category": "Provisional risk category"
+                    }
+                ),
+                hide_index=True,
+                use_container_width=True
+            )
+
+            first_probability = float(
+                sensitivity_results.iloc[0][
+                    "cancellation_probability"
+                ]
+            )
+
+            last_probability = float(
+                sensitivity_results.iloc[-1][
+                    "cancellation_probability"
+                ]
+            )
+
+            st.metric(
+                "Change across tested scenarios",
+                f"{(last_probability - first_probability) * 100:+.1f} percentage points"
+            )
+
+            st.caption(
+                "Only days since last visit changes across scenarios. "
+                "All other inputs are held constant. Results describe "
+                "the model's response, not a causal effect."
+            )
+
+        except Exception as error:
+
+            st.error(
+                "The sensitivity experiment could not be completed."
+            )
+
+            with st.expander("Technical details"):
+                st.code(str(error))
+
+
+# =========================================================
+# 11. ABOUT THE MODEL
+# =========================================================
 
 elif page == "About the Model":
 
-    st.header("About GymPulse AI")
+    st.markdown("## About GymPulse AI")
 
     st.write(
-        "GymPulse AI is an educational machine-learning project "
+        "GymPulse AI is a machine-learning portfolio project "
         "exploring gym membership cancellation-risk assessment."
     )
 
-    st.markdown("### Model details")
+    st.markdown("### Model architecture")
 
-    st.markdown(
-        """
-        - **Algorithm:** Logistic Regression
-        - **Training data:** Synthetic gym membership records
-        - **Training features:** Five
-        - **Candidate classification threshold:** 0.30
-        - **Development evaluation:** Train, validation and test splits
-        """
+    col1, col2, col3 = st.columns(3)
+
+    col1.metric(
+        "Algorithm",
+        "Logistic Regression"
     )
 
-    st.markdown("### Recorded test results")
+    col2.metric(
+        "Input Features",
+        "5"
+    )
+
+    col3.metric(
+        "Training Dataset",
+        "Synthetic"
+    )
+
+    st.markdown("### Features used by the model")
+
+    st.dataframe(
+        pd.DataFrame({
+            "Feature": [
+                "Membership type",
+                "Days since last visit",
+                "Attendance change",
+                "Days until renewal",
+                "PT sessions attended"
+            ],
+            "Description": [
+                "Member's membership category",
+                "Time since the most recent visit",
+                "Recent visits minus previous-period visits",
+                "Days remaining before renewal",
+                "Recorded personal-training attendance"
+            ]
+        }),
+        hide_index=True,
+        use_container_width=True
+    )
+
+    st.markdown("### Recorded development test results")
 
     metrics = pd.DataFrame({
         "Metric": [
@@ -432,7 +1123,7 @@ elif page == "About the Model":
             "F1-score",
             "ROC-AUC"
         ],
-        "Test result": [
+        "Recorded result": [
             "59.0%",
             "44.9%",
             "75.7%",
@@ -448,29 +1139,47 @@ elif page == "About the Model":
     )
 
     st.warning(
-        "These results are specific to the synthetic dataset. "
-        "They do not demonstrate predictive performance on real "
-        "gym membership data. Earlier test-set exploration also "
-        "means the final test results should be interpreted cautiously."
+        "These metrics describe earlier evaluation on synthetic data. "
+        "They do not establish performance on real gym members. "
+        "Prior exploration of the test set also means the recorded "
+        "test results should be interpreted cautiously."
     )
 
-    st.markdown("### Responsible use")
+    st.markdown("### Responsible development")
 
     st.write(
-        "Risk estimates should be treated as decision-support "
-        "signals for experimentation, not definitive statements "
-        "about individual members. The model should be evaluated "
-        "on suitable real-world data before operational use."
+        "Before operational use, the model would require suitable "
+        "real-world evaluation, data-quality checks, probability "
+        "calibration, and assessment of errors and potential bias. "
+        "Member data should be handled with appropriate permission "
+        "and privacy safeguards."
+    )
+
+    st.markdown("### Project scope")
+
+    st.write(
+        "This application demonstrates model integration, "
+        "input validation, interactive predictions, CSV processing, "
+        "and controlled sensitivity analysis. It is an educational "
+        "prototype rather than a validated commercial prediction system."
     )
 
 
-# -----------------------------------------
-# 10. FOOTER
-# -----------------------------------------
+# =========================================================
+# 12. FOOTER
+# =========================================================
 
-st.divider()
+st.markdown("---")
 
-st.caption(
-    "GymPulse AI | Machine Learning Portfolio Project | "
-    "Experimental prototype"
+st.markdown(
+    """
+    <div class="footer">
+        <b style="color:#B7F34A;">GYMPULSE AI</b>
+        &nbsp;路&nbsp; Machine Learning Portfolio Project
+        <br><br>
+        Experimental prototype 路 Synthetic training data
+        路 Not validated for real-world decisions
+    </div>
+    """,
+    unsafe_allow_html=True
 )
