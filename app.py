@@ -1456,7 +1456,13 @@ elif page == "Batch Assessment":
 
 elif page == "Model Insights":
 
+
+
+
 st.markdown("## Model Insights")
+
+
+
 
 st.write(
     "Explore how the model's estimates change when one input "
