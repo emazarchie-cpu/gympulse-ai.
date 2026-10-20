@@ -1549,9 +1549,8 @@ elif page == "Model Insights":
             sensitivity_results = assess_members(scenarios)
 
             sensitivity_results = sensitivity_results.sort_values(
-                "days since last visit"
-            )
-
+    "days_since_last_visit"
+)
             st.markdown("---")
             st.markdown("### Experimental response")
 
