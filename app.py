@@ -1050,7 +1050,7 @@ elif page == "Member Assessment":
 
         with col1:
 
-            Days since last visit = st.number_input(
+            days_since_last_visit = st.number_input(
                 "Days since last visit",
                 min_value=0,
                 max_value=365,
