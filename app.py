@@ -709,12 +709,14 @@ with st.sidebar:
     page = st.radio(
     "WORKSPACE",
     [
-        "Dashboard",
-        "Member Assessment",
-        "Batch Assessment",
-        "Model Insights",
-        "About the Model"
-    ],
+        
+    "Dashboard",
+    "Member Management",
+    "Member Assessment",
+    "Batch Assessment",
+    "Model Insights",
+    "About the Model"
+],
     key="selected_page",
     label_visibility="visible"
 )
