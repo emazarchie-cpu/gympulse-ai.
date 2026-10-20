@@ -601,13 +601,13 @@ def prepare_member_data(data):
 
     data = data.copy()
 
-    required_columns = [
+        required_columns = [
         "membership_type",
-        "days since last visit",
-        "visits previous 30 days",
-        "visits last 30 days",
-        "renewal due days",
-        "pt sessions attended"
+        "days_since_last_visit",
+        "visits_previous_30_days",
+        "visits_last_30_days",
+        "renewal_due_days",
+        "pt_sessions_attended"
     ]
 
     missing_columns = [
@@ -623,11 +623,11 @@ def prepare_member_data(data):
         )
 
     numeric_columns = [
-        "days since last visit",
-        "visits previous 30 days",
-        "visits last 30 days",
-        "renewal due days",
-        "pt sessions attended"
+        "days_since_last_visit",
+        "visits_previous_30_days",
+        "visits_last_30_days",
+        "renewal_due_days",
+        "pt_sessions_attended"
     ]
 
     for column in numeric_columns:
@@ -1094,12 +1094,13 @@ elif page == "Member Assessment":
     if submitted:
 
         member = pd.DataFrame([{
+            "membership_type": membership_type,
             "days_since_last_visit": days_since_last_visit,
-    "visits_previous_30_days": visits_previous_30_days,
-    "visits_last_30_days": visits_last_30_days,
-    "renewal_due_days": renewal_due_days,
-    "pt_sessions_attended": pt_sessions_attended
-}])
+            "visits_previous_30_days": visits_previous_30_days,
+            "visits_last_30_days": visits_last_30_days,
+            "renewal_due_days": renewal_due_days,
+            "pt_sessions_attended": pt_sessions_attended
+        }])
 
         try:
 
@@ -1429,13 +1430,12 @@ elif page == "Model Insights":
 
         scenarios = pd.DataFrame({
             "membership_type": [insight_membership] * len(scenario_days),
-            "days since last visit": scenario_days,
-            "visits previous 30 days": [insight_previous] * len(scenario_days),
-            "visits last 30 days": [insight_recent] * len(scenario_days),
-            "renewal due days": [insight_renewal] * len(scenario_days),
-            "pt sessions attended": [insight_pt] * len(scenario_days)
+            "days_since_last_visit": scenario_days,
+            "visits_previous_30_days": [insight_previous] * len(scenario_days),
+            "visits_last_30_days": [insight_recent] * len(scenario_days),
+            "renewal_due_days": [insight_renewal] * len(scenario_days),
+            "pt_sessions_attended": [insight_pt] * len(scenario_days)
         })
-
         try:
 
             sensitivity_results = assess_members(scenarios)
