@@ -495,28 +495,29 @@ if page == "Dashboard":
     step1, step2, step3 = st.columns(3)
 
     with step1:
-    st.markdown("### 01 | Input")
+        st.markdown("### 01 | Input")
 
-    st.write(
-        "Provide membership, attendance, renewal, "
-        "and personal-training information."
-    )
+        st.write(
+            "Provide membership, attendance, renewal, "
+            "and personal-training information."
+        )
 
-with step2:
-    st.markdown("### 02 | Analyse")
+    with step2:
+        st.markdown("### 02 | Analyse")
 
-    st.write(
-        "The existing model processes five features "
-        "to estimate cancellation probability."
-    )
+        st.write(
+            "The existing model processes five features "
+            "to estimate cancellation probability."
+        )
 
-with step3:
-    st.markdown("### 03 | Explore")
+    with step3:
+        st.markdown("### 03 | Explore")
 
-    st.write(
-        "Review the experimental estimate and investigate "
-        "attendance patterns."
-    )
+        st.write(
+            "Review the experimental estimate and investigate "
+            "attendance patterns."
+        )
+
     st.markdown(
         '<div class="section-label">GET STARTED</div>',
         unsafe_allow_html=True
@@ -563,7 +564,6 @@ with step3:
         "will cancel, and they should not be used to make decisions "
         "about real members without appropriate validation."
     )
-
 
 # =========================================================
 # 8. INDIVIDUAL MEMBER ASSESSMENT
