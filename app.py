@@ -599,9 +599,9 @@ unsafe_allow_html=True
 def prepare_member_data(data):
     """Validate member records and prepare model features."""
 
-    data = data.copy()
+       data = data.copy()
 
-        required_columns = [
+    required_columns = [
         "membership_type",
         "days_since_last_visit",
         "visits_previous_30_days",
