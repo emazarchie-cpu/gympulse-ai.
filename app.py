@@ -773,12 +773,11 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-st.warning(
-    "Research prototype: predictions come from a model trained "
-    "on synthetic data. They are not validated forecasts of "
-    "real members' behaviour."
+st.info(
+    "Your Gym, At a Glance. Manage your members, review fitness "
+    "assessments, monitor attendance patterns, and identify "
+    "opportunities to improve member retention, all from one workspace."
 )
-
 
 # =========================================================
 # 8. DASHBOARD
@@ -1621,17 +1620,3 @@ elif page == "About the Model":
 # 14. FOOTER
 # =========================================================
 
-st.markdown("---")
-
-st.markdown(
-    """
-    <div class="footer">
-        <b style="color:#B7F34A;">GYMPULSE AI</b>
-        &nbsp;|&nbsp; Machine Learning Portfolio Project
-        <br><br>
-        Experimental prototype | Synthetic training data
-        | Not validated for real-world decisions
-    </div>
-    """,
-    unsafe_allow_html=True
-)
