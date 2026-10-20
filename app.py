@@ -1456,117 +1456,165 @@ elif page == "Batch Assessment":
 
 elif page == "Model Insights":
 
-    st.markdown("## Model Insights")
+st.markdown("## Model Insights")
 
-    st.write(
-        "Explore how the existing model's estimates change "
-        "when a single input is varied while the other inputs "
-        "remain constant."
+st.write(
+    "Explore how the model's estimates change when one input "
+    "varies while the other inputs remain constant."
+)
+
+st.info(
+    "This experiment shows how the model responds to different "
+    "inputs. It does not establish causation or real world accuracy."
+)
+
+st.markdown("### Set the baseline member")
+
+col1, col2 = st.columns(2)
+
+with col1:
+    insight_membership = st.selectbox(
+        "Membership type",
+        ["Monthly", "Quarterly", "Annual"],
+        key="insight_membership"
     )
 
-    st.info(
-        "This is a controlled sensitivity experiment. It shows "
-        "how the model responds to different inputs; it does not "
-        "establish causation or real-world predictive accuracy."
+    insight_previous = st.number_input(
+        "Previous 30 day visits",
+        min_value=0,
+        max_value=100,
+        value=10,
+        key="insight_previous"
     )
 
-    st.markdown("### Set the baseline member")
+    insight_recent = st.number_input(
+        "Recent 30 day visits",
+        min_value=0,
+        max_value=100,
+        value=5,
+        key="insight_recent"
+    )
 
-    col1, col2 = st.columns(2)
+with col2:
+    insight_renewal = st.number_input(
+        "Days until renewal",
+        min_value=0,
+        max_value=365,
+        value=14,
+        key="insight_renewal"
+    )
 
-    with col1:
+    insight_pt = st.number_input(
+        "PT sessions attended",
+        min_value=0,
+        max_value=100,
+        value=2,
+        key="insight_pt"
+    )
 
-        insight_membership = st.selectbox(
-            "Membership type",
-            ["Monthly", "Quarterly", "Annual"],
-            key="insight_membership"
+    max_days = st.slider(
+        "Maximum days since last visit to explore",
+        min_value=7,
+        max_value=90,
+        value=30,
+        step=1
+    )
+
+if st.button(
+    "Run Sensitivity Experiment",
+    use_container_width=True
+):
+    scenario_days = list(
+        range(0, max_days + 1, max(1, max_days // 10))
+    )
+
+    if max_days not in scenario_days:
+        scenario_days.append(max_days)
+
+    scenarios = pd.DataFrame({
+        "membership_type": [insight_membership] * len(scenario_days),
+        "days_since_last_visit": scenario_days,
+        "visits_previous_30_days": [insight_previous] * len(scenario_days),
+        "visits_last_30_days": [insight_recent] * len(scenario_days),
+        "renewal_due_days": [insight_renewal] * len(scenario_days),
+        "pt_sessions_attended": [insight_pt] * len(scenario_days)
+    })
+
+    try:
+        sensitivity_results = assess_members(scenarios)
+
+        sensitivity_results = sensitivity_results.sort_values(
+            "days_since_last_visit"
         )
 
-        insight_previous = st.number_input(
-            "Previous 30-day visits",
-            min_value=0,
-            max_value=100,
-            value=10,
-            key="insight_previous"
+        st.markdown("---")
+        st.markdown("### Experimental response")
+
+        chart_data = sensitivity_results.set_index(
+            "days_since_last_visit"
+        )[["cancellation_probability"]].rename(
+            columns={
+                "cancellation_probability":
+                "Estimated cancellation probability"
+            }
         )
 
-        insight_recent = st.number_input(
-            "Recent 30-day visits",
-            min_value=0,
-            max_value=100,
-            value=5,
-            key="insight_recent"
+        st.line_chart(
+            chart_data,
+            y="Estimated cancellation probability",
+            x_label="Days since last visit",
+            y_label="Estimated probability",
+            use_container_width=True
         )
 
-    with col2:
-
-        insight_renewal = st.number_input(
-            "Days until renewal",
-            min_value=0,
-            max_value=365,
-            value=14,
-            key="insight_renewal"
+        st.dataframe(
+            sensitivity_results[
+                [
+                    "days_since_last_visit",
+                    "cancellation_probability",
+                    "risk_category"
+                ]
+            ].rename(
+                columns={
+                    "days_since_last_visit": "Days since last visit",
+                    "cancellation_probability": "Estimated probability",
+                    "risk_category": "Provisional risk category"
+                }
+            ),
+            hide_index=True,
+            use_container_width=True
         )
 
-        insight_pt = st.number_input(
-            "PT sessions attended",
-            min_value=0,
-            max_value=100,
-            value=2,
-            key="insight_pt"
+        first_probability = float(
+            sensitivity_results.iloc[0][
+                "cancellation_probability"
+            ]
         )
 
-        max_days = st.slider(
-            "Maximum days since last visit to explore",
-            min_value=7,
-            max_value=90,
-            value=30,
-            step=1
+        last_probability = float(
+            sensitivity_results.iloc[-1][
+                "cancellation_probability"
+            ]
         )
 
-        if st.button(
-        "Run Sensitivity Experiment",
-        use_container_width=True
-    ):
-
-        scenario_days = list(
-            range(0, max_days + 1, max(1, max_days // 10))
+        st.metric(
+            "Change across tested scenarios",
+            f"{(last_probability - first_probability) * 100:+.1f} percentage points"
         )
 
-        if max_days not in scenario_days:
-            scenario_days.append(max_days)
+        st.caption(
+            "Only days since last visit changes across scenarios. "
+            "All other inputs are held constant. Results describe "
+            "the model's response, not a causal effect."
+        )
 
-        scenarios = pd.DataFrame({
-            "membership_type": [insight_membership] * len(scenario_days),
-            "days_since_last_visit": scenario_days,
-            "visits_previous_30_days": [insight_previous] * len(scenario_days),
-            "visits_last_30_days": [insight_recent] * len(scenario_days),
-            "renewal_due_days": [insight_renewal] * len(scenario_days),
-            "pt_sessions_attended": [insight_pt] * len(scenario_days)
-        })
+    except Exception as error:
+        st.error(
+            "The sensitivity experiment could not be completed."
+        )
 
-        try:
-            sensitivity_results = assess_members(scenarios)
-
-            sensitivity_results = sensitivity_results.sort_values(
-                "days_since_last_visit"
-            )
-
-            st.markdown("---")
-            st.markdown("### Experimental response")
-
-            # Keep the remaining chart, table, metric,
-            # and caption code here, aligned with st.markdown.
-        
-        except Exception as error:
-
-            st.error(
-                "The sensitivity experiment could not be completed."
-            )
-
-            with st.expander("Technical details"):
-                st.code(str(error))
-
+        with st.expander("Technical details"):
+            st.code(str(error))
 
 # =========================================================
 # 13. ABOUT THE MODEL
