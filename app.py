@@ -603,11 +603,11 @@ def prepare_member_data(data):
 
     required_columns = [
         "membership_type",
-        "days_since_last_visit",
-        "visits_previous_30_days",
-        "visits_last_30_days",
-        "renewal_due_days",
-        "pt_sessions_attended"
+        "days since last visit",
+        "visits previous 30 days",
+        "visits last 30 days",
+        "renewal due days",
+        "pt sessions attended"
     ]
 
     missing_columns = [
@@ -623,11 +623,11 @@ def prepare_member_data(data):
         )
 
     numeric_columns = [
-        "days_since_last_visit",
-        "visits_previous_30_days",
-        "visits_last_30_days",
-        "renewal_due_days",
-        "pt_sessions_attended"
+        "days since last visit",
+        "visits previous 30 days",
+        "visits last 30 days",
+        "renewal due days",
+        "pt sessions attended"
     ]
 
     for column in numeric_columns:
@@ -738,16 +738,23 @@ with st.sidebar:
 
     st.markdown(
         """
-        <div style="font-size:12px;color:#9AA8BD;">
-            <b style="color:#B7F34A;">PROTOTYPE STATUS</b><br><br>
-            Educational ML application<br>
-            Synthetic training data<br>
-            Not validated for real-world use
+        <div style="font-size:12px;color:#9AA8BD;line-height:1.8;">
+            <b style="color:#B7F34A;">YOUR FITNESS BUSINESS</b>
+            <br><br>
+            Manage your members<br>
+            Track fitness assessments<br>
+            Review attendance patterns<br>
+            Explore member retention
+            <br><br>
+            <span style="color:#B7F34A;font-weight:600;">
+                GymPulse AI
+            </span>
+            <br>
+            Smarter insights for a stronger gym.
         </div>
         """,
         unsafe_allow_html=True
     )
-
 
 # =========================================================
 # 7. SHARED HEADER
@@ -1043,14 +1050,14 @@ elif page == "Member Assessment":
 
         with col1:
 
-            days_since_last_visit = st.number_input(
+            Days since last visit = st.number_input(
                 "Days since last visit",
                 min_value=0,
                 max_value=365,
                 value=7
             )
 
-            visits_previous_30_days = st.number_input(
+            visits previous 30 days = st.number_input(
                 "Visits in the previous 30 days",
                 min_value=0,
                 max_value=100,
@@ -1066,7 +1073,7 @@ elif page == "Member Assessment":
 
         with col2:
 
-            visits_last_30_days = st.number_input(
+            visits last 30 days = st.number_input(
                 "Visits in the most recent 30 days",
                 min_value=0,
                 max_value=100,
@@ -1088,12 +1095,12 @@ elif page == "Member Assessment":
     if submitted:
 
         member = pd.DataFrame([{
-            "membership_type": membership_type,
-            "days_since_last_visit": days_since_last_visit,
-            "visits_previous_30_days": visits_previous_30_days,
-            "visits_last_30_days": visits_last_30_days,
-            "renewal_due_days": renewal_due_days,
-            "pt_sessions_attended": pt_sessions_attended
+            "membership type": membership type,
+            "days since last visit": days since last visit,
+            "visits previous 30_days": visits previous 30 days,
+            "visits last 30 days": visits last 30 days,
+            "renewal due days": renewal due days,
+            "pt sessions attended": pt sessions attended
         }])
 
         try:
@@ -1222,11 +1229,11 @@ elif page == "Batch Assessment":
 
     st.code(
         "membership_type\n"
-        "days_since_last_visit\n"
-        "visits_previous_30_days\n"
-        "visits_last_30_days\n"
-        "renewal_due_days\n"
-        "pt_sessions_attended",
+        "days since last visit\n"
+        "visits previous 30 days\n"
+        "visits last 30 days\n"
+        "renewal due days\n"
+        "pt sessions attended",
         language="text"
     )
 
@@ -1424,11 +1431,11 @@ elif page == "Model Insights":
 
         scenarios = pd.DataFrame({
             "membership_type": [insight_membership] * len(scenario_days),
-            "days_since_last_visit": scenario_days,
-            "visits_previous_30_days": [insight_previous] * len(scenario_days),
-            "visits_last_30_days": [insight_recent] * len(scenario_days),
-            "renewal_due_days": [insight_renewal] * len(scenario_days),
-            "pt_sessions_attended": [insight_pt] * len(scenario_days)
+            "days since last visit": scenario_days,
+            "visits previous 30 days": [insight_previous] * len(scenario_days),
+            "visits last 30 days": [insight_recent] * len(scenario_days),
+            "renewal due days": [insight_renewal] * len(scenario_days),
+            "pt sessions attended": [insight_pt] * len(scenario_days)
         })
 
         try:
@@ -1436,14 +1443,14 @@ elif page == "Model Insights":
             sensitivity_results = assess_members(scenarios)
 
             sensitivity_results = sensitivity_results.sort_values(
-                "days_since_last_visit"
+                "days since last visit"
             )
 
             st.markdown("---")
             st.markdown("### Experimental response")
 
             chart_data = sensitivity_results.set_index(
-                "days_since_last_visit"
+                "days since last visit"
             )[["cancellation_probability"]].rename(
                 columns={
                     "cancellation_probability":
@@ -1468,9 +1475,9 @@ elif page == "Model Insights":
                     ]
                 ].rename(
                     columns={
-                        "days_since_last_visit": "Days since last visit",
-                        "cancellation_probability": "Estimated probability",
-                        "risk_category": "Provisional risk category"
+                        "days since last visit": "Days since last visit",
+                        "cancellation probability": "Estimated probability",
+                        "risk category": "Provisional risk category"
                     }
                 ),
                 hide_index=True,
