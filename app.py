@@ -383,6 +383,13 @@ def assess_members(data):
 # 5. BRANDING AND SIDEBAR
 # =========================================================
 
+# Handle dashboard navigation before creating the sidebar widget
+if "navigate_to" in st.session_state:
+    st.session_state["selected_page"] = st.session_state.pop(
+        "navigate_to"
+    )
+
+    
 with st.sidebar:
 
     st.markdown(
@@ -536,7 +543,7 @@ if page == "Dashboard":
             "Open Member Assessment",
             use_container_width=True
         ):
-            st.session_state["selected_page"] = "Member Assessment"
+            st.session_state["navigate_to"] = "Member Assessment"
             st.rerun()
 
     with right:
@@ -551,7 +558,7 @@ if page == "Dashboard":
             "Open Batch Assessment",
             use_container_width=True
         ):
-            st.session_state["selected_page"] = "Batch Assessment"
+            st.session_state["navigate_to"] = "Batch Assessment"
             st.rerun()
 
     st.markdown("---")
