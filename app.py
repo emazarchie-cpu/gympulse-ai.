@@ -1094,13 +1094,12 @@ elif page == "Member Assessment":
     if submitted:
 
         member = pd.DataFrame([{
-            "membership type": membership type,
-            "days since last visit": days since last visit,
-            "visits previous 30_days": visits previous 30 days,
-            "visits last 30 days": visits last 30 days,
-            "renewal due days": renewal due days,
-            "pt sessions attended": pt sessions attended
-        }])
+            "days_since_last_visit": days_since_last_visit,
+    "visits_previous_30_days": visits_previous_30_days,
+    "visits_last_30_days": visits_last_30_days,
+    "renewal_due_days": renewal_due_days,
+    "pt_sessions_attended": pt_sessions_attended
+}])
 
         try:
 
