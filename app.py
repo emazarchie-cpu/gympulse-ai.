@@ -484,92 +484,49 @@ profile = st.session_state.user_profile or {}
 user_name = profile.get("full_name", "User")
 business_name = profile.get("business_name", "My Gym")
 
-# Retrieve the gym workspace belonging to the logged-in owner
-gym_result = (
-    supabase.table("gyms")
-    .select("*")
-    .eq("owner_id", st.session_state.auth_user["id"])
-    .execute()
-)
+owner_id = st.session_state.auth_user["id"]
 
-if gym_result.data:
-    gym = gym_result.data[0]
-    st.session_state.gym_id = gym["id"]
-    business_name = gym["business_name"]
-else:
-    st.session_state.gym_id = None
 try:
-    current_hour = datetime.now(
-        ZoneInfo("Africa/Lagos")
-    ).hour
-except Exception:
-    current_hour = datetime.now().hour
-
-if current_hour < 12:
-    greeting = "Good morning"
-elif current_hour < 17:
-    greeting = "Good afternoon"
-else:
-    greeting = "Good evening"
-
-header_col, logout_col = st.columns([4, 1])
-
-with header_col:
-    st.markdown(
-        f"""
-        <div style="padding:12px 0;">
-            <div style="font-size:13px;color:#9AA8BD;">
-                {business_name}
-            </div>
-            <div style="font-size:25px;font-weight:800;color:#F4F7FB;">
-                {greeting}, {user_name}
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True
+    # Retrieve the gym belonging to the authenticated owner
+    gym_result = (
+        supabase.table("gyms")
+        .select("*")
+        .eq("owner_id", owner_id)
+        .limit(1)
+        .execute()
     )
 
-with logout_col:
-    st.write("")
-    st.write("")
+    # Create a workspace if this owner does not have one
+    if gym_result.data:
+        gym = gym_result.data[0]
 
-    if st.button("Log Out", use_container_width=True):
+    else:
+        new_gym = (
+            supabase.table("gyms")
+            .insert({
+                "owner_id": owner_id,
+                "business_name": business_name.strip() or "My Gym"
+            })
+            .execute()
+        )
 
-        try:
-            supabase.auth.sign_out()
-        except Exception:
-            pass
+        if not new_gym.data:
+            raise RuntimeError(
+                "The gym workspace could not be created."
+            )
 
-        st.session_state.auth_user = None
-        st.session_state.user_profile = None
+        gym = new_gym.data[0]
 
-        st.rerun()
-
-
-# =========================================================
-# 5. LOAD EXISTING TRAINED MODEL
-# =========================================================
-
-MODEL_PATH = os.path.join(
-    os.path.dirname(__file__),
-    "models",
-    "gympulse_model.joblib"
-)
-
-
-@st.cache_resource
-def load_model():
-    return joblib.load(MODEL_PATH)
-
-
-try:
-    model = load_model()
+    # Save the workspace information for the current session
+    st.session_state.gym_id = gym["id"]
+    business_name = gym["business_name"]
 
 except Exception as error:
+    st.session_state.gym_id = None
+
     st.error(
-        "The trained model could not be loaded. "
-        "Check that models/gympulse_model.joblib exists "
-        "and that your installed package versions are compatible."
+        "We couldn't load your gym workspace. "
+        "Please try refreshing the page."
     )
 
     with st.expander("Technical details"):
@@ -577,9 +534,8 @@ except Exception as error:
 
     st.stop()
 
-
 # =========================================================
-# 4. MODEL PREDICTION FUNCTIONS
+# 5. MODEL PREDICTION FUNCTIONS
 # =========================================================
 
 def prepare_member_data(data):
@@ -680,7 +636,7 @@ def assess_members(data):
 
 
 # =========================================================
-# 5. BRANDING AND SIDEBAR
+# 6. BRANDING AND SIDEBAR
 # =========================================================
 
 # Handle dashboard navigation before creating the sidebar widget
@@ -736,7 +692,7 @@ with st.sidebar:
 
 
 # =========================================================
-# 6. SHARED HEADER
+# 7. SHARED HEADER
 # =========================================================
 
 st.markdown(
@@ -767,7 +723,7 @@ st.warning(
 
 
 # =========================================================
-# 7. DASHBOARD
+# 8. DASHBOARD
 # =========================================================
 
 if page == "Dashboard":
@@ -873,10 +829,142 @@ if page == "Dashboard":
         "will cancel, and they should not be used to make decisions "
         "about real members without appropriate validation."
     )
+    
+# =========================================================
+# 9. MEMBER MANAGEMENT
+# =========================================================
+
+elif page == "Member Management":
+
+    st.markdown("## Member Management")
+    st.write("Register and manage members at your gym.")
+
+    gym_id = st.session_state.get("gym_id")
+
+    if not gym_id:
+        st.warning("No gym workspace found for your account.")
+    else:
+        st.markdown("### Register a New Member")
+
+        with st.form("register_member_form"):
+
+            full_name = st.text_input("Full name")
+            email = st.text_input("Email address")
+            phone = st.text_input("Phone number")
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                age = st.number_input(
+                    "Age", min_value=16, max_value=120, value=25
+                )
+
+                weight_kg = st.number_input(
+                    "Weight (kg)",
+                    min_value=1.0,
+                    max_value=500.0,
+                    value=70.0,
+                    step=0.5
+                )
+
+            with col2:
+                height_cm = st.number_input(
+                    "Height (cm)",
+                    min_value=50.0,
+                    max_value=260.0,
+                    value=170.0,
+                    step=0.5
+                )
+
+                fitness_goal = st.selectbox(
+                    "Fitness goal",
+                    [
+                        "Weight loss",
+                        "Muscle gain",
+                        "General fitness",
+                        "Strength",
+                        "Endurance",
+                        "Sports performance"
+                    ]
+                )
+
+            submitted = st.form_submit_button(
+                "Register Member",
+                use_container_width=True
+            )
+
+        if submitted:
+
+            if not full_name.strip():
+                st.error("Please enter the member's full name.")
+
+            else:
+                member_data = {
+                    "gym_id": gym_id,
+                    "full_name": full_name.strip(),
+                    "age": int(age),
+                    "weight_kg": float(weight_kg),
+                    "height_cm": float(height_cm),
+                    "fitness_goal": fitness_goal
+                }
+
+                if email.strip():
+                    member_data["email"] = email.strip()
+
+                if phone.strip():
+                    member_data["phone"] = phone.strip()
+
+                try:
+                    (
+                        supabase.table("members")
+                        .insert(member_data)
+                        .execute()
+                    )
+
+                    st.success("Member registered successfully!")
+                    st.rerun()
+
+                except Exception as error:
+                    st.error(f"Could not register member: {error}")
+
+        st.markdown("---")
+        st.markdown("### Registered Members")
+
+        try:
+            result = (
+                supabase.table("members")
+                .select(
+                    "full_name, email, phone, age, "
+                    "weight_kg, height_cm, fitness_goal, created_at"
+                )
+                .eq("gym_id", gym_id)
+                .order("created_at", desc=True)
+                .execute()
+            )
+
+            if result.data:
+                members_df = pd.DataFrame(result.data)
+
+                st.metric("Total Members", len(members_df))
+
+                st.dataframe(
+                    members_df,
+                    use_container_width=True,
+                    hide_index=True
+                )
+            else:
+                st.info(
+                    "No members registered yet. "
+                    "Register your first member above."
+                )
+
+        except Exception as error:
+            st.error(f"Could not load members: {error}")
+
 
 # =========================================================
-# 8. INDIVIDUAL MEMBER ASSESSMENT
-# =========================================================
+# 10. INDIVIDUAL MEMBER ASSESSMENT
+# ========================================================
 
 elif page == "Member Assessment":
 
@@ -1061,7 +1149,7 @@ elif page == "Member Assessment":
 
 
 # =========================================================
-# 9. BATCH CSV ASSESSMENT
+# 11. BATCH CSV ASSESSMENT
 # =========================================================
 
 elif page == "Batch Assessment":
@@ -1192,7 +1280,7 @@ elif page == "Batch Assessment":
 
 
 # =========================================================
-# 10. MODEL INSIGHTS
+# 12. MODEL INSIGHTS
 # =========================================================
 
 elif page == "Model Insights":
@@ -1366,7 +1454,7 @@ elif page == "Model Insights":
 
 
 # =========================================================
-# 11. ABOUT THE MODEL
+# 13. ABOUT THE MODEL
 # =========================================================
 
 elif page == "About the Model":
@@ -1472,7 +1560,7 @@ elif page == "About the Model":
     )
 
 # =========================================================
-# 12. FOOTER
+# 14. FOOTER
 # =========================================================
 
 st.markdown("---")
