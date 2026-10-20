@@ -1524,7 +1524,7 @@ elif page == "Model Insights":
             step=1
         )
 
-    if st.button(
+        if st.button(
         "Run Sensitivity Experiment",
         use_container_width=True
     ):
@@ -1544,73 +1544,20 @@ elif page == "Model Insights":
             "renewal_due_days": [insight_renewal] * len(scenario_days),
             "pt_sessions_attended": [insight_pt] * len(scenario_days)
         })
-        try:
 
-                        sensitivity_results = sensitivity_results.sort_values(
+        try:
+            sensitivity_results = assess_members(scenarios)
+
+            sensitivity_results = sensitivity_results.sort_values(
                 "days_since_last_visit"
             )
 
             st.markdown("---")
             st.markdown("### Experimental response")
 
-            chart_data = sensitivity_results.set_index(
-                "days_since_last_visit"
-            )[["cancellation_probability"]].rename(
-                columns={
-                    "cancellation_probability":
-                    "Estimated cancellation probability"
-                }
-            )
-
-            st.line_chart(
-                chart_data,
-                y="Estimated cancellation probability",
-                x_label="Days since last visit",
-                y_label="Estimated probability",
-                use_container_width=True
-            )
-
-            st.dataframe(
-                sensitivity_results[
-                    [
-                        "days_since_last_visit",
-                        "cancellation_probability",
-                        "risk_category"
-                    ]
-                ].rename(
-                    columns={
-                        "days_since_last_visit": "Days since last visit",
-                        "cancellation_probability": "Estimated probability",
-                        "risk_category": "Provisional risk category"
-                    }
-                ),
-                hide_index=True,
-                use_container_width=True
-            )
-
-            first_probability = float(
-                sensitivity_results.iloc[0][
-                    "cancellation_probability"
-                ]
-            )
-
-            last_probability = float(
-                sensitivity_results.iloc[-1][
-                    "cancellation_probability"
-                ]
-            )
-
-            st.metric(
-                "Change across tested scenarios",
-                f"{(last_probability - first_probability) * 100:+.1f} percentage points"
-            )
-
-            st.caption(
-                "Only days since last visit changes across scenarios. "
-                "All other inputs are held constant. Results describe "
-                "the model's response, not a causal effect."
-            )
-
+            # Keep the remaining chart, table, metric,
+            # and caption code here, aligned with st.markdown.
+        
         except Exception as error:
 
             st.error(
