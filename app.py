@@ -1056,12 +1056,12 @@ elif page == "Member Assessment":
     max_value=365,
     value=7
 )
-            visits previous 30 days = st.number_input(
-                "Visits in the previous 30 days",
-                min_value=0,
-                max_value=100,
-                value=10
-            )
+            visits_previous_30_days = st.number_input(
+    "Visits in the previous 30 days",
+    min_value=0,
+    max_value=100,
+    value=10
+)
 
             renewal_due_days = st.number_input(
                 "Days until renewal",
