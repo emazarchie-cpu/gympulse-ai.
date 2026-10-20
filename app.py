@@ -240,7 +240,9 @@ st.markdown(
         font-size: 11px;
         padding: 20px 0;
     }
-
+[data-testid="stSidebarCollapseButton"] span {
+    font-size: 0 !important;
+}
     </style>
     """,
     unsafe_allow_html=True
