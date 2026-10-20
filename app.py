@@ -484,6 +484,20 @@ profile = st.session_state.user_profile or {}
 user_name = profile.get("full_name", "User")
 business_name = profile.get("business_name", "My Gym")
 
+# Retrieve the gym workspace belonging to the logged-in owner
+gym_result = (
+    supabase.table("gyms")
+    .select("*")
+    .eq("owner_id", st.session_state.auth_user["id"])
+    .execute()
+)
+
+if gym_result.data:
+    gym = gym_result.data[0]
+    st.session_state.gym_id = gym["id"]
+    business_name = gym["business_name"]
+else:
+    st.session_state.gym_id = None
 try:
     current_hour = datetime.now(
         ZoneInfo("Africa/Lagos")
