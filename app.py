@@ -536,26 +536,29 @@ except Exception as error:
 
     st.stop()
 #=========================================================
-
 # 5. PERSONALIZED GREETING
-
 #=========================================================
 
-from datetime import datetime
-from zoneinfo import ZoneInfo
-import html
+if page == "Dashboard":
 
-current_hour = datetime.now(ZoneInfo("Africa/Lagos")).hour
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    import html
 
-if current_hour < 12:
-    greeting = "Good morning"
-elif current_hour < 17:
-    greeting = "Good afternoon"
-else:
-    greeting = "Good evening"
-    
-safe_user_name = html.escape(str(user_name))
-safe_business_name = html.escape(str(business_name))
+    current_hour = datetime.now(ZoneInfo("Africa/Lagos")).hour
+
+    if current_hour < 12:
+        greeting = "Good morning"
+    elif current_hour < 17:
+        greeting = "Good afternoon"
+    else:
+        greeting = "Good evening"
+
+    safe_user_name = html.escape(str(user_name))
+    safe_business_name = html.escape(str(business_name))
+
+    # Your complete existing st.markdown(...) block goes here.
+    # Keep all its HTML and styling unchanged.
 
 st.markdown(
 f"""
