@@ -1089,7 +1089,7 @@ elif page == "Member Management":
 
 # =========================================================
 # 10. INDIVIDUAL MEMBER ASSESSMENT
-# ========================================================
+# =========================================================
 
 elif page == "Member Assessment":
 
@@ -1112,17 +1112,18 @@ elif page == "Member Assessment":
         with col1:
 
             days_since_last_visit = st.number_input(
-    "days_since_last_visit",
-    min_value=0,
-    max_value=365,
-    value=7
-)
+                "Days since last visit",
+                min_value=0,
+                max_value=365,
+                value=7
+            )
+
             visits_previous_30_days = st.number_input(
-    "Visits in the previous 30 days",
-    min_value=0,
-    max_value=100,
-    value=10
-)
+                "Visits in the previous 30 days",
+                min_value=0,
+                max_value=100,
+                value=10
+            )
 
             renewal_due_days = st.number_input(
                 "Days until renewal",
@@ -1131,7 +1132,7 @@ elif page == "Member Assessment":
                 value=14
             )
 
-                with col2:
+        with col2:
 
             visits_last_30_days = st.number_input(
                 "Visits in the most recent 30 days",
@@ -1151,7 +1152,8 @@ elif page == "Member Assessment":
             "Generate Assessment",
             use_container_width=True
         )
-        if submitted:
+
+    if submitted:
 
         member = pd.DataFrame([{
             "membership_type": membership_type,
@@ -1165,6 +1167,7 @@ elif page == "Member Assessment":
         try:
 
             result = assess_members(member).iloc[0]
+
             probability = float(
                 result["cancellation_probability"]
             )
@@ -1194,6 +1197,7 @@ elif page == "Member Assessment":
                 visits_last_30_days
                 - visits_previous_30_days
             )
+
             st.markdown(
                 '<div class="section-label">ATTENDANCE ANALYSIS</div>',
                 unsafe_allow_html=True
@@ -1274,7 +1278,6 @@ elif page == "Member Assessment":
         except Exception as error:
 
             st.error(f"Assessment failed: {error}")
-
 # =========================================================
 # 11. BATCH CSV ASSESSMENT
 # =========================================================
