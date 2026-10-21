@@ -1131,14 +1131,14 @@ elif page == "Member Assessment":
                 value=14
             )
 
-        with col2:
+                with col2:
 
             visits_last_30_days = st.number_input(
-    "Visits in the most recent 30 days",
-    min_value=0,
-    max_value=100,
-    value=5
-)
+                "Visits in the most recent 30 days",
+                min_value=0,
+                max_value=100,
+                value=5
+            )
 
             pt_sessions_attended = st.number_input(
                 "Personal-training sessions attended",
@@ -1151,8 +1151,7 @@ elif page == "Member Assessment":
             "Generate Assessment",
             use_container_width=True
         )
-
-    if submitted:
+        if submitted:
 
         member = pd.DataFrame([{
             "membership_type": membership_type,
@@ -1163,10 +1162,9 @@ elif page == "Member Assessment":
             "pt_sessions_attended": pt_sessions_attended
         }])
 
-                try:
+        try:
 
             result = assess_members(member).iloc[0]
-
             probability = float(
                 result["cancellation_probability"]
             )
