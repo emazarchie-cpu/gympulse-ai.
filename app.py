@@ -1219,55 +1219,64 @@ elif page == "Member Assessment":
                 f"{attendance_change:+}"
             )
 
-            if attendance_change < 0:
+                        if attendance_change < 0:
 
                 st.warning(
-                    "Recorded attendance has decreased "
-                    "compared with the previous 30-day period."
+                    "WARNING: MEMBER CHECK-IN RECOMMENDED\n\n"
+                    "Attendance has dropped compared with the previous "
+                    "30 days. Consider contacting the member to understand "
+                    "the change and offer support."
                 )
 
             elif attendance_change > 0:
 
                 st.success(
-                    "Recorded attendance has increased "
-                    "compared with the previous 30-day period."
+                    "POSITIVE ENGAGEMENT\n\n"
+                    "Attendance has improved compared with the previous "
+                    "30 days. Encourage the member to maintain this progress."
                 )
 
             else:
 
                 st.info(
-                    "Recorded attendance is unchanged "
-                    "between the two periods."
+                    "ENGAGEMENT STABLE\n\n"
+                    "Attendance is unchanged compared with the previous "
+                    "30 days. Continue monitoring activity and encourage "
+                    "consistent attendance."
                 )
 
-            if risk == "High":
+                                    if risk == "High":
 
                 st.error(
-                    "The model's estimated probability falls "
-                    "in the provisional high-risk category."
+                    "PRIORITY FOLLOW-UP\n\n"
+                    "This member requires a priority review. Check their "
+                    "recent attendance and renewal date, then contact "
+                    "them to understand any difficulties they may be "
+                    "experiencing. Record the outcome and schedule a "
+                    "follow-up if needed."
                 )
 
             elif risk == "Medium":
 
                 st.warning(
-                    "The model's estimated probability falls "
-                    "in the provisional medium-risk category."
+                    "WARNING: MEMBER ENGAGEMENT NEEDS ATTENTION\n\n"
+                    "Review this member's recent attendance and upcoming "
+                    "renewal date. Consider a personal check-in and agree "
+                    "on a practical next step to encourage regular visits."
                 )
 
             else:
 
                 st.success(
-                    "The model's estimated probability falls "
-                    "in the provisional low-risk category."
+                    "MAINTAIN MEMBER ENGAGEMENT\n\n"
+                    "Continue monitoring attendance and supporting the "
+                    "member's fitness goals. Encourage consistent visits "
+                    "and review their progress at the next check-in."
                 )
-
-            
 
         except Exception as error:
 
             st.error(f"Assessment failed: {error}")
-
-
 # =========================================================
 # 11. BATCH CSV ASSESSMENT
 # =========================================================
