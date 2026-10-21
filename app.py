@@ -872,10 +872,9 @@ if page == "Dashboard":
                 Let's build a stronger, smarter fitness business.
             </p>
         </div>
-        """,
+                """,
         unsafe_allow_html=True
     )
-
     st.markdown("---")
 
     # =====================================================
