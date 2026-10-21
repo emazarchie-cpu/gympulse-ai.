@@ -1,4 +1,5 @@
 import os
+import textwrap
 
 import joblib
 import pandas as pd
@@ -1374,7 +1375,7 @@ elif page == "Batch Assessment":
             with column:
 
                 st.markdown(
-                    f"""
+                   textwrap.dedent(f"""
                     <div style="
                         background-color: #111827;
                         border: 1px solid #273449;
@@ -1416,12 +1417,11 @@ elif page == "Batch Assessment":
                             line-height: 1.5;
                         ">
                             {description}
-                        </div>
+                   </div>
                     </div>
-                    """,
+                    """),
                     unsafe_allow_html=True
                 )
-
     # -----------------------------------------------------
     # CSV UPLOAD
     # -----------------------------------------------------
