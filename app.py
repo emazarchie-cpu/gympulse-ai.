@@ -280,10 +280,19 @@ if st.session_state.auth_user is None:
 
     st.markdown(
         """
-        <div style="text-align:center; padding:45px 0 20px;">
-            <div style="font-size:42px;font-weight:800;">
-                GYM<span style="color:#B7F34A;">PULSE</span> AI
-            </div>
+        <div style="text-align:center; padding:25px 0 10px;">
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.image(
+        "gympulse_logo.png",
+        width=300
+    )
+
+    st.markdown(
+        """
+        <div style="text-align:center; padding:0 0 20px;">
             <p style="color:#9AA8BD;font-size:16px;">
                 Smarter insights. Stronger member retention.
             </p>
