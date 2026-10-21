@@ -1374,8 +1374,7 @@ elif page == "Batch Assessment":
 
             with column:
 
-                st.markdown(
-                   st.markdown(
+st.markdown(
     f"""
 <div style="
     background-color: #111827;
@@ -1420,9 +1419,10 @@ elif page == "Batch Assessment":
 """,
     unsafe_allow_html=True
 )
-    # -----------------------------------------------------
-    # CSV UPLOAD
-    # -----------------------------------------------------
+
+# -----------------------------------------------------
+# CSV UPLOAD
+# -----------------------------------------------------
 
     st.markdown("<br>", unsafe_allow_html=True)
 
