@@ -909,23 +909,6 @@ if page == "Dashboard":
         "cancellation-risk estimates."
     )
 
-    col1, col2, col3 = st.columns(3)
-
-    col1.metric(
-        "ML Algorithm",
-        "Logistic Regression"
-    )
-
-    col2.metric(
-        "Medium-Risk Threshold",
-        "30%"
-    )
-
-    col3.metric(
-        "Model Features",
-        "5"
-    )
-
     st.markdown(
         '<div class="section-label">HOW IT WORKS</div>',
         unsafe_allow_html=True
