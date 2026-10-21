@@ -785,15 +785,33 @@ with st.sidebar:
     key="selected_page",
     label_visibility="visible"
 )
+# =========================================================
+# PERSONALIZED GREETING VARIABLES
+# =========================================================
+
+from datetime import datetime
+from zoneinfo import ZoneInfo
+import html
+
+current_hour = datetime.now(ZoneInfo("Africa/Lagos")).hour
+
+if current_hour < 12:
+    greeting = "Good morning"
+elif current_hour < 17:
+    greeting = "Good afternoon"
+else:
+    greeting = "Good evening"
+
+safe_user_name = html.escape(str(user_name))
+safe_business_name = html.escape(str(business_name))
     
-
-
 # =========================================================
 # 7. SHARED HEADER — DASHBOARD ONLY
 # =========================================================
 
 if page == "Dashboard":
 
+    # FITNESS INTELLIGENCE PLATFORM
     st.markdown(
         """
         <div class="hero">
@@ -814,37 +832,7 @@ if page == "Dashboard":
         unsafe_allow_html=True
     )
 
-    st.info(
-        "Your Gym, At a Glance. Manage your members, review fitness "
-        "assessments, monitor attendance patterns, and identify "
-        "opportunities to improve member retention, all from one workspace."
-    )
-# =========================================================
-# 8. DASHBOARD
-# =========================================================
-
-if page == "Dashboard":
-    # Personalized greeting — Dashboard only
-    
-    # =====================================================
-    # PERSONALIZED GREETING VARIABLES
-    # =====================================================
-
-    from datetime import datetime
-    from zoneinfo import ZoneInfo
-    import html
-
-    current_hour = datetime.now(ZoneInfo("Africa/Lagos")).hour
-
-    if current_hour < 12:
-        greeting = "Good morning"
-    elif current_hour < 17:
-        greeting = "Good afternoon"
-    else:
-        greeting = "Good evening"
-
-    safe_user_name = html.escape(str(user_name))
-    safe_business_name = html.escape(str(business_name))
+    # YOUR FITNESS WORKSPACE
     st.markdown(
         """
         <div style="
@@ -854,7 +842,12 @@ if page == "Dashboard":
             border-left: 5px solid #B7F34A;
             margin-bottom: 24px;
         ">
-            <p style="color: #B7F34A; font-size: 14px; font-weight: 600;">
+            <p style="
+                color: #B7F34A;
+                font-size: 14px;
+                margin-bottom: 8px;
+                font-weight: 600;
+            ">
                 YOUR FITNESS WORKSPACE
             </p>
         </div>
@@ -868,6 +861,18 @@ if page == "Dashboard":
         f"Welcome to **{safe_business_name}**. "
         "Let's build a stronger, smarter fitness business."
     )
+# =========================================================
+# 8. DASHBOARD
+# =========================================================
+
+if page == "Dashboard":
+    # Personalized greeting — Dashboard only
+    
+    # =====================================================
+    # PERSONALIZED GREETING VARIABLES
+    # =====================================================
+
+
     # =====================================================
     # EXISTING DASHBOARD CONTENT
     # =====================================================
@@ -945,17 +950,6 @@ if page == "Dashboard":
         ):
             st.session_state["navigate_to"] = "Batch Assessment"
             st.rerun()
-
-    st.markdown("---")
-
-    st.markdown("### Important interpretation")
-
-    st.info(
-        "The risk labels are provisional categories applied to "
-        "model probabilities. They do not establish that a member "
-        "will cancel, and they should not be used to make decisions "
-        "about real members without appropriate validation."
-    )
 
 
     
