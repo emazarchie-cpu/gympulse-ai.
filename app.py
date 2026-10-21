@@ -278,11 +278,11 @@ if "user_profile" not in st.session_state:
 # Show login and registration until authenticated
 if st.session_state.auth_user is None:
 
-        # -------------------------
-        # GYMPULSE AI LOGIN BRANDING
-        # -------------------------
+# -------------------------
+# GYMPULSE AI LOGIN BRANDING
+# -------------------------
 
-        BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOGO_PATH = os.path.join(
     BASE_DIR,
     "GymPulse_AI_logo_mark.png"
@@ -316,7 +316,7 @@ login_tab, signup_tab = st.tabs(
 # -------------------------
 # LOGIN
 # -------------------------
-        with login_tab:
+    with login_tab:
 
         st.subheader("Welcome back")
 
