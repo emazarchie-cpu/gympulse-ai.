@@ -845,7 +845,7 @@ if page == "Dashboard":
 
     safe_user_name = html.escape(str(user_name))
     safe_business_name = html.escape(str(business_name))
-        st.markdown(
+    st.markdown(
         """
         <div style="
             background-color: #111827;
