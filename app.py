@@ -308,7 +308,6 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-
 login_tab, signup_tab = st.tabs(
     ["Log In", "Create Account"]
 )    
