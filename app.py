@@ -1192,7 +1192,7 @@ elif page == "Member Assessment":
                 max(0.0, min(1.0, probability))
             )
 
-            attendance_change = (
+                        attendance_change = (
                 visits_last_30_days
                 - visits_previous_30_days
             )
@@ -1219,7 +1219,7 @@ elif page == "Member Assessment":
                 f"{attendance_change:+}"
             )
 
-                        if attendance_change < 0:
+            if attendance_change < 0:
 
                 st.warning(
                     "WARNING: MEMBER CHECK-IN RECOMMENDED\n\n"
@@ -1245,7 +1245,7 @@ elif page == "Member Assessment":
                     "consistent attendance."
                 )
 
-                                    if risk == "High":
+            if risk == "High":
 
                 st.error(
                     "PRIORITY FOLLOW-UP\n\n"
@@ -1277,6 +1277,7 @@ elif page == "Member Assessment":
         except Exception as error:
 
             st.error(f"Assessment failed: {error}")
+
 # =========================================================
 # 11. BATCH CSV ASSESSMENT
 # =========================================================
