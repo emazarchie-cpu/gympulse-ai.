@@ -1406,38 +1406,36 @@ elif page == "Batch Assessment":
         unsafe_allow_html=True
     )
 
-    st.markdown(
+        st.markdown(
         """
-        <div style="
-            background-color: #111827;
-            border: 1px solid #273449;
-            border-left: 5px solid #B7F34A;
-            border-radius: 16px;
-            padding: 24px;
-            margin: 12px 0 18px 0;
-        ">
-            <div style="
-                color: #FFFFFF;
-                font-size: 20px;
-                font-weight: 600;
-                margin-bottom: 8px;
-            ">
-                Upload your membership records
-            </div>
-
-            <div style="
-                color: #9CA3AF;
-                font-size: 14px;
-                line-height: 1.6;
-            ">
-                Select a CSV file containing your membership data.
-                You can review the records before running the assessment.
-            </div>
-        </div>
-        """,
+<div style="
+    background-color: #111827;
+    border: 1px solid #273449;
+    border-left: 5px solid #B7F34A;
+    border-radius: 16px;
+    padding: 24px;
+    margin: 12px 0 18px 0;
+">
+    <div style="
+        color: #FFFFFF;
+        font-size: 20px;
+        font-weight: 600;
+        margin-bottom: 8px;
+    ">
+        Upload your membership records
+    </div>
+    <div style="
+        color: #9CA3AF;
+        font-size: 14px;
+        line-height: 1.6;
+    ">
+        Select a CSV file containing your membership data.
+        You can review the records before running the assessment.
+    </div>
+</div>
+""",
         unsafe_allow_html=True
     )
-
     uploaded_file = st.file_uploader(
         "Choose a CSV file",
         type=["csv"],
