@@ -308,12 +308,14 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 login_tab, signup_tab = st.tabs(
     ["Log In", "Create Account"]
-)    
-    # -------------------------
-    # LOGIN
-    # -------------------------
+)
+
+# -------------------------
+# LOGIN
+# -------------------------
         with login_tab:
 
         st.subheader("Welcome back")
