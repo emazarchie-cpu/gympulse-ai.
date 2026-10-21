@@ -539,7 +539,7 @@ except Exception as error:
 # 5. PERSONALIZED GREETING
 #=========================================================
 
-if page == "Dashboard":
+
 
     from datetime import datetime
     from zoneinfo import ZoneInfo
