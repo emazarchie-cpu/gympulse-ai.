@@ -298,32 +298,32 @@ if st.session_state.auth_user is None:
         )
 
     # Original heading with smaller tagline
-    st.markdown(
-        """
+st.markdown(
+    """
+    <div style="
+        text-align: center;
+        padding: 0 0 20px;
+    ">
         <div style="
-            text-align: center;
-            padding: 0 0 20px;
+            font-size: 42px;
+            font-weight: 800;
+            line-height: 1.1;
         ">
-            <div style="
-                font-size: 42px;
-                font-weight: 800;
-                line-height: 1.1;
-            ">
-                GYM<span style="color:#B7F34A;">PULSE</span> AI
-            </div>
-
-            <p style="
-                color: #9AA8BD;
-                font-size: 12px;
-                margin-top: 5px;
-                margin-bottom: 0;
-            ">
-                Smarter insights. Stronger member retention.
-            </p>
+            GYM<span style="color:#B7F34A;">PULSE</span> AI
         </div>
-        """,
-        unsafe_allow_html=True
-    )
+
+        <p style="
+            color: #9AA8BD;
+            font-size: 12px;
+            margin-top: 5px;
+            margin-bottom: 0;
+        ">
+            Smarter insights. Stronger member retention.
+        </p>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
     login_tab, signup_tab = st.tabs(
         ["Log In", "Create Account"]
