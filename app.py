@@ -288,36 +288,18 @@ LOGO_PATH = os.path.join(
     "GymPulse_AI_logo_mark.png"
 )
 
-# Center the logo
 logo_col1, logo_col2, logo_col3 = st.columns([1, 1, 1])
 
 with logo_col2:
-    st.image(
-        LOGO_PATH,
-        width=115
-    )
+    st.image(LOGO_PATH, width=115)
 
-# Heading and tagline
 st.markdown(
     """
-    <div style="
-        text-align: center;
-        padding: 0 0 20px;
-    ">
-        <div style="
-            font-size: 42px;
-            font-weight: 800;
-            line-height: 1.1;
-        ">
+    <div style="text-align: center; padding: 0 0 20px;">
+        <div style="font-size: 42px; font-weight: 800; line-height: 1.1;">
             GYM<span style="color:#B7F34A;">PULSE</span> AI
         </div>
-
-        <p style="
-            color: #9AA8BD;
-            font-size: 12px;
-            margin-top: 5px;
-            margin-bottom: 0;
-        ">
+        <p style="color:#9AA8BD; font-size:12px; margin-top:5px; margin-bottom:0;">
             Smarter insights. Stronger member retention.
         </p>
     </div>
