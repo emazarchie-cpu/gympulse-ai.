@@ -288,21 +288,8 @@ if st.session_state.auth_user is None:
         "GymPulse_AI_logo_mark.png"
     )
 
-    # Center the transparent logo above the original heading
-    st.markdown(
-        """
-        <div style="
-            text-align: center;
-            padding: 25px 0 0;
-        ">
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-    logo_col1, logo_col2, logo_col3 = st.columns(
-        [1, 1, 1]
-    )
+    # Center the logo
+    logo_col1, logo_col2, logo_col3 = st.columns([1, 1, 1])
 
     with logo_col2:
         st.image(
@@ -310,13 +297,12 @@ if st.session_state.auth_user is None:
             width=115
         )
 
-    # Preserve the original GYMPULSE AI heading and styling
-        st.markdown(
+    # Original heading with smaller tagline
+    st.markdown(
         """
         <div style="
             text-align: center;
             padding: 0 0 20px;
-            margin-top: -5px;
         ">
             <div style="
                 font-size: 42px;
@@ -327,23 +313,21 @@ if st.session_state.auth_user is None:
             </div>
 
             <p style="
-    color: #9AA8BD;
-    font-size: 12px;
-    margin-top: 5px;
-    margin-bottom: 0;
-">
-    Smarter insights. Stronger member retention.
-</p>
+                color: #9AA8BD;
+                font-size: 12px;
+                margin-top: 5px;
+                margin-bottom: 0;
+            ">
                 Smarter insights. Stronger member retention.
             </p>
         </div>
         """,
         unsafe_allow_html=True
     )
+
     login_tab, signup_tab = st.tabs(
         ["Log In", "Create Account"]
     )
-
     # -------------------------
     # LOGIN
     # -------------------------
