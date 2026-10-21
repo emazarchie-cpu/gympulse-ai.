@@ -863,6 +863,7 @@ if page == "Dashboard":
 # =========================================================
 
 if page == "Dashboard":
+    # Personalized greeting — Dashboard only
     st.markdown(
         f"""
         <div style="
@@ -1397,11 +1398,11 @@ elif page == "Batch Assessment":
 
     st.code(
         "membership_type\n"
-        "days since last visit\n"
-        "visits previous 30 days\n"
-        "visits last 30 days\n"
-        "renewal due days\n"
-        "pt sessions attended",
+        "days_since_last_visit\n"
+        "visits_previous_30_days\n"
+        "visits_last_30_days\n"
+        "renewal_due_days\n"
+        "pt_sessions_attended",
         language="text"
     )
 
