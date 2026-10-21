@@ -1361,19 +1361,16 @@ elif page == "Batch Assessment":
         ),
     ]
 
-        for row_start in range(0, len(required_fields), 3):
-
+    for row_start in range(0, len(required_fields), 3):
         columns = st.columns(3)
 
         for column, field in zip(
             columns,
             required_fields[row_start:row_start + 3]
         ):
-
             number, title, field_name, description = field
 
             with column:
-
                 st.markdown(
                     f"""
 <div style="
@@ -1381,38 +1378,17 @@ elif page == "Batch Assessment":
     border: 1px solid #273449;
     border-radius: 14px;
     padding: 18px;
-    min-height: 190px;
-    margin-bottom: 14px;
 ">
-    <div style="
-        color: #B7F34A;
-        font-size: 12px;
-        font-weight: 700;
-        margin-bottom: 12px;
-    ">
+    <div style="color: #B7F34A; font-weight: 700;">
         FIELD {number}
     </div>
-    <div style="
-        color: #FFFFFF;
-        font-size: 16px;
-        font-weight: 600;
-        margin-bottom: 10px;
-    ">
+    <div style="color: #FFFFFF; font-size: 16px;">
         {title}
     </div>
-    <div style="
-        color: #B7F34A;
-        font-size: 12px;
-        overflow-wrap: anywhere;
-        margin-bottom: 10px;
-    ">
+    <div style="color: #B7F34A; font-size: 12px;">
         {field_name}
     </div>
-    <div style="
-        color: #9CA3AF;
-        font-size: 13px;
-        line-height: 1.5;
-    ">
+    <div style="color: #9CA3AF; font-size: 13px;">
         {description}
     </div>
 </div>
