@@ -1361,7 +1361,7 @@ elif page == "Batch Assessment":
         ),
     ]
 
-    for row_start in range(0, len(required_fields), 3):
+        for row_start in range(0, len(required_fields), 3):
 
         columns = st.columns(3)
 
@@ -1372,10 +1372,10 @@ elif page == "Batch Assessment":
 
             number, title, field_name, description = field
 
-           with column:
+            with column:
 
-    st.markdown(
-        f"""
+                st.markdown(
+                    f"""
 <div style="
     background-color: #111827;
     border: 1px solid #273449;
@@ -1417,9 +1417,8 @@ elif page == "Batch Assessment":
     </div>
 </div>
 """,
-        unsafe_allow_html=True
-    )
-
+                    unsafe_allow_html=True
+                )
 # -----------------------------------------------------
 # CSV UPLOAD
 # -----------------------------------------------------
