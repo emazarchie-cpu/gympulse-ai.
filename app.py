@@ -285,8 +285,11 @@ if st.session_state.auth_user is None:
         unsafe_allow_html=True
     )
 
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    LOGO_PATH = os.path.join(BASE_DIR, "gympulse_logo.png")
+
     st.image(
-        "gympulse_logo.png",
+        LOGO_PATH,
         width=300
     )
 
