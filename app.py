@@ -811,27 +811,6 @@ safe_business_name = html.escape(str(business_name))
 
 if page == "Dashboard":
 
-    # FITNESS INTELLIGENCE PLATFORM
-    st.markdown(
-        """
-        <div class="hero">
-            <div class="hero-eyebrow">
-                FITNESS INTELLIGENCE PLATFORM
-            </div>
-            <div class="hero-title">
-                Smarter insights.<br>Stronger member retention.
-            </div>
-            <div class="hero-description">
-                Explore experimental machine-learning estimates
-                using gym membership and attendance information.
-                Turn member activity data into opportunities for
-                further investigation.
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
     # YOUR FITNESS WORKSPACE
     st.markdown(
         """
@@ -855,11 +834,33 @@ if page == "Dashboard":
         unsafe_allow_html=True
     )
 
+    # PERSONALIZED GREETING
     st.subheader(f"{greeting}, {safe_user_name}! 👋")
 
     st.markdown(
         f"Welcome to **{safe_business_name}**. "
         "Let's build a stronger, smarter fitness business."
+    )
+
+    # FITNESS INTELLIGENCE PLATFORM
+    st.markdown(
+        """
+        <div class="hero">
+            <div class="hero-eyebrow">
+                FITNESS INTELLIGENCE PLATFORM
+            </div>
+            <div class="hero-title">
+                Smarter insights.<br>Stronger member retention.
+            </div>
+            <div class="hero-description">
+                Explore experimental machine-learning estimates
+                using gym membership and attendance information.
+                Turn member activity data into opportunities for
+                further investigation.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
     )
 # =========================================================
 # 8. DASHBOARD
