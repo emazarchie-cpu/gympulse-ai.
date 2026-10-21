@@ -327,11 +327,13 @@ if st.session_state.auth_user is None:
             </div>
 
             <p style="
-                color: #9AA8BD;
-                font-size: 12px;
-                margin-top: 5px;
-                margin-bottom: 0;
-            ">
+    color: #9AA8BD;
+    font-size: 12px;
+    margin-top: 5px;
+    margin-bottom: 0;
+">
+    Smarter insights. Stronger member retention.
+</p>
                 Smarter insights. Stronger member retention.
             </p>
         </div>
