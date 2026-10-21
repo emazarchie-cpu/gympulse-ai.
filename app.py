@@ -812,40 +812,123 @@ with st.sidebar:
     )
 
 # =========================================================
-# 7. SHARED HEADER
+# 7. SHARED HEADER — DASHBOARD ONLY
 # =========================================================
 
-st.markdown(
-    """
-    <div class="hero">
-        <div class="hero-eyebrow">
-            FITNESS INTELLIGENCE PLATFORM
-        </div>
-        <div class="hero-title">
-            Smarter insights.<br>Stronger member retention.
-        </div>
-        <div class="hero-description">
-            Explore experimental machine-learning estimates
-            using gym membership and attendance information.
-            Turn member activity data into opportunities for
-            further investigation.
-        </div>
-    </div>
-    """,
-    unsafe_allow_html=True
-)
+if page == "Dashboard":
 
-st.info(
-    "Your Gym, At a Glance. Manage your members, review fitness "
-    "assessments, monitor attendance patterns, and identify "
-    "opportunities to improve member retention, all from one workspace."
-)
+    st.markdown(
+        """
+        <div class="hero">
+            <div class="hero-eyebrow">
+                FITNESS INTELLIGENCE PLATFORM
+            </div>
+            <div class="hero-title">
+                Smarter insights.<br>Stronger member retention.
+            </div>
+            <div class="hero-description">
+                Explore experimental machine-learning estimates
+                using gym membership and attendance information.
+                Turn member activity data into opportunities for
+                further investigation.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
+    st.info(
+        "Your Gym, At a Glance. Manage your members, review fitness "
+        "assessments, monitor attendance patterns, and identify "
+        "opportunities to improve member retention, all from one workspace."
+    )
 # =========================================================
 # 8. DASHBOARD
 # =========================================================
 
 if page == "Dashboard":
+
+    # =====================================================
+    # PERSONALIZED GREETING
+    # =====================================================
+
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    import html
+
+    current_hour = datetime.now(ZoneInfo("Africa/Lagos")).hour
+
+    if current_hour < 12:
+        greeting = "Good morning"
+    elif current_hour < 17:
+        greeting = "Good afternoon"
+    else:
+        greeting = "Good evening"
+
+    safe_user_name = html.escape(str(user_name))
+    safe_business_name = html.escape(str(business_name))
+
+    st.markdown(
+        f"""
+        <div style="
+            background: linear-gradient(135deg, #111827, #1e293b);
+            padding: 24px;
+            border-radius: 16px;
+            border-left: 5px solid #B7F34A;
+            margin-bottom: 24px;
+        ">
+            <p style="
+                color: #B7F34A;
+                font-size: 14px;
+                margin-bottom: 8px;
+                font-weight: 600;
+            ">
+                YOUR FITNESS WORKSPACE
+            </p>
+
+            <h2 style="color: white; margin: 0 0 8px 0;">
+                {greeting}, {safe_user_name}! 👋
+            </h2>
+
+            <p style="color: #CBD5E1; font-size: 16px; margin: 0;">
+                Welcome to <strong style="color: white;">
+                {safe_business_name}</strong>.
+                Let's build a stronger, smarter fitness business.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    # =====================================================
+    # FITNESS INTELLIGENCE PLATFORM INTRODUCTION
+    # =====================================================
+
+    st.markdown("## FITNESS INTELLIGENCE PLATFORM")
+
+    st.markdown("### Smarter insights.")
+
+    st.markdown("**Stronger member retention.**")
+
+    st.write(
+        "Explore experimental machine-learning estimates using "
+        "gym membership and attendance information. Turn member "
+        "activity data into opportunities for further investigation."
+    )
+
+    st.markdown("### Your Gym, at a Glance")
+
+    st.write(
+        "Manage your members, review fitness assessments, "
+        "monitor attendance patterns, and identify opportunities "
+        "to improve member retention, all from one workspace."
+    )
+
+    st.markdown("---")
+
+    # =====================================================
+    # EXISTING DASHBOARD CONTENT
+    # =====================================================
 
     st.markdown("## Dashboard")
 
@@ -931,6 +1014,8 @@ if page == "Dashboard":
         "will cancel, and they should not be used to make decisions "
         "about real members without appropriate validation."
     )
+
+
     
 # =========================================================
 # 9. MEMBER MANAGEMENT
