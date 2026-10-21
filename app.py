@@ -1372,10 +1372,10 @@ elif page == "Batch Assessment":
 
             number, title, field_name, description = field
 
-            with column:
+           with column:
 
-st.markdown(
-    f"""
+    st.markdown(
+        f"""
 <div style="
     background-color: #111827;
     border: 1px solid #273449;
@@ -1417,8 +1417,8 @@ st.markdown(
     </div>
 </div>
 """,
-    unsafe_allow_html=True
-)
+        unsafe_allow_html=True
+    )
 
 # -----------------------------------------------------
 # CSV UPLOAD
