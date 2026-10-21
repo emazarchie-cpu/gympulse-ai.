@@ -1626,6 +1626,11 @@ elif page == "About the Model":
         "Synthetic"
     )
 
+    st.metric(
+        "Medium-Risk Threshold",
+        "30%"
+    )
+
     st.markdown("### Features used by the model")
 
     st.dataframe(
