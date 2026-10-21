@@ -1261,11 +1261,7 @@ elif page == "Member Assessment":
                     "in the provisional low-risk category."
                 )
 
-            st.caption(
-                "These are experimental model outputs, not "
-                "validated estimates of an individual's actual "
-                "cancellation probability."
-            )
+            
 
         except Exception as error:
 
