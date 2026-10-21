@@ -278,32 +278,62 @@ if "user_profile" not in st.session_state:
 # Show login and registration until authenticated
 if st.session_state.auth_user is None:
 
+    # -------------------------
+    # GYMPULSE AI LOGIN BRANDING
+    # -------------------------
+
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    LOGO_PATH = os.path.join(
+        BASE_DIR,
+        "GymPulse_AI_logo_mark.png"
+    )
+
+    # Center the transparent logo above the original heading
     st.markdown(
         """
-        <div style="text-align:center; padding:25px 0 10px;">
+        <div style="
+            text-align: center;
+            padding: 25px 0 0;
+        ">
+        </div>
         """,
         unsafe_allow_html=True
     )
 
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    LOGO_PATH = os.path.join(BASE_DIR, "GymPulse AI logo.png")
-
-    st.image(
-        LOGO_PATH,
-        width=300
+    logo_col1, logo_col2, logo_col3 = st.columns(
+        [1, 1, 1]
     )
 
+    with logo_col2:
+        st.image(
+            LOGO_PATH,
+            width=115
+        )
+
+    # Preserve the original GYMPULSE AI heading and styling
     st.markdown(
         """
-        <div style="text-align:center; padding:0 0 20px;">
-            <p style="color:#9AA8BD;font-size:16px;">
+        <div style="
+            text-align: center;
+            padding: 0 0 20px;
+        ">
+            <div style="
+                font-size: 42px;
+                font-weight: 800;
+            ">
+                GYM<span style="color:#B7F34A;">PULSE</span> AI
+            </div>
+
+            <p style="
+                color: #9AA8BD;
+                font-size: 16px;
+            ">
                 Smarter insights. Stronger member retention.
             </p>
         </div>
         """,
         unsafe_allow_html=True
     )
-
     login_tab, signup_tab = st.tabs(
         ["Log In", "Create Account"]
     )
