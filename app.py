@@ -557,8 +557,6 @@ except Exception as error:
     safe_user_name = html.escape(str(user_name))
     safe_business_name = html.escape(str(business_name))
 
-    # Your complete existing st.markdown(...) block goes here.
-    # Keep all its HTML and styling unchanged.
 
 st.markdown(
 f"""
