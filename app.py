@@ -1163,7 +1163,7 @@ elif page == "Member Assessment":
             "pt_sessions_attended": pt_sessions_attended
         }])
 
-        try:
+                try:
 
             result = assess_members(member).iloc[0]
 
@@ -1192,11 +1192,10 @@ elif page == "Member Assessment":
                 max(0.0, min(1.0, probability))
             )
 
-                        attendance_change = (
+            attendance_change = (
                 visits_last_30_days
                 - visits_previous_30_days
             )
-
             st.markdown(
                 '<div class="section-label">ATTENDANCE ANALYSIS</div>',
                 unsafe_allow_html=True
