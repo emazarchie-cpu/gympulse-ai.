@@ -1375,53 +1375,51 @@ elif page == "Batch Assessment":
             with column:
 
                 st.markdown(
-                   textwrap.dedent(f"""
-                    <div style="
-                        background-color: #111827;
-                        border: 1px solid #273449;
-                        border-radius: 14px;
-                        padding: 18px;
-                        min-height: 190px;
-                        margin-bottom: 14px;
-                    ">
-                        <div style="
-                            color: #B7F34A;
-                            font-size: 12px;
-                            font-weight: 700;
-                            margin-bottom: 12px;
-                        ">
-                            FIELD {number}
-                        </div>
-
-                        <div style="
-                            color: #FFFFFF;
-                            font-size: 16px;
-                            font-weight: 600;
-                            margin-bottom: 10px;
-                        ">
-                            {title}
-                        </div>
-
-                        <div style="
-                            color: #B7F34A;
-                            font-size: 12px;
-                            overflow-wrap: anywhere;
-                            margin-bottom: 10px;
-                        ">
-                            {field_name}
-                        </div>
-
-                        <div style="
-                            color: #9CA3AF;
-                            font-size: 13px;
-                            line-height: 1.5;
-                        ">
-                            {description}
-                   </div>
-                    </div>
-                    """),
-                    unsafe_allow_html=True
-                )
+                   st.markdown(
+    f"""
+<div style="
+    background-color: #111827;
+    border: 1px solid #273449;
+    border-radius: 14px;
+    padding: 18px;
+    min-height: 190px;
+    margin-bottom: 14px;
+">
+    <div style="
+        color: #B7F34A;
+        font-size: 12px;
+        font-weight: 700;
+        margin-bottom: 12px;
+    ">
+        FIELD {number}
+    </div>
+    <div style="
+        color: #FFFFFF;
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 10px;
+    ">
+        {title}
+    </div>
+    <div style="
+        color: #B7F34A;
+        font-size: 12px;
+        overflow-wrap: anywhere;
+        margin-bottom: 10px;
+    ">
+        {field_name}
+    </div>
+    <div style="
+        color: #9CA3AF;
+        font-size: 13px;
+        line-height: 1.5;
+    ">
+        {description}
+    </div>
+</div>
+""",
+    unsafe_allow_html=True
+)
     # -----------------------------------------------------
     # CSV UPLOAD
     # -----------------------------------------------------
