@@ -1277,29 +1277,201 @@ elif page == "Member Assessment":
 
 elif page == "Batch Assessment":
 
-    st.markdown("## Batch Assessment")
+    # -----------------------------------------------------
+    # PAGE HEADER
+    # -----------------------------------------------------
 
-    st.write(
-        "Upload a CSV file to explore model outputs for "
-        "multiple membership records."
+    st.markdown(
+        """
+        <div class="hero">
+            <div class="hero-eyebrow">
+                GYMPULSE AI · BATCH INTELLIGENCE
+            </div>
+            <div class="hero-title">
+                Batch Assessment
+            </div>
+            <div class="hero-description">
+                Analyse multiple membership records in one workflow.
+                Explore experimental cancellation-risk estimates
+                and identify patterns that may deserve further review.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
     )
 
-    st.markdown("### Required columns")
+    st.markdown("<br>", unsafe_allow_html=True)
 
-    st.code(
-        "membership_type\n"
-        "days_since_last_visit\n"
-        "visits_previous_30_days\n"
-        "visits_last_30_days\n"
-        "renewal_due_days\n"
-        "pt_sessions_attended",
-        language="text"
+    # -----------------------------------------------------
+    # REQUIRED DATA FIELDS
+    # -----------------------------------------------------
+
+    st.markdown(
+        '<div class="section-label">REQUIRED DATA</div>',
+        unsafe_allow_html=True
+    )
+
+    st.markdown(
+        """
+        <p style="color: #9CA3AF; margin-bottom: 20px;">
+            Your CSV file must contain all six fields below.
+            Use the exact column names shown.
+        </p>
+        """,
+        unsafe_allow_html=True
+    )
+
+    required_fields = [
+        (
+            "01",
+            "Membership Type",
+            "membership_type",
+            "The member's membership category."
+        ),
+        (
+            "02",
+            "Days Since Last Visit",
+            "days_since_last_visit",
+            "How many days have passed since the last visit."
+        ),
+        (
+            "03",
+            "Previous 30-Day Visits",
+            "visits_previous_30_days",
+            "Attendance during the preceding 30-day period."
+        ),
+        (
+            "04",
+            "Last 30-Day Visits",
+            "visits_last_30_days",
+            "Recent attendance activity."
+        ),
+        (
+            "05",
+            "Renewal Due Days",
+            "renewal_due_days",
+            "Days remaining until renewal is due."
+        ),
+        (
+            "06",
+            "PT Sessions Attended",
+            "pt_sessions_attended",
+            "Number of personal-training sessions attended."
+        ),
+    ]
+
+    for row_start in range(0, len(required_fields), 3):
+
+        columns = st.columns(3)
+
+        for column, field in zip(
+            columns,
+            required_fields[row_start:row_start + 3]
+        ):
+
+            number, title, field_name, description = field
+
+            with column:
+
+                st.markdown(
+                    f"""
+                    <div style="
+                        background-color: #111827;
+                        border: 1px solid #273449;
+                        border-radius: 14px;
+                        padding: 18px;
+                        min-height: 190px;
+                        margin-bottom: 14px;
+                    ">
+                        <div style="
+                            color: #B7F34A;
+                            font-size: 12px;
+                            font-weight: 700;
+                            margin-bottom: 12px;
+                        ">
+                            FIELD {number}
+                        </div>
+
+                        <div style="
+                            color: #FFFFFF;
+                            font-size: 16px;
+                            font-weight: 600;
+                            margin-bottom: 10px;
+                        ">
+                            {title}
+                        </div>
+
+                        <div style="
+                            color: #B7F34A;
+                            font-size: 12px;
+                            overflow-wrap: anywhere;
+                            margin-bottom: 10px;
+                        ">
+                            {field_name}
+                        </div>
+
+                        <div style="
+                            color: #9CA3AF;
+                            font-size: 13px;
+                            line-height: 1.5;
+                        ">
+                            {description}
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+    # -----------------------------------------------------
+    # CSV UPLOAD
+    # -----------------------------------------------------
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    st.markdown(
+        '<div class="section-label">UPLOAD MEMBERSHIP DATA</div>',
+        unsafe_allow_html=True
+    )
+
+    st.markdown(
+        """
+        <div style="
+            background-color: #111827;
+            border: 1px solid #273449;
+            border-left: 5px solid #B7F34A;
+            border-radius: 16px;
+            padding: 24px;
+            margin: 12px 0 18px 0;
+        ">
+            <div style="
+                color: #FFFFFF;
+                font-size: 20px;
+                font-weight: 600;
+                margin-bottom: 8px;
+            ">
+                Upload your membership records
+            </div>
+
+            <div style="
+                color: #9CA3AF;
+                font-size: 14px;
+                line-height: 1.6;
+            ">
+                Select a CSV file containing your membership data.
+                You can review the records before running the assessment.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
     )
 
     uploaded_file = st.file_uploader(
-        "Upload membership CSV",
-        type=["csv"]
+        "Choose a CSV file",
+        type=["csv"],
+        help="Upload a CSV containing all six required columns."
     )
+
+    st.caption("Supported format: CSV · Maximum file size: 200 MB")
 
     if uploaded_file is not None:
 
@@ -1308,23 +1480,127 @@ elif page == "Batch Assessment":
             uploaded_data = pd.read_csv(uploaded_file)
 
             if uploaded_data.empty:
-                st.error("The uploaded CSV contains no records.")
+                st.error(
+                    "The uploaded CSV contains no records."
+                )
                 st.stop()
 
-            st.markdown("### Uploaded data preview")
+            # ---------------------------------------------
+            # VALIDATE REQUIRED COLUMNS
+            # ---------------------------------------------
 
-            st.dataframe(
-                uploaded_data.head(10),
-                use_container_width=True,
-                hide_index=True
+            required_columns = [
+                "membership_type",
+                "days_since_last_visit",
+                "visits_previous_30_days",
+                "visits_last_30_days",
+                "renewal_due_days",
+                "pt_sessions_attended",
+            ]
+
+            missing_columns = [
+                column
+                for column in required_columns
+                if column not in uploaded_data.columns
+            ]
+
+            if missing_columns:
+
+                st.error(
+                    "Your CSV is missing the following required "
+                    "columns: "
+                    + ", ".join(missing_columns)
+                )
+
+                st.info(
+                    "Check the column names in the Required Data "
+                    "section above and upload the corrected file."
+                )
+
+                st.stop()
+
+            # ---------------------------------------------
+            # FILE SUMMARY
+            # ---------------------------------------------
+
+            st.markdown("<br>", unsafe_allow_html=True)
+
+            st.markdown(
+                '<div class="section-label">FILE OVERVIEW</div>',
+                unsafe_allow_html=True
+            )
+
+            overview_col1, overview_col2, overview_col3 = (
+                st.columns(3)
+            )
+
+            overview_col1.metric(
+                "Total Records",
+                f"{len(uploaded_data):,}"
+            )
+
+            overview_col2.metric(
+                "Required Fields",
+                len(required_columns)
+            )
+
+            overview_col3.metric(
+                "File Status",
+                "Ready"
+            )
+
+            # ---------------------------------------------
+            # DATA PREVIEW
+            # ---------------------------------------------
+
+            with st.expander(
+                "Preview uploaded membership data",
+                expanded=True
+            ):
+
+                st.dataframe(
+                    uploaded_data.head(10),
+                    use_container_width=True,
+                    hide_index=True
+                )
+
+                st.caption(
+                    "Showing the first 10 records. "
+                    "Your original uploaded data is not modified here."
+                )
+
+            # ---------------------------------------------
+            # RUN ASSESSMENT
+            # ---------------------------------------------
+
+            st.markdown("<br>", unsafe_allow_html=True)
+
+            st.markdown(
+                '<div class="section-label">RUN ASSESSMENT</div>',
+                unsafe_allow_html=True
+            )
+
+            st.markdown(
+                """
+                <p style="color: #9CA3AF;">
+                    Run the existing model against the uploaded records
+                    to explore its experimental risk estimates.
+                </p>
+                """,
+                unsafe_allow_html=True
             )
 
             if st.button(
                 "Assess All Members",
-                use_container_width=True
+                use_container_width=True,
+                type="primary"
             ):
 
-                results = assess_members(uploaded_data)
+                with st.spinner(
+                    "Assessing membership records..."
+                ):
+
+                    results = assess_members(uploaded_data)
 
                 total_members = len(results)
 
@@ -1340,32 +1616,60 @@ elif page == "Batch Assessment":
                     (results["risk_category"] == "Low").sum()
                 )
 
-                st.markdown("---")
-                st.markdown("### Assessment Summary")
+                # -----------------------------------------
+                # RESULTS SUMMARY
+                # -----------------------------------------
+
+                st.markdown("<br>", unsafe_allow_html=True)
+
+                st.markdown(
+                    '<div class="section-label">'
+                    'ASSESSMENT SUMMARY</div>',
+                    unsafe_allow_html=True
+                )
+
+                st.markdown(
+                    """
+                    <p style="color: #9CA3AF;">
+                        Overview of the model outputs for this batch.
+                    </p>
+                    """,
+                    unsafe_allow_html=True
+                )
 
                 col1, col2, col3, col4 = st.columns(4)
 
                 col1.metric(
                     "Records Assessed",
-                    total_members
+                    f"{total_members:,}"
                 )
 
                 col2.metric(
                     "High Risk",
-                    high_risk
+                    f"{high_risk:,}"
                 )
 
                 col3.metric(
                     "Medium Risk",
-                    medium_risk
+                    f"{medium_risk:,}"
                 )
 
                 col4.metric(
                     "Low Risk",
-                    low_risk
+                    f"{low_risk:,}"
                 )
 
-                st.markdown("### Results")
+                # -----------------------------------------
+                # RESULTS TABLE
+                # -----------------------------------------
+
+                st.markdown("<br>", unsafe_allow_html=True)
+
+                st.markdown(
+                    '<div class="section-label">'
+                    'MEMBER ASSESSMENT RESULTS</div>',
+                    unsafe_allow_html=True
+                )
 
                 st.dataframe(
                     results,
@@ -1373,34 +1677,40 @@ elif page == "Batch Assessment":
                     hide_index=True
                 )
 
+                # -----------------------------------------
+                # DOWNLOAD RESULTS
+                # -----------------------------------------
+
                 csv_output = results.to_csv(
                     index=False
                 ).encode("utf-8")
 
                 st.download_button(
-                    label="Download Assessment Results",
+                    label="Download Assessment Results CSV",
                     data=csv_output,
                     file_name="gympulse_assessment_results.csv",
                     mime="text/csv",
-                    use_container_width=True
+                    use_container_width=True,
+                    type="primary"
                 )
 
                 st.caption(
-                    "Assessment results are generated for this session. "
-                    "The application does not save them to a permanent "
-                    "member database."
+                    "Results are generated for this session and are "
+                    "not saved to a permanent member database. "
+                    "Risk estimates are experimental and should not "
+                    "be treated as confirmed predictions of cancellation."
                 )
 
         except Exception as error:
 
             st.error(
                 "Could not process the uploaded file. "
-                "Check the required columns and values."
+                "Check the required columns, values, and file format."
             )
 
             with st.expander("Technical details"):
-                st.code(str(error))
 
+                st.code(str(error))
 
 # =========================================================
 # 12. MODEL INSIGHTS
