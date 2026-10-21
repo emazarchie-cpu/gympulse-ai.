@@ -845,37 +845,29 @@ if page == "Dashboard":
 
     safe_user_name = html.escape(str(user_name))
     safe_business_name = html.escape(str(business_name))
-    st.markdown(
-        f"""
+        st.markdown(
+        """
         <div style="
-            background: linear-gradient(135deg, #111827, #1e293b);
+            background-color: #111827;
             padding: 24px;
             border-radius: 16px;
             border-left: 5px solid #B7F34A;
             margin-bottom: 24px;
         ">
-            <p style="
-                color: #B7F34A;
-                font-size: 14px;
-                margin-bottom: 8px;
-                font-weight: 600;
-            ">
+            <p style="color: #B7F34A; font-size: 14px; font-weight: 600;">
                 YOUR FITNESS WORKSPACE
-            </p>
-
-            <h2 style="color: white; margin: 0 0 8px 0;">
-                {greeting}, {safe_user_name}! 👋
-            </h2>
-
-            <p style="color: #CBD5E1; font-size: 16px; margin: 0;">
-                Welcome to <strong style="color: white;">{safe_business_name}</strong>.
-                Let's build a stronger, smarter fitness business.
             </p>
         </div>
         """,
         unsafe_allow_html=True
     )
 
+    st.subheader(f"{greeting}, {safe_user_name}! 👋")
+
+    st.markdown(
+        f"Welcome to **{safe_business_name}**. "
+        "Let's build a stronger, smarter fitness business."
+    )
     # =====================================================
     # EXISTING DASHBOARD CONTENT
     # =====================================================
