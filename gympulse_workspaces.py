@@ -1,15 +1,15 @@
 """GymPulse AI: Risk Radar, Retention Action Centre, Business Insights, Archie.
-
+ 
 Pure logic (build_roster, drivers, playbook, kpis, archie_context) is separate
 from Streamlit rendering so it can be tested without a database.
 """
 from datetime import date, timedelta
-
+ 
 import pandas as pd
 import streamlit as st
-
+ 
 ARCHIE_MODEL = "claude-sonnet-5-5"
-
+ 
 ACTIVITY_COLS = [
     "membership_type", "days_since_last_visit", "visits_previous_30_days",
     "visits_last_30_days", "renewal_due_days", "pt_sessions_attended",
@@ -18,8 +18,8 @@ ACTION_TYPES = ["Personal call", "WhatsApp check-in", "Free PT session",
                 "Renewal offer", "Class invite", "Goal review"]
 STATUSES = ["To do", "In progress", "Done"]
 OUTCOMES = ["Retained", "Cancelled", "No response"]
-
-
+ 
+ 
 # ---------------------------------------------------------------- data
 def load_roster(supabase, gym_id, assess_fn):
     """Members + activity, scored by the model. Members without activity
@@ -34,8 +34,8 @@ def load_roster(supabase, gym_id, assess_fn):
         .eq("gym_id", gym_id).execute().data or []
     )
     return build_roster(members, activity, assess_fn)
-
-
+ 
+ 
 def build_roster(members, activity, assess_fn):
     if members.empty:
         return pd.DataFrame(), pd.DataFrame()
@@ -55,14 +55,14 @@ def build_roster(members, activity, assess_fn):
     scored["drivers"] = scored.apply(drivers, axis=1)
     scored["suggested_action"] = scored.apply(suggest_action, axis=1)
     return scored.sort_values("cancellation_probability", ascending=False), missing
-
-
+ 
+ 
 def load_actions(supabase, gym_id):
     rows = (supabase.table("retention_actions").select("*")
             .eq("gym_id", gym_id).order("created_at", desc=True).execute().data or [])
     return pd.DataFrame(rows)
-
-
+ 
+ 
 # ------------------------------------------------------------- logic
 def drivers(row):
     """Plain-language reasons a member is flagged (rule-based, transparent)."""
@@ -79,8 +79,8 @@ def drivers(row):
     if row["membership_type"] == "Monthly":
         out.append("monthly plan (easy to leave)")
     return ", ".join(out) or "no major warning signs"
-
-
+ 
+ 
 def suggest_action(row):
     if row["renewal_due_days"] <= 14 and row["risk_category"] != "Low":
         return "Renewal offer"
@@ -91,8 +91,8 @@ def suggest_action(row):
     if row["risk_category"] == "Low":
         return "Goal review"
     return "WhatsApp check-in"
-
-
+ 
+ 
 def kpis(roster, actions):
     n = len(roster)
     high = roster[roster["risk_category"] == "High"] if n else roster
@@ -116,8 +116,8 @@ def kpis(roster, actions):
                 done.loc[done["outcome"] == "Retained", "member_id"]
             )["monthly_fee"].sum()) if retained and n else 0.0,
     }
-
-
+ 
+ 
 def archie_context(roster, actions, business_name):
     k = kpis(roster, actions)
     lines = [f"Gym: {business_name}. Members scored: {k['members_scored']}.",
@@ -132,8 +132,8 @@ def archie_context(roster, actions, business_name):
             lines.append(f"- {r['full_name']} | {r['cancellation_probability']:.0%} | "
                          f"{r['drivers']} | {r['suggested_action']}")
     return "\n".join(lines)
-
-
+ 
+ 
 ARCHIE_SYSTEM = (
     "You are Archie, the retention assistant inside GymPulse AI. You help gym "
     "owners keep members. Use ONLY the data provided; if something is not in it, "
@@ -142,8 +142,8 @@ ARCHIE_SYSTEM = (
     "message to a member, write it ready to send (WhatsApp length, friendly, no "
     "pressure, no mention of 'risk' or 'cancellation')."
 )
-
-
+ 
+ 
 def archie_reply(history, context):
     """Claude if ANTHROPIC_API_KEY is set; otherwise a rules-based answer."""
     key = st.secrets.get("ANTHROPIC_API_KEY") if hasattr(st, "secrets") else None
@@ -161,19 +161,19 @@ def archie_reply(history, context):
     except Exception as e:
         return f"Archie couldn't reach the AI service ({type(e).__name__}).\n\n" + \
                _offline_reply(history[-1]["content"], context), False
-
-
+ 
+ 
 def _offline_reply(question, context):
     return ("I'm running without an AI key, so here is today's snapshot instead:\n\n"
             + context + "\n\nAdd `ANTHROPIC_API_KEY` to your Streamlit secrets to "
             "unlock full answers and ready-to-send member messages.")
-
-
+ 
+ 
 # ------------------------------------------------------- rendering
 def _money(x):
     return f"{x:,.0f}"
-
-
+ 
+ 
 def _activity_editor(supabase, gym_id, roster, missing):
     """Add or update visit/renewal data for any member."""
     names, current = {}, {}
@@ -187,19 +187,19 @@ def _activity_editor(supabase, gym_id, roster, missing):
     if not names:
         st.info("Register members in Member Management first.")
         return
-
+ 
     plans = ["Monthly", "Quarterly", "Annual"]
-
+ 
     with st.expander("Add or update member activity", expanded=roster.empty):
         member_id = st.selectbox(
             "Member", list(names),
             format_func=lambda i: names[i], key="act_member"
         )
         r = current.get(member_id)
-
+ 
         def val(col, default):
             return default if r is None else r[col]
-
+ 
         with st.form(f"activity_form_{member_id}"):
             c1, c2 = st.columns(2)
             mtype = c1.selectbox(
@@ -241,34 +241,11 @@ def _activity_editor(supabase, gym_id, roster, missing):
                     "pt_sessions_attended": int(pt),
                 }).execute()
                 st.rerun()
-
+ 
     if not missing.empty:
         st.caption(f"{len(missing)} member(s) still need activity data.")
-    st.info("Add attendance data so the model can score your members.")
-    if missing.empty:
-        return
-    with st.form("activity_form"):
-        name = st.selectbox("Member", missing["full_name"])
-        c1, c2 = st.columns(2)
-        mtype = c1.selectbox("Membership type", ["Monthly", "Quarterly", "Annual"])
-        fee = c2.number_input("Monthly fee", min_value=0.0, step=500.0)
-        d = c1.number_input("Days since last visit", 0, 365, 7)
-        prev = c2.number_input("Visits, previous 30 days", 0, 100, 10)
-        last = c1.number_input("Visits, last 30 days", 0, 100, 8)
-        ren = c2.number_input("Days until renewal", 0, 365, 30)
-        pt = c1.number_input("PT sessions attended", 0, 100, 0)
-        if st.form_submit_button("Save activity", use_container_width=True):
-            mid = missing.loc[missing["full_name"] == name, "id"].iloc[0]
-            supabase.table("member_activity").upsert({
-                "member_id": mid, "gym_id": gym_id, "membership_type": mtype,
-                "monthly_fee": float(fee), "days_since_last_visit": int(d),
-                "visits_previous_30_days": int(prev), "visits_last_30_days": int(last),
-                "renewal_due_days": int(ren), "pt_sessions_attended": int(pt),
-            }).execute()
-            st.rerun()
-    st.caption(f"{len(missing)} member(s) still need activity data.")
-
-
+ 
+ 
 def render_risk_radar(supabase, gym_id, assess_fn):
     st.markdown("## Member Risk Radar")
     st.write("Every member, scored and ranked, with the reasons behind the flag.")
@@ -283,27 +260,34 @@ def render_risk_radar(supabase, gym_id, assess_fn):
         st.info("Add attendance data so the model can score your members.")
         _activity_editor(supabase, gym_id, roster, missing)
         return
+ 
     k = kpis(roster, pd.DataFrame())
-    c = st.columns(4)
-    c[0].metric("High risk", k["high"])
-    c[1].metric("Medium risk", k["medium"])
-    c[2].metric("Monthly revenue held by high-risk", _money(k["high_risk_revenue"]))
-    c[3].metric("Renewals ≤30d at risk", k["renewals_30d_at_risk"])
-_activity_editor(supabase, gym_id, roster, missing)
+    c = st.columns(5)
+    c[0].metric("Members scored", k["members_scored"])
+    c[1].metric("High risk", k["high"])
+    c[2].metric("Medium risk", k["medium"])
+    c[3].metric("Low risk", k["members_scored"] - k["high"] - k["medium"])
+    c[4].metric("Renewals ≤30d at risk", k["renewals_30d_at_risk"])
+ 
+    _activity_editor(supabase, gym_id, roster, missing)
+ 
     f1, f2, f3 = st.columns([2, 2, 3])
-    levels = f1.multiselect("Risk level", ["High", "Medium", "Low"], ["High", "Medium"])
+    levels = f1.multiselect("Risk level", ["High", "Medium", "Low"], ["High", "Medium", "Low"])
     plans = f2.multiselect("Membership", ["Monthly", "Quarterly", "Annual"],
                            ["Monthly", "Quarterly", "Annual"])
     search = f3.text_input("Search member")
     view = roster[roster["risk_category"].isin(levels) & roster["membership_type"].isin(plans)]
     if search:
         view = view[view["full_name"].str.contains(search, case=False, na=False)]
-
+    if view.empty:
+        st.info("No members match these filters.")
+        return
+ 
     st.markdown('<div class="section-label">THE RADAR</div>', unsafe_allow_html=True)
     st.caption("Right = longer absent. Up = higher cancellation estimate.")
     st.scatter_chart(view, x="days_since_last_visit", y="cancellation_probability",
                      color="risk_category", size="monthly_fee", height=320)
-
+ 
     st.markdown('<div class="section-label">PRIORITY LIST</div>', unsafe_allow_html=True)
     show = view[["full_name", "risk_category", "cancellation_probability",
                  "drivers", "suggested_action", "monthly_fee"]].rename(columns={
@@ -313,7 +297,7 @@ _activity_editor(supabase, gym_id, roster, missing)
     st.dataframe(show, hide_index=True, use_container_width=True,
                  column_config={"Probability": st.column_config.ProgressColumn(
                      format="%.0f%%", min_value=0, max_value=1)})
-
+ 
     if view.empty:
         return
     st.markdown('<div class="section-label">MEMBER DETAIL</div>', unsafe_allow_html=True)
@@ -331,15 +315,15 @@ _activity_editor(supabase, gym_id, roster, missing)
         st.success("Added to the Retention Action Centre.")
     st.caption("Estimates come from a model trained on synthetic data. Use them "
                "to prioritise conversations, not to make decisions about members.")
-
-
+ 
+ 
 def _create_action(supabase, gym_id, member_id, action_type, renewal_days, note=""):
     due = date.today() + timedelta(days=1 if renewal_days <= 14 else 3)
     supabase.table("retention_actions").insert({
         "gym_id": gym_id, "member_id": member_id, "action_type": action_type,
         "due_date": due.isoformat(), "note": note}).execute()
-
-
+ 
+ 
 def render_action_centre(supabase, gym_id, assess_fn):
     st.markdown("## Retention Action Centre")
     st.write("Turn risk into follow-ups, track them, and learn what works.")
@@ -360,7 +344,7 @@ def render_action_centre(supabase, gym_id, assess_fn):
     c[0].metric("Open actions", k["open_actions"])
     c[1].metric("Members saved", k["saves"])
     c[2].metric("Save rate", "n/a" if k["save_rate"] is None else f"{k['save_rate']:.0%}")
-
+ 
     open_ids = set(actions.loc[actions["status"] != "Done", "member_id"]) if not actions.empty else set()
     todo = roster[(roster["risk_category"] != "Low") & ~roster["id"].isin(open_ids)]
     st.markdown('<div class="section-label">SUGGESTED TODAY</div>', unsafe_allow_html=True)
@@ -382,7 +366,7 @@ def render_action_centre(supabase, gym_id, assess_fn):
                 _create_action(supabase, gym_id, r["id"], r["suggested_action"],
                                r["renewal_due_days"])
             st.rerun()
-
+ 
     st.markdown('<div class="section-label">YOUR BOARD</div>', unsafe_allow_html=True)
     if actions.empty:
         st.info("No actions yet. Add one from the suggestions above.")
@@ -413,8 +397,8 @@ def render_action_centre(supabase, gym_id, assess_fn):
                             "completed_at": date.today().isoformat()}
                         ).eq("id", a["id"]).execute()
                         st.rerun()
-
-
+ 
+ 
 def render_business_insights(supabase, gym_id, assess_fn):
     st.markdown("## Business Insights")
     st.write("What retention is worth, where it leaks, and what's working.")
@@ -437,7 +421,7 @@ def render_business_insights(supabase, gym_id, assess_fn):
     c[3].metric("Revenue saved", _money(k["revenue_saved"]))
     st.caption("Expected loss = each member's estimate × their monthly fee. "
                "It is a planning figure from a synthetic-data model, not a forecast.")
-
+ 
     l, r = st.columns(2)
     with l:
         st.markdown('<div class="section-label">RISK MIX</div>', unsafe_allow_html=True)
@@ -446,7 +430,7 @@ def render_business_insights(supabase, gym_id, assess_fn):
     with r:
         st.markdown('<div class="section-label">REVENUE AT RISK BY PLAN</div>', unsafe_allow_html=True)
         st.bar_chart(roster.groupby("membership_type")["revenue_at_risk"].sum())
-
+ 
     st.markdown('<div class="section-label">RENEWAL PIPELINE</div>', unsafe_allow_html=True)
     bins = pd.cut(roster["renewal_due_days"], [-1, 7, 14, 30, 60, 10_000],
                   labels=["≤7d", "8-14d", "15-30d", "31-60d", "60d+"])
@@ -457,7 +441,7 @@ def render_business_insights(supabase, gym_id, assess_fn):
     st.dataframe(pipe.rename(columns={"members": "Members", "avg_risk": "Avg risk",
                                       "fees": "Monthly fees"}),
                  use_container_width=True)
-
+ 
     st.markdown('<div class="section-label">WHAT WORKS</div>', unsafe_allow_html=True)
     done = actions[actions["status"] == "Done"] if not actions.empty else actions
     if done.empty:
@@ -470,7 +454,7 @@ def render_business_insights(supabase, gym_id, assess_fn):
         st.dataframe(tbl, use_container_width=True)
         if len(done) < 20:
             st.caption("Small sample, so treat these as early signals only.")
-
+ 
     st.markdown('<div class="section-label">TO DO THIS WEEK</div>', unsafe_allow_html=True)
     if k["high"]:
         st.write(f"- Contact the **{k['high']}** high-risk members, starting with "
@@ -479,16 +463,16 @@ def render_business_insights(supabase, gym_id, assess_fn):
         st.write(f"- Close out **{k['open_actions']}** open actions and record outcomes.")
     if not k["high"] and not k["open_actions"]:
         st.write("- Nothing urgent. Run a goal review with a few Low-risk members.")
-
-
+ 
+ 
 ARCHIE_PROMPTS = [
     "Who should I call first today?",
     "Write a WhatsApp message for my most at-risk member",
     "Why is revenue at risk this month?",
     "Give me a 3-step plan for this week",
 ]
-
-
+ 
+ 
 def render_archie(supabase, gym_id, assess_fn, business_name):
     st.markdown("## Archie · your retention assistant")
     st.write("Ask about your members, revenue and follow-ups. Archie reads your "
@@ -500,7 +484,7 @@ def render_archie(supabase, gym_id, assess_fn, business_name):
         roster, actions = pd.DataFrame(), pd.DataFrame()
     context = archie_context(roster, actions, business_name) if len(roster) \
         else f"Gym: {business_name}. No scored members yet."
-
+ 
     if "archie_msgs" not in st.session_state:
         st.session_state.archie_msgs = []
     cols = st.columns(len(ARCHIE_PROMPTS))
