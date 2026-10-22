@@ -144,14 +144,36 @@ ARCHIE_SYSTEM = (
 )
  
  
+def _clean_key(raw):
+    """Remove spaces, newlines and stray quotes a paste can add."""
+    return str(raw).strip().strip('"').strip("'").strip()
+ 
+ 
+def key_check():
+    """Safe description of the key Streamlit is passing in (never the key)."""
+    try:
+        raw = st.secrets.get("ANTHROPIC_API_KEY")
+    except Exception:
+        raw = None
+    if not raw:
+        return "No ANTHROPIC_API_KEY found in secrets."
+    key = _clean_key(raw)
+    return (f"Key found: {len(key)} characters, starts with "
+            f"'{key[:7]}', ends with '...{key[-3:]}', "
+            f"valid prefix: {key.startswith('sk-ant-')}.")
+ 
+ 
 def archie_reply(history, context):
     """Claude if ANTHROPIC_API_KEY is set; otherwise a rules-based answer."""
-    key = st.secrets.get("ANTHROPIC_API_KEY") if hasattr(st, "secrets") else None
-    if not key:
+    try:
+        raw = st.secrets.get("ANTHROPIC_API_KEY")
+    except Exception:
+        raw = None
+    if not raw:
         return _offline_reply(history[-1]["content"], context), False
     try:
         import anthropic
-        client = anthropic.Anthropic(api_key=key)
+        client = anthropic.Anthropic(api_key=_clean_key(raw))
         resp = client.messages.create(
             model=ARCHIE_MODEL, max_tokens=700,
             system=ARCHIE_SYSTEM + "\n\nGYM DATA:\n" + context,
@@ -159,14 +181,15 @@ def archie_reply(history, context):
         )
         return resp.content[0].text, True
     except Exception as e:
-        return f"Archie couldn't reach the AI service ({type(e).__name__}).\n\n" + \
-               _offline_reply(history[-1]["content"], context), False
+        detail = str(e)[:300]
+        return (f"Archie couldn't reach the AI service "
+                f"({type(e).__name__}): {detail}\n\n"
+                + _offline_reply(history[-1]["content"], context)), False
  
  
 def _offline_reply(question, context):
-    return ("I'm running without an AI key, so here is today's snapshot instead:\n\n"
-            + context + "\n\nAdd `ANTHROPIC_API_KEY` to your Streamlit secrets to "
-            "unlock full answers and ready-to-send member messages.")
+    return ("Here is today's snapshot from your data:\n\n" + context
+            + "\n\n(AI answers are off. " + key_check() + ")")
  
  
 # ------------------------------------------------------- rendering
