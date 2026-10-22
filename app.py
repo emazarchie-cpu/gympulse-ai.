@@ -374,240 +374,280 @@ st.markdown(
     .st-key-top_nav div[role="radiogroup"] label:hover p {
         color: #10182A !important;
     }
-    /* ---------- Landing page ---------- */
+    /* ---------- Landing page 2026 ---------- */
     .lp-hero {
-        text-align: center;
-        padding: 18px 10px 10px;
-        background: radial-gradient(
-            ellipse at top,
-            rgba(183,243,74,0.13) 0%,
-            rgba(11,16,32,0) 65%
-        );
-    }
-
-    .lp-eyebrow {
-        color: var(--lime);
-        text-transform: uppercase;
-        font-size: 11px;
-        font-weight: 800;
-        letter-spacing: 2.5px;
-        margin-bottom: 14px;
-    }
-
-    .lp-title {
-        font-size: 54px;
-        font-weight: 800;
-        line-height: 1.08;
-        letter-spacing: -1.5px;
-        color: var(--white);
-    }
-
-    .lp-title span { color: var(--lime); }
-
-    .lp-sub {
-        color: #BCC8D8;
-        font-size: 16px;
-        line-height: 1.7;
-        max-width: 680px;
-        margin: 18px auto 20px;
-    }
-
-    .lp-chips {
-        display: flex;
-        gap: 10px;
-        justify-content: center;
-        flex-wrap: wrap;
-        margin-bottom: 18px;
-    }
-
-    .lp-chip {
-        border: 1px solid var(--border);
-        background: var(--surface);
-        border-radius: 999px;
-        padding: 6px 14px;
-        font-size: 12px;
-        color: var(--muted);
-    }
-
-    .lp-section-title {
-        text-align: center;
-        font-size: 30px;
-        font-weight: 800;
-        letter-spacing: -0.5px;
-        color: var(--white);
-        margin: 64px 0 8px;
-    }
-
-    .lp-section-sub {
-        text-align: center;
-        color: var(--muted);
-        font-size: 14px;
-        line-height: 1.6;
-        max-width: 620px;
-        margin: 0 auto 28px;
-    }
-
-    .lp-grid {
+        position: relative;
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        grid-template-columns: 1.1fr 0.9fr;
+        gap: 36px;
+        align-items: center;
+        padding: 30px 6px 20px;
+        overflow: hidden;
+    }
+    .lp-hero::before {
+        content: "";
+        position: absolute;
+        width: 520px; height: 520px;
+        top: -200px; left: -120px;
+        background: radial-gradient(circle, rgba(183,243,74,0.22), transparent 65%);
+        filter: blur(30px);
+        pointer-events: none;
+    }
+    .lp-hero::after {
+        content: "";
+        position: absolute;
+        width: 480px; height: 480px;
+        bottom: -220px; right: -100px;
+        background: radial-gradient(circle, rgba(53,214,237,0.20), transparent 65%);
+        filter: blur(30px);
+        pointer-events: none;
+    }
+    .lp-hero > * { position: relative; z-index: 1; }
+
+    .lp-pill {
+        display: inline-flex; align-items: center; gap: 8px;
+        padding: 6px 14px 6px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: rgba(255,255,255,0.04);
+        backdrop-filter: blur(10px);
+        color: var(--muted);
+        font-size: 12px; font-weight: 600;
+        margin-bottom: 20px;
+    }
+    .lp-dot {
+        width: 8px; height: 8px; border-radius: 50%;
+        background: var(--lime);
+        animation: lp-pulse 1.8s infinite;
+    }
+    .lp-title {
+        font-size: 58px; font-weight: 800;
+        line-height: 1.04; letter-spacing: -2.5px;
+        color: var(--white);
+    }
+    .lp-grad {
+        background: linear-gradient(90deg, #B7F34A, #35D6ED);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+    }
+    .lp-sub {
+        color: #BCC8D8; font-size: 16px; line-height: 1.7;
+        max-width: 540px; margin: 20px 0 22px;
+    }
+    .lp-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+    .lp-chip {
+        display: inline-flex; align-items: center; gap: 6px;
+        font-size: 12px; color: var(--muted);
+        padding: 6px 12px; border-radius: 999px;
+        border: 1px solid var(--border);
+        background: rgba(255,255,255,0.03);
+    }
+    .lp-chip svg { color: var(--lime); }
+
+    /* Risk Radar preview */
+    .lp-radar {
+        background: rgba(21,29,48,0.75);
+        backdrop-filter: blur(16px);
+        border: 1px solid rgba(255,255,255,0.12);
+        border-radius: 22px;
+        padding: 20px;
+        box-shadow: 0 30px 80px rgba(0,0,0,0.45), 0 0 0 1px rgba(183,243,74,0.05);
+        animation: lp-float 6s ease-in-out infinite;
+    }
+    .lp-radar-head {
+        display: flex; justify-content: space-between; align-items: center;
+        margin-bottom: 6px;
+    }
+    .lp-radar-title { font-weight: 800; font-size: 15px; color: var(--white); }
+    .lp-live {
+        display: inline-flex; align-items: center; gap: 6px;
+        font-size: 11px; font-weight: 700; color: var(--lime);
+    }
+    .lp-pulse-line { width: 100%; height: 54px; margin: 4px 0 8px; }
+    .lp-pulse-line path {
+        stroke-dasharray: 700; stroke-dashoffset: 700;
+        animation: lp-dash 3.5s ease-out infinite;
+    }
+    .lp-row {
+        display: flex; align-items: center; gap: 12px;
+        padding: 11px 12px; margin-top: 8px;
+        background: rgba(255,255,255,0.035);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+    }
+    .lp-avatar {
+        width: 34px; height: 34px; border-radius: 50%;
+        display: grid; place-items: center;
+        font-size: 12px; font-weight: 800; color: #10182A;
+    }
+    .lp-row-main { flex: 1; }
+    .lp-row-name { font-size: 13px; font-weight: 700; color: var(--white); }
+    .lp-row-sub { font-size: 11px; color: var(--muted); }
+    .lp-risk {
+        font-size: 11px; font-weight: 800;
+        padding: 4px 10px; border-radius: 999px;
+    }
+    .lp-high { background: rgba(255,107,107,0.16); color: #FF7A7A; }
+    .lp-med  { background: rgba(255,196,77,0.16);  color: #FFC44D; }
+    .lp-low  { background: rgba(183,243,74,0.16);  color: #B7F34A; }
+    .lp-tiny {
+        text-align: center; font-size: 10px; color: var(--muted);
+        margin-top: 12px; letter-spacing: 1px;
+    }
+
+    /* Stat strip */
+    .lp-stats {
+        display: grid; grid-template-columns: repeat(4, 1fr);
+        gap: 1px; background: var(--border);
+        border: 1px solid var(--border);
+        border-radius: 18px; overflow: hidden; margin: 18px 0 6px;
+    }
+    .lp-stat { background: var(--surface); padding: 18px; text-align: center; }
+    .lp-stat b { display: block; font-size: 26px; color: var(--white); letter-spacing: -1px; }
+    .lp-stat span { font-size: 12px; color: var(--muted); }
+
+    /* Section headings */
+    .lp-kicker {
+        text-align: center; color: var(--lime);
+        font-size: 11px; font-weight: 800; letter-spacing: 2.5px;
+        text-transform: uppercase; margin: 76px 0 10px;
+    }
+    .lp-h2 {
+        text-align: center; font-size: 38px; font-weight: 800;
+        letter-spacing: -1.5px; line-height: 1.1; color: var(--white);
+    }
+    .lp-lead {
+        text-align: center; color: var(--muted);
+        font-size: 15px; line-height: 1.7;
+        max-width: 600px; margin: 12px auto 34px;
+    }
+
+    /* Icon tile */
+    .lp-ic {
+        width: 44px; height: 44px; border-radius: 13px;
+        display: grid; place-items: center; margin-bottom: 14px;
+        color: var(--lime);
+        background: linear-gradient(145deg, rgba(183,243,74,0.16), rgba(53,214,237,0.08));
+        border: 1px solid rgba(183,243,74,0.25);
+    }
+
+    /* Fade-out visual */
+    .lp-split {
+        display: grid; grid-template-columns: 1fr 1fr; gap: 28px;
+        align-items: center;
+        background: var(--surface); border: 1px solid var(--border);
+        border-radius: 24px; padding: 30px;
+    }
+    .lp-split h3 { font-size: 24px; letter-spacing: -0.5px; margin: 0 0 10px; }
+    .lp-split p { color: var(--muted); font-size: 14px; line-height: 1.7; }
+    .lp-bars {
+        display: flex; align-items: flex-end; gap: 12px; height: 190px;
+        padding: 0 6px; border-bottom: 1px solid var(--border);
+    }
+    .lp-bar-col { flex: 1; text-align: center; }
+    .lp-bar-fill {
+        border-radius: 8px 8px 0 0;
+        background: linear-gradient(180deg, #B7F34A, rgba(183,243,74,0.25));
+        transform-origin: bottom;
+        animation: lp-grow 1.2s ease-out both;
+    }
+    .lp-bar-fill.warn { background: linear-gradient(180deg, #FF8A5B, rgba(255,138,91,0.2)); }
+    .lp-bar-lbl { font-size: 10px; color: var(--muted); margin-top: 6px; }
+    .lp-bar-cap {
+        font-size: 11px; color: var(--muted); text-align: center; margin-top: 10px;
+    }
+
+    /* Steps */
+    .lp-steps {
+        display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px;
+        position: relative;
+    }
+    .lp-stepcard {
+        background: var(--surface); border: 1px solid var(--border);
+        border-radius: 20px; padding: 24px; position: relative;
+    }
+    .lp-num {
+        position: absolute; top: 18px; right: 20px;
+        font-size: 46px; font-weight: 800; letter-spacing: -2px;
+        color: rgba(255,255,255,0.05);
+    }
+    .lp-stepcard h4, .lp-bento h4 {
+        color: var(--white); font-size: 17px; font-weight: 800; margin: 0 0 6px;
+    }
+    .lp-stepcard p, .lp-bento p {
+        color: var(--muted); font-size: 13px; line-height: 1.65; margin: 0;
+    }
+
+    /* Bento grid */
+    .lp-bento-grid {
+        display: grid; grid-template-columns: repeat(6, 1fr);
         gap: 16px;
     }
-
-    .lp-card {
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: 16px;
-        padding: 22px;
-        transition: transform 0.2s ease, border-color 0.2s ease;
+    .lp-bento {
+        position: relative; overflow: hidden;
+        background: var(--surface); border: 1px solid var(--border);
+        border-radius: 22px; padding: 24px;
+        transition: transform .25s ease, border-color .25s ease;
+    }
+    .lp-bento::after {
+        content: ""; position: absolute; inset: 0;
+        background: radial-gradient(circle at 100% 0%, rgba(183,243,74,0.10), transparent 55%);
+        opacity: 0; transition: opacity .3s ease; pointer-events: none;
+    }
+    .lp-bento:hover { transform: translateY(-4px); border-color: rgba(183,243,74,0.5); }
+    .lp-bento:hover::after { opacity: 1; }
+    .b-4 { grid-column: span 4; }
+    .b-3 { grid-column: span 3; }
+    .b-2 { grid-column: span 2; }
+    .lp-mini {
+        display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap;
     }
 
-    .lp-card:hover {
-        transform: translateY(-4px);
-        border-color: var(--lime);
-    }
-
-    .lp-icon { font-size: 26px; margin-bottom: 10px; }
-
-    .lp-step {
-        color: var(--lime);
-        font-size: 12px;
-        font-weight: 800;
-        letter-spacing: 2px;
-        margin-bottom: 8px;
-    }
-
-    .lp-card h4 {
-        color: var(--white);
-        font-size: 16px;
-        font-weight: 800;
-        margin: 0 0 6px;
-    }
-
-    .lp-card p {
-        color: var(--muted);
-        font-size: 13px;
-        line-height: 1.6;
-        margin: 0;
-    }
-
-    .lp-preview {
-        max-width: 560px;
-        margin: 0 auto;
-        background: linear-gradient(135deg, #17243A 0%, #142033 100%);
-        border: 1px solid var(--border);
-        border-radius: 20px;
-        padding: 26px;
-    }
-
-    .lp-preview-tag {
-        color: var(--lime);
-        font-size: 11px;
-        font-weight: 800;
-        letter-spacing: 2px;
-        margin-bottom: 14px;
-    }
-
-    .lp-preview-row {
-        display: flex;
-        justify-content: space-between;
-        color: var(--muted);
-        font-size: 13px;
-        padding: 7px 0;
-        border-bottom: 1px solid var(--border);
-    }
-
-    .lp-preview-row b { color: var(--white); }
-
-    .lp-prob {
-        display: flex;
-        align-items: baseline;
-        justify-content: space-between;
-        margin-top: 18px;
-    }
-
-    .lp-prob-num {
-        font-size: 40px;
-        font-weight: 800;
-        color: #FF8A5B;
-    }
-
-    .lp-badge {
-        background: rgba(255,138,91,0.15);
-        color: #FF8A5B;
-        font-size: 12px;
-        font-weight: 800;
-        padding: 5px 12px;
-        border-radius: 999px;
-    }
-
-    .lp-bar {
-        height: 8px;
-        background: #0B1020;
-        border-radius: 6px;
-        overflow: hidden;
-        margin-top: 10px;
-    }
-
-    .lp-bar > div {
-        width: 72%;
-        height: 100%;
-        background: linear-gradient(90deg, #B7F34A, #FF8A5B);
-    }
-
+    /* Transparency + CTA */
     .lp-note {
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-left: 5px solid var(--cyan);
-        border-radius: 16px;
-        padding: 24px;
-        max-width: 820px;
-        margin: 0 auto;
+        max-width: 860px; margin: 0 auto;
+        display: flex; gap: 18px; align-items: flex-start;
+        background: var(--surface); border: 1px solid var(--border);
+        border-radius: 22px; padding: 26px;
     }
-
-    .lp-note h4 {
-        color: var(--white);
-        font-size: 17px;
-        font-weight: 800;
-        margin: 0 0 8px;
-    }
-
-    .lp-note p {
-        color: #BCC8D8;
-        font-size: 14px;
-        line-height: 1.7;
-        margin: 0;
-    }
+    .lp-note h4 { color: var(--white); margin: 0 0 6px; font-size: 17px; }
+    .lp-note p { color: #BCC8D8; margin: 0; font-size: 14px; line-height: 1.7; }
+    .lp-note .lp-ic { margin: 0; flex-shrink: 0; color: var(--cyan);
+        border-color: rgba(53,214,237,0.3);
+        background: rgba(53,214,237,0.1); }
 
     .lp-cta {
-        text-align: center;
-        margin: 64px 0 10px;
-        padding: 40px 20px;
-        border: 1px solid var(--border);
-        border-radius: 20px;
-        background: radial-gradient(
-            ellipse at center,
-            rgba(183,243,74,0.12) 0%,
-            rgba(21,29,48,1) 70%
-        );
+        position: relative; overflow: hidden; text-align: center;
+        margin: 70px 0 10px; padding: 64px 24px;
+        border-radius: 28px; border: 1px solid rgba(183,243,74,0.25);
+        background:
+            radial-gradient(circle at 20% 0%, rgba(183,243,74,0.22), transparent 50%),
+            radial-gradient(circle at 80% 100%, rgba(53,214,237,0.20), transparent 50%),
+            #121B2E;
     }
-
     .lp-cta-title {
-        font-size: 32px;
-        font-weight: 800;
-        letter-spacing: -1px;
-        color: var(--white);
+        font-size: 44px; font-weight: 800;
+        letter-spacing: -2px; line-height: 1.08; color: var(--white);
     }
+    .lp-cta p { color: var(--muted); margin: 14px 0 0; font-size: 15px; }
+    .lp-arrow { display: inline-flex; vertical-align: middle; margin-left: 4px; }
 
-    .lp-cta-title span { color: var(--lime); }
-
-    .lp-cta p {
-        color: var(--muted);
-        font-size: 14px;
-        margin: 10px 0 0;
+    @keyframes lp-pulse {
+        0% { box-shadow: 0 0 0 0 rgba(183,243,74,0.6); }
+        100% { box-shadow: 0 0 0 10px rgba(183,243,74,0); }
     }
+    @keyframes lp-float { 50% { transform: translateY(-8px); } }
+    @keyframes lp-dash { to { stroke-dashoffset: 0; } }
+    @keyframes lp-grow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
 
-    @media (max-width: 700px) {
-        .lp-title { font-size: 36px; }
+    @media (max-width: 900px) {
+        .lp-hero, .lp-split, .lp-steps { grid-template-columns: 1fr; }
+        .lp-stats { grid-template-columns: repeat(2, 1fr); }
+        .b-4, .b-3, .b-2 { grid-column: span 6; }
+        .lp-title { font-size: 40px; }
+        .lp-h2 { font-size: 28px; }
+        .lp-cta-title { font-size: 30px; }
     }
     .footer {
         text-align: center;
@@ -646,7 +686,43 @@ if "auth_user" not in st.session_state:
 if "user_profile" not in st.session_state:
     st.session_state.user_profile = None
 
+# ---------- Landing page helpers ----------
 
+ICON_PATHS = {
+    "pulse": '<path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/>',
+    "down": '<polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/>',
+    "calendar": '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+    "target": '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+    "user": '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+    "users": '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
+    "upload": '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/>',
+    "gauge": '<path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/>',
+    "sliders": '<line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/>',
+    "chat": '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>',
+    "shield": '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>',
+    "check": '<polyline points="20 6 9 17 4 12"/>',
+    "arrow": '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
+    "download": '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/>',
+}
+
+
+def icon(name, size=22):
+    """Return a thin-stroke SVG icon that inherits the current text color."""
+    return (
+        f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" '
+        'fill="none" stroke="currentColor" stroke-width="1.75" '
+        'stroke-linecap="round" stroke-linejoin="round">'
+        f'{ICON_PATHS[name]}</svg>'
+    )
+
+
+def html(block):
+    """Render an HTML block. Flattens it so Streamlit's Markdown never
+    mistakes indented lines for a code block."""
+    flat = " ".join(
+        line.strip() for line in block.splitlines() if line.strip()
+    )
+    st.markdown(flat, unsafe_allow_html=True)
 # Show login and registration until authenticated
 # Show login and registration until authenticated
 if st.session_state.auth_user is None:
@@ -668,33 +744,69 @@ if st.session_state.auth_user is None:
         st.image(LOGO_PATH, width=115)
 
     # Hero
-    st.markdown(
-        """
-        <div class="lp-hero">
-            <div class="lp-eyebrow">MEMBER RETENTION INTELLIGENCE</div>
-            <div class="lp-title">
-                Know who is about to leave<br><span>before they do.</span>
-            </div>
-            <div class="lp-sub">
-                GymPulse AI turns attendance and renewal data into early
-                warning signals, so you can reach out to the right members
-                at the right time. Register your members or upload a
-                spreadsheet and see cancellation-risk estimates in seconds.
-            </div>
-            <div class="lp-chips">
-                <div class="lp-chip">✓ Free to start</div>
-                <div class="lp-chip">✓ Runs in your browser</div>
-                <div class="lp-chip">✓ No special hardware</div>
-                <div class="lp-chip">✓ Works with a simple CSV</div>
-            </div>
+    html(f"""
+    <div class="lp-hero">
+      <div>
+        <div class="lp-pill"><span class="lp-dot"></span>
+          Member retention intelligence for gyms</div>
+        <div class="lp-title">Know who is leaving<br>
+          <span class="lp-grad">before they do.</span></div>
+        <div class="lp-sub">GymPulse AI reads attendance and renewal
+          patterns and flags the members who are drifting away, so you can
+          reach out while it still matters. Add members by hand or drop in
+          a spreadsheet.</div>
+        <div class="lp-chips">
+          <div class="lp-chip">{icon('check', 14)} Free to start</div>
+          <div class="lp-chip">{icon('check', 14)} Runs in your browser</div>
+          <div class="lp-chip">{icon('check', 14)} Works with a simple CSV</div>
         </div>
-        <div class="section-label" style="text-align:center;">
-            LOG IN OR CREATE YOUR FREE ACCOUNT
+      </div>
+      <div class="lp-radar">
+        <div class="lp-radar-head">
+          <div class="lp-radar-title">Risk Radar</div>
+          <div class="lp-live"><span class="lp-dot"></span>LIVE PREVIEW</div>
         </div>
-        """,
-        unsafe_allow_html=True
-    )
-
+        <svg class="lp-pulse-line" viewBox="0 0 400 54" preserveAspectRatio="none">
+          <path d="M0 30 H110 L130 30 L145 6 L165 50 L182 18 L195 30 H400"
+                fill="none" stroke="#B7F34A" stroke-width="2.5"
+                stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="lp-row">
+          <div class="lp-avatar" style="background:#FF8A5B;">AO</div>
+          <div class="lp-row-main">
+            <div class="lp-row-name">Member A</div>
+            <div class="lp-row-sub">18 days away · renews in 6 days</div>
+          </div>
+          <div class="lp-risk lp-high">HIGH · 72%</div>
+        </div>
+        <div class="lp-row">
+          <div class="lp-avatar" style="background:#FFC44D;">KB</div>
+          <div class="lp-row-main">
+            <div class="lp-row-name">Member B</div>
+            <div class="lp-row-sub">Visits down 4 this month</div>
+          </div>
+          <div class="lp-risk lp-med">MEDIUM · 41%</div>
+        </div>
+        <div class="lp-row">
+          <div class="lp-avatar" style="background:#B7F34A;">CE</div>
+          <div class="lp-row-main">
+            <div class="lp-row-name">Member C</div>
+            <div class="lp-row-sub">Steady visits · 6 PT sessions</div>
+          </div>
+          <div class="lp-risk lp-low">LOW · 14%</div>
+        </div>
+        <div class="lp-tiny">ILLUSTRATIVE EXAMPLE · NOT REAL MEMBER DATA</div>
+      </div>
+    </div>
+    <div class="lp-stats">
+      <div class="lp-stat"><b>5</b><span>signals analysed</span></div>
+      <div class="lp-stat"><b>3</b><span>clear risk levels</span></div>
+      <div class="lp-stat"><b>CSV</b><span>or manual entry</span></div>
+      <div class="lp-stat"><b>Seconds</b><span>to a full assessment</span></div>
+    </div>
+    <div class="section-label" style="text-align:center;margin-top:34px;">
+      LOG IN OR CREATE YOUR FREE ACCOUNT</div>
+    """)
     login_tab, signup_tab = st.tabs(
         ["Log In", "Create Account"]
     )
@@ -877,199 +989,127 @@ if st.session_state.auth_user is None:
                         "be registered, or the request may have failed. "
                         "Please check your details and try again."
                     )
-# -------------------------
-    # LANDING PAGE SECTIONS
-    # -------------------------
+# LANDING PAGE SECTIONS
 
-    # The problem
-    st.markdown(
-        """
-        <div class="lp-section-title">
-            Members rarely announce they are leaving.
+    # The quiet exit
+    html(f"""
+    <div class="lp-kicker">The problem</div>
+    <div class="lp-h2">Members rarely say goodbye.<br>They just fade.</div>
+    <div class="lp-lead">By the time a cancellation lands, the warning signs
+      have been there for weeks.</div>
+    <div class="lp-split">
+      <div>
+        <div class="lp-ic">{icon('down')}</div>
+        <h3>Attendance slips first. Cancellation follows.</h3>
+        <p>A drop from regular visits to almost none is easy to miss in a
+          busy gym. GymPulse AI watches that pattern together with renewal
+          timing and personal-training activity, then tells you where to
+          look first.</p>
+      </div>
+      <div>
+        <div class="lp-bars">
+          <div class="lp-bar-col"><div class="lp-bar-fill" style="height:92%"></div><div class="lp-bar-lbl">W1</div></div>
+          <div class="lp-bar-col"><div class="lp-bar-fill" style="height:84%"></div><div class="lp-bar-lbl">W2</div></div>
+          <div class="lp-bar-col"><div class="lp-bar-fill" style="height:70%"></div><div class="lp-bar-lbl">W3</div></div>
+          <div class="lp-bar-col"><div class="lp-bar-fill warn" style="height:46%"></div><div class="lp-bar-lbl">W4</div></div>
+          <div class="lp-bar-col"><div class="lp-bar-fill warn" style="height:28%"></div><div class="lp-bar-lbl">W5</div></div>
+          <div class="lp-bar-col"><div class="lp-bar-fill warn" style="height:14%"></div><div class="lp-bar-lbl">W6</div></div>
         </div>
-        <div class="lp-section-sub">
-            They just stop showing up. By the time you notice, the
-            cancellation is already on its way.
-        </div>
-        <div class="lp-grid">
-            <div class="lp-card">
-                <div class="lp-icon">📉</div>
-                <h4>Attendance fades quietly</h4>
-                <p>A drop from ten visits a month to three is easy to miss
-                when you are running a busy gym.</p>
-            </div>
-            <div class="lp-card">
-                <div class="lp-icon">📅</div>
-                <h4>Renewals feel like surprises</h4>
-                <p>Without a view of who is close to renewal and barely
-                attending, you only find out when they do not renew.</p>
-            </div>
-            <div class="lp-card">
-                <div class="lp-icon">🎯</div>
-                <h4>Follow-up becomes guesswork</h4>
-                <p>You cannot call everyone. Knowing who to call first is
-                what saves members.</p>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+        <div class="lp-bar-cap">Illustrative weekly visits for one member</div>
+      </div>
+    </div>
+    """)
 
     # How it works
-    st.markdown(
-        """
-        <div class="lp-section-title">From data to action in three steps</div>
-        <div class="lp-section-sub">
-            No complicated setup. Bring the information you already have.
-        </div>
-        <div class="lp-grid">
-            <div class="lp-card">
-                <div class="lp-step">STEP 01</div>
-                <h4>Add your members</h4>
-                <p>Register members one by one, or prepare a CSV with
-                membership type, visits, renewal date and personal-training
-                sessions.</p>
-            </div>
-            <div class="lp-card">
-                <div class="lp-step">STEP 02</div>
-                <h4>Run an assessment</h4>
-                <p>GymPulse AI estimates each member's cancellation
-                probability and sorts them into High, Medium or Low risk.</p>
-            </div>
-            <div class="lp-card">
-                <div class="lp-step">STEP 03</div>
-                <h4>Reach out early</h4>
-                <p>Start with the members who need attention most, check in
-                personally and download the results to share with your
-                team.</p>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    html(f"""
+    <div class="lp-kicker">How it works</div>
+    <div class="lp-h2">From spreadsheet to action<br>in three moves</div>
+    <div class="lp-lead">Bring the information you already have. No hardware,
+      no installs.</div>
+    <div class="lp-steps">
+      <div class="lp-stepcard"><div class="lp-num">01</div>
+        <div class="lp-ic">{icon('upload')}</div>
+        <h4>Bring your data</h4>
+        <p>Register members one at a time or upload a CSV with membership
+          type, visits, renewal timing and PT sessions.</p></div>
+      <div class="lp-stepcard"><div class="lp-num">02</div>
+        <div class="lp-ic">{icon('gauge')}</div>
+        <h4>Get risk estimates</h4>
+        <p>Each member gets a cancellation probability and a High, Medium
+          or Low level you can read at a glance.</p></div>
+      <div class="lp-stepcard"><div class="lp-num">03</div>
+        <div class="lp-ic">{icon('chat')}</div>
+        <h4>Reach out early</h4>
+        <p>Start with the members who need you most, check in personally and
+          download the results for your team.</p></div>
+    </div>
+    """)
 
-    # Example output
-    st.markdown(
-        """
-        <div class="lp-section-title">See what an assessment looks like</div>
-        <div class="lp-section-sub">
-            Clear numbers and a plain-language risk level, not a wall of
-            statistics.
+    # Bento features
+    html(f"""
+    <div class="lp-kicker">Features</div>
+    <div class="lp-h2">Built for one job:<br>keeping your members</div>
+    <div class="lp-lead">Focused tools, no clutter.</div>
+    <div class="lp-bento-grid">
+      <div class="lp-bento b-4">
+        <div class="lp-ic">{icon('upload')}</div>
+        <h4>Batch CSV assessment</h4>
+        <p>Upload your whole membership list, preview the records, and
+          download an estimate for every member in a single file.</p>
+        <div class="lp-mini">
+          <span class="lp-risk lp-high">HIGH</span>
+          <span class="lp-risk lp-med">MEDIUM</span>
+          <span class="lp-risk lp-low">LOW</span>
         </div>
-        <div class="lp-preview">
-            <div class="lp-preview-tag">ILLUSTRATIVE EXAMPLE</div>
-            <div class="lp-preview-row">
-                <span>Membership</span><b>Monthly</b>
-            </div>
-            <div class="lp-preview-row">
-                <span>Days since last visit</span><b>18</b>
-            </div>
-            <div class="lp-preview-row">
-                <span>Visits: previous 30 days to last 30 days</span>
-                <b>10 → 3</b>
-            </div>
-            <div class="lp-preview-row">
-                <span>Days until renewal</span><b>6</b>
-            </div>
-            <div class="lp-prob">
-                <div>
-                    <div style="color:#9AA8BD;font-size:12px;">
-                        Estimated cancellation probability
-                    </div>
-                    <div class="lp-prob-num">72%</div>
-                </div>
-                <div class="lp-badge">HIGH RISK</div>
-            </div>
-            <div class="lp-bar"><div></div></div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+      </div>
+      <div class="lp-bento b-2">
+        <div class="lp-ic">{icon('user')}</div>
+        <h4>Individual assessment</h4>
+        <p>One member, instant estimate, plus suggested next steps.</p>
+      </div>
+      <div class="lp-bento b-2">
+        <div class="lp-ic">{icon('users')}</div>
+        <h4>Member management</h4>
+        <p>A private register with goals, contact details and body metrics.</p>
+      </div>
+      <div class="lp-bento b-2">
+        <div class="lp-ic">{icon('sliders')}</div>
+        <h4>What-if explorer</h4>
+        <p>See how the estimate shifts as time since the last visit grows.</p>
+      </div>
+      <div class="lp-bento b-2">
+        <div class="lp-ic">{icon('target')}</div>
+        <h4>Priority follow-up</h4>
+        <p>Plain-language guidance on who to contact first.</p>
+      </div>
+    </div>
+    """)
 
-    # Features
-    st.markdown(
-        """
-        <div class="lp-section-title">Everything you need to keep members</div>
-        <div class="lp-section-sub">
-            Simple tools focused on one job: helping you hold on to the
-            people who train with you.
-        </div>
-        <div class="lp-grid">
-            <div class="lp-card">
-                <div class="lp-icon">🧍</div>
-                <h4>Individual assessment</h4>
-                <p>Enter one member's details and get an instant estimate
-                with attendance analysis and suggested next steps.</p>
-            </div>
-            <div class="lp-card">
-                <div class="lp-icon">📂</div>
-                <h4>Batch CSV assessment</h4>
-                <p>Upload your whole membership list, review the data and
-                download every estimate in one file.</p>
-            </div>
-            <div class="lp-card">
-                <div class="lp-icon">👥</div>
-                <h4>Member management</h4>
-                <p>Keep a private register of your members, with goals,
-                contact details and body metrics, separate from other
-                gyms.</p>
-            </div>
-            <div class="lp-card">
-                <div class="lp-icon">🚦</div>
-                <h4>Simple risk levels</h4>
-                <p>High, Medium and Low categories tell you at a glance who
-                needs a conversation first.</p>
-            </div>
-            <div class="lp-card">
-                <div class="lp-icon">🔬</div>
-                <h4>What-if exploration</h4>
-                <p>See how the estimate changes as time since the last visit
-                grows, to understand what the model reacts to.</p>
-            </div>
-            <div class="lp-card">
-                <div class="lp-icon">💡</div>
-                <h4>Built-in guidance</h4>
-                <p>An FAQ section answers common questions about
-                assessments, CSV files and handling member data.</p>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-    # Honest note
-    st.markdown(
-        """
-        <div class="lp-section-title">Built to be transparent</div>
-        <div class="lp-note">
-            <h4>Experimental estimates, clearly labelled</h4>
-            <p>GymPulse AI is an early-stage project. Its model is currently
-            trained on synthetic data, so results are a guide for deciding
-            who to check in with, not a guarantee of what will happen. Every
-            result in the app is labelled accordingly, and your own
-            knowledge of your members always comes first.</p>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    # Transparency
+    html(f"""
+    <div class="lp-kicker">Transparency</div>
+    <div class="lp-note">
+      <div class="lp-ic">{icon('shield')}</div>
+      <div>
+        <h4>Experimental estimates, clearly labelled</h4>
+        <p>GymPulse AI is an early-stage project and its model is trained on
+          synthetic data. Treat results as a guide for deciding who to check
+          in with, not a guarantee. Your own knowledge of your members always
+          comes first.</p>
+      </div>
+    </div>
+    """)
 
     # Closing call to action
-    st.markdown(
-        """
-        <div class="lp-cta">
-            <div class="lp-cta-title">
-                Keep more members.<br><span>Start with GymPulse AI.</span>
-            </div>
-            <p>Create your free account at the top of this page.</p>
-        </div>
-        <div class="footer">
-            © GymPulse AI · Smarter insights. Stronger member retention.
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-    st.stop()
-
+    html(f"""
+    <div class="lp-cta">
+      <div class="lp-cta-title">Keep more members.<br>
+        <span class="lp-grad">Start with GymPulse AI.</span></div>
+      <p>Create your free account at the top of this page
+        <span class="lp-arrow">{icon('arrow', 16)}</span></p>
+    </div>
+    <div class="footer">© GymPulse AI · Smarter insights. Stronger member retention.</div>
+    """)
 
 # =========================================================
 # 4. PERSONALIZED WORKSPACE HEADER
