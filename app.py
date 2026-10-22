@@ -886,6 +886,20 @@ if page == "Dashboard":
 # =========================================================
 
 if page == "Dashboard":
+# Logout button
+with st.sidebar:
+    st.write(f"Signed in: {st.session_state.auth_user.get('email', '')}")
+
+    if st.button("Log Out", use_container_width=True):
+        try:
+            supabase.auth.sign_out()
+        except Exception:
+            pass
+
+        st.session_state.auth_user = None
+        st.session_state.user_profile = None
+
+        st.rerun()
     # Personalized greeting — Dashboard only
     
     # =====================================================
