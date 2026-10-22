@@ -1,3 +1,4 @@
+import gympulse_workspaces as gw
 import os
 import textwrap
 
@@ -1715,37 +1716,48 @@ def assess_members(data):
 # =========================================================
 
 # Handle dashboard navigation before creating the sidebar widget
-if "navigate_to" in st.session_state:
-    st.session_state["selected_page"] = st.session_state.pop(
-        "navigate_to"
-    )
-
-    
-
-def go_home():
-    st.session_state["selected_page"] = "Dashboard"
-
-
-def log_out():
-    """End the Supabase session and return to the login page."""
-    try:
-        supabase.auth.sign_out()
-    except Exception:
-        pass
-
-    for key in list(st.session_state.keys()):
-        del st.session_state[key]
-
-
-NAV_PAGES = [
+MAIN_PAGES = [
     "Dashboard",
+    "Risk Radar",
+    "Action Centre",
+    "Business Insights",
+    "Archie",
     "Member Management",
+]
+
+MORE_PAGES = [
     "Member Assessment",
     "Batch Assessment",
     "Model Insights",
     "About the Model",
-    "FAQs"
+    "FAQs",
 ]
+
+if "current_page" not in st.session_state:
+    st.session_state["current_page"] = "Dashboard"
+
+
+def show_page(name):
+    """Open a page and keep the top-bar radio in sync."""
+    st.session_state["current_page"] = name
+    st.session_state["main_nav"] = name if name in MAIN_PAGES else None
+
+
+def on_main_nav():
+    if st.session_state.get("main_nav"):
+        st.session_state["current_page"] = st.session_state["main_nav"]
+
+
+def go_home():
+    show_page("Dashboard")
+
+
+# Dashboard buttons still set "navigate_to"
+if "navigate_to" in st.session_state:
+    show_page(st.session_state.pop("navigate_to"))
+
+if "main_nav" not in st.session_state:
+    st.session_state["main_nav"] = "Dashboard"
 
 with st.container(key="top_nav"):
 
@@ -1783,14 +1795,37 @@ with st.container(key="top_nav"):
             )
 
     with nav_col:
-        page = st.radio(
-            "WORKSPACE",
-            NAV_PAGES,
-            key="selected_page",
-            horizontal=True,
-            label_visibility="collapsed"
+        radio_col, more_col = st.columns(
+            [5.2, 1.3],
+            vertical_alignment="center"
         )
 
+        with radio_col:
+            st.radio(
+                "WORKSPACE",
+                MAIN_PAGES,
+                index=None,
+                key="main_nav",
+                on_change=on_main_nav,
+                horizontal=True,
+                label_visibility="collapsed"
+            )
+
+        with more_col:
+            current = st.session_state["current_page"]
+            more_label = current if current in MORE_PAGES else "More"
+
+            with st.popover(more_label, use_container_width=True):
+                for name in MORE_PAGES:
+                    st.button(
+                        name,
+                        key=f"more_{name}",
+                        on_click=show_page,
+                        args=(name,),
+                        use_container_width=True
+                    )
+
+    page = st.session_state["current_page"]
     with user_col:
         st.button(
             "Log Out",
@@ -1971,7 +2006,14 @@ if page == "Dashboard":
 # =========================================================
 # 9. MEMBER MANAGEMENT
 # =========================================================
-
+elif page == "Risk Radar":
+    gw.render_risk_radar(supabase, st.session_state.gym_id, assess_members)
+elif page == "Action Centre":
+    gw.render_action_centre(supabase, st.session_state.gym_id, assess_members)
+elif page == "Business Insights":
+    gw.render_business_insights(supabase, st.session_state.gym_id, assess_members)
+elif page == "Archie":
+    gw.render_archie(supabase, st.session_state.gym_id, assess_members, business_name)
 elif page == "Member Management":
 
     st.markdown("## Member Management")
