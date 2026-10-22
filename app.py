@@ -712,6 +712,39 @@ st.markdown(
     .st-key-to_login button:hover p {
         text-decoration: underline;
     }
+    .st-key-to_forgot button,
+    .st-key-back_to_login button,
+    .st-key-reset_other button,
+    .st-key-open_terms button,
+    .st-key-open_privacy button {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        min-height: 0 !important;
+        padding: 2px 0 !important;
+        width: 100%;
+        justify-content: center !important;
+    }
+
+    .st-key-to_forgot button p,
+    .st-key-back_to_login button p,
+    .st-key-reset_other button p,
+    .st-key-open_terms button p,
+    .st-key-open_privacy button p {
+        color: var(--muted) !important;
+        font-size: 12px !important;
+        font-weight: 600 !important;
+        margin: 0 !important;
+    }
+
+    .st-key-to_forgot button:hover p,
+    .st-key-back_to_login button:hover p,
+    .st-key-reset_other button:hover p,
+    .st-key-open_terms button:hover p,
+    .st-key-open_privacy button:hover p {
+        color: var(--lime) !important;
+        text-decoration: underline;
+    }
     .footer {
         text-align: center;
         color: var(--muted);
@@ -879,6 +912,7 @@ if st.session_state.auth_user is None:
 
     def set_auth_mode(mode):
         st.session_state.auth_mode = mode
+        st.session_state.reset_email_sent = False
 
     _, auth_col, _ = st.columns([1, 1.4, 1])
 
@@ -892,7 +926,10 @@ if st.session_state.auth_user is None:
                     '<div class="auth-title">Welcome back, sign in</div>',
                     unsafe_allow_html=True
                 )
-
+if st.session_state.pop("password_updated", False):
+                    st.success(
+                        "Password updated. Sign in with your new password."
+                    )
                 st.button(
                     "Sign up",
                     on_click=set_auth_mode,
@@ -958,9 +995,15 @@ if st.session_state.auth_user is None:
                                 "Login failed. Check your credentials "
                                 "and confirm your email address."
                             )
+                            st.button(
+                    "Forgot password?",
+                    on_click=set_auth_mode,
+                    args=("forgot",),
+                    key="to_forgot"
+                )
 
             # ---------------- SIGN UP ----------------
-            else:
+            elif st.session_state.auth_mode == "signup":
 
                 st.markdown(
                     '<div class="auth-title">Create your free account</div>',
