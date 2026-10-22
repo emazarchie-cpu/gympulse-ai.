@@ -649,6 +649,69 @@ st.markdown(
         .lp-h2 { font-size: 28px; }
         .lp-cta-title { font-size: 30px; }
     }
+    /* ---------- Auth card ---------- */
+    .st-key-auth_card {
+        background: rgba(21,29,48,0.85);
+        backdrop-filter: blur(14px);
+        border: 1px solid rgba(255,255,255,0.12) !important;
+        border-radius: 22px !important;
+        padding: 14px 10px !important;
+        box-shadow: 0 30px 80px rgba(0,0,0,0.4);
+    }
+
+    .auth-title {
+        font-size: 28px;
+        font-weight: 800;
+        letter-spacing: -1px;
+        color: var(--white);
+        text-align: center;
+        margin: 4px 0 2px;
+    }
+
+    .auth-secure {
+        text-align: center;
+        color: var(--muted);
+        font-size: 11px;
+        margin-top: 14px;
+    }
+
+    /* "Don't have an account? Sign up" as one clickable button */
+    .st-key-to_signup button,
+    .st-key-to_login button {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        min-height: 0 !important;
+        padding: 2px 0 !important;
+        width: 100%;
+        justify-content: center !important;
+    }
+
+    .st-key-to_signup button p,
+    .st-key-to_login button p {
+        color: var(--lime) !important;
+        font-size: 14px !important;
+        font-weight: 800 !important;
+        margin: 0 !important;
+        white-space: pre !important;
+    }
+
+    .st-key-to_signup button p::before {
+        content: "Don't have an account?  ";
+        color: var(--muted);
+        font-weight: 500;
+    }
+
+    .st-key-to_login button p::before {
+        content: "Already have an account?  ";
+        color: var(--muted);
+        font-weight: 500;
+    }
+
+    .st-key-to_signup button:hover p,
+    .st-key-to_login button:hover p {
+        text-decoration: underline;
+    }
     .footer {
         text-align: center;
         color: var(--muted);
@@ -805,190 +868,224 @@ if st.session_state.auth_user is None:
       <div class="lp-stat"><b>Seconds</b><span>to a full assessment</span></div>
     </div>
     <div class="section-label" style="text-align:center;margin-top:34px;">
-      LOG IN OR CREATE YOUR FREE ACCOUNT</div>
+      SIGN IN TO YOUR WORKSPACE</div>
     """)
-    login_tab, signup_tab = st.tabs(
-        ["Log In", "Create Account"]
-    )
-
     # -------------------------
-    # LOGIN
+    # AUTH CARD
     # -------------------------
-    with login_tab:
 
-        st.subheader("Welcome back")
+    if "auth_mode" not in st.session_state:
+        st.session_state.auth_mode = "login"
 
-        with st.form("login_form"):
+    def set_auth_mode(mode):
+        st.session_state.auth_mode = mode
 
-            login_email = st.text_input("Email address")
-            login_password = st.text_input(
-                "Password",
-                type="password"
-            )
+    _, auth_col, _ = st.columns([1, 1.4, 1])
 
-            login_submitted = st.form_submit_button(
-                "Log In",
-                use_container_width=True
-            )
+    with auth_col:
+        with st.container(border=True, key="auth_card"):
 
-        if login_submitted:
+            # ---------------- SIGN IN ----------------
+            if st.session_state.auth_mode == "login":
 
-            if not login_email or not login_password:
-                st.warning("Enter your email and password.")
-
-            else:
-                try:
-                    result = supabase.auth.sign_in_with_password(
-                        {
-                            "email": login_email.strip(),
-                            "password": login_password
-                        }
-                    )
-
-                    if result.user:
-
-                        st.session_state.auth_user = {
-                            "id": str(result.user.id),
-                            "email": result.user.email
-                        }
-
-                        profile_result = (
-                            supabase.table("profiles")
-                            .select("*")
-                            .eq("id", str(result.user.id))
-                            .execute()
-                        )
-
-                        if profile_result.data:
-                            st.session_state.user_profile = (
-                                profile_result.data[0]
-                            )
-                        else:
-                            st.session_state.user_profile = {
-                                "full_name": "User",
-                                "business_name": "My Gym"
-                            }
-
-                        st.rerun()
-
-                except Exception:
-                    st.error(
-                        "Login failed. Check your credentials "
-                        "and confirm your email address."
-                    )
-
-    # -------------------------
-    # SIGNUP
-    # -------------------------
-    with signup_tab:
-
-        st.subheader("Create your workspace")
-
-        with st.form("signup_form"):
-
-            full_name = st.text_input("Your full name")
-
-            business_name = st.text_input(
-                "Gym or company name",
-                placeholder="e.g. Nuelarch Gym"
-            )
-
-            signup_email = st.text_input(
-                "Email address",
-                key="signup_email"
-            )
-
-            signup_password = st.text_input(
-                "Create password",
-                type="password",
-                key="signup_password"
-            )
-
-            confirm_password = st.text_input(
-                "Confirm password",
-                type="password"
-            )
-
-            signup_submitted = st.form_submit_button(
-                "Create Free Account",
-                use_container_width=True
-            )
-
-        if signup_submitted:
-
-            if not all([
-                full_name.strip(),
-                business_name.strip(),
-                signup_email.strip(),
-                signup_password,
-                confirm_password
-            ]):
-                st.warning("Please complete every field.")
-
-            elif signup_password != confirm_password:
-                st.error("Your passwords do not match.")
-
-            elif len(signup_password) < 8:
-                st.warning(
-                    "Your password must contain at least 8 characters."
+                st.markdown(
+                    '<div class="auth-title">Welcome back, sign in</div>',
+                    unsafe_allow_html=True
                 )
 
-            else:
-                try:
-                    result = supabase.auth.sign_up(
-                        {
-                            "email": signup_email.strip(),
-                            "password": signup_password,
-                            "options": {
-                                "data": {
-                                    "full_name": full_name.strip(),
-                                    "business_name": business_name.strip(),
-                                    "account_type": "gym_owner"
-                                }
-                            }
-                        }
+                st.button(
+                    "Sign up",
+                    on_click=set_auth_mode,
+                    args=("signup",),
+                    key="to_signup"
+                )
+
+                with st.form("login_form", border=False):
+
+                    login_email = st.text_input("Email address")
+                    login_password = st.text_input(
+                        "Password",
+                        type="password"
                     )
 
-                    if result.session and result.user:
+                    login_submitted = st.form_submit_button(
+                        "Sign in with email",
+                        use_container_width=True
+                    )
 
-                        st.session_state.auth_user = {
-                            "id": str(result.user.id),
-                            "email": result.user.email
-                        }
+                if login_submitted:
 
-                        profile_result = (
-                            supabase.table("profiles")
-                            .select("*")
-                            .eq("id", str(result.user.id))
-                            .execute()
-                        )
-
-                        if profile_result.data:
-                            st.session_state.user_profile = (
-                                profile_result.data[0]
-                            )
-                        else:
-                            st.session_state.user_profile = {
-                                "full_name": full_name.strip(),
-                                "business_name": business_name.strip()
-                            }
-
-                        st.success("Account created successfully!")
-                        st.rerun()
+                    if not login_email or not login_password:
+                        st.warning("Enter your email and password.")
 
                     else:
-                        st.success(
-                            "Registration submitted! Check your email "
-                            "for a confirmation link, then return here "
-                            "to log in."
+                        try:
+                            result = supabase.auth.sign_in_with_password(
+                                {
+                                    "email": login_email.strip(),
+                                    "password": login_password
+                                }
+                            )
+
+                            if result.user:
+
+                                st.session_state.auth_user = {
+                                    "id": str(result.user.id),
+                                    "email": result.user.email
+                                }
+
+                                profile_result = (
+                                    supabase.table("profiles")
+                                    .select("*")
+                                    .eq("id", str(result.user.id))
+                                    .execute()
+                                )
+
+                                if profile_result.data:
+                                    st.session_state.user_profile = (
+                                        profile_result.data[0]
+                                    )
+                                else:
+                                    st.session_state.user_profile = {
+                                        "full_name": "User",
+                                        "business_name": "My Gym"
+                                    }
+
+                                st.rerun()
+
+                        except Exception:
+                            st.error(
+                                "Login failed. Check your credentials "
+                                "and confirm your email address."
+                            )
+
+            # ---------------- SIGN UP ----------------
+            else:
+
+                st.markdown(
+                    '<div class="auth-title">Create your free account</div>',
+                    unsafe_allow_html=True
+                )
+
+                st.button(
+                    "Sign in",
+                    on_click=set_auth_mode,
+                    args=("login",),
+                    key="to_login"
+                )
+
+                with st.form("signup_form", border=False):
+
+                    full_name = st.text_input("Your full name")
+
+                    business_name = st.text_input(
+                        "Gym or company name",
+                        placeholder="e.g. Nuelarch Gym"
+                    )
+
+                    signup_email = st.text_input(
+                        "Email address",
+                        key="signup_email"
+                    )
+
+                    signup_password = st.text_input(
+                        "Create password",
+                        type="password",
+                        key="signup_password"
+                    )
+
+                    confirm_password = st.text_input(
+                        "Confirm password",
+                        type="password"
+                    )
+
+                    signup_submitted = st.form_submit_button(
+                        "Create free account",
+                        use_container_width=True
+                    )
+
+                if signup_submitted:
+
+                    if not all([
+                        full_name.strip(),
+                        business_name.strip(),
+                        signup_email.strip(),
+                        signup_password,
+                        confirm_password
+                    ]):
+                        st.warning("Please complete every field.")
+
+                    elif signup_password != confirm_password:
+                        st.error("Your passwords do not match.")
+
+                    elif len(signup_password) < 8:
+                        st.warning(
+                            "Your password must contain at least "
+                            "8 characters."
                         )
 
-                except Exception:
-                    st.error(
-                        "Registration failed. Your email may already "
-                        "be registered, or the request may have failed. "
-                        "Please check your details and try again."
-                    )
+                    else:
+                        try:
+                            result = supabase.auth.sign_up(
+                                {
+                                    "email": signup_email.strip(),
+                                    "password": signup_password,
+                                    "options": {
+                                        "data": {
+                                            "full_name": full_name.strip(),
+                                            "business_name": business_name.strip(),
+                                            "account_type": "gym_owner"
+                                        }
+                                    }
+                                }
+                            )
+
+                            if result.session and result.user:
+
+                                st.session_state.auth_user = {
+                                    "id": str(result.user.id),
+                                    "email": result.user.email
+                                }
+
+                                profile_result = (
+                                    supabase.table("profiles")
+                                    .select("*")
+                                    .eq("id", str(result.user.id))
+                                    .execute()
+                                )
+
+                                if profile_result.data:
+                                    st.session_state.user_profile = (
+                                        profile_result.data[0]
+                                    )
+                                else:
+                                    st.session_state.user_profile = {
+                                        "full_name": full_name.strip(),
+                                        "business_name": business_name.strip()
+                                    }
+
+                                st.rerun()
+
+                            else:
+                                st.success(
+                                    "Registration submitted! Check your "
+                                    "email for a confirmation link, then "
+                                    "come back and sign in."
+                                )
+
+                        except Exception:
+                            st.error(
+                                "Registration failed. Your email may "
+                                "already be registered, or the request "
+                                "may have failed. Please try again."
+                            )
+
+            st.markdown(
+                '<div class="auth-secure">'
+                'Secure sign-in. Your password is never stored in plain text.'
+                '</div>',
+                unsafe_allow_html=True
+            )
 # LANDING PAGE SECTIONS
 
     # The quiet exit
