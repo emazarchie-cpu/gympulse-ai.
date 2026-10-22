@@ -271,19 +271,79 @@ st.markdown(
         display: none !important;
     }
 
+    /* ---------- Compact page spacing ---------- */
+    .block-container {
+        padding-top: 1rem !important;
+    }
+
+    /* ---------- Top bar container ---------- */
+    .st-key-top_nav {
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 10px;
+        margin-bottom: 18px;
+    }
+
+    /* Logo column: logo and tagline tightly stacked */
+    .st-key-top_nav [data-testid="stColumn"]:first-child [data-testid="stVerticalBlock"],
+    .st-key-top_nav [data-testid="column"]:first-child [data-testid="stVerticalBlock"] {
+        gap: 0 !important;
+    }
+
+    .nav-tagline {
+        color: var(--muted);
+        font-size: 10px;
+        line-height: 1.2;
+        margin: 0;
+        white-space: nowrap;
+    }
+
+    /* ---------- Logo button: GYM (white) PULSE (lime) AI (white) ---------- */
+    .st-key-brand_home button {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+        min-height: 0 !important;
+        justify-content: flex-start !important;
+    }
+
+    .st-key-brand_home button p {
+        font-size: 24px !important;
+        font-weight: 800 !important;
+        letter-spacing: -1px !important;
+        line-height: 1.1 !important;
+        color: #B7F34A !important;
+        white-space: pre !important;
+        margin: 0 !important;
+    }
+
+    .st-key-brand_home button p::before {
+        content: "GYM";
+        color: #F4F7FB;
+    }
+
+    .st-key-brand_home button p::after {
+        content: " AI";
+        color: #F4F7FB;
+    }
+
+    /* ---------- Navigation: blends with the background ---------- */
     .st-key-top_nav div[role="radiogroup"] {
-        gap: 6px;
+        gap: 2px;
         flex-wrap: wrap;
     }
 
     .st-key-top_nav div[role="radiogroup"] label {
-        background: var(--surface);
-        border: 1px solid var(--border);
+        background: transparent;
+        border: none;
+        border-bottom: 2px solid transparent;
         border-radius: 10px;
         padding: 8px 14px;
         cursor: pointer;
+        transition: background 0.15s ease;
     }
 
+    /* Hide the radio circle */
     .st-key-top_nav div[role="radiogroup"] label > div:first-child {
         display: none;
     }
@@ -291,17 +351,28 @@ st.markdown(
     .st-key-top_nav div[role="radiogroup"] label p {
         font-size: 13px;
         font-weight: 700;
-        color: var(--white);
+        color: var(--muted);
         margin: 0;
     }
 
+    /* Current page: lime text with an underline */
     .st-key-top_nav div[role="radiogroup"] label:has(input:checked) {
-        background: var(--lime);
-        border-color: var(--lime);
+        border-bottom: 2px solid var(--lime);
+        border-radius: 10px 10px 0 0;
     }
 
     .st-key-top_nav div[role="radiogroup"] label:has(input:checked) p {
-        color: #10182A;
+        color: var(--lime);
+    }
+
+    /* Hover: lime box for as long as the mouse is over it */
+    .st-key-top_nav div[role="radiogroup"] label:hover {
+        background: var(--lime) !important;
+        border-radius: 10px;
+    }
+
+    .st-key-top_nav div[role="radiogroup"] label:hover p {
+        color: #10182A !important;
     }
     .footer {
         text-align: center;
@@ -869,7 +940,7 @@ NAV_PAGES = [
 with st.container(key="top_nav"):
 
     brand_col, nav_col, user_col = st.columns(
-        [1.5, 7, 1.2],
+        [2.4, 7, 1.1],
         vertical_alignment="center"
     )
 
@@ -878,6 +949,13 @@ with st.container(key="top_nav"):
             "PULSE",
             on_click=go_home,
             key="brand_home"
+        )
+
+        st.markdown(
+            '<div class="nav-tagline">'
+            'Smarter insights. Stronger member retention.'
+            '</div>',
+            unsafe_allow_html=True
         )
 
     with nav_col:
@@ -897,7 +975,6 @@ with st.container(key="top_nav"):
             key="logout_button_main"
         )
 
-st.markdown("---")
     
 # =========================================================
 # PERSONALIZED GREETING VARIABLES
