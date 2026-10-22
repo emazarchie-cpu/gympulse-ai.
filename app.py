@@ -173,7 +173,7 @@ st.markdown(
 
     .stButton > button:hover,
     .stFormSubmitButton > button:hover {
-        background: #D0FF7A;
+        background: var(--lime);
         color: #10182A;
         border: none;
     }
@@ -248,7 +248,7 @@ st.markdown(
         font-size: 27px !important;
         font-weight: 800 !important;
         letter-spacing: -1px !important;
-        color: #B7F34A !important;
+        color: var(--lime) !important;
         white-space: pre !important;
         margin: 0 !important;
     }
@@ -283,18 +283,24 @@ st.markdown(
         margin-bottom: 18px;
     }
 
-    /* Logo column: logo and tagline tightly stacked */
+    /* ---------- Brand lockup: logo, wordmark and tagline ---------- */
     .st-key-top_nav [data-testid="stColumn"]:first-child [data-testid="stVerticalBlock"],
     .st-key-top_nav [data-testid="column"]:first-child [data-testid="stVerticalBlock"] {
         gap: 0 !important;
     }
 
     .nav-tagline {
-        color: var(--muted);
-        font-size: 10px;
-        line-height: 1.2;
-        margin: 0;
+        color: var(--muted) !important;
+        font-size: 10px !important;
+        line-height: 1.25 !important;
+        margin: 2px 0 0 0 !important;
+        padding: 0 !important;
         white-space: nowrap;
+        letter-spacing: 0 !important;
+    }
+
+    .st-key-brand_home button:hover p {
+        opacity: 1 !important;
     }
 
     /* ---------- Logo button: GYM (white) PULSE (lime) AI (white) ---------- */
@@ -312,7 +318,7 @@ st.markdown(
         font-weight: 800 !important;
         letter-spacing: -1px !important;
         line-height: 1.1 !important;
-        color: #B7F34A !important;
+        color: var(--lime) !important;
         white-space: pre !important;
         margin: 0 !important;
     }
@@ -426,7 +432,7 @@ st.markdown(
         color: var(--white);
     }
     .lp-grad {
-        background: linear-gradient(90deg, #B7F34A, #35D6ED);
+        background: linear-gradient(90deg, var(--lime), #35D6ED);
         -webkit-background-clip: text;
         background-clip: text;
         color: transparent;
@@ -490,7 +496,7 @@ st.markdown(
     }
     .lp-high { background: rgba(255,107,107,0.16); color: #FF7A7A; }
     .lp-med  { background: rgba(255,196,77,0.16);  color: #FFC44D; }
-    .lp-low  { background: rgba(183,243,74,0.16);  color: #B7F34A; }
+    .lp-low  { background: rgba(183,243,74,0.16);  color: var(--lime); }
     .lp-tiny {
         text-align: center; font-size: 10px; color: var(--muted);
         margin-top: 12px; letter-spacing: 1px;
@@ -548,7 +554,7 @@ st.markdown(
     .lp-bar-col { flex: 1; text-align: center; }
     .lp-bar-fill {
         border-radius: 8px 8px 0 0;
-        background: linear-gradient(180deg, #B7F34A, rgba(183,243,74,0.25));
+        background: linear-gradient(180deg, var(--lime), rgba(183,243,74,0.25));
         transform-origin: bottom;
         animation: lp-grow 1.2s ease-out both;
     }
@@ -1010,7 +1016,7 @@ if st.session_state.auth_user is None:
                 <div style="text-align:center; margin-bottom: 12px;">
                     <div style="display:flex; justify-content:center; align-items:center; gap:8px; font-size: 2.0rem; font-weight:800; letter-spacing:-0.04em;">
                         <span style="color:#ffffff;">gym</span>
-                        <span style="color:#b7f34a;">pulse</span>
+                        <span style="color:#B7F34A;">pulse</span>
                         <span style="color:#ffffff;">ai</span>
                     </div>
                 </div>
@@ -1758,23 +1764,37 @@ NAV_PAGES = [
 with st.container(key="top_nav"):
 
     brand_col, nav_col, user_col = st.columns(
-        [2.4, 7, 1.1],
+        [3.0, 6.4, 1.1],
         vertical_alignment="center"
     )
 
     with brand_col:
-        st.button(
-            "PULSE",
-            on_click=go_home,
-            key="brand_home"
+        logo_col, wordmark_col = st.columns(
+            [0.8, 3.2],
+            vertical_alignment="center",
+            gap="small"
         )
 
-        st.markdown(
-            '<div class="nav-tagline">'
-            'Smarter insights. Stronger member retention.'
-            '</div>',
-            unsafe_allow_html=True
-        )
+        with logo_col:
+            logo_path = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)),
+                "GymPulse_AI_logo_mark.png"
+            )
+            st.image(logo_path, width=42)
+
+        with wordmark_col:
+            st.button(
+                "PULSE",
+                on_click=go_home,
+                key="brand_home"
+            )
+
+            st.markdown(
+                '<div class="nav-tagline">'
+                'Smarter insights. Stronger member retention.'
+                '</div>',
+                unsafe_allow_html=True
+            )
 
     with nav_col:
         page = st.radio(
@@ -1827,11 +1847,11 @@ if page == "Dashboard":
             background-color: #111827;
             padding: 24px;
             border-radius: 16px;
-            border-left: 5px solid #B7F34A;
+            border-left: 5px solid var(--lime);
             margin-bottom: 24px;
         ">
             <p style="
-                color: #B7F34A;
+                color: var(--lime);
                 font-size: 14px;
                 margin-bottom: 8px;
                 font-weight: 600;
@@ -2392,13 +2412,13 @@ elif page == "Batch Assessment":
     border-radius: 14px;
     padding: 18px;
 ">
-    <div style="color: #B7F34A; font-weight: 700;">
+    <div style="color: var(--lime); font-weight: 700;">
         FIELD {number}
     </div>
     <div style="color: #FFFFFF; font-size: 16px;">
         {title}
     </div>
-    <div style="color: #B7F34A; font-size: 12px;">
+    <div style="color: var(--lime); font-size: 12px;">
         {field_name}
     </div>
     <div style="color: #9CA3AF; font-size: 13px;">
@@ -2424,7 +2444,7 @@ elif page == "Batch Assessment":
 <div style="
     background-color: #111827;
     border: 1px solid #273449;
-    border-left: 5px solid #B7F34A;
+    border-left: 5px solid var(--lime);
     border-radius: 16px;
     padding: 24px;
     margin: 12px 0 18px 0;
