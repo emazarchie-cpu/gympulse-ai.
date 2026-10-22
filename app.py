@@ -786,7 +786,7 @@ def log_out():
 
 
 with st.sidebar:
-
+    st.write("✅ NEW SIDEBAR CODE")
     st.markdown(
         """
         <div class="brand-logo">
