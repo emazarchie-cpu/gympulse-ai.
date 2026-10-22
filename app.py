@@ -17,7 +17,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-st.error(f"RUNNING FILE: {__file__}")
+
 
 # =========================================================
 # 2. PREMIUM FITNESS-TECH DESIGN
@@ -56,7 +56,7 @@ st.markdown(
         border-right: 1px solid var(--border);
     }
 
-    [data-testid="stSidebar"] * {
+    [data-testid="stSidebar"] *:not([data-testid="stIconMaterial"]) {
         font-family: 'Inter', sans-serif;
     }
 
@@ -776,7 +776,7 @@ if "navigate_to" in st.session_state:
 
 
 with st.sidebar:
-    st.write("✅ NEW SIDEBAR CODE")
+    
     st.markdown(
         """
         <div class="brand-logo">
