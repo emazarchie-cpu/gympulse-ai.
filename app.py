@@ -1750,6 +1750,15 @@ def on_main_nav():
 
 def go_home():
     show_page("Dashboard")
+    def log_out():
+    """End the Supabase session and return to the login page."""
+    try:
+        supabase.auth.sign_out()
+    except Exception:
+        pass
+
+    for key in list(st.session_state.keys()):
+        del st.session_state[key]
 
 
 # Dashboard buttons still set "navigate_to"
