@@ -806,8 +806,10 @@ if "navigate_to" in st.session_state:
 
 def go_home():
     st.session_state["selected_page"] = "Dashboard"
+
+
 with st.sidebar:
-    
+
     st.button(
         "PULSE",
         on_click=go_home,
@@ -820,11 +822,7 @@ with st.sidebar:
         '</div>',
         unsafe_allow_html=True
     )
-        st.button(
-            "Go to Dashboard",
-            on_click=go_home,
-            key="brand_home_button"
-        )
+
     st.markdown("---")
 
     page = st.radio(
@@ -844,7 +842,6 @@ with st.sidebar:
     st.markdown("---")
 
     st.caption(f"Signed in as {st.session_state.auth_user['email']}")
-
     
 # =========================================================
 # PERSONALIZED GREETING VARIABLES
