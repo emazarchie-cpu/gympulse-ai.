@@ -881,14 +881,19 @@ if page == "Dashboard":
         """,
         unsafe_allow_html=True
     )
-# =========================================================
-# 8. DASHBOARD
-# =========================================================
+=========================================================
+
+8. DASHBOARD
+
+=========================================================
 
 if page == "Dashboard":
+
 # Logout button
 with st.sidebar:
-    st.write(f"Signed in: {st.session_state.auth_user.get('email', '')}")
+    st.write(
+        f"Signed in: {st.session_state.auth_user.get('email', '')}"
+    )
 
     if st.button("Log Out", use_container_width=True):
         try:
@@ -900,17 +905,16 @@ with st.sidebar:
         st.session_state.user_profile = None
 
         st.rerun()
-    # Personalized greeting — Dashboard only
-    
-    # =====================================================
-    # PERSONALIZED GREETING VARIABLES
-    # =====================================================
 
+# Personalized greeting — Dashboard only
 
-    # =====================================================
-    # EXISTING DASHBOARD CONTENT
-    # =====================================================
+# =====================================================
+# PERSONALIZED GREETING VARIABLES
+# =====================================================
 
+# =====================================================
+# EXISTING DASHBOARD CONTENT
+# =====================================================
     st.markdown("## Dashboard")
 
     st.write(
