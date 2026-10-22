@@ -1110,11 +1110,13 @@ if st.session_state.auth_user is None:
     </div>
     <div class="footer">© GymPulse AI · Smarter insights. Stronger member retention.</div>
     """)
+    st.stop()
 
 # =========================================================
 # 4. PERSONALIZED WORKSPACE HEADER
 # =========================================================
-
+if st.session_state.auth_user is None:
+    st.stop()
 profile = st.session_state.user_profile or {}
 
 user_name = profile.get("full_name", "User")
