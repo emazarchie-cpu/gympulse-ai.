@@ -241,9 +241,7 @@ st.markdown(
         font-size: 11px;
         padding: 20px 0;
     }
-[data-testid="stSidebarCollapseButton"] span {
-    font-size: 0 !important;
-}
+
     </style>
     """,
     unsafe_allow_html=True
@@ -774,15 +772,6 @@ if "navigate_to" in st.session_state:
     )
 
     
-def log_out():
-    """End the Supabase session and clear all local session data."""
-    try:
-        supabase.auth.sign_out()
-    except Exception:
-        pass  # still log out locally even if this call fails
-
-    for key in list(st.session_state.keys()):
-        del st.session_state[key]
 
 
 with st.sidebar:
@@ -819,12 +808,7 @@ with st.sidebar:
 
     st.caption(f"Signed in as {st.session_state.auth_user['email']}")
 
-    st.button(
-        "Log Out",
-        on_click=log_out,
-        use_container_width=True,
-        key="logout_button"
-    )
+    
 # =========================================================
 # PERSONALIZED GREETING VARIABLES
 # =========================================================
@@ -844,7 +828,30 @@ else:
 
 safe_user_name = html.escape(str(user_name))
 safe_business_name = html.escape(str(business_name))
-    
+# =========================================================
+# LOGOUT BUTTON (TOP RIGHT OF EVERY PAGE)
+# =========================================================
+
+def log_out():
+    """End the Supabase session and return to the login page."""
+    try:
+        supabase.auth.sign_out()
+    except Exception:
+        pass
+
+    for key in list(st.session_state.keys()):
+        del st.session_state[key]
+
+
+top_left, top_right = st.columns([5, 1])
+
+with top_right:
+    st.button(
+        "Log Out",
+        on_click=log_out,
+        use_container_width=True,
+        key="logout_button_main"
+    )   
 # =========================================================
 # 7. SHARED HEADER — DASHBOARD ONLY
 # =========================================================
