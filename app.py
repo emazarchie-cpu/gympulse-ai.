@@ -791,19 +791,35 @@ with st.sidebar:
     st.markdown("---")
 
     page = st.radio(
-    "WORKSPACE",
-    [
-        
-    "Dashboard",
-    "Member Management",
-    "Member Assessment",
-    "Batch Assessment",
-    "Model Insights",
-    "About the Model"
-],
-    key="selected_page",
-    label_visibility="visible"
-)
+        "WORKSPACE",
+        [
+            "Dashboard",
+            "Member Management",
+            "Member Assessment",
+            "Batch Assessment",
+            "Model Insights",
+            "About the Model"
+        ],
+        key="selected_page",
+        label_visibility="visible"
+    )
+
+    st.markdown("---")
+
+    if st.session_state.auth_user:
+        st.caption(
+            f"Signed in: {st.session_state.auth_user.get('email', '')}"
+        )
+
+        if st.button("Log Out", use_container_width=True):
+            try:
+                supabase.auth.sign_out()
+            except Exception:
+                pass
+
+            st.session_state.auth_user = None
+            st.session_state.user_profile = None
+            st.rerun()
 # =========================================================
 # PERSONALIZED GREETING VARIABLES
 # =========================================================
@@ -889,22 +905,6 @@ if page == "Dashboard":
 
 if page == "Dashboard":
 
-# Logout button
-with st.sidebar:
-    st.write(
-        f"Signed in: {st.session_state.auth_user.get('email', '')}"
-    )
-
-    if st.button("Log Out", use_container_width=True):
-        try:
-            supabase.auth.sign_out()
-        except Exception:
-            pass
-
-        st.session_state.auth_user = None
-        st.session_state.user_profile = None
-
-        st.rerun()
 
 # Personalized greeting — Dashboard only
 
