@@ -813,7 +813,15 @@ def icon(name, size=22):
 
 
 def html(block):
-    @st.dialog("Terms of Service")
+    """Render an HTML block. Flattens it so Streamlit's Markdown never
+    mistakes indented lines for a code block."""
+    flat = " ".join(
+        line.strip() for line in block.splitlines() if line.strip()
+    )
+    st.markdown(flat, unsafe_allow_html=True)
+
+
+@st.dialog("Terms of Service")
 def show_terms():
     st.markdown(
         """
@@ -884,17 +892,11 @@ under applicable law, including the Nigeria Data Protection Act.
 **Contact:** gympulseai22@gmail.com
         """
     )
-    
-    """Render an HTML block. Flattens it so Streamlit's Markdown never
-    mistakes indented lines for a code block."""
-    flat = " ".join(
-        line.strip() for line in block.splitlines() if line.strip()
-    )
-    st.markdown(flat, unsafe_allow_html=True)
-# Show login and registration until authenticated
+
+
 # Show login and registration until authenticated
 if st.session_state.auth_user is None:
-
+    ...
     # -------------------------
     # GYMPULSE AI LOGIN BRANDING
     # -------------------------
