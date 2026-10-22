@@ -1010,20 +1010,6 @@ if st.session_state.auth_user is None:
     with auth_col:
         with st.container(border=True, key="auth_card"):
 
-            # Top branding
-            st.markdown(
-                """
-                <div style="text-align:center; margin-bottom: 12px;">
-                    <div style="display:flex; justify-content:center; align-items:center; gap:8px; font-size: 2.0rem; font-weight:800; letter-spacing:-0.04em;">
-                        <span style="color:#ffffff;">gym</span>
-                        <span style="color:#B7F34A;">pulse</span>
-                        <span style="color:#ffffff;">ai</span>
-                    </div>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-
             # ---------------- LOGIN PAGE ----------------
             if st.session_state.auth_mode == "login":
 
