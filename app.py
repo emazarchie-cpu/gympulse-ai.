@@ -14,7 +14,7 @@ from supabase import create_client
 st.set_page_config(
     page_title="GymPulse AI | Member Intelligence",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
 
@@ -265,6 +265,43 @@ st.markdown(
 
     .st-key-brand_home button:hover p {
         opacity: 0.85;
+    }[data-testid="stSidebar"],
+    [data-testid="stSidebarCollapsedControl"],
+    [data-testid="collapsedControl"] {
+        display: none !important;
+    }
+
+    .st-key-top_nav div[role="radiogroup"] {
+        gap: 6px;
+        flex-wrap: wrap;
+    }
+
+    .st-key-top_nav div[role="radiogroup"] label {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 8px 14px;
+        cursor: pointer;
+    }
+
+    .st-key-top_nav div[role="radiogroup"] label > div:first-child {
+        display: none;
+    }
+
+    .st-key-top_nav div[role="radiogroup"] label p {
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--white);
+        margin: 0;
+    }
+
+    .st-key-top_nav div[role="radiogroup"] label:has(input:checked) {
+        background: var(--lime);
+        border-color: var(--lime);
+    }
+
+    .st-key-top_nav div[role="radiogroup"] label:has(input:checked) p {
+        color: #10182A;
     }
     .footer {
         text-align: center;
@@ -808,40 +845,59 @@ def go_home():
     st.session_state["selected_page"] = "Dashboard"
 
 
-with st.sidebar:
+def log_out():
+    """End the Supabase session and return to the login page."""
+    try:
+        supabase.auth.sign_out()
+    except Exception:
+        pass
 
-    st.button(
-        "PULSE",
-        on_click=go_home,
-        key="brand_home"
+    for key in list(st.session_state.keys()):
+        del st.session_state[key]
+
+
+NAV_PAGES = [
+    "Dashboard",
+    "Member Management",
+    "Member Assessment",
+    "Batch Assessment",
+    "Model Insights",
+    "About the Model",
+    "FAQs"
+]
+
+with st.container(key="top_nav"):
+
+    brand_col, nav_col, user_col = st.columns(
+        [1.5, 7, 1.2],
+        vertical_alignment="center"
     )
 
-    st.markdown(
-        '<div class="brand-tagline">'
-        'Smarter insights. Stronger member retention.'
-        '</div>',
-        unsafe_allow_html=True
-    )
+    with brand_col:
+        st.button(
+            "PULSE",
+            on_click=go_home,
+            key="brand_home"
+        )
 
-    st.markdown("---")
+    with nav_col:
+        page = st.radio(
+            "WORKSPACE",
+            NAV_PAGES,
+            key="selected_page",
+            horizontal=True,
+            label_visibility="collapsed"
+        )
 
-    page = st.radio(
-        "WORKSPACE",
-        [
-            "Dashboard",
-            "Member Management",
-            "Member Assessment",
-            "Batch Assessment",
-            "Model Insights",
-            "About the Model"
-        ],
-        key="selected_page",
-        label_visibility="visible"
-    )
+    with user_col:
+        st.button(
+            "Log Out",
+            on_click=log_out,
+            use_container_width=True,
+            key="logout_button_main"
+        )
 
-    st.markdown("---")
-
-    st.caption(f"Signed in as {st.session_state.auth_user['email']}")
+st.markdown("---")
     
 # =========================================================
 # PERSONALIZED GREETING VARIABLES
@@ -862,30 +918,7 @@ else:
 
 safe_user_name = html.escape(str(user_name))
 safe_business_name = html.escape(str(business_name))
-# =========================================================
-# LOGOUT BUTTON (TOP RIGHT OF EVERY PAGE)
-# =========================================================
-
-def log_out():
-    """End the Supabase session and return to the login page."""
-    try:
-        supabase.auth.sign_out()
-    except Exception:
-        pass
-
-    for key in list(st.session_state.keys()):
-        del st.session_state[key]
-
-
-top_left, top_right = st.columns([5, 1])
-
-with top_right:
-    st.button(
-        "Log Out",
-        on_click=log_out,
-        use_container_width=True,
-        key="logout_button_main"
-    )   
+   
 # =========================================================
 # 7. SHARED HEADER — DASHBOARD ONLY
 # =========================================================
@@ -2037,7 +2070,126 @@ elif page == "About the Model":
         "and controlled sensitivity analysis. It is an educational "
         "prototype rather than a validated commercial prediction system."
     )
+# =========================================================
+# 13B. FAQs
+# =========================================================
 
+elif page == "FAQs":
+
+    st.markdown("## Frequently Asked Questions")
+
+    st.write(
+        "Quick answers to help you get the most out of GymPulse AI."
+    )
+
+    st.markdown(
+        '<div class="section-label">GETTING STARTED</div>',
+        unsafe_allow_html=True
+    )
+
+    with st.expander("How do I add members to my gym?"):
+        st.write(
+            "Open **Member Management**, fill in the member's details, "
+            "and click **Register Member**. Only the full name is "
+            "required. Registered members appear in the table below "
+            "the form."
+        )
+
+    with st.expander("Is my gym's data separate from other gyms?"):
+        st.write(
+            "Yes. Each account has its own gym workspace, and the "
+            "Member Management page only loads members registered "
+            "under your gym."
+        )
+
+    with st.expander("How do I log out?"):
+        st.write(
+            "Click **Log Out** at the top right. This ends your "
+            "session and returns you to the login page. Always log "
+            "out on shared computers."
+        )
+
+    st.markdown(
+        '<div class="section-label">RISK ASSESSMENTS</div>',
+        unsafe_allow_html=True
+    )
+
+    with st.expander("What does the cancellation probability mean?"):
+        st.write(
+            "It is the model's estimate of how likely a member is to "
+            "cancel, based on membership type, days since last visit, "
+            "attendance change, days until renewal, and personal-"
+            "training sessions. It is a guide for deciding who to "
+            "check in with, not a guarantee."
+        )
+
+    with st.expander("What do High, Medium, and Low risk mean?"):
+        st.write(
+            "- **High**: estimated probability of 50% or more\n"
+            "- **Medium**: 30% to just under 50%\n"
+            "- **Low**: below 30%\n\n"
+            "These categories are provisional and meant to help you "
+            "prioritise follow-ups."
+        )
+
+    with st.expander("How accurate are the predictions?"):
+        st.write(
+            "The model was trained on **synthetic** (simulated) data, "
+            "so its accuracy on real gym members has not been "
+            "established. Treat results as experimental and combine "
+            "them with your own knowledge of your members."
+        )
+
+    with st.expander("What should I do for a high-risk member?"):
+        st.write(
+            "Check their recent attendance and renewal date, then "
+            "reach out personally. Ask how they are finding their "
+            "training, offer support or a session with a trainer, and "
+            "note the outcome so you can follow up."
+        )
+
+    st.markdown(
+        '<div class="section-label">BATCH ASSESSMENT</div>',
+        unsafe_allow_html=True
+    )
+
+    with st.expander("What columns does my CSV need?"):
+        st.write(
+            "Your file must include these exact column names:\n\n"
+            "- `membership_type` (Monthly, Quarterly, or Annual)\n"
+            "- `days_since_last_visit`\n"
+            "- `visits_previous_30_days`\n"
+            "- `visits_last_30_days`\n"
+            "- `renewal_due_days`\n"
+            "- `pt_sessions_attended`"
+        )
+
+    with st.expander("Why did my CSV upload fail?"):
+        st.write(
+            "The most common causes are a misspelled column name, "
+            "an empty cell, a negative number, or a membership type "
+            "other than Monthly, Quarterly, or Annual. Fix the file "
+            "and upload it again."
+        )
+
+    with st.expander("Are my batch results saved?"):
+        st.write(
+            "No. Batch results exist only for your current session. "
+            "Use **Download Assessment Results CSV** to keep a copy."
+        )
+
+    st.markdown(
+        '<div class="section-label">PRIVACY</div>',
+        unsafe_allow_html=True
+    )
+
+    with st.expander("How should I handle member data?"):
+        st.write(
+            "Only collect information members have agreed to share, "
+            "keep your login private, and log out on shared devices. "
+            "Follow the data-protection rules that apply where you "
+            "operate."
+        )
 # =========================================================
 # 14. FOOTER
 # =========================================================
