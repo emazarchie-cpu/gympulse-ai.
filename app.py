@@ -17,6 +17,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+st.error(f"RUNNING FILE: {__file__}")
 
 # =========================================================
 # 2. PREMIUM FITNESS-TECH DESIGN
