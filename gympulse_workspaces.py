@@ -174,7 +174,76 @@ def _money(x):
     return f"{x:,.0f}"
 
 
-def _need_data(missing, supabase, gym_id):
+def _activity_editor(supabase, gym_id, roster, missing):
+    """Add or update visit/renewal data for any member."""
+    names, current = {}, {}
+    if not roster.empty:
+        for _, r in roster.iterrows():
+            names[r["id"]] = r["full_name"]
+            current[r["id"]] = r
+    if not missing.empty:
+        for _, r in missing.iterrows():
+            names[r["id"]] = r["full_name"]
+    if not names:
+        st.info("Register members in Member Management first.")
+        return
+
+    plans = ["Monthly", "Quarterly", "Annual"]
+
+    with st.expander("Add or update member activity", expanded=roster.empty):
+        member_id = st.selectbox(
+            "Member", list(names),
+            format_func=lambda i: names[i], key="act_member"
+        )
+        r = current.get(member_id)
+
+        def val(col, default):
+            return default if r is None else r[col]
+
+        with st.form(f"activity_form_{member_id}"):
+            c1, c2 = st.columns(2)
+            mtype = c1.selectbox(
+                "Membership type", plans,
+                index=plans.index(val("membership_type", "Monthly"))
+            )
+            fee = c2.number_input(
+                "Monthly fee", min_value=0.0, step=500.0,
+                value=float(val("monthly_fee", 0.0))
+            )
+            d = c1.number_input(
+                "Days since last visit", 0, 365,
+                int(val("days_since_last_visit", 7))
+            )
+            prev = c2.number_input(
+                "Visits, previous 30 days", 0, 100,
+                int(val("visits_previous_30_days", 10))
+            )
+            last = c1.number_input(
+                "Visits, last 30 days", 0, 100,
+                int(val("visits_last_30_days", 8))
+            )
+            ren = c2.number_input(
+                "Days until renewal", 0, 365,
+                int(val("renewal_due_days", 30))
+            )
+            pt = c1.number_input(
+                "PT sessions attended", 0, 100,
+                int(val("pt_sessions_attended", 0))
+            )
+            if st.form_submit_button("Save activity", use_container_width=True):
+                supabase.table("member_activity").upsert({
+                    "member_id": member_id, "gym_id": gym_id,
+                    "membership_type": mtype, "monthly_fee": float(fee),
+                    "days_since_last_visit": int(d),
+                    "visits_previous_30_days": int(prev),
+                    "visits_last_30_days": int(last),
+                    "renewal_due_days": int(ren),
+                    "pt_sessions_attended": int(pt),
+                }).execute()
+                st.rerun()
+
+    if not missing.empty:
+        st.caption(f"{len(missing)} member(s) still need activity data.")
     st.info("Add attendance data so the model can score your members.")
     if missing.empty:
         return
@@ -211,16 +280,16 @@ def render_risk_radar(supabase, gym_id, assess_fn):
             st.code(str(e))
         return
     if roster.empty:
-        _need_data(missing, supabase, gym_id)
+        st.info("Add attendance data so the model can score your members.")
+        _activity_editor(supabase, gym_id, roster, missing)
         return
-
     k = kpis(roster, pd.DataFrame())
     c = st.columns(4)
     c[0].metric("High risk", k["high"])
     c[1].metric("Medium risk", k["medium"])
     c[2].metric("Monthly revenue held by high-risk", _money(k["high_risk_revenue"]))
     c[3].metric("Renewals ≤30d at risk", k["renewals_30d_at_risk"])
-
+_activity_editor(supabase, gym_id, roster, missing)
     f1, f2, f3 = st.columns([2, 2, 3])
     levels = f1.multiselect("Risk level", ["High", "Medium", "Low"], ["High", "Medium"])
     plans = f2.multiselect("Membership", ["Monthly", "Quarterly", "Annual"],
