@@ -774,6 +774,17 @@ if "navigate_to" in st.session_state:
     )
 
     
+def log_out():
+    """End the Supabase session and clear all local session data."""
+    try:
+        supabase.auth.sign_out()
+    except Exception:
+        pass  # still log out locally even if this call fails
+
+    for key in list(st.session_state.keys()):
+        del st.session_state[key]
+
+
 with st.sidebar:
 
     st.markdown(
@@ -806,21 +817,14 @@ with st.sidebar:
 
     st.markdown("---")
 
-    # Signed-in user info
     st.caption(f"Signed in as {st.session_state.auth_user['email']}")
 
-    # Log out button
-    if st.button("Log Out", use_container_width=True, key="logout_button"):
-        try:
-            supabase.auth.sign_out()
-        except Exception:
-            pass  # still clear the local session even if this fails
-
-        # Clear everything so the next user starts fresh
-        for key in list(st.session_state.keys()):
-            del st.session_state[key]
-
-        st.rerun()
+    st.button(
+        "Log Out",
+        on_click=log_out,
+        use_container_width=True,
+        key="logout_button"
+    )
 # =========================================================
 # PERSONALIZED GREETING VARIABLES
 # =========================================================
@@ -898,12 +902,9 @@ if page == "Dashboard":
         """,
         unsafe_allow_html=True
     )
-=========================================================
-
-8. DASHBOARD
-
-=========================================================
-
+# =========================================================
+# 8. DASHBOARD
+# =========================================================
 if page == "Dashboard":
 
 
