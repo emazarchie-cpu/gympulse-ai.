@@ -898,311 +898,320 @@ under applicable law, including the Nigeria Data Protection Act.
 if st.session_state.auth_user is None:
     ...
     # -------------------------
-    # GYMPULSE AI LOGIN BRANDING
-    # -------------------------
+# GYMPULSE AI LOGIN BRANDING
+# -------------------------
 
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    LOGO_PATH = os.path.join(
-        BASE_DIR,
-        "GymPulse_AI_logo_mark.png"
-    )
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+LOGO_PATH = os.path.join(
+    BASE_DIR,
+    "GymPulse_AI_logo_mark.png"
+)
 
-    # Center the logo
-    logo_col1, logo_col2, logo_col3 = st.columns([1, 1, 1])
+# Center the logo
+logo_col1, logo_col2, logo_col3 = st.columns([1, 1, 1])
 
-    with logo_col2:
-        st.image(LOGO_PATH, width=115)
+with logo_col2:
+    st.image(LOGO_PATH, width=115)
 
-    # Hero
-    html(f"""
-    <div class="lp-hero">
-      <div>
-        <div class="lp-pill"><span class="lp-dot"></span>
-          Member retention intelligence for gyms</div>
-        <div class="lp-title">Know who is leaving<br>
-          <span class="lp-grad">before they do.</span></div>
-        <div class="lp-sub">GymPulse AI reads attendance and renewal
-          patterns and flags the members who are drifting away, so you can
-          reach out while it still matters. Add members by hand or drop in
-          a spreadsheet.</div>
-        <div class="lp-chips">
-          <div class="lp-chip">{icon('check', 14)} Free to start</div>
-          <div class="lp-chip">{icon('check', 14)} Runs in your browser</div>
-          <div class="lp-chip">{icon('check', 14)} Works with a simple CSV</div>
-        </div>
-      </div>
-      <div class="lp-radar">
-        <div class="lp-radar-head">
-          <div class="lp-radar-title">Risk Radar</div>
-          <div class="lp-live"><span class="lp-dot"></span>LIVE PREVIEW</div>
-        </div>
-        <svg class="lp-pulse-line" viewBox="0 0 400 54" preserveAspectRatio="none">
-          <path d="M0 30 H110 L130 30 L145 6 L165 50 L182 18 L195 30 H400"
-                fill="none" stroke="#B7F34A" stroke-width="2.5"
-                stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        <div class="lp-row">
-          <div class="lp-avatar" style="background:#FF8A5B;">AO</div>
-          <div class="lp-row-main">
-            <div class="lp-row-name">Member A</div>
-            <div class="lp-row-sub">18 days away · renews in 6 days</div>
-          </div>
-          <div class="lp-risk lp-high">HIGH · 72%</div>
-        </div>
-        <div class="lp-row">
-          <div class="lp-avatar" style="background:#FFC44D;">KB</div>
-          <div class="lp-row-main">
-            <div class="lp-row-name">Member B</div>
-            <div class="lp-row-sub">Visits down 4 this month</div>
-          </div>
-          <div class="lp-risk lp-med">MEDIUM · 41%</div>
-        </div>
-        <div class="lp-row">
-          <div class="lp-avatar" style="background:#B7F34A;">CE</div>
-          <div class="lp-row-main">
-            <div class="lp-row-name">Member C</div>
-            <div class="lp-row-sub">Steady visits · 6 PT sessions</div>
-          </div>
-          <div class="lp-risk lp-low">LOW · 14%</div>
-        </div>
-        <div class="lp-tiny">ILLUSTRATIVE EXAMPLE · NOT REAL MEMBER DATA</div>
-      </div>
+# Hero
+html(f"""
+<div class="lp-hero">
+  <div>
+    <div class="lp-pill"><span class="lp-dot"></span>
+      Member retention intelligence for gyms</div>
+    <div class="lp-title">Know who is leaving<br>
+      <span class="lp-grad">before they do.</span></div>
+    <div class="lp-sub">GymPulse AI reads attendance and renewal
+      patterns and flags the members who are drifting away, so you can
+      reach out while it still matters. Add members by hand or drop in
+      a spreadsheet.</div>
+    <div class="lp-chips">
+      <div class="lp-chip">{icon('check', 14)} Free to start</div>
+      <div class="lp-chip">{icon('check', 14)} Runs in your browser</div>
+      <div class="lp-chip">{icon('check', 14)} Works with a simple CSV</div>
     </div>
-    <div class="lp-stats">
-      <div class="lp-stat"><b>5</b><span>signals analysed</span></div>
-      <div class="lp-stat"><b>3</b><span>clear risk levels</span></div>
-      <div class="lp-stat"><b>CSV</b><span>or manual entry</span></div>
-      <div class="lp-stat"><b>Seconds</b><span>to a full assessment</span></div>
+  </div>
+  <div class="lp-radar">
+    <div class="lp-radar-head">
+      <div class="lp-radar-title">Risk Radar</div>
+      <div class="lp-live"><span class="lp-dot"></span>LIVE PREVIEW</div>
     </div>
-    <div class="section-label" style="text-align:center;margin-top:34px;">
-      SIGN IN TO YOUR WORKSPACE</div>
-    """)
-    # -------------------------
-    # AUTH CARD
-    # -------------------------
+    <svg class="lp-pulse-line" viewBox="0 0 400 54" preserveAspectRatio="none">
+      <path d="M0 30 H110 L130 30 L145 6 L165 50 L182 18 L195 30 H400"
+            fill="none" stroke="#B7F34A" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <div class="lp-row">
+      <div class="lp-avatar" style="background:#FF8A5B;">AO</div>
+      <div class="lp-row-main">
+        <div class="lp-row-name">Member A</div>
+        <div class="lp-row-sub">18 days away · renews in 6 days</div>
+      </div>
+      <div class="lp-risk lp-high">HIGH · 72%</div>
+    </div>
+    <div class="lp-row">
+      <div class="lp-avatar" style="background:#FFC44D;">KB</div>
+      <div class="lp-row-main">
+        <div class="lp-row-name">Member B</div>
+        <div class="lp-row-sub">Visits down 4 this month</div>
+      </div>
+      <div class="lp-risk lp-med">MEDIUM · 41%</div>
+    </div>
+    <div class="lp-row">
+      <div class="lp-avatar" style="background:#B7F34A;">CE</div>
+      <div class="lp-row-main">
+        <div class="lp-row-name">Member C</div>
+        <div class="lp-row-sub">Steady visits · 6 PT sessions</div>
+      </div>
+      <div class="lp-risk lp-low">LOW · 14%</div>
+    </div>
+    <div class="lp-tiny">ILLUSTRATIVE EXAMPLE · NOT REAL MEMBER DATA</div>
+  </div>
+</div>
+<div class="lp-stats">
+  <div class="lp-stat"><b>5</b><span>signals analysed</span></div>
+  <div class="lp-stat"><b>3</b><span>clear risk levels</span></div>
+  <div class="lp-stat"><b>CSV</b><span>or manual entry</span></div>
+  <div class="lp-stat"><b>Seconds</b><span>to a full assessment</span></div>
+</div>
+<div class="section-label" style="text-align:center;margin-top:34px;">
+  SIGN IN TO YOUR WORKSPACE</div>
+""")
 
-    if "auth_mode" not in st.session_state:
-        st.session_state.auth_mode = "login"
+# -------------------------
+# AUTH CARD
+# -------------------------
 
-    def set_auth_mode(mode):
-        st.session_state.auth_mode = mode
-        st.session_state.reset_email_sent = False
+if "auth_mode" not in st.session_state:
+    st.session_state.auth_mode = "login"
 
-    _, auth_col, _ = st.columns([1, 1.4, 1])
 
-    with auth_col:
-        with st.container(border=True, key="auth_card"):
+def set_auth_mode(mode):
+    st.session_state.auth_mode = mode
+    st.session_state.reset_email_sent = False
 
-            # ---------------- SIGN IN ----------------
-            if st.session_state.auth_mode == "login":
 
-                st.markdown(
-                    '<div class="auth-title">Welcome back, sign in</div>',
-                    unsafe_allow_html=True
-                )
-if st.session_state.pop("password_updated", False):
-                    st.success(
-                        "Password updated. Sign in with your new password."
-                    )
-                st.button(
-                    "Sign up",
-                    on_click=set_auth_mode,
-                    args=("signup",),
-                    key="to_signup"
-                )
+_, auth_col, _ = st.columns([1, 1.4, 1])
 
-                with st.form("login_form", border=False):
+with auth_col:
+    with st.container(border=True, key="auth_card"):
 
-                    login_email = st.text_input("Email address")
-                    login_password = st.text_input(
-                        "Password",
-                        type="password"
-                    )
+        # ---------------- SIGN IN ----------------
+        if st.session_state.auth_mode == "login":
 
-                    login_submitted = st.form_submit_button(
-                        "Sign in with email",
-                        use_container_width=True
-                    )
+            st.markdown(
+                '<div class="auth-title">Welcome back, sign in</div>',
+                unsafe_allow_html=True
+            )
 
-                if login_submitted:
-
-                    if not login_email or not login_password:
-                        st.warning("Enter your email and password.")
-
-                    else:
-                        try:
-                            result = supabase.auth.sign_in_with_password(
-                                {
-                                    "email": login_email.strip(),
-                                    "password": login_password
-                                }
-                            )
-
-                            if result.user:
-
-                                st.session_state.auth_user = {
-                                    "id": str(result.user.id),
-                                    "email": result.user.email
-                                }
-
-                                profile_result = (
-                                    supabase.table("profiles")
-                                    .select("*")
-                                    .eq("id", str(result.user.id))
-                                    .execute()
-                                )
-
-                                if profile_result.data:
-                                    st.session_state.user_profile = (
-                                        profile_result.data[0]
-                                    )
-                                else:
-                                    st.session_state.user_profile = {
-                                        "full_name": "User",
-                                        "business_name": "My Gym"
-                                    }
-
-                                st.rerun()
-
-                        except Exception:
-                            st.error(
-                                "Login failed. Check your credentials "
-                                "and confirm your email address."
-                            )
-                            st.button(
-                    "Forgot password?",
-                    on_click=set_auth_mode,
-                    args=("forgot",),
-                    key="to_forgot"
+            if st.session_state.pop("password_updated", False):
+                st.success(
+                    "Password updated. Sign in with your new password."
                 )
 
-            # ---------------- SIGN UP ----------------
-            elif st.session_state.auth_mode == "signup":
+            st.button(
+                "Sign up",
+                on_click=set_auth_mode,
+                args=("signup",),
+                key="to_signup"
+            )
 
-                st.markdown(
-                    '<div class="auth-title">Create your free account</div>',
-                    unsafe_allow_html=True
+            st.button(
+                "Forgot password?",
+                on_click=set_auth_mode,
+                args=("forgot",),
+                key="to_forgot"
+            )
+
+            with st.form("login_form", border=False):
+
+                login_email = st.text_input("Email address")
+                login_password = st.text_input(
+                    "Password",
+                    type="password"
                 )
 
-                st.button(
-                    "Sign in",
-                    on_click=set_auth_mode,
-                    args=("login",),
-                    key="to_login"
+                login_submitted = st.form_submit_button(
+                    "Sign in with email",
+                    use_container_width=True
                 )
 
-                with st.form("signup_form", border=False):
+            if login_submitted:
 
-                    full_name = st.text_input("Your full name")
+                if not login_email or not login_password:
+                    st.warning("Enter your email and password.")
 
-                    business_name = st.text_input(
-                        "Gym or company name",
-                        placeholder="e.g. Nuelarch Gym"
-                    )
-
-                    signup_email = st.text_input(
-                        "Email address",
-                        key="signup_email"
-                    )
-
-                    signup_password = st.text_input(
-                        "Create password",
-                        type="password",
-                        key="signup_password"
-                    )
-
-                    confirm_password = st.text_input(
-                        "Confirm password",
-                        type="password"
-                    )
-                    agree = st.checkbox(
-                        "I agree to the Terms of Service and Privacy Policy"
-                    )
-
-                    signup_submitted = st.form_submit_button(
-                        "Create free account",
-                        use_container_width=True
-                    )
-
-                if signup_submitted:
-
-                    if not all([
-                        full_name.strip(),
-                        business_name.strip(),
-                        signup_email.strip(),
-                        signup_password,
-                        confirm_password
-                    ]):
-                        st.warning("Please complete every field.")
-elif not agree:
-                        st.warning(
-                            "Please accept the Terms of Service and "
-                            "Privacy Policy."
-                        )
-                    elif signup_password != confirm_password:
-                        st.error("Your passwords do not match.")
-
-                    elif len(signup_password) < 8:
-                        st.warning(
-                            "Your password must contain at least "
-                            "8 characters."
+                else:
+                    try:
+                        result = supabase.auth.sign_in_with_password(
+                            {
+                                "email": login_email.strip(),
+                                "password": login_password
+                            }
                         )
 
-                    else:
-                        try:
-                            result = supabase.auth.sign_up(
-                                {
-                                    "email": signup_email.strip(),
-                                    "password": signup_password,
-                                    "options": {
-                                        "data": {
-                                            "full_name": full_name.strip(),
-                                            "business_name": business_name.strip(),
-                                            "account_type": "gym_owner"
-                                        }
-                                    }
-                                }
+                        if result.user:
+
+                            st.session_state.auth_user = {
+                                "id": str(result.user.id),
+                                "email": result.user.email
+                            }
+
+                            profile_result = (
+                                supabase.table("profiles")
+                                .select("*")
+                                .eq("id", str(result.user.id))
+                                .execute()
                             )
 
-                            if result.session and result.user:
-
-                                st.session_state.auth_user = {
-                                    "id": str(result.user.id),
-                                    "email": result.user.email
-                                }
-
-                                profile_result = (
-                                    supabase.table("profiles")
-                                    .select("*")
-                                    .eq("id", str(result.user.id))
-                                    .execute()
+                            if profile_result.data:
+                                st.session_state.user_profile = (
+                                    profile_result.data[0]
                                 )
-
-                                if profile_result.data:
-                                    st.session_state.user_profile = (
-                                        profile_result.data[0]
-                                    )
-                                else:
-                                    st.session_state.user_profile = {
-                                        "full_name": full_name.strip(),
-                                        "business_name": business_name.strip()
-                                    }
-
-                                st.rerun()
-
                             else:
-                                st.success(
-                                    "Registration submitted! Check your "
-                                    "email for a confirmation link, then "
-                                    "come back and sign in."
-                                )
+                                st.session_state.user_profile = {
+                                    "full_name": "User",
+                                    "business_name": "My Gym"
+                                }
 
-                        except Exception:
-                            st.error(
-                                "Registration failed. Your email may "
-                                "already be registered, or the request "
-                                "may have failed. Please try again."
+                            st.rerun()
+
+                    except Exception:
+                        st.error(
+                            "Login failed. Check your credentials "
+                            "and confirm your email address."
+                        )
+
+        # ---------------- SIGN UP ----------------
+        elif st.session_state.auth_mode == "signup":
+
+            st.markdown(
+                '<div class="auth-title">Create your free account</div>',
+                unsafe_allow_html=True
+            )
+
+            st.button(
+                "Sign in",
+                on_click=set_auth_mode,
+                args=("login",),
+                key="to_login"
+            )
+
+            with st.form("signup_form", border=False):
+
+                full_name = st.text_input("Your full name")
+
+                business_name = st.text_input(
+                    "Gym or company name",
+                    placeholder="e.g. Nuelarch Gym"
+                )
+
+                signup_email = st.text_input(
+                    "Email address",
+                    key="signup_email"
+                )
+
+                signup_password = st.text_input(
+                    "Create password",
+                    type="password",
+                    key="signup_password"
+                )
+
+                confirm_password = st.text_input(
+                    "Confirm password",
+                    type="password"
+                )
+
+                agree = st.checkbox(
+                    "I agree to the Terms of Service and Privacy Policy"
+                )
+
+                signup_submitted = st.form_submit_button(
+                    "Create free account",
+                    use_container_width=True
+                )
+
+            if signup_submitted:
+
+                if not all([
+                    full_name.strip(),
+                    business_name.strip(),
+                    signup_email.strip(),
+                    signup_password,
+                    confirm_password
+                ]):
+                    st.warning("Please complete every field.")
+
+                elif not agree:
+                    st.warning(
+                        "Please accept the Terms of Service and "
+                        "Privacy Policy."
+                    )
+
+                elif signup_password != confirm_password:
+                    st.error("Your passwords do not match.")
+
+                elif len(signup_password) < 8:
+                    st.warning(
+                        "Your password must contain at least "
+                        "8 characters."
+                    )
+
+                else:
+                    try:
+                        result = supabase.auth.sign_up(
+                            {
+                                "email": signup_email.strip(),
+                                "password": signup_password,
+                                "options": {
+                                    "data": {
+                                        "full_name": full_name.strip(),
+                                        "business_name": business_name.strip(),
+                                        "account_type": "gym_owner"
+                                    }
+                                }
+                            }
+                        )
+
+                        if result.session and result.user:
+
+                            st.session_state.auth_user = {
+                                "id": str(result.user.id),
+                                "email": result.user.email
+                            }
+
+                            profile_result = (
+                                supabase.table("profiles")
+                                .select("*")
+                                .eq("id", str(result.user.id))
+                                .execute()
                             )
+
+                            if profile_result.data:
+                                st.session_state.user_profile = (
+                                    profile_result.data[0]
+                                )
+                            else:
+                                st.session_state.user_profile = {
+                                    "full_name": full_name.strip(),
+                                    "business_name": business_name.strip()
+                                }
+
+                            st.rerun()
+
+                        else:
+                            st.success(
+                                "Registration submitted! Check your "
+                                "email for a confirmation link, then "
+                                "come back and sign in."
+                            )
+
+                    except Exception:
+                        st.error(
+                            "Registration failed. Your email may "
+                            "already be registered, or the request "
+                            "may have failed. Please try again."
+                        )
 # ---------------- FORGOT PASSWORD ----------------
             else:
 
