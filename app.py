@@ -374,6 +374,241 @@ st.markdown(
     .st-key-top_nav div[role="radiogroup"] label:hover p {
         color: #10182A !important;
     }
+    /* ---------- Landing page ---------- */
+    .lp-hero {
+        text-align: center;
+        padding: 18px 10px 10px;
+        background: radial-gradient(
+            ellipse at top,
+            rgba(183,243,74,0.13) 0%,
+            rgba(11,16,32,0) 65%
+        );
+    }
+
+    .lp-eyebrow {
+        color: var(--lime);
+        text-transform: uppercase;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 2.5px;
+        margin-bottom: 14px;
+    }
+
+    .lp-title {
+        font-size: 54px;
+        font-weight: 800;
+        line-height: 1.08;
+        letter-spacing: -1.5px;
+        color: var(--white);
+    }
+
+    .lp-title span { color: var(--lime); }
+
+    .lp-sub {
+        color: #BCC8D8;
+        font-size: 16px;
+        line-height: 1.7;
+        max-width: 680px;
+        margin: 18px auto 20px;
+    }
+
+    .lp-chips {
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+        flex-wrap: wrap;
+        margin-bottom: 18px;
+    }
+
+    .lp-chip {
+        border: 1px solid var(--border);
+        background: var(--surface);
+        border-radius: 999px;
+        padding: 6px 14px;
+        font-size: 12px;
+        color: var(--muted);
+    }
+
+    .lp-section-title {
+        text-align: center;
+        font-size: 30px;
+        font-weight: 800;
+        letter-spacing: -0.5px;
+        color: var(--white);
+        margin: 64px 0 8px;
+    }
+
+    .lp-section-sub {
+        text-align: center;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.6;
+        max-width: 620px;
+        margin: 0 auto 28px;
+    }
+
+    .lp-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 16px;
+    }
+
+    .lp-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 22px;
+        transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+
+    .lp-card:hover {
+        transform: translateY(-4px);
+        border-color: var(--lime);
+    }
+
+    .lp-icon { font-size: 26px; margin-bottom: 10px; }
+
+    .lp-step {
+        color: var(--lime);
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 2px;
+        margin-bottom: 8px;
+    }
+
+    .lp-card h4 {
+        color: var(--white);
+        font-size: 16px;
+        font-weight: 800;
+        margin: 0 0 6px;
+    }
+
+    .lp-card p {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.6;
+        margin: 0;
+    }
+
+    .lp-preview {
+        max-width: 560px;
+        margin: 0 auto;
+        background: linear-gradient(135deg, #17243A 0%, #142033 100%);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        padding: 26px;
+    }
+
+    .lp-preview-tag {
+        color: var(--lime);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 2px;
+        margin-bottom: 14px;
+    }
+
+    .lp-preview-row {
+        display: flex;
+        justify-content: space-between;
+        color: var(--muted);
+        font-size: 13px;
+        padding: 7px 0;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .lp-preview-row b { color: var(--white); }
+
+    .lp-prob {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        margin-top: 18px;
+    }
+
+    .lp-prob-num {
+        font-size: 40px;
+        font-weight: 800;
+        color: #FF8A5B;
+    }
+
+    .lp-badge {
+        background: rgba(255,138,91,0.15);
+        color: #FF8A5B;
+        font-size: 12px;
+        font-weight: 800;
+        padding: 5px 12px;
+        border-radius: 999px;
+    }
+
+    .lp-bar {
+        height: 8px;
+        background: #0B1020;
+        border-radius: 6px;
+        overflow: hidden;
+        margin-top: 10px;
+    }
+
+    .lp-bar > div {
+        width: 72%;
+        height: 100%;
+        background: linear-gradient(90deg, #B7F34A, #FF8A5B);
+    }
+
+    .lp-note {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-left: 5px solid var(--cyan);
+        border-radius: 16px;
+        padding: 24px;
+        max-width: 820px;
+        margin: 0 auto;
+    }
+
+    .lp-note h4 {
+        color: var(--white);
+        font-size: 17px;
+        font-weight: 800;
+        margin: 0 0 8px;
+    }
+
+    .lp-note p {
+        color: #BCC8D8;
+        font-size: 14px;
+        line-height: 1.7;
+        margin: 0;
+    }
+
+    .lp-cta {
+        text-align: center;
+        margin: 64px 0 10px;
+        padding: 40px 20px;
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        background: radial-gradient(
+            ellipse at center,
+            rgba(183,243,74,0.12) 0%,
+            rgba(21,29,48,1) 70%
+        );
+    }
+
+    .lp-cta-title {
+        font-size: 32px;
+        font-weight: 800;
+        letter-spacing: -1px;
+        color: var(--white);
+    }
+
+    .lp-cta-title span { color: var(--lime); }
+
+    .lp-cta p {
+        color: var(--muted);
+        font-size: 14px;
+        margin: 10px 0 0;
+    }
+
+    @media (max-width: 700px) {
+        .lp-title { font-size: 36px; }
+    }
     .footer {
         text-align: center;
         color: var(--muted);
@@ -432,16 +667,29 @@ if st.session_state.auth_user is None:
     with logo_col2:
         st.image(LOGO_PATH, width=115)
 
-    # Heading and tagline
+    # Hero
     st.markdown(
         """
-        <div style="text-align: center; padding: 0 0 20px;">
-            <div style="font-size: 42px; font-weight: 800; line-height: 1.1;">
-                GYM<span style="color:#B7F34A;">PULSE</span> AI
+        <div class="lp-hero">
+            <div class="lp-eyebrow">MEMBER RETENTION INTELLIGENCE</div>
+            <div class="lp-title">
+                Know who is about to leave<br><span>before they do.</span>
             </div>
-            <p style="color:#9AA8BD; font-size:12px; margin-top:5px; margin-bottom:0;">
-                Smarter insights. Stronger member retention.
-            </p>
+            <div class="lp-sub">
+                GymPulse AI turns attendance and renewal data into early
+                warning signals, so you can reach out to the right members
+                at the right time. Register your members or upload a
+                spreadsheet and see cancellation-risk estimates in seconds.
+            </div>
+            <div class="lp-chips">
+                <div class="lp-chip">✓ Free to start</div>
+                <div class="lp-chip">✓ Runs in your browser</div>
+                <div class="lp-chip">✓ No special hardware</div>
+                <div class="lp-chip">✓ Works with a simple CSV</div>
+            </div>
+        </div>
+        <div class="section-label" style="text-align:center;">
+            LOG IN OR CREATE YOUR FREE ACCOUNT
         </div>
         """,
         unsafe_allow_html=True
@@ -629,7 +877,197 @@ if st.session_state.auth_user is None:
                         "be registered, or the request may have failed. "
                         "Please check your details and try again."
                     )
+# -------------------------
+    # LANDING PAGE SECTIONS
+    # -------------------------
 
+    # The problem
+    st.markdown(
+        """
+        <div class="lp-section-title">
+            Members rarely announce they are leaving.
+        </div>
+        <div class="lp-section-sub">
+            They just stop showing up. By the time you notice, the
+            cancellation is already on its way.
+        </div>
+        <div class="lp-grid">
+            <div class="lp-card">
+                <div class="lp-icon">📉</div>
+                <h4>Attendance fades quietly</h4>
+                <p>A drop from ten visits a month to three is easy to miss
+                when you are running a busy gym.</p>
+            </div>
+            <div class="lp-card">
+                <div class="lp-icon">📅</div>
+                <h4>Renewals feel like surprises</h4>
+                <p>Without a view of who is close to renewal and barely
+                attending, you only find out when they do not renew.</p>
+            </div>
+            <div class="lp-card">
+                <div class="lp-icon">🎯</div>
+                <h4>Follow-up becomes guesswork</h4>
+                <p>You cannot call everyone. Knowing who to call first is
+                what saves members.</p>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    # How it works
+    st.markdown(
+        """
+        <div class="lp-section-title">From data to action in three steps</div>
+        <div class="lp-section-sub">
+            No complicated setup. Bring the information you already have.
+        </div>
+        <div class="lp-grid">
+            <div class="lp-card">
+                <div class="lp-step">STEP 01</div>
+                <h4>Add your members</h4>
+                <p>Register members one by one, or prepare a CSV with
+                membership type, visits, renewal date and personal-training
+                sessions.</p>
+            </div>
+            <div class="lp-card">
+                <div class="lp-step">STEP 02</div>
+                <h4>Run an assessment</h4>
+                <p>GymPulse AI estimates each member's cancellation
+                probability and sorts them into High, Medium or Low risk.</p>
+            </div>
+            <div class="lp-card">
+                <div class="lp-step">STEP 03</div>
+                <h4>Reach out early</h4>
+                <p>Start with the members who need attention most, check in
+                personally and download the results to share with your
+                team.</p>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    # Example output
+    st.markdown(
+        """
+        <div class="lp-section-title">See what an assessment looks like</div>
+        <div class="lp-section-sub">
+            Clear numbers and a plain-language risk level, not a wall of
+            statistics.
+        </div>
+        <div class="lp-preview">
+            <div class="lp-preview-tag">ILLUSTRATIVE EXAMPLE</div>
+            <div class="lp-preview-row">
+                <span>Membership</span><b>Monthly</b>
+            </div>
+            <div class="lp-preview-row">
+                <span>Days since last visit</span><b>18</b>
+            </div>
+            <div class="lp-preview-row">
+                <span>Visits: previous 30 days to last 30 days</span>
+                <b>10 → 3</b>
+            </div>
+            <div class="lp-preview-row">
+                <span>Days until renewal</span><b>6</b>
+            </div>
+            <div class="lp-prob">
+                <div>
+                    <div style="color:#9AA8BD;font-size:12px;">
+                        Estimated cancellation probability
+                    </div>
+                    <div class="lp-prob-num">72%</div>
+                </div>
+                <div class="lp-badge">HIGH RISK</div>
+            </div>
+            <div class="lp-bar"><div></div></div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    # Features
+    st.markdown(
+        """
+        <div class="lp-section-title">Everything you need to keep members</div>
+        <div class="lp-section-sub">
+            Simple tools focused on one job: helping you hold on to the
+            people who train with you.
+        </div>
+        <div class="lp-grid">
+            <div class="lp-card">
+                <div class="lp-icon">🧍</div>
+                <h4>Individual assessment</h4>
+                <p>Enter one member's details and get an instant estimate
+                with attendance analysis and suggested next steps.</p>
+            </div>
+            <div class="lp-card">
+                <div class="lp-icon">📂</div>
+                <h4>Batch CSV assessment</h4>
+                <p>Upload your whole membership list, review the data and
+                download every estimate in one file.</p>
+            </div>
+            <div class="lp-card">
+                <div class="lp-icon">👥</div>
+                <h4>Member management</h4>
+                <p>Keep a private register of your members, with goals,
+                contact details and body metrics, separate from other
+                gyms.</p>
+            </div>
+            <div class="lp-card">
+                <div class="lp-icon">🚦</div>
+                <h4>Simple risk levels</h4>
+                <p>High, Medium and Low categories tell you at a glance who
+                needs a conversation first.</p>
+            </div>
+            <div class="lp-card">
+                <div class="lp-icon">🔬</div>
+                <h4>What-if exploration</h4>
+                <p>See how the estimate changes as time since the last visit
+                grows, to understand what the model reacts to.</p>
+            </div>
+            <div class="lp-card">
+                <div class="lp-icon">💡</div>
+                <h4>Built-in guidance</h4>
+                <p>An FAQ section answers common questions about
+                assessments, CSV files and handling member data.</p>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    # Honest note
+    st.markdown(
+        """
+        <div class="lp-section-title">Built to be transparent</div>
+        <div class="lp-note">
+            <h4>Experimental estimates, clearly labelled</h4>
+            <p>GymPulse AI is an early-stage project. Its model is currently
+            trained on synthetic data, so results are a guide for deciding
+            who to check in with, not a guarantee of what will happen. Every
+            result in the app is labelled accordingly, and your own
+            knowledge of your members always comes first.</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    # Closing call to action
+    st.markdown(
+        """
+        <div class="lp-cta">
+            <div class="lp-cta-title">
+                Keep more members.<br><span>Start with GymPulse AI.</span>
+            </div>
+            <p>Create your free account at the top of this page.</p>
+        </div>
+        <div class="footer">
+            © GymPulse AI · Smarter insights. Stronger member retention.
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
     st.stop()
 
 
