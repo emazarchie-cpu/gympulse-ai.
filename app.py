@@ -1276,11 +1276,13 @@ with auth_col:
                             )
                         else:
                             try:
-                                supabase.auth.verify_otp({
-                                    "email": st.session_state.reset_email,
-                                    "token": reset_code.strip(),
-                                    "type": "recovery"
-                                })
+                                supabase.auth.verify_otp(
+                                    {
+                                        "email": st.session_state.reset_email,
+                                        "token": reset_code.strip(),
+                                        "type": "recovery",
+                                    }
+                                )
                                 supabase.auth.update_user(
                                     {"password": new_password}
                                 )
@@ -1310,13 +1312,15 @@ with auth_col:
                     args=("login",),
                     key="back_to_login"
                 )
+
             st.markdown(
                 '<div class="auth-secure">'
-                'Secure sign-in. Your password is never stored in plain text.'
-                '</div>',
+                "Secure sign-in. Your password is never stored in plain text."
+                "</div>",
                 unsafe_allow_html=True
             )
-legal_a, legal_b = st.columns(2)
+
+            legal_a, legal_b = st.columns(2)
 
             with legal_a:
                 if st.button("Terms of Service", key="open_terms"):
@@ -1325,6 +1329,7 @@ legal_a, legal_b = st.columns(2)
             with legal_b:
                 if st.button("Privacy Policy", key="open_privacy"):
                     show_privacy()
+
 # LANDING PAGE SECTIONS
 
     # The quiet exit
