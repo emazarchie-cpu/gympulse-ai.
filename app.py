@@ -804,15 +804,23 @@ with st.sidebar:
         label_visibility="visible"
     )
 
-     st.markdown("---")
-    st.write("DEBUG: Sidebar is running")
-    st.write(f"Auth state: {st.session_state.auth_user is not None}")
+    st.markdown("---")
 
-    if st.button("TEST BUTTON", use_container_width=True):
-        st.success("The sidebar button works!")
-            st.session_state.auth_user = None
-            st.session_state.user_profile = None
-            st.rerun()
+    # Signed-in user info
+    st.caption(f"Signed in as {st.session_state.auth_user['email']}")
+
+    # Log out button
+    if st.button("Log Out", use_container_width=True, key="logout_button"):
+        try:
+            supabase.auth.sign_out()
+        except Exception:
+            pass  # still clear the local session even if this fails
+
+        # Clear everything so the next user starts fresh
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+
+        st.rerun()
 # =========================================================
 # PERSONALIZED GREETING VARIABLES
 # =========================================================
