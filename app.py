@@ -804,19 +804,12 @@ with st.sidebar:
         label_visibility="visible"
     )
 
-    st.markdown("---")
+     st.markdown("---")
+    st.write("DEBUG: Sidebar is running")
+    st.write(f"Auth state: {st.session_state.auth_user is not None}")
 
-    if st.session_state.auth_user:
-        st.caption(
-            f"Signed in: {st.session_state.auth_user.get('email', '')}"
-        )
-
-        if st.button("Log Out", use_container_width=True):
-            try:
-                supabase.auth.sign_out()
-            except Exception:
-                pass
-
+    if st.button("TEST BUTTON", use_container_width=True):
+        st.success("The sidebar button works!")
             st.session_state.auth_user = None
             st.session_state.user_profile = None
             st.rerun()
