@@ -235,24 +235,24 @@ st.markdown(
         font-size: 12px;
         margin-top: 6px;
     }
-.st-key-brand_home button {
-        background: transparent !important;
-        border: none !important;
-        box-shadow: none !important;
-        padding: 0 !important;
-        min-height: 0 !important;
-        justify-content: flex-start !important;
+.st-key-brand_home {
+        position: relative;
     }
 
-    .st-key-brand_home button p {
-        font-size: 27px !important;
-        font-weight: 800 !important;
-        letter-spacing: -1px !important;
-        color: var(--lime) !important;
+    .st-key-brand_home [data-testid="stButton"] {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 2;
     }
 
-    .st-key-brand_home button:hover p {
-        color: #D0FF7A !important;
+    .st-key-brand_home button {
+        width: 100% !important;
+        height: 100% !important;
+        opacity: 0 !important;
+        cursor: pointer;
     }
     .footer {
         text-align: center;
@@ -796,19 +796,25 @@ def go_home():
     st.session_state["selected_page"] = "Dashboard"
 with st.sidebar:
     
-    st.button(
-        "GYMPULSE AI",
-        on_click=go_home,
-        key="brand_home"
-    )
+    with st.container(key="brand_home"):
 
-    st.markdown(
-        '<div class="brand-tagline">'
-        'Smarter insights. Stronger member retention.'
-        '</div>',
-        unsafe_allow_html=True
-    )
+        st.markdown(
+            """
+            <div class="brand-logo">
+                GYM<span class="brand-accent">PULSE</span> AI
+            </div>
+            <div class="brand-tagline">
+                Smarter insights. Stronger member retention.
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
+        st.button(
+            "Go to Dashboard",
+            on_click=go_home,
+            key="brand_home_button"
+        )
     st.markdown("---")
 
     page = st.radio(
