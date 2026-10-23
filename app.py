@@ -2140,8 +2140,17 @@ elif page == "Member Management":
 
             if result.data:
                 members_df = pd.DataFrame(result.data)
+                total_members = len(members_df)
 
-                st.metric("Total Members", len(members_df))
+                focus_member = st.session_state.get("focus_member")
+                if focus_member:
+                    members_df = members_df[members_df["full_name"] == focus_member]
+                    st.info(f"Showing {focus_member}.")
+                    if st.button("Show all members", key="clear_focus_member"):
+                        st.session_state.pop("focus_member", None)
+                        st.rerun()
+
+                st.metric("Total Members", total_members)
 
                 st.dataframe(
                     members_df,
