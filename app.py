@@ -763,6 +763,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+gw.apply_mobile_styles()
 
 # =========================================================
 # 3. USER AUTHENTICATION
