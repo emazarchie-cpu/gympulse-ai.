@@ -47,6 +47,13 @@ MOBILE_CSS = """
         max-width: 100vw !important;
         overscroll-behavior-x: none;
     }
+    html, body, .stApp,
+    [data-testid="stApp"],
+    [data-testid="stAppViewContainer"],
+    [data-testid="stMain"] {
+        touch-action: pan-y pinch-zoom !important;
+    }
+    html, body { position: relative; width: 100%; }
     .block-container {
         max-width: 100% !important;
         overflow-x: hidden;
@@ -117,9 +124,58 @@ MOBILE_CSS = """
 """
 
 
+OVERFLOW_JS = r"""
+<div id="out" style="font:12px monospace;color:#fff;background:#111;padding:8px;
+ white-space:pre-wrap;word-break:break-all">scanning...</div>
+<script>
+function scan() {
+  try {
+    const d = window.parent.document, w = d.documentElement.clientWidth;
+    const clipped = (el) => {
+      for (let a = el.parentElement; a && a !== d.body; a = a.parentElement) {
+        const o = window.parent.getComputedStyle(a).overflowX;
+        if (['auto', 'scroll', 'hidden', 'clip'].includes(o)) {
+          const r = a.getBoundingClientRect();
+          if (r.right <= w + 1 && r.left >= -1) return true;
+        }
+      }
+      return false;
+    };
+    const bad = [];
+    d.querySelectorAll('body *').forEach(el => {
+      const r = el.getBoundingClientRect();
+      if (r.width > 0 && (r.right > w + 1 || r.left < -1) && !clipped(el)) {
+        const tid = el.getAttribute('data-testid');
+        const cls = (typeof el.className === 'string' && el.className)
+          ? '.' + el.className.split(' ').filter(Boolean).slice(0, 2).join('.') : '';
+        bad.push(el.tagName.toLowerCase() + (tid ? '[' + tid + ']' : '') + cls
+          + '  right=' + Math.round(r.right) + ' width=' + Math.round(r.width));
+      }
+    });
+    const doc = d.documentElement;
+    document.getElementById('out').textContent =
+      'viewport=' + w + 'px  scrollWidth=' + doc.scrollWidth + 'px\n'
+      + (bad.slice(0, 20).join('\n') || 'no overflowing elements found');
+  } catch (e) {
+    document.getElementById('out').textContent = 'scan failed: ' + e;
+  }
+}
+scan();
+setInterval(scan, 2000);
+</script>
+"""
+
+
 def apply_mobile_styles():
-    """Call once, right after the main CSS block in app.py."""
+    """Call once, right after the main CSS block in app.py.
+    Open the app with ?debug=overflow to list elements wider than the screen."""
     st.markdown(MOBILE_CSS, unsafe_allow_html=True)
+    try:
+        if st.query_params.get("debug") == "overflow":
+            import streamlit.components.v1 as components
+            components.html(OVERFLOW_JS, height=320, scrolling=True)
+    except Exception:
+        pass
 
 
 # ---------------------------------------------------------------- data
