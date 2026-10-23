@@ -76,13 +76,7 @@ MOBILE_CSS = """
     .vega-embed, [data-testid="stDataFrame"] {
         overscroll-behavior-x: contain;
     }
-    /* the invisible helper iframe takes no room */
-    [data-testid="stElementContainer"]:has(iframe[height="0"]) {
-        position: absolute !important;
-        width: 0 !important; height: 0 !important;
-        margin: 0 !important; padding: 0 !important;
-        overflow: hidden !important;
-    }
+
     .vega-embed, [data-testid="stVegaLiteChart"] {
         max-width: 100% !important;
         overflow-x: auto;
@@ -231,17 +225,34 @@ function lockFn() {
 """
 
 
+HELPER_CSS = """
+<style>
+[data-testid="stElementContainer"]:has(iframe[height="0"]) {
+    position: absolute !important;
+    width: 0 !important; height: 0 !important;
+    margin: 0 !important; padding: 0 !important;
+    overflow: hidden !important;
+}
+</style>
+"""
+
+
 def apply_mobile_styles():
     """Call once, right after the main CSS block in app.py.
-    Open the app with ?debug=overflow to list elements wider than the screen."""
+
+    The CSS is always on. Two extras are opt-in through the address bar so a
+    problem can never stop the normal app from opening:
+      ?lock=1            turns on the swipe lock script
+      ?debug=overflow    lists elements wider than the screen
+    """
     st.markdown(MOBILE_CSS, unsafe_allow_html=True)
     try:
-        import streamlit.components.v1 as components
-        components.html(LOCK_JS, height=0)
-    except Exception:
-        pass
-    try:
-        if st.query_params.get("debug") == "overflow":
+        params = st.query_params
+        if params.get("lock") == "1":
+            import streamlit.components.v1 as components
+            st.markdown(HELPER_CSS, unsafe_allow_html=True)
+            components.html(LOCK_JS, height=0)
+        if params.get("debug") == "overflow":
             import streamlit.components.v1 as components
             components.html(OVERFLOW_JS, height=320, scrolling=True)
     except Exception:
