@@ -61,6 +61,28 @@ MOBILE_CSS = """
     [data-testid="stMarkdownContainer"] { overflow-wrap: anywhere; }
     img, svg, video, canvas { max-width: 100%; }
     [data-testid="stRadio"] { max-width: 100%; min-width: 0; }
+
+    /* quarantine the top bar: nothing inside it may widen the page */
+    .st-key-top_nav {
+        max-width: 100% !important;
+        overflow-x: clip;
+    }
+    .st-key-top_nav [data-testid="stElementContainer"],
+    .st-key-top_nav [data-testid="stColumn"] {
+        max-width: 100% !important;
+    }
+    /* swiping past the end of the tab row must not drag the page */
+    .st-key-top_nav div[role="radiogroup"],
+    .vega-embed, [data-testid="stDataFrame"] {
+        overscroll-behavior-x: contain;
+    }
+    /* the invisible helper iframe takes no room */
+    [data-testid="stElementContainer"]:has(iframe[height="0"]) {
+        position: absolute !important;
+        width: 0 !important; height: 0 !important;
+        margin: 0 !important; padding: 0 !important;
+        overflow: hidden !important;
+    }
     .vega-embed, [data-testid="stVegaLiteChart"] {
         max-width: 100% !important;
         overflow-x: auto;
@@ -166,10 +188,58 @@ setInterval(scan, 2000);
 """
 
 
+LOCK_JS = r"""
+<script>
+function lockFn() {
+  let sx = 0, sy = 0, dir = null;
+  const SAFE = '[role="slider"],[data-baseweb="slider"],input,textarea,select,' +
+    '[data-testid="stDataFrame"],.vega-embed,[role="radiogroup"],pre,code,canvas';
+  function insideScroller(el) {
+    for (let n = el; n && n !== document.body && n !== document.documentElement;
+         n = n.parentElement) {
+      if (n.matches && n.matches(SAFE)) return true;
+      const cs = getComputedStyle(n);
+      if ((cs.overflowX === 'auto' || cs.overflowX === 'scroll') &&
+          n.scrollWidth > n.clientWidth + 1) return true;
+    }
+    return false;
+  }
+  document.addEventListener('touchstart', function (e) {
+    dir = null;
+    if (e.touches.length === 1) { sx = e.touches[0].clientX; sy = e.touches[0].clientY; }
+  }, {passive: true});
+  document.addEventListener('touchmove', function (e) {
+    if (e.touches.length !== 1) return;
+    const dx = e.touches[0].clientX - sx, dy = e.touches[0].clientY - sy;
+    if (dir === null && (Math.abs(dx) > 6 || Math.abs(dy) > 6)) {
+      dir = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v';
+    }
+    if (dir === 'h' && e.cancelable && !insideScroller(e.target)) e.preventDefault();
+  }, {passive: false});
+}
+(function () {
+  try {
+    var d = window.parent.document;
+    if (d.getElementById('gp-hlock')) return;
+    var s = d.createElement('script');
+    s.id = 'gp-hlock';
+    s.textContent = '(' + lockFn.toString() + ')();';
+    d.head.appendChild(s);
+  } catch (e) {}
+})();
+</script>
+"""
+
+
 def apply_mobile_styles():
     """Call once, right after the main CSS block in app.py.
     Open the app with ?debug=overflow to list elements wider than the screen."""
     st.markdown(MOBILE_CSS, unsafe_allow_html=True)
+    try:
+        import streamlit.components.v1 as components
+        components.html(LOCK_JS, height=0)
+    except Exception:
+        pass
     try:
         if st.query_params.get("debug") == "overflow":
             import streamlit.components.v1 as components
