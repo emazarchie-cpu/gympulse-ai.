@@ -535,6 +535,43 @@ def _delete_action_control(supabase, action_id):
         st.rerun()
 
 
+def _radar_chart(view):
+    """Scatter of absence vs risk: fixed colours, 0-100% axis, member tooltips."""
+    cols = ["full_name", "days_since_last_visit", "cancellation_probability",
+            "risk_category", "monthly_fee"]
+    data = view[cols].copy()
+    data["cancellation_probability"] = data["cancellation_probability"].astype(float)
+    try:
+        import altair as alt
+        x_max = max(14, float(data["days_since_last_visit"].max()) * 1.1)
+        colours = alt.Scale(domain=["High", "Medium", "Low"],
+                            range=["#FF6B6B", "#FFC44D", "#B7F34A"])
+        chart = (
+            alt.Chart(data).mark_circle(opacity=0.85)
+            .encode(
+                x=alt.X("days_since_last_visit:Q", title="Days since last visit",
+                        scale=alt.Scale(domain=[0, x_max])),
+                y=alt.Y("cancellation_probability:Q", title="Cancellation estimate",
+                        scale=alt.Scale(domain=[0, 1]), axis=alt.Axis(format="%")),
+                color=alt.Color("risk_category:N", title="Risk", scale=colours),
+                size=alt.Size("monthly_fee:Q", legend=None,
+                              scale=alt.Scale(range=[90, 420])),
+                tooltip=[
+                    alt.Tooltip("full_name:N", title="Member"),
+                    alt.Tooltip("risk_category:N", title="Risk"),
+                    alt.Tooltip("cancellation_probability:Q", title="Estimate", format=".0%"),
+                    alt.Tooltip("days_since_last_visit:Q", title="Days away"),
+                    alt.Tooltip("monthly_fee:Q", title="Monthly fee", format=",.0f"),
+                ],
+            )
+            .properties(height=320)
+        )
+        st.altair_chart(chart, use_container_width=True)
+    except Exception:
+        st.scatter_chart(data, x="days_since_last_visit", y="cancellation_probability",
+                         color="risk_category", size="monthly_fee", height=320)
+
+
 def render_risk_radar(supabase, gym_id, assess_fn):
     st.markdown("## Member Risk Radar")
     flash = st.session_state.pop("flash", None)
@@ -581,8 +618,7 @@ def render_risk_radar(supabase, gym_id, assess_fn):
 
     st.markdown('<div class="section-label">THE RADAR</div>', unsafe_allow_html=True)
     st.caption("Right = longer absent. Up = higher cancellation estimate.")
-    st.scatter_chart(view, x="days_since_last_visit", y="cancellation_probability",
-                     color="risk_category", size="monthly_fee", height=320)
+    _radar_chart(view)
 
     st.markdown('<div class="section-label">PRIORITY LIST</div>', unsafe_allow_html=True)
     show = view[["full_name", "risk_category", "cancellation_probability",
