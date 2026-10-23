@@ -35,54 +35,6 @@ MOBILE_CSS = """
     }
 }
 
-@media (max-width: 900px) {
-    /* the page may only scroll up and down, never sideways */
-    html, body, .stApp,
-    [data-testid="stApp"],
-    [data-testid="stAppViewContainer"],
-    [data-testid="stMain"],
-    section.main, .main {
-        overflow-x: hidden !important;
-        overflow-x: clip !important;
-        max-width: 100vw !important;
-        overscroll-behavior-x: none;
-    }
-    html, body, .stApp,
-    [data-testid="stApp"],
-    [data-testid="stAppViewContainer"],
-    [data-testid="stMain"] {
-        touch-action: pan-y pinch-zoom !important;
-    }
-    html, body { position: relative; width: 100%; }
-    .block-container {
-        max-width: 100% !important;
-        overflow-x: hidden;
-    }
-    [data-testid="stMarkdownContainer"] { overflow-wrap: anywhere; }
-    img, svg, video, canvas { max-width: 100%; }
-    [data-testid="stRadio"] { max-width: 100%; min-width: 0; }
-
-    /* quarantine the top bar: nothing inside it may widen the page */
-    .st-key-top_nav {
-        max-width: 100% !important;
-        overflow-x: clip;
-    }
-    .st-key-top_nav [data-testid="stElementContainer"],
-    .st-key-top_nav [data-testid="stColumn"] {
-        max-width: 100% !important;
-    }
-    /* swiping past the end of the tab row must not drag the page */
-    .st-key-top_nav div[role="radiogroup"],
-    .vega-embed, [data-testid="stDataFrame"] {
-        overscroll-behavior-x: contain;
-    }
-
-    .vega-embed, [data-testid="stVegaLiteChart"] {
-        max-width: 100% !important;
-        overflow-x: auto;
-    }
-}
-
 @media (max-width: 640px) {
     .block-container {
         padding-left: 0.9rem !important;
@@ -135,6 +87,59 @@ MOBILE_CSS = """
 
     /* easier tap targets */
     .block-container .stButton > button { min-height: 44px; }
+}
+</style>
+"""
+
+
+LOCK_CSS = """
+<style>
+@media (max-width: 900px) {
+    /* the page may only scroll up and down, never sideways */
+    html, body, .stApp,
+    [data-testid="stApp"],
+    [data-testid="stAppViewContainer"],
+    [data-testid="stMain"],
+    section.main, .main {
+        overflow-x: hidden !important;
+        overflow-x: clip !important;
+        max-width: 100vw !important;
+        overscroll-behavior-x: none;
+    }
+    html, body, .stApp,
+    [data-testid="stApp"],
+    [data-testid="stAppViewContainer"],
+    [data-testid="stMain"] {
+        touch-action: pan-y pinch-zoom !important;
+    }
+    html, body { position: relative; width: 100%; }
+    .block-container {
+        max-width: 100% !important;
+        overflow-x: hidden;
+    }
+    [data-testid="stMarkdownContainer"] { overflow-wrap: anywhere; }
+    img, svg, video, canvas { max-width: 100%; }
+    [data-testid="stRadio"] { max-width: 100%; min-width: 0; }
+
+    /* quarantine the top bar: nothing inside it may widen the page */
+    .st-key-top_nav {
+        max-width: 100% !important;
+        overflow-x: clip;
+    }
+    .st-key-top_nav [data-testid="stElementContainer"],
+    .st-key-top_nav [data-testid="stColumn"] {
+        max-width: 100% !important;
+    }
+    /* swiping past the end of the tab row must not drag the page */
+    .st-key-top_nav div[role="radiogroup"],
+    .vega-embed, [data-testid="stDataFrame"] {
+        overscroll-behavior-x: contain;
+    }
+
+    .vega-embed, [data-testid="stVegaLiteChart"] {
+        max-width: 100% !important;
+        overflow-x: auto;
+    }
 }
 </style>
 """
@@ -240,15 +245,21 @@ HELPER_CSS = """
 def apply_mobile_styles():
     """Call once, right after the main CSS block in app.py.
 
-    The CSS is always on. Two extras are opt-in through the address bar so a
-    problem can never stop the normal app from opening:
-      ?lock=1            turns on the swipe lock script
+    The always-on styles are the phone layout fixes you tested. Anything
+    experimental is opt-in through the address bar, so a problem can never
+    stop the normal app from opening:
+      ?lock=css          CSS-only attempt to stop sideways sliding
+      ?lock=1            swipe-lock script only
+      ?lock=all          both
       ?debug=overflow    lists elements wider than the screen
     """
     st.markdown(MOBILE_CSS, unsafe_allow_html=True)
     try:
         params = st.query_params
-        if params.get("lock") == "1":
+        mode = str(params.get("lock", ""))
+        if mode in ("css", "all"):
+            st.markdown(LOCK_CSS, unsafe_allow_html=True)
+        if mode in ("1", "js", "all"):
             import streamlit.components.v1 as components
             st.markdown(HELPER_CSS, unsafe_allow_html=True)
             components.html(LOCK_JS, height=0)
