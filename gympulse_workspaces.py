@@ -422,11 +422,15 @@ def archie_reply(history, context):
         import anthropic
         client = anthropic.Anthropic(api_key=_clean_key(raw))
         resp = client.messages.create(
-            model=ARCHIE_MODEL, max_tokens=700,
+            model=ARCHIE_MODEL, max_tokens=1000,
             system=ARCHIE_SYSTEM + "\n\nGYM DATA:\n" + context,
             messages=history[-12:],
         )
-        return resp.content[0].text, True
+        text = "".join(
+            block.text for block in resp.content
+            if getattr(block, "type", None) == "text"
+        ).strip()
+        return (text or "Archie had no answer this time. Please try again."), True
     except Exception as e:
         detail = str(e)[:300]
         return (f"Archie couldn't reach the AI service "
