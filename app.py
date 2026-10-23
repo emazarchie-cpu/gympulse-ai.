@@ -1288,19 +1288,21 @@ if st.session_state.auth_user is None:
                                         "type": "recovery"
                                     }
                                 )
-                                supabase.auth.update_user({"password": new_password})
-                                supabase.auth.sign_out()
-
-                                st.session_state.reset_email_sent = False
-                                st.session_state.auth_mode = "login"
-                                st.session_state.password_updated = True
-                                st.rerun()
-
-                            except Exception:
-                                st.error(
-                                    "That code is invalid or has expired. "
-                                    "Request a new one and try again."
-                                )
+                            except Exception as e:
+                                st.error("That code is invalid or has expired. Request a new one and try again.")
+                                st.caption(f"Technical detail: {type(e).__name__}: {str(e)[:200]}")
+                            else:
+                                try:
+                                    supabase.auth.update_user({"password": new_password})
+                                    supabase.auth.sign_out()
+                                except Exception as e:
+                                    st.error("Your code worked, but the new password could not be saved.")
+                                    st.caption(f"Technical detail: {type(e).__name__}: {str(e)[:200]}")
+                                else:
+                                    st.session_state.reset_email_sent = False
+                                    st.session_state.auth_mode = "login"
+                                    st.session_state.password_updated = True
+                                    st.rerun()
 
             # ---------------- LEGAL LINKS ----------------
             st.markdown(
