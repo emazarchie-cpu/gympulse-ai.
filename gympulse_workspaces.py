@@ -1099,9 +1099,11 @@ def render_archie(supabase, gym_id, assess_fn, business_name, owner_name="the gy
         actions = load_actions(supabase, gym_id)
     except Exception:
         roster, actions = pd.DataFrame(), pd.DataFrame()
-    context = (archie_context(roster, actions, business_name) if len(roster)
-           else f"Gym: {business_name}. No scored members yet.")
-context += f"\nThe owner's name is {owner_name}. Sign messages with this name."
+    if len(roster):
+        context = archie_context(roster, actions, business_name)
+    else:
+        context = f"Gym: {business_name}. No scored members yet."
+    context += f"\nThe owner's name is {owner_name}. Sign messages with this name."
 
     if "archie_msgs" not in st.session_state:
         st.session_state.archie_msgs = []
