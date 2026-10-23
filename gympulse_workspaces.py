@@ -20,8 +20,8 @@ STATUSES = ["To do", "In progress", "Done"]
 OUTCOMES = ["Retained", "Cancelled", "No response"]
 
 
-MOBILE_CSS = """
-<style>
+MOBILE_PARTS = {
+    "hover": """
 @media (hover: none) {
     /* touch screens keep :hover after a tap, which left tabs stuck lime */
     .st-key-top_nav div[role="radiogroup"] label:hover {
@@ -34,14 +34,25 @@ MOBILE_CSS = """
         color: var(--lime) !important;
     }
 }
-
+""",
+    "base": """
 @media (max-width: 640px) {
     .block-container {
         padding-left: 0.9rem !important;
         padding-right: 0.9rem !important;
         padding-top: 0.6rem !important;
     }
-
+    /* hero banner */
+    .hero { padding: 18px !important; }
+    .hero-title { font-size: 26px !important; }
+    /* 16px inputs stop iPhones zooming in when a field is tapped */
+    input, textarea, [data-baseweb="select"] input { font-size: 16px !important; }
+    /* easier tap targets */
+    .block-container .stButton > button { min-height: 44px; }
+}
+""",
+    "nav": """
+@media (max-width: 640px) {
     /* top bar: tagline hidden, tabs scroll sideways in one row */
     .nav-tagline { display: none !important; }
     .st-key-top_nav div[role="radiogroup"] {
@@ -56,7 +67,10 @@ MOBILE_CSS = """
         white-space: nowrap;
         padding: 8px 10px !important;
     }
-
+}
+""",
+    "brand": """
+@media (max-width: 640px) {
     /* keep the logo and the wordmark side by side */
     .st-key-top_nav [data-testid="stColumn"]:first-child [data-testid="stHorizontalBlock"] {
         flex-direction: row !important;
@@ -65,7 +79,10 @@ MOBILE_CSS = """
     .st-key-top_nav [data-testid="stColumn"]:first-child [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
         min-width: 0 !important;
     }
-
+}
+""",
+    "metrics": """
+@media (max-width: 640px) {
     /* metric cards: two per row instead of one long stack */
     [data-testid="stHorizontalBlock"]:has([data-testid="stMetric"]) {
         flex-wrap: wrap !important;
@@ -77,72 +94,18 @@ MOBILE_CSS = """
     }
     [data-testid="stMetric"] { padding: 14px !important; }
     [data-testid="stMetricValue"] { font-size: 22px !important; }
-
-    /* hero banner */
-    .hero { padding: 18px !important; }
-    .hero-title { font-size: 26px !important; }
-
-    /* 16px inputs stop iPhones zooming in when a field is tapped */
-    input, textarea, [data-baseweb="select"] input { font-size: 16px !important; }
-
-    /* easier tap targets */
-    .block-container .stButton > button { min-height: 44px; }
 }
-</style>
-"""
-
-
-LOCK_CSS = """
-<style>
-@media (max-width: 900px) {
-    /* the page may only scroll up and down, never sideways */
-    html, body, .stApp,
-    [data-testid="stApp"],
-    [data-testid="stAppViewContainer"],
-    [data-testid="stMain"],
-    section.main, .main {
-        overflow-x: hidden !important;
-        overflow-x: clip !important;
-        max-width: 100vw !important;
-        overscroll-behavior-x: none;
-    }
-    html, body, .stApp,
-    [data-testid="stApp"],
-    [data-testid="stAppViewContainer"],
-    [data-testid="stMain"] {
-        touch-action: pan-y pinch-zoom !important;
-    }
-    html, body { position: relative; width: 100%; }
-    .block-container {
-        max-width: 100% !important;
-        overflow-x: hidden;
-    }
-    [data-testid="stMarkdownContainer"] { overflow-wrap: anywhere; }
-    img, svg, video, canvas { max-width: 100%; }
-    [data-testid="stRadio"] { max-width: 100%; min-width: 0; }
-
-    /* quarantine the top bar: nothing inside it may widen the page */
-    .st-key-top_nav {
-        max-width: 100% !important;
-        overflow-x: clip;
-    }
-    .st-key-top_nav [data-testid="stElementContainer"],
-    .st-key-top_nav [data-testid="stColumn"] {
-        max-width: 100% !important;
-    }
-    /* swiping past the end of the tab row must not drag the page */
-    .st-key-top_nav div[role="radiogroup"],
-    .vega-embed, [data-testid="stDataFrame"] {
-        overscroll-behavior-x: contain;
-    }
-
-    .vega-embed, [data-testid="stVegaLiteChart"] {
-        max-width: 100% !important;
-        overflow-x: auto;
-    }
+""",
 }
-</style>
-"""
+
+
+def _mobile_css(off=()):
+    """Assemble the phone styles, leaving out any part named in `off`."""
+    keep = "".join(css for name, css in MOBILE_PARTS.items() if name not in off)
+    return "<style>" + keep + "</style>"
+
+
+MOBILE_CSS = _mobile_css()
 
 
 OVERFLOW_JS = r"""
@@ -245,21 +208,24 @@ HELPER_CSS = """
 def apply_mobile_styles():
     """Call once, right after the main CSS block in app.py.
 
-    The always-on styles are the phone layout fixes you tested. Anything
-    experimental is opt-in through the address bar, so a problem can never
-    stop the normal app from opening:
-      ?lock=css          CSS-only attempt to stop sideways sliding
-      ?lock=1            swipe-lock script only
-      ?lock=all          both
-      ?debug=overflow    lists elements wider than the screen
+    Normal address = all phone styles on. For troubleshooting, the address bar
+    can change this without editing any file:
+      ?off=nav,brand,metrics,hover,base   leave those style groups out
+      ?off=all                            leave every phone style out
+      ?lock=1                             swipe-lock script
+      ?debug=overflow                     lists elements wider than the screen
     """
-    st.markdown(MOBILE_CSS, unsafe_allow_html=True)
+    off = ()
     try:
         params = st.query_params
-        mode = str(params.get("lock", ""))
-        if mode in ("css", "all"):
-            st.markdown(LOCK_CSS, unsafe_allow_html=True)
-        if mode in ("1", "js", "all"):
+        raw = str(params.get("off", ""))
+        off = tuple(MOBILE_PARTS) if raw == "all" else tuple(
+            x.strip() for x in raw.split(",") if x.strip())
+    except Exception:
+        params = {}
+    st.markdown(_mobile_css(off), unsafe_allow_html=True)
+    try:
+        if str(params.get("lock", "")) in ("1", "js"):
             import streamlit.components.v1 as components
             st.markdown(HELPER_CSS, unsafe_allow_html=True)
             components.html(LOCK_JS, height=0)
