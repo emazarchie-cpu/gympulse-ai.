@@ -2027,7 +2027,7 @@ elif page == "Action Centre":
 elif page == "Business Insights":
     gw.render_business_insights(supabase, st.session_state.gym_id, assess_members)
 elif page == "Archie":
-    gw.render_archie(supabase, st.session_state.gym_id, assess_members, business_name)
+    gw.render_archie(supabase, st.session_state.gym_id, assess_members, business_name, user_name)
 elif page == "Member Management":
 
     st.markdown("## Member Management")
