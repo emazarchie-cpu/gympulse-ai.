@@ -18,6 +18,7 @@ ACTION_TYPES = ["Personal call", "WhatsApp check-in", "Free PT session",
                 "Renewal offer", "Class invite", "Goal review"]
 STATUSES = ["To do", "In progress", "Done"]
 OUTCOMES = ["Retained", "Cancelled", "No response"]
+SUGGEST_COOLDOWN_DAYS = 30   # a member you finished with stays out of "Suggested today" this long
 
 
 MOBILE_PARTS = {
@@ -304,6 +305,35 @@ def suggest_action(row):
     return "WhatsApp check-in"
 
 
+def members_to_contact(roster, actions, cooldown_days=SUGGEST_COOLDOWN_DAYS, today=None):
+    """At-risk members who still need a follow-up.
+
+    Left out: members with an open action, members whose action was finished
+    within `cooldown_days`, and members whose outcome was 'Cancelled'.
+    """
+    if roster.empty:
+        return roster
+    blocked = set()
+    if not actions.empty:
+        now = pd.Timestamp(today or date.today())
+        open_mask = actions["status"] != "Done"
+        blocked |= set(actions.loc[open_mask, "member_id"])
+        done = actions[~open_mask].copy()
+        when = pd.to_datetime(done["completed_at"], errors="coerce", utc=True)
+        when = when.dt.tz_localize(None)
+        recent = when.isna() | (when >= now - pd.Timedelta(days=cooldown_days))
+        blocked |= set(done.loc[recent, "member_id"])
+        blocked |= set(done.loc[done["outcome"] == "Cancelled", "member_id"])
+    return roster[(roster["risk_category"] != "Low") & ~roster["id"].isin(blocked)]
+
+
+def _go(page, member=None):
+    """Button callback: open another page (optionally focused on one member)."""
+    st.session_state["navigate_to"] = page
+    if member is not None:
+        st.session_state["focus_member"] = member
+
+
 def kpis(roster, actions):
     n = len(roster)
     high = roster[roster["risk_category"] == "High"] if n else roster
@@ -338,8 +368,14 @@ def archie_context(roster, actions, business_name):
              f"Renewals in 30 days that are at risk: {k['renewals_30d_at_risk']}.",
              f"Open retention actions: {k['open_actions']}; members saved: {k['saves']}."]
     if len(roster):
-        lines.append("Top 10 at-risk members (name | risk% | reasons | suggested action):")
-        for _, r in roster.head(10).iterrows():
+        need = members_to_contact(roster, actions)
+        if need.empty:
+            lines.append("Every at-risk member already has an action in progress "
+                         "or was contacted recently.")
+        else:
+            lines.append("Top at-risk members still needing a follow-up "
+                         "(name | risk% | reasons | suggested action):")
+        for _, r in need.head(10).iterrows():
             lines.append(f"- {r['full_name']} | {r['cancellation_probability']:.0%} | "
                          f"{r['drivers']} | {r['suggested_action']}")
     return "\n".join(lines)
@@ -853,11 +889,24 @@ def render_risk_radar(supabase, gym_id, assess_fn):
     st.write(f"**Why flagged:** {m['drivers']}")
     st.write(f"**Suggested:** {m['suggested_action']}")
     if st.button(f"Create action for {pick}", key="radar_create"):
-        _create_action(supabase, gym_id, m["id"], m["suggested_action"],
-                       m["renewal_due_days"])
-        st.success("Added to the Retention Action Centre.")
+        if _has_open_action(supabase, m["id"]):
+            st.button(f"ℹ️ {pick} already has an open action. Tap to open the Action Centre",
+                      key="radar_open_ac", on_click=_go, args=("Action Centre",),
+                      use_container_width=True)
+        else:
+            _create_action(supabase, gym_id, m["id"], m["suggested_action"],
+                           m["renewal_due_days"])
+            st.button("✅ Added to the Retention Action Centre. Tap to open it",
+                      key="radar_open_ac", on_click=_go, args=("Action Centre",),
+                      use_container_width=True)
     st.caption("Estimates come from a model trained on synthetic data. Use them "
                "to prioritise conversations, not to make decisions about members.")
+
+
+def _has_open_action(supabase, member_id):
+    rows = (supabase.table("retention_actions").select("id")
+            .eq("member_id", member_id).neq("status", "Done").limit(1).execute().data)
+    return bool(rows)
 
 
 def _create_action(supabase, gym_id, member_id, action_type, renewal_days, note=""):
@@ -888,11 +937,11 @@ def render_action_centre(supabase, gym_id, assess_fn):
     c[1].metric("Members saved", k["saves"])
     c[2].metric("Save rate", "n/a" if k["save_rate"] is None else f"{k['save_rate']:.0%}")
 
-    open_ids = set(actions.loc[actions["status"] != "Done", "member_id"]) if not actions.empty else set()
-    todo = roster[(roster["risk_category"] != "Low") & ~roster["id"].isin(open_ids)]
+    todo = members_to_contact(roster, actions)
     st.markdown('<div class="section-label">SUGGESTED TODAY</div>', unsafe_allow_html=True)
     if todo.empty:
-        st.success("Every at-risk member already has an open action.")
+        st.success("Everyone who needs a follow-up has one in progress or was "
+                   f"contacted in the last {SUGGEST_COOLDOWN_DAYS} days.")
     else:
         top = todo.head(5)
         for _, r in top.iterrows():
@@ -1000,13 +1049,31 @@ def render_business_insights(supabase, gym_id, assess_fn):
             st.caption("Small sample, so treat these as early signals only.")
 
     st.markdown('<div class="section-label">TO DO THIS WEEK</div>', unsafe_allow_html=True)
-    if k["high"]:
-        st.write(f"- Contact the **{k['high']}** high-risk members, starting with "
-                 f"the {k['renewals_30d_at_risk']} renewing within 30 days.")
+    need = members_to_contact(roster, actions)
+    high = need[need["risk_category"] == "High"]
+    if not high.empty:
+        high = high.assign(_soon=high["renewal_due_days"] <= 30).sort_values(
+            ["_soon", "cancellation_probability"], ascending=False)
+        soon = int(high["_soon"].sum())
+        line = f"Contact {'this high-risk member' if len(high) == 1 else 'these high-risk members'}"
+        st.write(line + (f" ({soon} renewing within 30 days). Tap a name to open "
+                         "their record:" if soon else ". Tap a name to open their record:"))
+        shown = high.head(6)
+        for start in range(0, len(shown), 3):
+            chunk = shown.iloc[start:start + 3]
+            cols = st.columns(3)
+            for col, (_, r) in zip(cols, chunk.iterrows()):
+                col.button(r["full_name"], key=f"todo_{r['id']}", on_click=_go,
+                           args=("Member Management", r["full_name"]),
+                           use_container_width=True)
+        if len(high) > len(shown):
+            st.caption(f"+{len(high) - len(shown)} more in the Action Centre.")
     if k["open_actions"]:
-        st.write(f"- Close out **{k['open_actions']}** open actions and record outcomes.")
-    if not k["high"] and not k["open_actions"]:
-        st.write("- Nothing urgent. Run a goal review with a few Low-risk members.")
+        st.write(f"Close out **{k['open_actions']}** open action(s) and record the outcomes.")
+        st.button("Open Action Centre", key="todo_open_ac", on_click=_go,
+                  args=("Action Centre",))
+    if high.empty and not k["open_actions"]:
+        st.write("Nothing urgent. Run a goal review with a few Low-risk members.")
 
 
 ARCHIE_PROMPTS = [
