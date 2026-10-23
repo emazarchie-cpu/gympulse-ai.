@@ -35,6 +35,31 @@ MOBILE_CSS = """
     }
 }
 
+@media (max-width: 900px) {
+    /* the page may only scroll up and down, never sideways */
+    html, body, .stApp,
+    [data-testid="stApp"],
+    [data-testid="stAppViewContainer"],
+    [data-testid="stMain"],
+    section.main, .main {
+        overflow-x: hidden !important;
+        overflow-x: clip !important;
+        max-width: 100vw !important;
+        overscroll-behavior-x: none;
+    }
+    .block-container {
+        max-width: 100% !important;
+        overflow-x: hidden;
+    }
+    [data-testid="stMarkdownContainer"] { overflow-wrap: anywhere; }
+    img, svg, video, canvas { max-width: 100%; }
+    [data-testid="stRadio"] { max-width: 100%; min-width: 0; }
+    .vega-embed, [data-testid="stVegaLiteChart"] {
+        max-width: 100% !important;
+        overflow-x: auto;
+    }
+}
+
 @media (max-width: 640px) {
     .block-container {
         padding-left: 0.9rem !important;
