@@ -1288,22 +1288,25 @@ if st.session_state.auth_user is None:
                                         "type": "recovery"
                                     }
                                 )
-                            except Exception as e:
+                            except Exception:
                                 st.error("That code is invalid or has expired. Request a new one and try again.")
-                                st.caption(f"Technical detail: {type(e).__name__}: {str(e)[:200]}")
                             else:
                                 try:
                                     supabase.auth.update_user({"password": new_password})
                                     supabase.auth.sign_out()
                                 except Exception as e:
-                                    st.error("Your code worked, but the new password could not be saved.")
-                                    st.caption(f"Technical detail: {type(e).__name__}: {str(e)[:200]}")
+                                    reason = str(e).lower()
+                                    if "different from the old" in reason:
+                                        st.error("Your new password must be different from your current one.")
+                                    elif "password" in reason:
+                                        st.error("That password was not accepted. Try a longer one with letters and numbers.")
+                                    else:
+                                        st.error("Your code worked, but the new password could not be saved. Please try again.")
                                 else:
                                     st.session_state.reset_email_sent = False
                                     st.session_state.auth_mode = "login"
                                     st.session_state.password_updated = True
                                     st.rerun()
-
             # ---------------- LEGAL LINKS ----------------
             st.markdown(
                 '<div class="auth-secure">'
