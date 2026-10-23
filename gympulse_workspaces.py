@@ -53,18 +53,13 @@ MOBILE_PARTS = {
 """,
     "nav": """
 @media (max-width: 640px) {
-    /* top bar: tagline hidden, tabs scroll sideways in one row */
+    /* top bar: tagline hidden; tabs wrap onto compact rows, no sideways scrolling */
     .nav-tagline { display: none !important; }
     .st-key-top_nav div[role="radiogroup"] {
-        flex-wrap: nowrap !important;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: none;
+        flex-wrap: wrap !important;
+        gap: 4px !important;
     }
-    .st-key-top_nav div[role="radiogroup"]::-webkit-scrollbar { display: none; }
     .st-key-top_nav div[role="radiogroup"] label {
-        flex: 0 0 auto;
-        white-space: nowrap;
         padding: 8px 10px !important;
     }
 }
