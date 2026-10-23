@@ -2131,9 +2131,11 @@ elif page == "Member Management":
                     "weight_kg, height_cm, fitness_goal, created_at"
                 )
                 .eq("gym_id", gym_id)
+                .eq("archived", False)
                 .order("created_at", desc=True)
                 .execute()
             )
+            
 
             if result.data:
                 members_df = pd.DataFrame(result.data)
