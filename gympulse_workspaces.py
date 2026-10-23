@@ -1,15 +1,15 @@
 """GymPulse AI: Risk Radar, Retention Action Centre, Business Insights, Archie.
- 
+
 Pure logic (build_roster, drivers, playbook, kpis, archie_context) is separate
 from Streamlit rendering so it can be tested without a database.
 """
-from datetime import date, timedelta
- 
+from datetime import date, datetime, timedelta, timezone
+
 import pandas as pd
 import streamlit as st
- 
+
 ARCHIE_MODEL = "claude-sonnet-5-5"
- 
+
 ACTIVITY_COLS = [
     "membership_type", "days_since_last_visit", "visits_previous_30_days",
     "visits_last_30_days", "renewal_due_days", "pt_sessions_attended",
@@ -18,8 +18,8 @@ ACTION_TYPES = ["Personal call", "WhatsApp check-in", "Free PT session",
                 "Renewal offer", "Class invite", "Goal review"]
 STATUSES = ["To do", "In progress", "Done"]
 OUTCOMES = ["Retained", "Cancelled", "No response"]
- 
- 
+
+
 # ---------------------------------------------------------------- data
 def load_roster(supabase, gym_id, assess_fn):
     """Members + activity, scored by the model. Members without activity
@@ -27,15 +27,15 @@ def load_roster(supabase, gym_id, assess_fn):
     members = pd.DataFrame(
         supabase.table("members")
         .select("id, full_name, email, phone, fitness_goal")
-        .eq("gym_id", gym_id).execute().data or []
+        .eq("gym_id", gym_id).eq("archived", False).execute().data or []
     )
     activity = pd.DataFrame(
         supabase.table("member_activity").select("*")
         .eq("gym_id", gym_id).execute().data or []
     )
     return build_roster(members, activity, assess_fn)
- 
- 
+
+
 def build_roster(members, activity, assess_fn):
     if members.empty:
         return pd.DataFrame(), pd.DataFrame()
@@ -55,14 +55,14 @@ def build_roster(members, activity, assess_fn):
     scored["drivers"] = scored.apply(drivers, axis=1)
     scored["suggested_action"] = scored.apply(suggest_action, axis=1)
     return scored.sort_values("cancellation_probability", ascending=False), missing
- 
- 
+
+
 def load_actions(supabase, gym_id):
     rows = (supabase.table("retention_actions").select("*")
             .eq("gym_id", gym_id).order("created_at", desc=True).execute().data or [])
     return pd.DataFrame(rows)
- 
- 
+
+
 # ------------------------------------------------------------- logic
 def drivers(row):
     """Plain-language reasons a member is flagged (rule-based, transparent)."""
@@ -79,8 +79,8 @@ def drivers(row):
     if row["membership_type"] == "Monthly":
         out.append("monthly plan (easy to leave)")
     return ", ".join(out) or "no major warning signs"
- 
- 
+
+
 def suggest_action(row):
     if row["renewal_due_days"] <= 14 and row["risk_category"] != "Low":
         return "Renewal offer"
@@ -91,8 +91,8 @@ def suggest_action(row):
     if row["risk_category"] == "Low":
         return "Goal review"
     return "WhatsApp check-in"
- 
- 
+
+
 def kpis(roster, actions):
     n = len(roster)
     high = roster[roster["risk_category"] == "High"] if n else roster
@@ -116,8 +116,8 @@ def kpis(roster, actions):
                 done.loc[done["outcome"] == "Retained", "member_id"]
             )["monthly_fee"].sum()) if retained and n else 0.0,
     }
- 
- 
+
+
 def archie_context(roster, actions, business_name):
     k = kpis(roster, actions)
     lines = [f"Gym: {business_name}. Members scored: {k['members_scored']}.",
@@ -132,8 +132,8 @@ def archie_context(roster, actions, business_name):
             lines.append(f"- {r['full_name']} | {r['cancellation_probability']:.0%} | "
                          f"{r['drivers']} | {r['suggested_action']}")
     return "\n".join(lines)
- 
- 
+
+
 ARCHIE_SYSTEM = (
     "You are Archie, the retention assistant inside GymPulse AI. You help gym "
     "owners keep members. Use ONLY the data provided; if something is not in it, "
@@ -142,13 +142,13 @@ ARCHIE_SYSTEM = (
     "message to a member, write it ready to send (WhatsApp length, friendly, no "
     "pressure, no mention of 'risk' or 'cancellation')."
 )
- 
- 
+
+
 def _clean_key(raw):
     """Remove spaces, newlines and stray quotes a paste can add."""
     return str(raw).strip().strip('"').strip("'").strip()
- 
- 
+
+
 def key_check():
     """Safe description of the key Streamlit is passing in (never the key)."""
     try:
@@ -161,8 +161,8 @@ def key_check():
     return (f"Key found: {len(key)} characters, starts with "
             f"'{key[:7]}', ends with '...{key[-3:]}', "
             f"valid prefix: {key.startswith('sk-ant-')}.")
- 
- 
+
+
 def archie_reply(history, context):
     """Claude if ANTHROPIC_API_KEY is set; otherwise a rules-based answer."""
     try:
@@ -185,18 +185,18 @@ def archie_reply(history, context):
         return (f"Archie couldn't reach the AI service "
                 f"({type(e).__name__}): {detail}\n\n"
                 + _offline_reply(history[-1]["content"], context)), False
- 
- 
+
+
 def _offline_reply(question, context):
     return ("Here is today's snapshot from your data:\n\n" + context
             + "\n\n(AI answers are off. " + key_check() + ")")
- 
- 
+
+
 # ------------------------------------------------------- rendering
 def _money(x):
     return f"{x:,.0f}"
- 
- 
+
+
 def _activity_editor(supabase, gym_id, roster, missing):
     """Add or update visit/renewal data for any member."""
     names, current = {}, {}
@@ -210,19 +210,19 @@ def _activity_editor(supabase, gym_id, roster, missing):
     if not names:
         st.info("Register members in Member Management first.")
         return
- 
+
     plans = ["Monthly", "Quarterly", "Annual"]
- 
+
     with st.expander("Add or update member activity", expanded=roster.empty):
         member_id = st.selectbox(
             "Member", list(names),
             format_func=lambda i: names[i], key="act_member"
         )
         r = current.get(member_id)
- 
+
         def val(col, default):
             return default if r is None else r[col]
- 
+
         with st.form(f"activity_form_{member_id}"):
             c1, c2 = st.columns(2)
             mtype = c1.selectbox(
@@ -264,13 +264,282 @@ def _activity_editor(supabase, gym_id, roster, missing):
                     "pt_sessions_attended": int(pt),
                 }).execute()
                 st.rerun()
- 
+
     if not missing.empty:
         st.caption(f"{len(missing)} member(s) still need activity data.")
- 
- 
+
+
+IMPORT_NUMERIC = {
+    "days_since_last_visit": (0, 3650),
+    "visits_previous_30_days": (0, 200),
+    "visits_last_30_days": (0, 200),
+    "renewal_due_days": (0, 730),
+    "pt_sessions_attended": (0, 500),
+}
+IMPORT_PLANS = {"monthly": "Monthly", "quarterly": "Quarterly", "annual": "Annual"}
+ISSUE_COLS = ["Row", "Member", "Problem", "Result"]
+
+
+def parse_activity_csv(csv_df, members):
+    """Check an uploaded CSV and match each row to a registered member.
+
+    Returns (payload, issues, fatal):
+      payload - list of dicts ready to upsert into member_activity
+      issues  - DataFrame of rows that were skipped or need a note
+      fatal   - list of problems that stop the whole import
+    """
+    df = csv_df.copy()
+    df.columns = [str(c).strip().lower().replace(" ", "_") for c in df.columns]
+    empty = pd.DataFrame(columns=ISSUE_COLS)
+
+    id_col = ("email" if "email" in df.columns
+              else "full_name" if "full_name" in df.columns else None)
+    fatal = []
+    if id_col is None:
+        fatal.append("Add an 'email' column (or 'full_name') so each row can "
+                     "be matched to a registered member.")
+    wanted = ["membership_type"] + list(IMPORT_NUMERIC)
+    absent = [c for c in wanted if c not in df.columns]
+    if absent:
+        fatal.append("Missing column(s): " + ", ".join(absent))
+    if fatal:
+        return [], empty, fatal
+
+    has_fee = "monthly_fee" in df.columns
+    lookup = {}
+    for _, m in members.iterrows():
+        val = m.get(id_col)
+        key = "" if pd.isna(val) else str(val).strip().lower()
+        if key:
+            lookup.setdefault(key, []).append(m["id"])
+
+    issues, chosen = [], {}
+    for i, r in df.iterrows():
+        line = int(i) + 2          # +2: header row, and spreadsheets start at 1
+        raw_id = r[id_col]
+        ident = "" if pd.isna(raw_id) else str(raw_id).strip()
+
+        def skip(why, line=line, ident=ident):
+            issues.append((line, ident, why, "Skipped"))
+
+        if not ident:
+            skip(f"Empty {id_col}")
+            continue
+        ids = lookup.get(ident.lower(), [])
+        if not ids:
+            skip(f"No registered member with this {id_col}")
+            continue
+        if len(ids) > 1:
+            skip(f"More than one member has this {id_col}; use email instead")
+            continue
+        plan = IMPORT_PLANS.get(str(r["membership_type"]).strip().lower())
+        if not plan:
+            skip("membership_type must be Monthly, Quarterly or Annual")
+            continue
+
+        row = {"member_id": ids[0], "membership_type": plan}
+        problem = None
+        for col, (lo, hi) in IMPORT_NUMERIC.items():
+            v = pd.to_numeric(r[col], errors="coerce")
+            if pd.isna(v) or v < lo or v > hi or v != int(v):
+                problem = f"{col} must be a whole number from {lo} to {hi}"
+                break
+            row[col] = int(v)
+        if problem is None and has_fee:
+            v = pd.to_numeric(r["monthly_fee"], errors="coerce")
+            if pd.isna(v) or v < 0:
+                problem = "monthly_fee must be a number, 0 or more"
+            else:
+                row["monthly_fee"] = float(v)
+        if problem:
+            skip(problem)
+            continue
+
+        if ids[0] in chosen:
+            issues.append((line, ident, "Appears more than once; this later row is used",
+                           "Note"))
+        chosen[ids[0]] = row
+
+    issues_df = pd.DataFrame(issues, columns=ISSUE_COLS) if issues else empty
+    return list(chosen.values()), issues_df, []
+
+
+def render_csv_import(supabase, gym_id):
+    try:
+        members = pd.DataFrame(
+            supabase.table("members").select("id, full_name, email")
+            .eq("gym_id", gym_id).eq("archived", False).execute().data or []
+        )
+    except Exception as e:
+        st.error("Couldn't load members for import. Have you run schema_update_archive.sql?")
+        with st.expander("Technical details"):
+            st.code(str(e))
+        return
+
+    key = st.session_state.get("csv_up_key", 0)
+    with st.expander("Import activity from CSV"):
+        st.caption("One row per member. Members are matched by email (or full_name "
+                   "if there is no email column). Existing activity is replaced; "
+                   "members not in the file are left unchanged.")
+        if members.empty:
+            st.info("Register members in Member Management first.")
+            return
+
+        template = members[["email", "full_name"]].copy()
+        for col in ["membership_type", "monthly_fee"] + list(IMPORT_NUMERIC):
+            template[col] = ""
+        st.download_button(
+            "Download a template with my members",
+            template.to_csv(index=False).encode("utf-8"),
+            "gympulse_activity_template.csv", "text/csv",
+        )
+        st.caption("Fill in the blank columns, then upload it below. "
+                   "monthly_fee is optional; leave the column out to keep each "
+                   "member's current fee.")
+
+        up = st.file_uploader("CSV file", type="csv", key=f"csv_up_{key}")
+        if up is None:
+            return
+        try:
+            raw = pd.read_csv(up)
+        except Exception:
+            st.error("That file couldn't be read as a CSV.")
+            return
+        if len(raw) > 5000:
+            st.error("Please upload 5,000 rows or fewer at a time.")
+            return
+
+        payload, issues, fatal = parse_activity_csv(raw, members)
+        if fatal:
+            for f in fatal:
+                st.error(f)
+            return
+
+        skipped = int((issues["Result"] == "Skipped").sum()) if not issues.empty else 0
+        c1, c2 = st.columns(2)
+        c1.metric("Ready to import", len(payload))
+        c2.metric("Skipped", skipped)
+        if not issues.empty:
+            st.dataframe(issues, hide_index=True, use_container_width=True)
+        if not payload:
+            return
+
+        names = members.set_index("id")["full_name"]
+        preview = pd.DataFrame(payload)
+        preview.insert(0, "member", preview["member_id"].map(names))
+        st.caption("Preview of the first 20 rows:")
+        st.dataframe(preview.drop(columns="member_id").head(20),
+                     hide_index=True, use_container_width=True)
+
+        if st.button(f"Import {len(payload)} member(s)", key="csv_import_go",
+                     type="primary"):
+            now = datetime.now(timezone.utc).isoformat()
+            rows = [{**p, "gym_id": gym_id, "updated_at": now} for p in payload]
+            try:
+                for start in range(0, len(rows), 200):
+                    supabase.table("member_activity").upsert(
+                        rows[start:start + 200]).execute()
+            except Exception as e:
+                st.error("The import failed part-way. Nothing else was changed.")
+                with st.expander("Technical details"):
+                    st.code(str(e))
+                return
+            st.session_state["flash"] = (
+                f"Imported activity for {len(rows)} member(s)"
+                + (f"; {skipped} row(s) skipped." if skipped else "."))
+            st.session_state["csv_up_key"] = key + 1
+            st.rerun()
+
+
+def _set_archived(supabase, member_id, flag):
+    supabase.table("members").update({
+        "archived": flag,
+        "archived_at": datetime.now(timezone.utc).isoformat() if flag else None,
+    }).eq("id", member_id).execute()
+
+
+def _member_manager(supabase, gym_id, roster, missing):
+    names = {}
+    for df in (roster, missing):
+        if not df.empty:
+            for _, r in df.iterrows():
+                names[r["id"]] = r["full_name"]
+    try:
+        archived = pd.DataFrame(
+            supabase.table("members").select("id, full_name")
+            .eq("gym_id", gym_id).eq("archived", True).execute().data or [])
+    except Exception:
+        archived = pd.DataFrame()
+
+    with st.expander(f"Archive, restore or delete members ({len(archived)} archived)"):
+        if names:
+            pick = st.selectbox("Member", list(names),
+                                format_func=lambda i: names[i], key="mgr_member")
+            st.caption("Archive hides a member from the radar, Action Centre "
+                       "and insights, and keeps their history. Delete removes "
+                       "the member, their activity and their actions for good.")
+            c1, c2 = st.columns(2)
+            if c1.button("Archive member", key="mgr_archive", use_container_width=True):
+                try:
+                    _set_archived(supabase, pick, True)
+                except Exception:
+                    st.error("Couldn't archive. Have you run schema_update_archive.sql?")
+                else:
+                    st.session_state["flash"] = f"{names[pick]} archived."
+                    st.rerun()
+            if st.session_state.get("del_member") == pick:
+                st.warning(f"Permanently delete {names[pick]}? This cannot be undone.")
+                y, n = st.columns(2)
+                if y.button("Yes, delete", key="mgr_del_yes", use_container_width=True):
+                    try:
+                        supabase.table("members").delete().eq("id", pick).execute()
+                    except Exception:
+                        st.error("Couldn't delete this member.")
+                    else:
+                        st.session_state.pop("del_member", None)
+                        st.session_state["flash"] = f"{names[pick]} deleted."
+                        st.rerun()
+                if n.button("Cancel", key="mgr_del_no", use_container_width=True):
+                    st.session_state.pop("del_member", None)
+                    st.rerun()
+            elif c2.button("Delete permanently", key="mgr_delete", use_container_width=True):
+                st.session_state["del_member"] = pick
+                st.rerun()
+        else:
+            st.caption("No active members.")
+
+        if not archived.empty:
+            st.markdown("**Archived members**")
+            for _, r in archived.iterrows():
+                a, b = st.columns([4, 1])
+                a.write(r["full_name"])
+                if b.button("Restore", key=f"rs_{r['id']}"):
+                    _set_archived(supabase, r["id"], False)
+                    st.session_state["flash"] = f"{r['full_name']} restored."
+                    st.rerun()
+
+
+def _delete_action_control(supabase, action_id):
+    if st.session_state.get("del_action") == action_id:
+        st.warning("Delete this action permanently?")
+        y, n = st.columns(2)
+        if y.button("Yes, delete", key=f"dy_{action_id}"):
+            supabase.table("retention_actions").delete().eq("id", action_id).execute()
+            st.session_state.pop("del_action", None)
+            st.rerun()
+        if n.button("Cancel", key=f"dn_{action_id}"):
+            st.session_state.pop("del_action", None)
+            st.rerun()
+    elif st.button("Delete", key=f"dx_{action_id}"):
+        st.session_state["del_action"] = action_id
+        st.rerun()
+
+
 def render_risk_radar(supabase, gym_id, assess_fn):
     st.markdown("## Member Risk Radar")
+    flash = st.session_state.pop("flash", None)
+    if flash:
+        st.success(flash)
     st.write("Every member, scored and ranked, with the reasons behind the flag.")
     try:
         roster, missing = load_roster(supabase, gym_id, assess_fn)
@@ -282,8 +551,10 @@ def render_risk_radar(supabase, gym_id, assess_fn):
     if roster.empty:
         st.info("Add attendance data so the model can score your members.")
         _activity_editor(supabase, gym_id, roster, missing)
+        render_csv_import(supabase, gym_id)
+        _member_manager(supabase, gym_id, roster, missing)
         return
- 
+
     k = kpis(roster, pd.DataFrame())
     c = st.columns(5)
     c[0].metric("Members scored", k["members_scored"])
@@ -291,9 +562,11 @@ def render_risk_radar(supabase, gym_id, assess_fn):
     c[2].metric("Medium risk", k["medium"])
     c[3].metric("Low risk", k["members_scored"] - k["high"] - k["medium"])
     c[4].metric("Renewals ≤30d at risk", k["renewals_30d_at_risk"])
- 
+
     _activity_editor(supabase, gym_id, roster, missing)
- 
+    render_csv_import(supabase, gym_id)
+    _member_manager(supabase, gym_id, roster, missing)
+
     f1, f2, f3 = st.columns([2, 2, 3])
     levels = f1.multiselect("Risk level", ["High", "Medium", "Low"], ["High", "Medium", "Low"])
     plans = f2.multiselect("Membership", ["Monthly", "Quarterly", "Annual"],
@@ -305,12 +578,12 @@ def render_risk_radar(supabase, gym_id, assess_fn):
     if view.empty:
         st.info("No members match these filters.")
         return
- 
+
     st.markdown('<div class="section-label">THE RADAR</div>', unsafe_allow_html=True)
     st.caption("Right = longer absent. Up = higher cancellation estimate.")
     st.scatter_chart(view, x="days_since_last_visit", y="cancellation_probability",
                      color="risk_category", size="monthly_fee", height=320)
- 
+
     st.markdown('<div class="section-label">PRIORITY LIST</div>', unsafe_allow_html=True)
     show = view[["full_name", "risk_category", "cancellation_probability",
                  "drivers", "suggested_action", "monthly_fee"]].rename(columns={
@@ -320,7 +593,7 @@ def render_risk_radar(supabase, gym_id, assess_fn):
     st.dataframe(show, hide_index=True, use_container_width=True,
                  column_config={"Probability": st.column_config.ProgressColumn(
                      format="%.0f%%", min_value=0, max_value=1)})
- 
+
     if view.empty:
         return
     st.markdown('<div class="section-label">MEMBER DETAIL</div>', unsafe_allow_html=True)
@@ -338,15 +611,15 @@ def render_risk_radar(supabase, gym_id, assess_fn):
         st.success("Added to the Retention Action Centre.")
     st.caption("Estimates come from a model trained on synthetic data. Use them "
                "to prioritise conversations, not to make decisions about members.")
- 
- 
+
+
 def _create_action(supabase, gym_id, member_id, action_type, renewal_days, note=""):
     due = date.today() + timedelta(days=1 if renewal_days <= 14 else 3)
     supabase.table("retention_actions").insert({
         "gym_id": gym_id, "member_id": member_id, "action_type": action_type,
         "due_date": due.isoformat(), "note": note}).execute()
- 
- 
+
+
 def render_action_centre(supabase, gym_id, assess_fn):
     st.markdown("## Retention Action Centre")
     st.write("Turn risk into follow-ups, track them, and learn what works.")
@@ -367,7 +640,7 @@ def render_action_centre(supabase, gym_id, assess_fn):
     c[0].metric("Open actions", k["open_actions"])
     c[1].metric("Members saved", k["saves"])
     c[2].metric("Save rate", "n/a" if k["save_rate"] is None else f"{k['save_rate']:.0%}")
- 
+
     open_ids = set(actions.loc[actions["status"] != "Done", "member_id"]) if not actions.empty else set()
     todo = roster[(roster["risk_category"] != "Low") & ~roster["id"].isin(open_ids)]
     st.markdown('<div class="section-label">SUGGESTED TODAY</div>', unsafe_allow_html=True)
@@ -389,7 +662,7 @@ def render_action_centre(supabase, gym_id, assess_fn):
                 _create_action(supabase, gym_id, r["id"], r["suggested_action"],
                                r["renewal_due_days"])
             st.rerun()
- 
+
     st.markdown('<div class="section-label">YOUR BOARD</div>', unsafe_allow_html=True)
     if actions.empty:
         st.info("No actions yet. Add one from the suggestions above.")
@@ -402,26 +675,27 @@ def render_action_centre(supabase, gym_id, assess_fn):
                 st.caption("Nothing here.")
             for _, a in sub.iterrows():
                 with st.container(border=True):
-                    who = names.get(a["member_id"], "Unknown member")
+                    who = names.get(a["member_id"], "Archived member")
                     st.write(f"**{who}** · {a['action_type']} · due {a.get('due_date') or '-'}")
                     if status == "Done":
                         st.caption(f"Outcome: {a.get('outcome') or 'not recorded'}")
-                        continue
-                    n = st.text_input("Note", a.get("note") or "", key=f"n_{a['id']}")
-                    x, y = st.columns(2)
-                    if status == "To do" and x.button("Start", key=f"s_{a['id']}"):
-                        supabase.table("retention_actions").update(
-                            {"status": "In progress", "note": n}).eq("id", a["id"]).execute()
-                        st.rerun()
-                    out = y.selectbox("Outcome", OUTCOMES, key=f"o_{a['id']}")
-                    if y.button("Mark done", key=f"d_{a['id']}"):
-                        supabase.table("retention_actions").update({
-                            "status": "Done", "outcome": out, "note": n,
-                            "completed_at": date.today().isoformat()}
-                        ).eq("id", a["id"]).execute()
-                        st.rerun()
- 
- 
+                    else:
+                        n = st.text_input("Note", a.get("note") or "", key=f"n_{a['id']}")
+                        x, y = st.columns(2)
+                        if status == "To do" and x.button("Start", key=f"s_{a['id']}"):
+                            supabase.table("retention_actions").update(
+                                {"status": "In progress", "note": n}).eq("id", a["id"]).execute()
+                            st.rerun()
+                        out = y.selectbox("Outcome", OUTCOMES, key=f"o_{a['id']}")
+                        if y.button("Mark done", key=f"d_{a['id']}"):
+                            supabase.table("retention_actions").update({
+                                "status": "Done", "outcome": out, "note": n,
+                                "completed_at": date.today().isoformat()}
+                            ).eq("id", a["id"]).execute()
+                            st.rerun()
+                    _delete_action_control(supabase, a["id"])
+
+
 def render_business_insights(supabase, gym_id, assess_fn):
     st.markdown("## Business Insights")
     st.write("What retention is worth, where it leaks, and what's working.")
@@ -444,7 +718,7 @@ def render_business_insights(supabase, gym_id, assess_fn):
     c[3].metric("Revenue saved", _money(k["revenue_saved"]))
     st.caption("Expected loss = each member's estimate × their monthly fee. "
                "It is a planning figure from a synthetic-data model, not a forecast.")
- 
+
     l, r = st.columns(2)
     with l:
         st.markdown('<div class="section-label">RISK MIX</div>', unsafe_allow_html=True)
@@ -453,7 +727,7 @@ def render_business_insights(supabase, gym_id, assess_fn):
     with r:
         st.markdown('<div class="section-label">REVENUE AT RISK BY PLAN</div>', unsafe_allow_html=True)
         st.bar_chart(roster.groupby("membership_type")["revenue_at_risk"].sum())
- 
+
     st.markdown('<div class="section-label">RENEWAL PIPELINE</div>', unsafe_allow_html=True)
     bins = pd.cut(roster["renewal_due_days"], [-1, 7, 14, 30, 60, 10_000],
                   labels=["≤7d", "8-14d", "15-30d", "31-60d", "60d+"])
@@ -464,7 +738,7 @@ def render_business_insights(supabase, gym_id, assess_fn):
     st.dataframe(pipe.rename(columns={"members": "Members", "avg_risk": "Avg risk",
                                       "fees": "Monthly fees"}),
                  use_container_width=True)
- 
+
     st.markdown('<div class="section-label">WHAT WORKS</div>', unsafe_allow_html=True)
     done = actions[actions["status"] == "Done"] if not actions.empty else actions
     if done.empty:
@@ -477,7 +751,7 @@ def render_business_insights(supabase, gym_id, assess_fn):
         st.dataframe(tbl, use_container_width=True)
         if len(done) < 20:
             st.caption("Small sample, so treat these as early signals only.")
- 
+
     st.markdown('<div class="section-label">TO DO THIS WEEK</div>', unsafe_allow_html=True)
     if k["high"]:
         st.write(f"- Contact the **{k['high']}** high-risk members, starting with "
@@ -486,16 +760,16 @@ def render_business_insights(supabase, gym_id, assess_fn):
         st.write(f"- Close out **{k['open_actions']}** open actions and record outcomes.")
     if not k["high"] and not k["open_actions"]:
         st.write("- Nothing urgent. Run a goal review with a few Low-risk members.")
- 
- 
+
+
 ARCHIE_PROMPTS = [
     "Who should I call first today?",
     "Write a WhatsApp message for my most at-risk member",
     "Why is revenue at risk this month?",
     "Give me a 3-step plan for this week",
 ]
- 
- 
+
+
 def render_archie(supabase, gym_id, assess_fn, business_name):
     st.markdown("## Archie · your retention assistant")
     st.write("Ask about your members, revenue and follow-ups. Archie reads your "
@@ -507,7 +781,7 @@ def render_archie(supabase, gym_id, assess_fn, business_name):
         roster, actions = pd.DataFrame(), pd.DataFrame()
     context = archie_context(roster, actions, business_name) if len(roster) \
         else f"Gym: {business_name}. No scored members yet."
- 
+
     if "archie_msgs" not in st.session_state:
         st.session_state.archie_msgs = []
     cols = st.columns(len(ARCHIE_PROMPTS))
