@@ -387,7 +387,9 @@ ARCHIE_SYSTEM = (
     "say so. The risk scores come from a model trained on synthetic data, so call "
     "them estimates, never facts. Be warm, concrete and brief. When asked for a "
     "message to a member, write it ready to send (WhatsApp length, friendly, no "
-    "pressure, no mention of 'risk' or 'cancellation')."
+    "pressure, no mention of 'risk' or 'cancellation'). "
+    "Never leave placeholders like [your name] in a message; sign it with the "
+    "owner's name from the data."
 )
 
 
@@ -1088,7 +1090,7 @@ ARCHIE_PROMPTS = [
 ]
 
 
-def render_archie(supabase, gym_id, assess_fn, business_name):
+def render_archie(supabase, gym_id, assess_fn, business_name, owner_name="the gym owner"):
     st.markdown("## Archie · your retention assistant")
     st.write("Ask about your members, revenue and follow-ups. Archie reads your "
              "live GymPulse data.")
@@ -1097,8 +1099,9 @@ def render_archie(supabase, gym_id, assess_fn, business_name):
         actions = load_actions(supabase, gym_id)
     except Exception:
         roster, actions = pd.DataFrame(), pd.DataFrame()
-    context = archie_context(roster, actions, business_name) if len(roster) \
-        else f"Gym: {business_name}. No scored members yet."
+    context = (archie_context(roster, actions, business_name) if len(roster)
+           else f"Gym: {business_name}. No scored members yet.")
+context += f"\nThe owner's name is {owner_name}. Sign messages with this name."
 
     if "archie_msgs" not in st.session_state:
         st.session_state.archie_msgs = []
