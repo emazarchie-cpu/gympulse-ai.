@@ -1015,8 +1015,7 @@ if st.session_state.auth_user is None:
 
     with auth_col:
         with st.container(border=True, key="auth_card"):
-
-            # ---------------- LOGIN PAGE ----------------
+# ---------------- LOGIN PAGE ----------------
             if st.session_state.auth_mode == "login":
 
                 st.markdown(
