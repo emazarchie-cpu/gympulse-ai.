@@ -1711,7 +1711,164 @@ def assess_members(data):
 
     return results
 
+def render_member_list(supabase, gym_id):
+    """Registered members, with suspend, archive, restore and delete controls."""
+    from datetime import timezone
 
+    flash = st.session_state.pop("mm_flash", None)
+    if flash:
+        st.success(flash)
+
+    try:
+        rows = (
+            supabase.table("members")
+            .select(
+                "id, full_name, email, phone, age, weight_kg, height_cm, "
+                "fitness_goal, created_at, archived, suspended"
+            )
+            .eq("gym_id", gym_id)
+            .order("created_at", desc=True)
+            .execute()
+            .data or []
+        )
+    except Exception as error:
+        st.error(
+            "Could not load members. Have you added the 'suspended' "
+            "column in Supabase?"
+        )
+        with st.expander("Technical details"):
+            st.code(str(error))
+        return
+
+    members_df = pd.DataFrame(rows)
+
+    if members_df.empty:
+        st.info("No members registered yet. Register your first member above.")
+        return
+
+    members_df["status"] = members_df.apply(
+        lambda r: "Archived" if r["archived"]
+        else "Suspended" if r["suspended"]
+        else "Active",
+        axis=1
+    )
+
+    counts = members_df["status"].value_counts()
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Active", int(counts.get("Active", 0)))
+    c2.metric("Suspended", int(counts.get("Suspended", 0)))
+    c3.metric("Archived", int(counts.get("Archived", 0)))
+
+    view = st.radio(
+        "Show",
+        ["Active", "Suspended", "Archived"],
+        horizontal=True,
+        key="mm_view"
+    )
+
+    shown = members_df[members_df["status"] == view]
+
+    focus_member = st.session_state.get("focus_member")
+    if focus_member:
+        shown = shown[shown["full_name"] == focus_member]
+        st.info(f"Showing {focus_member}.")
+        if st.button("Show all members", key="clear_focus_member"):
+            st.session_state.pop("focus_member", None)
+            st.rerun()
+
+    if shown.empty:
+        st.caption(f"No {view.lower()} members.")
+        return
+
+    st.dataframe(
+        shown.drop(columns=["id", "archived", "suspended", "status"]),
+        use_container_width=True,
+        hide_index=True
+    )
+
+    # ---------------- manage one member ----------------
+    st.markdown("#### Manage a member")
+
+    names = dict(zip(shown["id"], shown["full_name"]))
+    pick = st.selectbox(
+        "Select a member",
+        list(names),
+        format_func=lambda member_id: names[member_id],
+        key=f"mm_pick_{view}"
+    )
+
+    def change(fields, message):
+        try:
+            (
+                supabase.table("members")
+                .update(fields)
+                .eq("id", pick)
+                .eq("gym_id", gym_id)
+                .execute()
+            )
+        except Exception as error:
+            st.error(f"Could not update this member: {error}")
+            return
+        st.session_state["mm_flash"] = message
+        st.rerun()
+
+    now = datetime.now(timezone.utc).isoformat()
+    name = names[pick]
+
+    if view == "Active":
+        a, b = st.columns(2)
+        if a.button("Suspend member", key="mm_suspend", use_container_width=True):
+            change({"suspended": True, "suspended_at": now},
+                   f"{name} suspended.")
+        if b.button("Archive member", key="mm_archive", use_container_width=True):
+            change({"archived": True, "archived_at": now},
+                   f"{name} archived.")
+
+    elif view == "Suspended":
+        a, b = st.columns(2)
+        if a.button("Reactivate member", key="mm_reactivate", use_container_width=True):
+            change({"suspended": False, "suspended_at": None},
+                   f"{name} reactivated.")
+        if b.button("Archive member", key="mm_archive", use_container_width=True):
+            change({"archived": True, "archived_at": now},
+                   f"{name} archived.")
+
+    else:  # Archived
+        if st.button("Restore member", key="mm_restore", use_container_width=True):
+            change({"archived": False, "archived_at": None},
+                   f"{name} restored.")
+
+    # ---------------- permanent delete (asks first) ----------------
+    st.caption(
+        "Suspend pauses a member and keeps their history. Archive hides them "
+        "from your lists. Delete removes them, their activity and their "
+        "actions for good."
+    )
+
+    if st.session_state.get("mm_delete_confirm") == pick:
+        st.warning(f"Permanently delete {name}? This cannot be undone.")
+        yes, no = st.columns(2)
+        if yes.button("Yes, delete", key="mm_delete_yes", use_container_width=True):
+            try:
+                (
+                    supabase.table("members")
+                    .delete()
+                    .eq("id", pick)
+                    .eq("gym_id", gym_id)
+                    .execute()
+                )
+            except Exception as error:
+                st.error(f"Could not delete this member: {error}")
+            else:
+                st.session_state.pop("mm_delete_confirm", None)
+                st.session_state["mm_flash"] = f"{name} deleted."
+                st.rerun()
+        if no.button("Cancel", key="mm_delete_no", use_container_width=True):
+            st.session_state.pop("mm_delete_confirm", None)
+            st.rerun()
+    elif st.button("Delete permanently", key="mm_delete", use_container_width=True):
+        st.session_state["mm_delete_confirm"] = pick
+        st.rerun()
 # =========================================================
 # 6. BRANDING AND SIDEBAR
 # =========================================================
