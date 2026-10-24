@@ -2275,19 +2275,7 @@ elif page == "Member Management":
 
         st.markdown("---")
         st.markdown("### Registered Members")
-
-        try:
-            result = (
-                supabase.table("members")
-                .select(
-                    "full_name, email, phone, age, "
-                    "weight_kg, height_cm, fitness_goal, created_at"
-                )
-                .eq("gym_id", gym_id)
-                .eq("archived", False)
-                .order("created_at", desc=True)
-                .execute()
-            )
+        render_member_list(supabase, gym_id)
             
 
             if result.data:
