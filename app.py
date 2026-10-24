@@ -1016,17 +1016,16 @@ if st.session_state.auth_user is None:
     with auth_col:
         with st.container(border=True, key="auth_card"):
 
-            ---------------- LOGIN PAGE ----------------
+            # ---------------- LOGIN PAGE ----------------
+            if st.session_state.auth_mode == "login":
 
-        if st.session_state.auth_mode == "login":
+                st.markdown(
+                    '<div class="auth-title">Welcome back, sign in</div>',
+                    unsafe_allow_html=True
+                )
 
-            st.markdown(
-                '<div class="auth-title">Welcome back, sign in</div>',
-                unsafe_allow_html=True
-            )
-
-            if st.session_state.get("password_updated", False):
-                st.success("Password updated. Sign in with your new password.")
+                if st.session_state.get("password_updated", False):
+                    st.success("Password updated. Sign in with your new password.")
                 st.button(
                     "Sign up",
                     on_click=set_auth_mode,
