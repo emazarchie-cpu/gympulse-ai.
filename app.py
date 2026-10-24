@@ -809,13 +809,17 @@ st.markdown(
         display: block;
         width: 52px;
         height: auto;
-        margin: 0 auto 4px auto;
+        margin: 0 auto 2px auto;
+    }
+    .st-key-top_nav [data-testid="stColumn"]:first-child [data-testid="stMarkdownContainer"] {
+        width: 100%;
+        text-align: center;
     }
     .st-key-brand_home {
-        display: flex;
-        justify-content: center;
+        width: 100%;
     }
     .st-key-brand_home button {
+        width: 100% !important;
         justify-content: center !important;
     }
     .st-key-brand_home button p {
@@ -825,6 +829,7 @@ st.markdown(
     .nav-tagline {
         color: #BCC8D8 !important;
         text-align: center;
+        width: 100%;
     }
 
     </style>
@@ -2133,7 +2138,8 @@ with st.container(key="top_nav"):
         st.button(
             "PULSE",
             on_click=go_home,
-            key="brand_home"
+            key="brand_home",
+            use_container_width=True
         )
 
         st.markdown(
