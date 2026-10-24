@@ -1711,40 +1711,74 @@ def assess_members(data):
 
     return results
 
+
+# =========================================================
+# 5B. MEMBER LIST WITH SUSPEND / ARCHIVE / DELETE
+# =========================================================
+
 def render_member_list(supabase, gym_id):
-    """Registered members, with suspend, archive, restore and delete controls."""
+    """Registered members, with suspend, archive, restore and delete controls.
+
+    Works even if the 'suspended' column has not been added in Supabase yet:
+    the list still loads, and a notice explains how to switch suspend on.
+    """
     from datetime import timezone
 
     flash = st.session_state.pop("mm_flash", None)
     if flash:
         st.success(flash)
 
+    base_columns = (
+        "id, full_name, email, phone, age, weight_kg, height_cm, "
+        "fitness_goal, created_at, archived"
+    )
+
+    suspend_ready = True
+
     try:
-        rows = (
-            supabase.table("members")
-            .select(
-                "id, full_name, email, phone, age, weight_kg, height_cm, "
-                "fitness_goal, created_at, archived, suspended"
+        try:
+            rows = (
+                supabase.table("members")
+                .select(base_columns + ", suspended")
+                .eq("gym_id", gym_id)
+                .order("created_at", desc=True)
+                .execute()
+                .data or []
             )
-            .eq("gym_id", gym_id)
-            .order("created_at", desc=True)
-            .execute()
-            .data or []
-        )
+        except Exception:
+            # The 'suspended' column does not exist yet
+            suspend_ready = False
+            rows = (
+                supabase.table("members")
+                .select(base_columns)
+                .eq("gym_id", gym_id)
+                .order("created_at", desc=True)
+                .execute()
+                .data or []
+            )
     except Exception as error:
-        st.error(
-            "Could not load members. Have you added the 'suspended' "
-            "column in Supabase?"
-        )
+        st.error("Could not load members.")
         with st.expander("Technical details"):
             st.code(str(error))
         return
+
+    if not suspend_ready:
+        st.warning(
+            "Suspend is not switched on yet. Add the 'suspended' column in "
+            "Supabase (see the SQL step) and refresh this page."
+        )
 
     members_df = pd.DataFrame(rows)
 
     if members_df.empty:
         st.info("No members registered yet. Register your first member above.")
         return
+
+    if "suspended" not in members_df.columns:
+        members_df["suspended"] = False
+
+    members_df["archived"] = members_df["archived"].fillna(False).astype(bool)
+    members_df["suspended"] = members_df["suspended"].fillna(False).astype(bool)
 
     members_df["status"] = members_df.apply(
         lambda r: "Archived" if r["archived"]
@@ -1754,6 +1788,7 @@ def render_member_list(supabase, gym_id):
     )
 
     counts = members_df["status"].value_counts()
+
     c1, c2, c3 = st.columns(3)
     c1.metric("Active", int(counts.get("Active", 0)))
     c2.metric("Suspended", int(counts.get("Suspended", 0)))
@@ -1790,12 +1825,16 @@ def render_member_list(supabase, gym_id):
     st.markdown("#### Manage a member")
 
     names = dict(zip(shown["id"], shown["full_name"]))
+
     pick = st.selectbox(
         "Select a member",
         list(names),
         format_func=lambda member_id: names[member_id],
         key=f"mm_pick_{view}"
     )
+
+    name = names[pick]
+    now = datetime.now(timezone.utc).isoformat()
 
     def change(fields, message):
         try:
@@ -1809,46 +1848,85 @@ def render_member_list(supabase, gym_id):
         except Exception as error:
             st.error(f"Could not update this member: {error}")
             return
+
         st.session_state["mm_flash"] = message
         st.rerun()
 
-    now = datetime.now(timezone.utc).isoformat()
-    name = names[pick]
-
     if view == "Active":
         a, b = st.columns(2)
-        if a.button("Suspend member", key="mm_suspend", use_container_width=True):
-            change({"suspended": True, "suspended_at": now},
-                   f"{name} suspended.")
-        if b.button("Archive member", key="mm_archive", use_container_width=True):
-            change({"archived": True, "archived_at": now},
-                   f"{name} archived.")
+
+        if a.button(
+            "Suspend member",
+            key="mm_suspend",
+            use_container_width=True,
+            disabled=not suspend_ready
+        ):
+            change(
+                {"suspended": True, "suspended_at": now},
+                f"{name} suspended."
+            )
+
+        if b.button(
+            "Archive member",
+            key="mm_archive",
+            use_container_width=True
+        ):
+            change(
+                {"archived": True, "archived_at": now},
+                f"{name} archived."
+            )
 
     elif view == "Suspended":
         a, b = st.columns(2)
-        if a.button("Reactivate member", key="mm_reactivate", use_container_width=True):
-            change({"suspended": False, "suspended_at": None},
-                   f"{name} reactivated.")
-        if b.button("Archive member", key="mm_archive", use_container_width=True):
-            change({"archived": True, "archived_at": now},
-                   f"{name} archived.")
+
+        if a.button(
+            "Reactivate member",
+            key="mm_reactivate",
+            use_container_width=True
+        ):
+            change(
+                {"suspended": False, "suspended_at": None},
+                f"{name} reactivated."
+            )
+
+        if b.button(
+            "Archive member",
+            key="mm_archive",
+            use_container_width=True
+        ):
+            change(
+                {"archived": True, "archived_at": now},
+                f"{name} archived."
+            )
 
     else:  # Archived
-        if st.button("Restore member", key="mm_restore", use_container_width=True):
-            change({"archived": False, "archived_at": None},
-                   f"{name} restored.")
+        if st.button(
+            "Restore member",
+            key="mm_restore",
+            use_container_width=True
+        ):
+            change(
+                {"archived": False, "archived_at": None},
+                f"{name} restored."
+            )
 
-    # ---------------- permanent delete (asks first) ----------------
     st.caption(
         "Suspend pauses a member and keeps their history. Archive hides them "
         "from your lists. Delete removes them, their activity and their "
         "actions for good."
     )
 
+    # ---------------- permanent delete (asks first) ----------------
     if st.session_state.get("mm_delete_confirm") == pick:
         st.warning(f"Permanently delete {name}? This cannot be undone.")
+
         yes, no = st.columns(2)
-        if yes.button("Yes, delete", key="mm_delete_yes", use_container_width=True):
+
+        if yes.button(
+            "Yes, delete",
+            key="mm_delete_yes",
+            use_container_width=True
+        ):
             try:
                 (
                     supabase.table("members")
@@ -1863,12 +1941,24 @@ def render_member_list(supabase, gym_id):
                 st.session_state.pop("mm_delete_confirm", None)
                 st.session_state["mm_flash"] = f"{name} deleted."
                 st.rerun()
-        if no.button("Cancel", key="mm_delete_no", use_container_width=True):
+
+        if no.button(
+            "Cancel",
+            key="mm_delete_no",
+            use_container_width=True
+        ):
             st.session_state.pop("mm_delete_confirm", None)
             st.rerun()
-    elif st.button("Delete permanently", key="mm_delete", use_container_width=True):
+
+    elif st.button(
+        "Delete permanently",
+        key="mm_delete",
+        use_container_width=True
+    ):
         st.session_state["mm_delete_confirm"] = pick
         st.rerun()
+
+
 # =========================================================
 # 6. BRANDING AND SIDEBAR
 # =========================================================
@@ -2007,7 +2097,7 @@ with st.container(key="top_nav"):
 
 from datetime import datetime
 from zoneinfo import ZoneInfo
-import html
+from html import escape as html_escape
 
 current_hour = datetime.now(ZoneInfo("Africa/Lagos")).hour
 
@@ -2018,8 +2108,8 @@ elif current_hour < 17:
 else:
     greeting = "Good evening"
 
-safe_user_name = html.escape(str(user_name))
-safe_business_name = html.escape(str(business_name))
+safe_user_name = html_escape(str(user_name))
+safe_business_name = html_escape(str(business_name))
    
 # =========================================================
 # 7. SHARED HEADER — DASHBOARD ONLY
@@ -2275,36 +2365,8 @@ elif page == "Member Management":
 
         st.markdown("---")
         st.markdown("### Registered Members")
+
         render_member_list(supabase, gym_id)
-            
-
-            if result.data:
-                members_df = pd.DataFrame(result.data)
-                total_members = len(members_df)
-
-                focus_member = st.session_state.get("focus_member")
-                if focus_member:
-                    members_df = members_df[members_df["full_name"] == focus_member]
-                    st.info(f"Showing {focus_member}.")
-                    if st.button("Show all members", key="clear_focus_member"):
-                        st.session_state.pop("focus_member", None)
-                        st.rerun()
-
-                st.metric("Total Members", total_members)
-
-                st.dataframe(
-                    members_df,
-                    use_container_width=True,
-                    hide_index=True
-                )
-            else:
-                st.info(
-                    "No members registered yet. "
-                    "Register your first member above."
-                )
-
-        except Exception as error:
-            st.error(f"Could not load members: {error}")
 
 
 # =========================================================
@@ -3203,6 +3265,15 @@ elif page == "FAQs":
             "the form."
         )
 
+    with st.expander("Can I suspend or remove a member?"):
+        st.write(
+            "Yes. In **Member Management**, scroll to **Registered "
+            "Members**, pick a member and choose **Suspend**, "
+            "**Archive** or **Delete permanently**. Suspended and "
+            "archived members are left out of risk scoring and can be "
+            "reactivated or restored at any time."
+        )
+
     with st.expander("Is my gym's data separate from other gyms?"):
         st.write(
             "Yes. Each account has its own gym workspace, and the "
@@ -3301,4 +3372,3 @@ elif page == "FAQs":
 # =========================================================
 # 14. FOOTER
 # =========================================================
-
