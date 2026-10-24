@@ -1027,12 +1027,7 @@ if st.session_state.auth_user is None:
                 if st.session_state.get("password_updated", False):
                     st.success("Password updated. Sign in with your new password.")
 
-                st.markdown(
-                    '<div style="margin-bottom:10px;">'
-                    'Don\'t have an account?'
-                    '</div>',
-                    unsafe_allow_html=True
-                )
+                
 
                 st.button(
                     "Sign up",
