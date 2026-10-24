@@ -1,36 +1,36 @@
 import gympulse_workspaces as gw
 import os
 import textwrap
-
+ 
 import joblib
 import pandas as pd
 import streamlit as st
 from supabase import create_client
-
-
+ 
+ 
 # =========================================================
 # 1. PAGE CONFIGURATION
 # =========================================================
-
+ 
 st.set_page_config(
     page_title="GymPulse AI | Member Intelligence",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
-
-
-
+ 
+ 
+ 
 # =========================================================
 # 2. PREMIUM FITNESS-TECH DESIGN
 # =========================================================
-
+ 
 st.markdown(
     """
     <style>
     @import url(
         'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap'
     );
-
+ 
     :root {
         --background: #0B1020;
         --surface: #151D30;
@@ -41,13 +41,13 @@ st.markdown(
         --muted: #9AA8BD;
         --border: rgba(255,255,255,0.09);
     }
-
+ 
     .stApp {
         background: var(--background);
         color: var(--white);
         font-family: 'Inter', sans-serif;
     }
-
+ 
     [data-testid="stHeader"],
 [data-testid="stToolbar"],
 [data-testid="stMainMenu"],
@@ -55,26 +55,26 @@ st.markdown(
 [data-testid="stStatusWidget"] {
     display: none !important;
 }
-
+ 
     [data-testid="stSidebar"] {
         background: #10182A;
         border-right: 1px solid var(--border);
     }
-
+ 
     [data-testid="stSidebar"] *:not([data-testid="stIconMaterial"]) {
         font-family: 'Inter', sans-serif;
     }
-
+ 
     h1, h2, h3 {
         color: var(--white) !important;
         font-weight: 800 !important;
         letter-spacing: -0.5px;
     }
-
+ 
     p, label, .stMarkdown {
         color: var(--white);
     }
-
+ 
     .brand-logo {
         font-size: 27px;
         font-weight: 800;
@@ -82,17 +82,17 @@ st.markdown(
         color: var(--white);
         margin-bottom: 2px;
     }
-
+ 
     .brand-accent {
         color: var(--lime);
     }
-
+ 
     .brand-tagline {
         color: var(--muted);
         font-size: 12px;
         margin-bottom: 28px;
     }
-
+ 
     .hero {
         padding: 28px 30px;
         background: linear-gradient(
@@ -105,7 +105,7 @@ st.markdown(
         border-radius: 20px;
         margin-bottom: 25px;
     }
-
+ 
     .hero-eyebrow {
         color: var(--lime);
         text-transform: uppercase;
@@ -114,7 +114,7 @@ st.markdown(
         letter-spacing: 2px;
         margin-bottom: 10px;
     }
-
+ 
     .hero-title {
         font-size: 34px;
         font-weight: 800;
@@ -122,14 +122,14 @@ st.markdown(
         color: var(--white);
         margin-bottom: 10px;
     }
-
+ 
     .hero-description {
         color: #BCC8D8;
         font-size: 14px;
         line-height: 1.7;
         max-width: 720px;
     }
-
+ 
     .section-label {
         color: var(--lime);
         text-transform: uppercase;
@@ -139,24 +139,24 @@ st.markdown(
         margin-top: 22px;
         margin-bottom: 12px;
     }
-
+ 
     [data-testid="stMetric"] {
         background: var(--surface);
         border: 1px solid var(--border);
         padding: 20px 22px;
         border-radius: 16px;
     }
-
+ 
     [data-testid="stMetricLabel"] {
         color: var(--muted) !important;
         font-size: 12px !important;
     }
-
+ 
     [data-testid="stMetricValue"] {
         color: var(--lime) !important;
         font-weight: 800 !important;
     }
-
+ 
     div[data-testid="stForm"],
     div[data-testid="stFileUploader"] {
         background: var(--surface);
@@ -164,7 +164,7 @@ st.markdown(
         border-radius: 16px;
         padding: 20px;
     }
-
+ 
     .stButton > button,
     .stFormSubmitButton > button {
         background: var(--lime);
@@ -175,14 +175,14 @@ st.markdown(
         min-height: 43px;
         transition: 0.2s ease;
     }
-
+ 
     .stButton > button:hover,
     .stFormSubmitButton > button:hover {
         background: var(--lime);
         color: #10182A;
         border: none;
     }
-
+ 
     .stDownloadButton > button {
         background: var(--cyan);
         color: #0B1020;
@@ -190,31 +190,31 @@ st.markdown(
         border-radius: 10px;
         font-weight: 800;
     }
-
+ 
     .stProgress > div > div > div > div {
         background: var(--lime);
     }
-
+ 
     [data-testid="stDataFrame"] {
         border: 1px solid var(--border);
         border-radius: 12px;
         overflow: hidden;
     }
-
+ 
     div[data-baseweb="select"] > div,
     div[data-baseweb="input"] > div {
         background: #111B2D;
         border-color: var(--border);
     }
-
+ 
     [data-testid="stAlert"] {
         border-radius: 12px;
     }
-
+ 
     hr {
         border-color: var(--border);
     }
-
+ 
     .risk-card {
         background: var(--surface);
         padding: 22px;
@@ -222,19 +222,19 @@ st.markdown(
         border-radius: 16px;
         min-height: 130px;
     }
-
+ 
     .risk-label {
         font-size: 12px;
         color: var(--muted);
         margin-bottom: 10px;
     }
-
+ 
     .risk-number {
         font-size: 29px;
         font-weight: 800;
         color: var(--lime);
     }
-
+ 
     .risk-note {
         color: var(--muted);
         font-size: 12px;
@@ -248,7 +248,7 @@ st.markdown(
         min-height: 0 !important;
         justify-content: flex-start !important;
     }
-
+ 
     .st-key-brand_home button p {
         font-size: 27px !important;
         font-weight: 800 !important;
@@ -257,17 +257,17 @@ st.markdown(
         white-space: pre !important;
         margin: 0 !important;
     }
-
+ 
     .st-key-brand_home button p::before {
         content: "GYM";
         color: #F4F7FB;
     }
-
+ 
     .st-key-brand_home button p::after {
         content: " AI";
         color: #F4F7FB;
     }
-
+ 
     .st-key-brand_home button:hover p {
         opacity: 0.85;
     }[data-testid="stSidebar"],
@@ -275,25 +275,25 @@ st.markdown(
     [data-testid="collapsedControl"] {
         display: none !important;
     }
-
+ 
     /* ---------- Compact page spacing ---------- */
     .block-container {
         padding-top: 1rem !important;
     }
-
+ 
     /* ---------- Top bar container ---------- */
     .st-key-top_nav {
         border-bottom: 1px solid var(--border);
         padding-bottom: 10px;
         margin-bottom: 18px;
     }
-
+ 
     /* ---------- Brand lockup: logo, wordmark and tagline ---------- */
     .st-key-top_nav [data-testid="stColumn"]:first-child [data-testid="stVerticalBlock"],
     .st-key-top_nav [data-testid="column"]:first-child [data-testid="stVerticalBlock"] {
         gap: 0 !important;
     }
-
+ 
     .nav-tagline {
         color: var(--muted) !important;
         font-size: 10px !important;
@@ -303,11 +303,11 @@ st.markdown(
         white-space: nowrap;
         letter-spacing: 0 !important;
     }
-
+ 
     .st-key-brand_home button:hover p {
         opacity: 1 !important;
     }
-
+ 
     /* ---------- Logo button: GYM (white) PULSE (lime) AI (white) ---------- */
     .st-key-brand_home button {
         background: transparent !important;
@@ -317,7 +317,7 @@ st.markdown(
         min-height: 0 !important;
         justify-content: flex-start !important;
     }
-
+ 
     .st-key-brand_home button p {
         font-size: 24px !important;
         font-weight: 800 !important;
@@ -327,23 +327,23 @@ st.markdown(
         white-space: pre !important;
         margin: 0 !important;
     }
-
+ 
     .st-key-brand_home button p::before {
         content: "GYM";
         color: #F4F7FB;
     }
-
+ 
     .st-key-brand_home button p::after {
         content: " AI";
         color: #F4F7FB;
     }
-
+ 
     /* ---------- Navigation: blends with the background ---------- */
     .st-key-top_nav div[role="radiogroup"] {
         gap: 2px;
         flex-wrap: wrap;
     }
-
+ 
     .st-key-top_nav div[role="radiogroup"] label {
         background: transparent;
         border: none;
@@ -353,35 +353,35 @@ st.markdown(
         cursor: pointer;
         transition: background 0.15s ease;
     }
-
+ 
     /* Hide the radio circle */
     .st-key-top_nav div[role="radiogroup"] label > div:first-child {
         display: none;
     }
-
+ 
     .st-key-top_nav div[role="radiogroup"] label p {
         font-size: 13px;
         font-weight: 700;
         color: var(--muted);
         margin: 0;
     }
-
+ 
     /* Current page: lime text with an underline */
     .st-key-top_nav div[role="radiogroup"] label:has(input:checked) {
         border-bottom: 2px solid var(--lime);
         border-radius: 10px 10px 0 0;
     }
-
+ 
     .st-key-top_nav div[role="radiogroup"] label:has(input:checked) p {
         color: var(--lime);
     }
-
+ 
     /* Hover: lime box for as long as the mouse is over it */
     .st-key-top_nav div[role="radiogroup"] label:hover {
         background: var(--lime) !important;
         border-radius: 10px;
     }
-
+ 
     .st-key-top_nav div[role="radiogroup"] label:hover p {
         color: #10182A !important;
     }
@@ -414,7 +414,7 @@ st.markdown(
         pointer-events: none;
     }
     .lp-hero > * { position: relative; z-index: 1; }
-
+ 
     .lp-pill {
         display: inline-flex; align-items: center; gap: 8px;
         padding: 6px 14px 6px 10px;
@@ -455,7 +455,7 @@ st.markdown(
         background: rgba(255,255,255,0.03);
     }
     .lp-chip svg { color: var(--lime); }
-
+ 
     /* Risk Radar preview */
     .lp-radar {
         background: rgba(21,29,48,0.75);
@@ -506,7 +506,7 @@ st.markdown(
         text-align: center; font-size: 10px; color: var(--muted);
         margin-top: 12px; letter-spacing: 1px;
     }
-
+ 
     /* Stat strip */
     .lp-stats {
         display: grid; grid-template-columns: repeat(4, 1fr);
@@ -517,7 +517,7 @@ st.markdown(
     .lp-stat { background: var(--surface); padding: 18px; text-align: center; }
     .lp-stat b { display: block; font-size: 26px; color: var(--white); letter-spacing: -1px; }
     .lp-stat span { font-size: 12px; color: var(--muted); }
-
+ 
     /* Section headings */
     .lp-kicker {
         text-align: center; color: var(--lime);
@@ -533,7 +533,7 @@ st.markdown(
         font-size: 15px; line-height: 1.7;
         max-width: 600px; margin: 12px auto 34px;
     }
-
+ 
     /* Icon tile */
     .lp-ic {
         width: 44px; height: 44px; border-radius: 13px;
@@ -542,7 +542,7 @@ st.markdown(
         background: linear-gradient(145deg, rgba(183,243,74,0.16), rgba(53,214,237,0.08));
         border: 1px solid rgba(183,243,74,0.25);
     }
-
+ 
     /* Fade-out visual */
     .lp-split {
         display: grid; grid-template-columns: 1fr 1fr; gap: 28px;
@@ -568,7 +568,7 @@ st.markdown(
     .lp-bar-cap {
         font-size: 11px; color: var(--muted); text-align: center; margin-top: 10px;
     }
-
+ 
     /* Steps */
     .lp-steps {
         display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px;
@@ -589,7 +589,7 @@ st.markdown(
     .lp-stepcard p, .lp-bento p {
         color: var(--muted); font-size: 13px; line-height: 1.65; margin: 0;
     }
-
+ 
     /* Bento grid */
     .lp-bento-grid {
         display: grid; grid-template-columns: repeat(6, 1fr);
@@ -614,7 +614,7 @@ st.markdown(
     .lp-mini {
         display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap;
     }
-
+ 
     /* Transparency + CTA */
     .lp-note {
         max-width: 860px; margin: 0 auto;
@@ -627,7 +627,7 @@ st.markdown(
     .lp-note .lp-ic { margin: 0; flex-shrink: 0; color: var(--cyan);
         border-color: rgba(53,214,237,0.3);
         background: rgba(53,214,237,0.1); }
-
+ 
     .lp-cta {
         position: relative; overflow: hidden; text-align: center;
         margin: 70px 0 10px; padding: 64px 24px;
@@ -643,7 +643,7 @@ st.markdown(
     }
     .lp-cta p { color: var(--muted); margin: 14px 0 0; font-size: 15px; }
     .lp-arrow { display: inline-flex; vertical-align: middle; margin-left: 4px; }
-
+ 
     @keyframes lp-pulse {
         0% { box-shadow: 0 0 0 0 rgba(183,243,74,0.6); }
         100% { box-shadow: 0 0 0 10px rgba(183,243,74,0); }
@@ -651,7 +651,7 @@ st.markdown(
     @keyframes lp-float { 50% { transform: translateY(-8px); } }
     @keyframes lp-dash { to { stroke-dashoffset: 0; } }
     @keyframes lp-grow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
-
+ 
     @media (max-width: 900px) {
         .lp-hero, .lp-split, .lp-steps { grid-template-columns: 1fr; }
         .lp-stats { grid-template-columns: repeat(2, 1fr); }
@@ -669,7 +669,7 @@ st.markdown(
         padding: 14px 10px !important;
         box-shadow: 0 30px 80px rgba(0,0,0,0.4);
     }
-
+ 
     .auth-title {
         font-size: 28px;
         font-weight: 800;
@@ -678,14 +678,14 @@ st.markdown(
         text-align: center;
         margin: 4px 0 2px;
     }
-
+ 
     .auth-secure {
         text-align: center;
         color: var(--muted);
         font-size: 11px;
         margin-top: 14px;
     }
-
+ 
     /* "Don't have an account? Sign up" as one clickable button */
     .st-key-to_signup button,
     .st-key-to_login button {
@@ -697,7 +697,7 @@ st.markdown(
         width: 100%;
         justify-content: center !important;
     }
-
+ 
     .st-key-to_signup button p,
     .st-key-to_login button p {
         color: var(--lime) !important;
@@ -706,19 +706,19 @@ st.markdown(
         margin: 0 !important;
         white-space: pre !important;
     }
-
+ 
     .st-key-to_signup button p::before {
         content: "Don't have an account?  ";
         color: var(--muted);
         font-weight: 500;
     }
-
+ 
     .st-key-to_login button p::before {
         content: "Already have an account?  ";
         color: var(--muted);
         font-weight: 500;
     }
-
+ 
     .st-key-to_signup button:hover p,
     .st-key-to_login button:hover p {
         text-decoration: underline;
@@ -736,7 +736,7 @@ st.markdown(
         width: 100%;
         justify-content: center !important;
     }
-
+ 
     .st-key-to_forgot button p,
     .st-key-back_to_login button p,
     .st-key-reset_other button p,
@@ -747,7 +747,7 @@ st.markdown(
         font-weight: 600 !important;
         margin: 0 !important;
     }
-
+ 
     .st-key-to_forgot button:hover p,
     .st-key-back_to_login button:hover p,
     .st-key-reset_other button:hover p,
@@ -762,40 +762,40 @@ st.markdown(
         font-size: 11px;
         padding: 20px 0;
     }
-
+ 
     </style>
     """,
     unsafe_allow_html=True
 )
 gw.apply_mobile_styles()
-
+ 
 # =========================================================
 # 3. USER AUTHENTICATION
 # =========================================================
-
+ 
 from datetime import datetime
 from zoneinfo import ZoneInfo
-
-
+ 
+ 
 # Connect to Supabase once per user session
 if "supabase_client" not in st.session_state:
     st.session_state.supabase_client = create_client(
         st.secrets["SUPABASE_URL"],
         st.secrets["SUPABASE_KEY"]
     )
-
+ 
 supabase = st.session_state.supabase_client
-
-
+ 
+ 
 # Initialise login state
 if "auth_user" not in st.session_state:
     st.session_state.auth_user = None
-
+ 
 if "user_profile" not in st.session_state:
     st.session_state.user_profile = None
-
+ 
 # ---------- Landing page helpers ----------
-
+ 
 ICON_PATHS = {
     "pulse": '<path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/>',
     "down": '<polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/>',
@@ -812,8 +812,8 @@ ICON_PATHS = {
     "arrow": '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
     "download": '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/>',
 }
-
-
+ 
+ 
 def icon(name, size=22):
     """Return a thin-stroke SVG icon that inherits the current text color."""
     return (
@@ -822,8 +822,8 @@ def icon(name, size=22):
         'stroke-linecap="round" stroke-linejoin="round">'
         f'{ICON_PATHS[name]}</svg>'
     )
-
-
+ 
+ 
 def html(block):
     """Render an HTML block. Flattens it so Streamlit's Markdown never
     mistakes indented lines for a code block."""
@@ -831,99 +831,99 @@ def html(block):
         line.strip() for line in block.splitlines() if line.strip()
     )
     st.markdown(flat, unsafe_allow_html=True)
-
-
+ 
+ 
 @st.dialog("Terms of Service")
 def show_terms():
     st.markdown(
         """
 **Last updated: October 2026**
-
+ 
 By creating an account or using GymPulse AI, you agree to these terms.
-
+ 
 **1. What GymPulse AI is.** A tool that gives gym owners experimental
 estimates of member cancellation risk, plus a register for managing members.
-
+ 
 **2. Estimates are not guarantees.** The model is currently trained on
 synthetic data. Results are a guide only and should not be the sole basis
 for any decision about a member.
-
+ 
 **3. Your account.** Keep your login details private. You are responsible
 for activity under your account.
-
+ 
 **4. Your data and your members.** You confirm you have the right to enter
 and process the member information you add, and that members have agreed
 to this where the law requires it.
-
+ 
 **5. Acceptable use.** Do not misuse the service, attempt to access other
 accounts, or upload unlawful content.
-
+ 
 **6. Availability and liability.** The service is provided as is, without
 warranties. To the extent the law allows, GymPulse AI is not liable for
 losses arising from its use.
-
+ 
 **7. Changes.** We may update these terms. Continued use means you accept
 the updated terms.
-
+ 
 **8. Governing law.** These terms are governed by the laws of Nigeria.
-
+ 
 **Contact:** YOUR-COMPANY-EMAIL
         """
     )
-
-
+ 
+ 
 @st.dialog("Privacy Policy")
 def show_privacy():
     st.markdown(
         """
 **Last updated: October 2026**
-
+ 
 **What we collect.** Your name, business name and email address when you
 sign up, and the member records you choose to add (name, contact details,
 age, weight, height and fitness goal).
-
+ 
 **CSV uploads.** Files uploaded for batch assessment are processed during
 your session and are not saved by GymPulse AI.
-
+ 
 **How we use it.** To run your account, show your members, and generate
 assessments. We do not sell your data or your members' data.
-
+ 
 **Where it is stored.** In our database provider (Supabase). Each gym can
 only access its own records. Passwords are handled by the authentication
 service and are not stored in plain text.
-
+ 
 **Emails.** We send account emails such as confirmations and password
 reset codes.
-
+ 
 **Your responsibilities.** You are responsible for having permission from
 your members to store their information.
-
+ 
 **Your rights.** You can ask us to access, correct or delete your data
 under applicable law, including the Nigeria Data Protection Act.
-
+ 
 **Contact:** gympulseai22@gmail.com
         """
     )
-
-
+ 
+ 
 # Show login and registration until authenticated
 if st.session_state.auth_user is None:
     # -------------------------
     # GYMPULSE AI LOGIN BRANDING
     # -------------------------
-
+ 
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     LOGO_PATH = os.path.join(
         BASE_DIR,
         "GymPulse_AI_logo_mark.png"
     )
-
+ 
     # Center the logo
     logo_col1, logo_col2, logo_col3 = st.columns([1, 1, 1])
-
+ 
     with logo_col2:
         st.image(LOGO_PATH, width=115)
-
+ 
     # Hero
     html(f"""
     <div class="lp-hero">
@@ -988,41 +988,41 @@ if st.session_state.auth_user is None:
     <div class="section-label" style="text-align:center;margin-top:34px;">
       SIGN IN TO YOUR WORKSPACE</div>
     """)
-
+ 
     # -------------------------
     # AUTH FLOW
     # -------------------------
-
+ 
     if "auth_mode" not in st.session_state:
         st.session_state.auth_mode = "login"
-
+ 
     if "reset_email_sent" not in st.session_state:
         st.session_state.reset_email_sent = False
-
+ 
     if "reset_email" not in st.session_state:
         st.session_state.reset_email = ""
-
+ 
     if "password_updated" not in st.session_state:
         st.session_state.password_updated = False
-
-
+ 
+ 
     def set_auth_mode(mode):
         st.session_state.auth_mode = mode
         st.session_state.reset_email_sent = False
-
-
+ 
+ 
     _, auth_col, _ = st.columns([1, 1.4, 1])
-
+ 
     with auth_col:
         with st.container(border=True, key="auth_card"):
 # ---------------- LOGIN PAGE ----------------
             if st.session_state.auth_mode == "login":
-
+ 
                 st.markdown(
                     '<div class="auth-title">Welcome back, sign in</div>',
                     unsafe_allow_html=True
                 )
-
+ 
                 if st.session_state.get("password_updated", False):
                     st.success("Password updated. Sign in with your new password.")
                 st.button(
@@ -1031,23 +1031,23 @@ if st.session_state.auth_user is None:
                     args=("signup",),
                     key="to_signup"
                 )
-
+ 
                 with st.form("login_form", border=False):
                     login_email = st.text_input("Email address")
                     login_password = st.text_input("Password", type="password")
-
+ 
                     login_submitted = st.form_submit_button(
                         "Sign in with email",
                         use_container_width=True
                     )
-
+ 
                 st.button(
                     "Forgot password?",
                     on_click=set_auth_mode,
                     args=("forgot",),
                     key="to_forgot"
                 )
-
+ 
                 if login_submitted:
                     if not login_email or not login_password:
                         st.warning("Enter your email and password.")
@@ -1059,20 +1059,20 @@ if st.session_state.auth_user is None:
                                     "password": login_password
                                 }
                             )
-
+ 
                             if result.user:
                                 st.session_state.auth_user = {
                                     "id": str(result.user.id),
                                     "email": result.user.email
                                 }
-
+ 
                                 profile_result = (
                                     supabase.table("profiles")
                                     .select("*")
                                     .eq("id", str(result.user.id))
                                     .execute()
                                 )
-
+ 
                                 if profile_result.data:
                                     st.session_state.user_profile = profile_result.data[0]
                                 else:
@@ -1080,30 +1080,30 @@ if st.session_state.auth_user is None:
                                         "full_name": "User",
                                         "business_name": "My Gym"
                                     }
-
+ 
                                 st.rerun()
-
+ 
                         except Exception:
                             st.error(
                                 "Login failed. Check your credentials and confirm "
                                 "your email address."
                             )
-
+ 
             # ---------------- SIGNUP PAGE ----------------
             elif st.session_state.auth_mode == "signup":
-
+ 
                 st.markdown(
                     '<div class="auth-title">Create your free account</div>',
                     unsafe_allow_html=True
                 )
-
+ 
                 st.button(
                     "Back to sign in",
                     on_click=set_auth_mode,
                     args=("login",),
                     key="back_to_login_from_signup"
                 )
-
+ 
                 with st.form("signup_form", border=False):
                     full_name = st.text_input("Your full name")
                     business_name = st.text_input(
@@ -1123,12 +1123,12 @@ if st.session_state.auth_user is None:
                     agree = st.checkbox(
                         "I agree to the Terms of Service and Privacy Policy"
                     )
-
+ 
                     signup_submitted = st.form_submit_button(
                         "Create free account",
                         use_container_width=True
                     )
-
+ 
                 if signup_submitted:
                     if not all([
                         full_name.strip(),
@@ -1161,20 +1161,20 @@ if st.session_state.auth_user is None:
                                     }
                                 }
                             )
-
+ 
                             if result.session and result.user:
                                 st.session_state.auth_user = {
                                     "id": str(result.user.id),
                                     "email": result.user.email
                                 }
-
+ 
                                 profile_result = (
                                     supabase.table("profiles")
                                     .select("*")
                                     .eq("id", str(result.user.id))
                                     .execute()
                                 )
-
+ 
                                 if profile_result.data:
                                     st.session_state.user_profile = profile_result.data[0]
                                 else:
@@ -1182,37 +1182,37 @@ if st.session_state.auth_user is None:
                                         "full_name": full_name.strip(),
                                         "business_name": business_name.strip()
                                     }
-
+ 
                                 st.rerun()
-
+ 
                             else:
                                 st.success(
                                     "Registration submitted! Check your email for a "
                                     "confirmation link, then return and sign in."
                                 )
-
+ 
                         except Exception:
                             st.error(
                                 "Registration failed. Your email may already be "
                                 "registered, or the request may have failed. "
                                 "Please try again."
                             )
-
+ 
             # ---------------- FORGOT PASSWORD PAGE ----------------
             elif st.session_state.auth_mode == "forgot":
-
+ 
                 st.button(
                     "Back to sign in",
                     on_click=set_auth_mode,
                     args=("login",),
                     key="back_to_login_from_forgot"
                 )
-
+ 
                 st.markdown(
                     '<div class="auth-title">Reset your password</div>',
                     unsafe_allow_html=True
                 )
-
+ 
                 st.markdown(
                     """
                     <div style="margin-bottom: 12px;">
@@ -1222,7 +1222,7 @@ if st.session_state.auth_user is None:
                     """,
                     unsafe_allow_html=True
                 )
-
+ 
                 if not st.session_state.get("reset_email_sent", False):
                     with st.form("reset_request_form", border=False):
                         reset_email = st.text_input("Email address")
@@ -1230,7 +1230,7 @@ if st.session_state.auth_user is None:
                             "Send reset code",
                             use_container_width=True
                         )
-
+ 
                     if send_code:
                         if not reset_email.strip():
                             st.warning("Enter your email address.")
@@ -1239,17 +1239,17 @@ if st.session_state.auth_user is None:
                                 supabase.auth.reset_password_for_email(reset_email.strip())
                             except Exception:
                                 pass
-
+ 
                             st.session_state.reset_email = reset_email.strip()
                             st.session_state.reset_email_sent = True
                             st.rerun()
-
+ 
                 else:
                     st.info(
                         f"If an account exists for {st.session_state.reset_email}, "
                         "a 6-digit code is on its way. Check your spam folder too."
                     )
-
+ 
                     with st.form("reset_confirm_form", border=False):
                         reset_code = st.text_input("6-digit code")
                         new_password = st.text_input(
@@ -1260,12 +1260,12 @@ if st.session_state.auth_user is None:
                             "Confirm new password",
                             type="password"
                         )
-
+ 
                         reset_submitted = st.form_submit_button(
                             "Update password",
                             use_container_width=True
                         )
-
+ 
                     if reset_submitted:
                         if not reset_code.strip() or not new_password:
                             st.warning("Please complete every field.")
@@ -1310,19 +1310,19 @@ if st.session_state.auth_user is None:
                 "</div>",
                 unsafe_allow_html=True
             )
-
+ 
             legal_a, legal_b = st.columns(2)
-
+ 
             with legal_a:
                 if st.button("Terms of Service", key="open_terms"):
                     show_terms()
-
+ 
             with legal_b:
                 if st.button("Privacy Policy", key="open_privacy"):
                     show_privacy()
-
+ 
     # LANDING PAGE SECTIONS
-
+ 
         # The quiet exit
         html(f"""
         <div class="lp-kicker">The problem</div>
@@ -1351,7 +1351,7 @@ if st.session_state.auth_user is None:
           </div>
         </div>
         """)
-
+ 
         # How it works
         html(f"""
         <div class="lp-kicker">How it works</div>
@@ -1376,7 +1376,7 @@ if st.session_state.auth_user is None:
               download the results for your team.</p></div>
         </div>
         """)
-
+ 
         # Bento features
         html(f"""
         <div class="lp-kicker">Features</div>
@@ -1416,7 +1416,7 @@ if st.session_state.auth_user is None:
           </div>
         </div>
         """)
-
+ 
         # Transparency
         html(f"""
         <div class="lp-kicker">Transparency</div>
@@ -1431,7 +1431,7 @@ if st.session_state.auth_user is None:
           </div>
         </div>
         """)
-
+ 
         # Closing call to action
         html(f"""
         <div class="lp-cta">
@@ -1443,19 +1443,19 @@ if st.session_state.auth_user is None:
         <div class="footer">© GymPulse AI · Smarter insights. Stronger member retention.</div>
         """)
         st.stop()
-
+ 
 # =========================================================
 # 4. PERSONALIZED WORKSPACE HEADER
 # =========================================================
 if st.session_state.auth_user is None:
     st.stop()
 profile = st.session_state.user_profile or {}
-
+ 
 user_name = profile.get("full_name", "User")
 business_name = profile.get("business_name", "My Gym")
-
+ 
 owner_id = st.session_state.auth_user["id"]
-
+ 
 try:
     # Retrieve the gym belonging to the authenticated owner
     gym_result = (
@@ -1465,11 +1465,11 @@ try:
         .limit(1)
         .execute()
     )
-
+ 
     # Create a workspace if this owner does not have one
     if gym_result.data:
         gym = gym_result.data[0]
-
+ 
     else:
         new_gym = (
             supabase.table("gyms")
@@ -1479,29 +1479,29 @@ try:
             })
             .execute()
         )
-
+ 
         if not new_gym.data:
             raise RuntimeError(
                 "The gym workspace could not be created."
             )
-
+ 
         gym = new_gym.data[0]
-
+ 
     # Save the workspace information for the current session
     st.session_state.gym_id = gym["id"]
     business_name = gym["business_name"]
-
+ 
 except Exception as error:
     st.session_state.gym_id = None
-
+ 
     st.error(
         "We couldn't load your gym workspace. "
         "Please try refreshing the page."
     )
-
+ 
     with st.expander("Technical details"):
         st.code(str(error))
-
+ 
     st.stop()
 # =========================================================
 # 5. MODEL PREDICTION FUNCTIONS
@@ -1509,54 +1509,54 @@ except Exception as error:
 # =========================================================
 # MODEL INITIALIZATION
 # =========================================================
-
+ 
 import numpy as np
-
+ 
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LogisticRegression
-
-
+ 
+ 
 @st.cache_resource
 def load_model():
     """Train a demonstration model using synthetic fitness data."""
-
+ 
     rng = np.random.default_rng(42)
-
+ 
     sample_size = 1000
-
+ 
     membership_type = rng.choice(
         ["Monthly", "Quarterly", "Annual"],
         size=sample_size,
         p=[0.55, 0.25, 0.20]
     )
-
+ 
     days_since_last_visit = rng.integers(
         0, 31, size=sample_size
     )
-
+ 
     visits_previous_30_days = rng.integers(
         0, 21, size=sample_size
     )
-
+ 
     visits_last_30_days = rng.integers(
         0, 21, size=sample_size
     )
-
+ 
     renewal_due_days = rng.integers(
         0, 91, size=sample_size
     )
-
+ 
     pt_sessions_attended = rng.integers(
         0, 13, size=sample_size
     )
-
+ 
     attendance_change = (
         visits_last_30_days
         - visits_previous_30_days
     )
-
+ 
     training_data = pd.DataFrame({
         "membership_type": membership_type,
         "days_since_last_visit": days_since_last_visit,
@@ -1564,7 +1564,7 @@ def load_model():
         "renewal_due_days": renewal_due_days,
         "pt_sessions_attended": pt_sessions_attended
     })
-
+ 
     # Demonstration labels generated from assumed risk patterns.
     # These are synthetic labels, not real member outcomes.
     risk_score = (
@@ -1576,20 +1576,20 @@ def load_model():
         + np.where(membership_type == "Annual", -0.5, 0)
         + rng.normal(0, 1.5, sample_size)
     )
-
+ 
     cancellation_label = (
         risk_score > np.median(risk_score)
     ).astype(int)
-
+ 
     categorical_features = ["membership_type"]
-
+ 
     numeric_features = [
         "days_since_last_visit",
         "attendance_change",
         "renewal_due_days",
         "pt_sessions_attended"
     ]
-
+ 
     preprocessing = ColumnTransformer(
         transformers=[
             (
@@ -1604,23 +1604,23 @@ def load_model():
             )
         ]
     )
-
+ 
     pipeline = Pipeline([
         ("preprocessing", preprocessing),
         ("classifier", LogisticRegression(max_iter=1000))
     ])
-
+ 
     pipeline.fit(training_data, cancellation_label)
-
+ 
     return pipeline
-
-
+ 
+ 
 model = load_model()
 def prepare_member_data(data):
     """Validate member records and prepare model features."""
-
+ 
     data = data.copy()
-
+ 
     required_columns = [
         "membership_type",
         "days_since_last_visit",
@@ -1629,19 +1629,19 @@ def prepare_member_data(data):
         "renewal_due_days",
         "pt_sessions_attended"
     ]
-
+ 
     missing_columns = [
         column
         for column in required_columns
         if column not in data.columns
     ]
-
+ 
     if missing_columns:
         raise ValueError(
             "Missing required columns: "
             + ", ".join(missing_columns)
         )
-
+ 
     numeric_columns = [
         "days_since_last_visit",
         "visits_previous_30_days",
@@ -1649,35 +1649,35 @@ def prepare_member_data(data):
         "renewal_due_days",
         "pt_sessions_attended"
     ]
-
+ 
     for column in numeric_columns:
         data[column] = pd.to_numeric(
             data[column],
             errors="raise"
         )
-
+ 
         if data[column].isna().any():
             raise ValueError(
                 f"{column} contains missing values."
             )
-
+ 
         if (data[column] < 0).any():
             raise ValueError(
                 f"{column} cannot contain negative values."
             )
-
+ 
     if not data["membership_type"].isin(
         ["Monthly", "Quarterly", "Annual"]
     ).all():
         raise ValueError(
             "Membership type must be Monthly, Quarterly, or Annual."
         )
-
+ 
     data["attendance_change"] = (
         data["visits_last_30_days"]
         - data["visits_previous_30_days"]
     )
-
+ 
     model_features = [
         "membership_type",
         "days_since_last_visit",
@@ -1685,56 +1685,56 @@ def prepare_member_data(data):
         "renewal_due_days",
         "pt_sessions_attended"
     ]
-
+ 
     return data[model_features]
-
+ 
 def assess_members(data):
     """Generate cancellation probabilities and provisional risk labels."""
-
+ 
     if data.empty:
         raise ValueError("The uploaded dataset contains no members.")
-
+ 
     features = prepare_member_data(data)
-
+ 
     probabilities = model.predict_proba(features)[:, 1]
-
+ 
     results = data.copy()
-
+ 
     results["cancellation_probability"] = probabilities
-
+ 
     results["risk_category"] = [
         "High" if probability >= 0.50
         else "Medium" if probability >= 0.30
         else "Low"
         for probability in probabilities
     ]
-
+ 
     return results
-
-
+ 
+ 
 # =========================================================
 # 5B. MEMBER LIST WITH SUSPEND / ARCHIVE / DELETE
 # =========================================================
-
+ 
 def render_member_list(supabase, gym_id):
     """Registered members, with suspend, archive, restore and delete controls.
-
+ 
     Works even if the 'suspended' column has not been added in Supabase yet:
     the list still loads, and a notice explains how to switch suspend on.
     """
     from datetime import timezone
-
+ 
     flash = st.session_state.pop("mm_flash", None)
     if flash:
         st.success(flash)
-
+ 
     base_columns = (
         "id, full_name, email, phone, age, weight_kg, height_cm, "
         "fitness_goal, created_at, archived"
     )
-
+ 
     suspend_ready = True
-
+ 
     try:
         try:
             rows = (
@@ -1761,48 +1761,48 @@ def render_member_list(supabase, gym_id):
         with st.expander("Technical details"):
             st.code(str(error))
         return
-
+ 
     if not suspend_ready:
         st.warning(
             "Suspend is not switched on yet. Add the 'suspended' column in "
             "Supabase (see the SQL step) and refresh this page."
         )
-
+ 
     members_df = pd.DataFrame(rows)
-
+ 
     if members_df.empty:
         st.info("No members registered yet. Register your first member above.")
         return
-
+ 
     if "suspended" not in members_df.columns:
         members_df["suspended"] = False
-
+ 
     members_df["archived"] = members_df["archived"].fillna(False).astype(bool)
     members_df["suspended"] = members_df["suspended"].fillna(False).astype(bool)
-
+ 
     members_df["status"] = members_df.apply(
         lambda r: "Archived" if r["archived"]
         else "Suspended" if r["suspended"]
         else "Active",
         axis=1
     )
-
+ 
     counts = members_df["status"].value_counts()
-
+ 
     c1, c2, c3 = st.columns(3)
     c1.metric("Active", int(counts.get("Active", 0)))
     c2.metric("Suspended", int(counts.get("Suspended", 0)))
     c3.metric("Archived", int(counts.get("Archived", 0)))
-
+ 
     view = st.radio(
         "Show",
         ["Active", "Suspended", "Archived"],
         horizontal=True,
         key="mm_view"
     )
-
+ 
     shown = members_df[members_df["status"] == view]
-
+ 
     focus_member = st.session_state.get("focus_member")
     if focus_member:
         shown = shown[shown["full_name"] == focus_member]
@@ -1810,32 +1810,32 @@ def render_member_list(supabase, gym_id):
         if st.button("Show all members", key="clear_focus_member"):
             st.session_state.pop("focus_member", None)
             st.rerun()
-
+ 
     if shown.empty:
         st.caption(f"No {view.lower()} members.")
         return
-
+ 
     st.dataframe(
         shown.drop(columns=["id", "archived", "suspended", "status"]),
         use_container_width=True,
         hide_index=True
     )
-
+ 
     # ---------------- manage one member ----------------
     st.markdown("#### Manage a member")
-
+ 
     names = dict(zip(shown["id"], shown["full_name"]))
-
+ 
     pick = st.selectbox(
         "Select a member",
         list(names),
         format_func=lambda member_id: names[member_id],
         key=f"mm_pick_{view}"
     )
-
+ 
     name = names[pick]
     now = datetime.now(timezone.utc).isoformat()
-
+ 
     def change(fields, message):
         try:
             (
@@ -1848,13 +1848,13 @@ def render_member_list(supabase, gym_id):
         except Exception as error:
             st.error(f"Could not update this member: {error}")
             return
-
+ 
         st.session_state["mm_flash"] = message
         st.rerun()
-
+ 
     if view == "Active":
         a, b = st.columns(2)
-
+ 
         if a.button(
             "Suspend member",
             key="mm_suspend",
@@ -1865,7 +1865,7 @@ def render_member_list(supabase, gym_id):
                 {"suspended": True, "suspended_at": now},
                 f"{name} suspended."
             )
-
+ 
         if b.button(
             "Archive member",
             key="mm_archive",
@@ -1875,10 +1875,10 @@ def render_member_list(supabase, gym_id):
                 {"archived": True, "archived_at": now},
                 f"{name} archived."
             )
-
+ 
     elif view == "Suspended":
         a, b = st.columns(2)
-
+ 
         if a.button(
             "Reactivate member",
             key="mm_reactivate",
@@ -1888,7 +1888,7 @@ def render_member_list(supabase, gym_id):
                 {"suspended": False, "suspended_at": None},
                 f"{name} reactivated."
             )
-
+ 
         if b.button(
             "Archive member",
             key="mm_archive",
@@ -1898,7 +1898,7 @@ def render_member_list(supabase, gym_id):
                 {"archived": True, "archived_at": now},
                 f"{name} archived."
             )
-
+ 
     else:  # Archived
         if st.button(
             "Restore member",
@@ -1909,19 +1909,19 @@ def render_member_list(supabase, gym_id):
                 {"archived": False, "archived_at": None},
                 f"{name} restored."
             )
-
+ 
     st.caption(
         "Suspend pauses a member and keeps their history. Archive hides them "
         "from your lists. Delete removes them, their activity and their "
         "actions for good."
     )
-
+ 
     # ---------------- permanent delete (asks first) ----------------
     if st.session_state.get("mm_delete_confirm") == pick:
         st.warning(f"Permanently delete {name}? This cannot be undone.")
-
+ 
         yes, no = st.columns(2)
-
+ 
         if yes.button(
             "Yes, delete",
             key="mm_delete_yes",
@@ -1941,7 +1941,7 @@ def render_member_list(supabase, gym_id):
                 st.session_state.pop("mm_delete_confirm", None)
                 st.session_state["mm_flash"] = f"{name} deleted."
                 st.rerun()
-
+ 
         if no.button(
             "Cancel",
             key="mm_delete_no",
@@ -1949,7 +1949,7 @@ def render_member_list(supabase, gym_id):
         ):
             st.session_state.pop("mm_delete_confirm", None)
             st.rerun()
-
+ 
     elif st.button(
         "Delete permanently",
         key="mm_delete",
@@ -1957,12 +1957,12 @@ def render_member_list(supabase, gym_id):
     ):
         st.session_state["mm_delete_confirm"] = pick
         st.rerun()
-
-
+ 
+ 
 # =========================================================
 # 6. BRANDING AND SIDEBAR
 # =========================================================
-
+ 
 # Handle dashboard navigation before creating the sidebar widget
 MAIN_PAGES = [
     "Dashboard",
@@ -1972,7 +1972,7 @@ MAIN_PAGES = [
     "Archie",
     "Member Management",
 ]
-
+ 
 MORE_PAGES = [
     "Member Assessment",
     "Batch Assessment",
@@ -1980,22 +1980,22 @@ MORE_PAGES = [
     "About the Model",
     "FAQs",
 ]
-
+ 
 if "current_page" not in st.session_state:
     st.session_state["current_page"] = "Dashboard"
-
-
+ 
+ 
 def show_page(name):
     """Open a page and keep the top-bar radio in sync."""
     st.session_state["current_page"] = name
     st.session_state["main_nav"] = name if name in MAIN_PAGES else None
-
-
+ 
+ 
 def on_main_nav():
     if st.session_state.get("main_nav"):
         st.session_state["current_page"] = st.session_state["main_nav"]
-
-
+ 
+ 
 def go_home():
     show_page("Dashboard")
 def log_out():
@@ -2004,58 +2004,58 @@ def log_out():
         supabase.auth.sign_out()
     except Exception:
         pass
-
+ 
     for key in list(st.session_state.keys()):
         del st.session_state[key]
-
+ 
 # Dashboard buttons still set "navigate_to"
 if "navigate_to" in st.session_state:
     show_page(st.session_state.pop("navigate_to"))
-
+ 
 if "main_nav" not in st.session_state:
     st.session_state["main_nav"] = "Dashboard"
-
+ 
 with st.container(key="top_nav"):
-
+ 
     brand_col, nav_col, user_col = st.columns(
         [3.0, 6.4, 1.1],
         vertical_alignment="center"
     )
-
+ 
     with brand_col:
         logo_col, wordmark_col = st.columns(
             [0.8, 3.2],
             vertical_alignment="center",
             gap="small"
         )
-
+ 
         with logo_col:
             logo_path = os.path.join(
                 os.path.dirname(os.path.abspath(__file__)),
                 "GymPulse_AI_logo_mark.png"
             )
             st.image(logo_path, width=42)
-
+ 
         with wordmark_col:
             st.button(
                 "PULSE",
                 on_click=go_home,
                 key="brand_home"
             )
-
+ 
             st.markdown(
                 '<div class="nav-tagline">'
                 'Smarter insights. Stronger member retention.'
                 '</div>',
                 unsafe_allow_html=True
             )
-
+ 
     with nav_col:
         radio_col, more_col = st.columns(
             [5.2, 1.3],
             vertical_alignment="center"
         )
-
+ 
         with radio_col:
             st.radio(
                 "WORKSPACE",
@@ -2066,11 +2066,11 @@ with st.container(key="top_nav"):
                 horizontal=True,
                 label_visibility="collapsed"
             )
-
+ 
         with more_col:
             current = st.session_state["current_page"]
             more_label = current if current in MORE_PAGES else "More"
-
+ 
             with st.popover(more_label, use_container_width=True):
                 for name in MORE_PAGES:
                     st.button(
@@ -2080,7 +2080,7 @@ with st.container(key="top_nav"):
                         args=(name,),
                         use_container_width=True
                     )
-
+ 
     page = st.session_state["current_page"]
     with user_col:
         st.button(
@@ -2089,34 +2089,34 @@ with st.container(key="top_nav"):
             use_container_width=True,
             key="logout_button_main"
         )
-
+ 
     
 # =========================================================
 # PERSONALIZED GREETING VARIABLES
 # =========================================================
-
+ 
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from html import escape as html_escape
-
+ 
 current_hour = datetime.now(ZoneInfo("Africa/Lagos")).hour
-
+ 
 if current_hour < 12:
     greeting = "Good morning"
 elif current_hour < 17:
     greeting = "Good afternoon"
 else:
     greeting = "Good evening"
-
+ 
 safe_user_name = html_escape(str(user_name))
 safe_business_name = html_escape(str(business_name))
    
 # =========================================================
 # 7. SHARED HEADER — DASHBOARD ONLY
 # =========================================================
-
+ 
 if page == "Dashboard":
-
+ 
     # YOUR FITNESS WORKSPACE
     st.markdown(
         """
@@ -2139,15 +2139,15 @@ if page == "Dashboard":
         """,
         unsafe_allow_html=True
     )
-
+ 
     # PERSONALIZED GREETING
     st.subheader(f"{greeting}, {safe_user_name}! 👋")
-
+ 
     st.markdown(
         f"Welcome to **{safe_business_name}**. "
         "Let's build a stronger, smarter fitness business."
     )
-
+ 
     # FITNESS INTELLIGENCE PLATFORM
     st.markdown(
         """
@@ -2172,92 +2172,92 @@ if page == "Dashboard":
 # 8. DASHBOARD
 # =========================================================
 if page == "Dashboard":
-
-
+ 
+ 
 # Personalized greeting — Dashboard only
-
+ 
 # =====================================================
 # PERSONALIZED GREETING VARIABLES
 # =====================================================
-
+ 
 # =====================================================
 # EXISTING DASHBOARD CONTENT
 # =====================================================
     st.markdown("## Dashboard")
-
+ 
     st.write(
         "Your starting point for exploring membership "
         "cancellation-risk estimates."
     )
-
+ 
     st.markdown(
         '<div class="section-label">HOW IT WORKS</div>',
         unsafe_allow_html=True
     )
-
+ 
     step1, step2, step3 = st.columns(3)
-
+ 
     with step1:
         st.markdown("### 01 | Input")
-
+ 
         st.write(
             "Provide membership, attendance, renewal, "
             "and personal-training information."
         )
-
+ 
     with step2:
         st.markdown("### 02 | Analyse")
-
+ 
         st.write(
             "The existing model processes five features "
             "to estimate cancellation probability."
         )
-
+ 
     with step3:
         st.markdown("### 03 | Explore")
-
+ 
         st.write(
             "Review the experimental estimate and investigate "
             "attendance patterns."
         )
-
+ 
     st.markdown(
         '<div class="section-label">GET STARTED</div>',
         unsafe_allow_html=True
     )
-
+ 
     left, right = st.columns(2)
-
+ 
     with left:
         st.markdown("### Individual assessment")
-
+ 
         st.write(
             "Explore an estimate for one hypothetical member."
         )
-
+ 
         if st.button(
             "Open Member Assessment",
             use_container_width=True
         ):
             st.session_state["navigate_to"] = "Member Assessment"
             st.rerun()
-
+ 
     with right:
         st.markdown("### Batch assessment")
-
+ 
         st.write(
             "Explore a CSV of membership records and "
             "download the resulting estimates."
         )
-
+ 
         if st.button(
             "Open Batch Assessment",
             use_container_width=True
         ):
             st.session_state["navigate_to"] = "Batch Assessment"
             st.rerun()
-
-
+ 
+ 
     
 # =========================================================
 # 9. MEMBER MANAGEMENT
@@ -2271,30 +2271,30 @@ elif page == "Business Insights":
 elif page == "Archie":
     gw.render_archie(supabase, st.session_state.gym_id, assess_members, business_name, user_name)
 elif page == "Member Management":
-
+ 
     st.markdown("## Member Management")
     st.write("Register and manage members at your gym.")
-
+ 
     gym_id = st.session_state.get("gym_id")
-
+ 
     if not gym_id:
         st.warning("No gym workspace found for your account.")
     else:
         st.markdown("### Register a New Member")
-
+ 
         with st.form("register_member_form"):
-
+ 
             full_name = st.text_input("Full name")
             email = st.text_input("Email address")
             phone = st.text_input("Phone number")
-
+ 
             col1, col2 = st.columns(2)
-
+ 
             with col1:
                 age = st.number_input(
                     "Age", min_value=16, max_value=120, value=25
                 )
-
+ 
                 weight_kg = st.number_input(
                     "Weight (kg)",
                     min_value=1.0,
@@ -2302,7 +2302,7 @@ elif page == "Member Management":
                     value=70.0,
                     step=0.5
                 )
-
+ 
             with col2:
                 height_cm = st.number_input(
                     "Height (cm)",
@@ -2311,7 +2311,7 @@ elif page == "Member Management":
                     value=170.0,
                     step=0.5
                 )
-
+ 
                 fitness_goal = st.selectbox(
                     "Fitness goal",
                     [
@@ -2323,17 +2323,17 @@ elif page == "Member Management":
                         "Sports performance"
                     ]
                 )
-
+ 
             submitted = st.form_submit_button(
                 "Register Member",
                 use_container_width=True
             )
-
+ 
         if submitted:
-
+ 
             if not full_name.strip():
                 st.error("Please enter the member's full name.")
-
+ 
             else:
                 member_data = {
                     "gym_id": gym_id,
@@ -2343,100 +2343,100 @@ elif page == "Member Management":
                     "height_cm": float(height_cm),
                     "fitness_goal": fitness_goal
                 }
-
+ 
                 if email.strip():
                     member_data["email"] = email.strip()
-
+ 
                 if phone.strip():
                     member_data["phone"] = phone.strip()
-
+ 
                 try:
                     (
                         supabase.table("members")
                         .insert(member_data)
                         .execute()
                     )
-
+ 
                     st.success("Member registered successfully!")
                     st.rerun()
-
+ 
                 except Exception as error:
                     st.error(f"Could not register member: {error}")
-
+ 
         st.markdown("---")
         st.markdown("### Registered Members")
-
+ 
         render_member_list(supabase, gym_id)
-
-
+ 
+ 
 # =========================================================
 # 10. INDIVIDUAL MEMBER ASSESSMENT
 # =========================================================
-
+ 
 elif page == "Member Assessment":
-
+ 
     st.markdown("## Member Assessment")
-
+ 
     st.write(
         "Enter a hypothetical member's details to explore "
         "the output of the trained model."
     )
-
+ 
     with st.form("member_assessment_form"):
-
+ 
         membership_type = st.selectbox(
             "Membership type",
             ["Monthly", "Quarterly", "Annual"]
         )
-
+ 
         col1, col2 = st.columns(2)
-
+ 
         with col1:
-
+ 
             days_since_last_visit = st.number_input(
                 "Days since last visit",
                 min_value=0,
                 max_value=365,
                 value=7
             )
-
+ 
             visits_previous_30_days = st.number_input(
                 "Visits in the previous 30 days",
                 min_value=0,
                 max_value=100,
                 value=10
             )
-
+ 
             renewal_due_days = st.number_input(
                 "Days until renewal",
                 min_value=0,
                 max_value=365,
                 value=14
             )
-
+ 
         with col2:
-
+ 
             visits_last_30_days = st.number_input(
                 "Visits in the most recent 30 days",
                 min_value=0,
                 max_value=100,
                 value=5
             )
-
+ 
             pt_sessions_attended = st.number_input(
                 "Personal-training sessions attended",
                 min_value=0,
                 max_value=100,
                 value=2
             )
-
+ 
         submitted = st.form_submit_button(
             "Generate Assessment",
             use_container_width=True
         )
-
+ 
     if submitted:
-
+ 
         member = pd.DataFrame([{
             "membership_type": membership_type,
             "days_since_last_visit": days_since_last_visit,
@@ -2445,91 +2445,91 @@ elif page == "Member Assessment":
             "renewal_due_days": renewal_due_days,
             "pt_sessions_attended": pt_sessions_attended
         }])
-
+ 
         try:
-
+ 
             result = assess_members(member).iloc[0]
-
+ 
             probability = float(
                 result["cancellation_probability"]
             )
-
+ 
             risk = result["risk_category"]
-
+ 
             st.markdown("---")
             st.markdown("### Assessment Results")
-
+ 
             col1, col2 = st.columns(2)
-
+ 
             col1.metric(
                 "Estimated Cancellation Probability",
                 f"{probability:.1%}"
             )
-
+ 
             col2.metric(
                 "Provisional Risk Category",
                 risk
             )
-
+ 
             st.progress(
                 max(0.0, min(1.0, probability))
             )
-
+ 
             attendance_change = (
                 visits_last_30_days
                 - visits_previous_30_days
             )
-
+ 
             st.markdown(
                 '<div class="section-label">ATTENDANCE ANALYSIS</div>',
                 unsafe_allow_html=True
             )
-
+ 
             a, b, c = st.columns(3)
-
+ 
             a.metric(
                 "Previous 30 Days",
                 int(visits_previous_30_days)
             )
-
+ 
             b.metric(
                 "Recent 30 Days",
                 int(visits_last_30_days)
             )
-
+ 
             c.metric(
                 "Attendance Change",
                 f"{attendance_change:+}"
             )
-
+ 
             if attendance_change < 0:
-
+ 
                 st.warning(
                     "WARNING: MEMBER CHECK-IN RECOMMENDED\n\n"
                     "Attendance has dropped compared with the previous "
                     "30 days. Consider contacting the member to understand "
                     "the change and offer support."
                 )
-
+ 
             elif attendance_change > 0:
-
+ 
                 st.success(
                     "POSITIVE ENGAGEMENT\n\n"
                     "Attendance has improved compared with the previous "
                     "30 days. Encourage the member to maintain this progress."
                 )
-
+ 
             else:
-
+ 
                 st.info(
                     "ENGAGEMENT STABLE\n\n"
                     "Attendance is unchanged compared with the previous "
                     "30 days. Continue monitoring activity and encourage "
                     "consistent attendance."
                 )
-
+ 
             if risk == "High":
-
+ 
                 st.error(
                     "PRIORITY FOLLOW-UP\n\n"
                     "This member requires a priority review. Check their "
@@ -2538,38 +2538,38 @@ elif page == "Member Assessment":
                     "experiencing. Record the outcome and schedule a "
                     "follow-up if needed."
                 )
-
+ 
             elif risk == "Medium":
-
+ 
                 st.warning(
                     "WARNING: MEMBER ENGAGEMENT NEEDS ATTENTION\n\n"
                     "Review this member's recent attendance and upcoming "
                     "renewal date. Consider a personal check-in and agree "
                     "on a practical next step to encourage regular visits."
                 )
-
+ 
             else:
-
+ 
                 st.success(
                     "MAINTAIN MEMBER ENGAGEMENT\n\n"
                     "Continue monitoring attendance and supporting the "
                     "member's fitness goals. Encourage consistent visits "
                     "and review their progress at the next check-in."
                 )
-
+ 
         except Exception as error:
-
+ 
             st.error(f"Assessment failed: {error}")
 # =========================================================
 # 11. BATCH CSV ASSESSMENT
 # =========================================================
-
+ 
 elif page == "Batch Assessment":
-
+ 
     # -----------------------------------------------------
     # PAGE HEADER
     # -----------------------------------------------------
-
+ 
     st.markdown(
         """
         <div class="hero">
@@ -2588,18 +2588,18 @@ elif page == "Batch Assessment":
         """,
         unsafe_allow_html=True
     )
-
+ 
     st.markdown("<br>", unsafe_allow_html=True)
-
+ 
     # -----------------------------------------------------
     # REQUIRED DATA FIELDS
     # -----------------------------------------------------
-
+ 
     st.markdown(
         '<div class="section-label">REQUIRED DATA</div>',
         unsafe_allow_html=True
     )
-
+ 
     st.markdown(
         """
         <p style="color: #9CA3AF; margin-bottom: 20px;">
@@ -2609,7 +2609,7 @@ elif page == "Batch Assessment":
         """,
         unsafe_allow_html=True
     )
-
+ 
     required_fields = [
         (
             "01",
@@ -2648,16 +2648,16 @@ elif page == "Batch Assessment":
             "Number of personal-training sessions attended."
         ),
     ]
-
+ 
     for row_start in range(0, len(required_fields), 3):
         columns = st.columns(3)
-
+ 
         for column, field in zip(
             columns,
             required_fields[row_start:row_start + 3]
         ):
             number, title, field_name, description = field
-
+ 
             with column:
                 st.markdown(
                     f"""
@@ -2686,14 +2686,14 @@ elif page == "Batch Assessment":
 # -----------------------------------------------------
 # CSV UPLOAD
 # -----------------------------------------------------
-
+ 
     st.markdown("<br>", unsafe_allow_html=True)
-
+ 
     st.markdown(
         '<div class="section-label">UPLOAD MEMBERSHIP DATA</div>',
         unsafe_allow_html=True
     )
-
+ 
     st.markdown(
         """
 <div style="
@@ -2729,25 +2729,25 @@ elif page == "Batch Assessment":
         type=["csv"],
         help="Upload a CSV containing all six required columns."
     )
-
+ 
     st.caption("Supported format: CSV · Maximum file size: 200 MB")
-
+ 
     if uploaded_file is not None:
-
+ 
         try:
-
+ 
             uploaded_data = pd.read_csv(uploaded_file)
-
+ 
             if uploaded_data.empty:
                 st.error(
                     "The uploaded CSV contains no records."
                 )
                 st.stop()
-
+ 
             # ---------------------------------------------
             # VALIDATE REQUIRED COLUMNS
             # ---------------------------------------------
-
+ 
             required_columns = [
                 "membership_type",
                 "days_since_last_visit",
@@ -2756,89 +2756,89 @@ elif page == "Batch Assessment":
                 "renewal_due_days",
                 "pt_sessions_attended",
             ]
-
+ 
             missing_columns = [
                 column
                 for column in required_columns
                 if column not in uploaded_data.columns
             ]
-
+ 
             if missing_columns:
-
+ 
                 st.error(
                     "Your CSV is missing the following required "
                     "columns: "
                     + ", ".join(missing_columns)
                 )
-
+ 
                 st.info(
                     "Check the column names in the Required Data "
                     "section above and upload the corrected file."
                 )
-
+ 
                 st.stop()
-
+ 
             # ---------------------------------------------
             # FILE SUMMARY
             # ---------------------------------------------
-
+ 
             st.markdown("<br>", unsafe_allow_html=True)
-
+ 
             st.markdown(
                 '<div class="section-label">FILE OVERVIEW</div>',
                 unsafe_allow_html=True
             )
-
+ 
             overview_col1, overview_col2, overview_col3 = (
                 st.columns(3)
             )
-
+ 
             overview_col1.metric(
                 "Total Records",
                 f"{len(uploaded_data):,}"
             )
-
+ 
             overview_col2.metric(
                 "Required Fields",
                 len(required_columns)
             )
-
+ 
             overview_col3.metric(
                 "File Status",
                 "Ready"
             )
-
+ 
             # ---------------------------------------------
             # DATA PREVIEW
             # ---------------------------------------------
-
+ 
             with st.expander(
                 "Preview uploaded membership data",
                 expanded=True
             ):
-
+ 
                 st.dataframe(
                     uploaded_data.head(10),
                     use_container_width=True,
                     hide_index=True
                 )
-
+ 
                 st.caption(
                     "Showing the first 10 records. "
                     "Your original uploaded data is not modified here."
                 )
-
+ 
             # ---------------------------------------------
             # RUN ASSESSMENT
             # ---------------------------------------------
-
+ 
             st.markdown("<br>", unsafe_allow_html=True)
-
+ 
             st.markdown(
                 '<div class="section-label">RUN ASSESSMENT</div>',
                 unsafe_allow_html=True
             )
-
+ 
             st.markdown(
                 """
                 <p style="color: #9CA3AF;">
@@ -2848,45 +2848,45 @@ elif page == "Batch Assessment":
                 """,
                 unsafe_allow_html=True
             )
-
+ 
             if st.button(
                 "Assess All Members",
                 use_container_width=True,
                 type="primary"
             ):
-
+ 
                 with st.spinner(
                     "Assessing membership records..."
                 ):
-
+ 
                     results = assess_members(uploaded_data)
-
+ 
                 total_members = len(results)
-
+ 
                 high_risk = int(
                     (results["risk_category"] == "High").sum()
                 )
-
+ 
                 medium_risk = int(
                     (results["risk_category"] == "Medium").sum()
                 )
-
+ 
                 low_risk = int(
                     (results["risk_category"] == "Low").sum()
                 )
-
+ 
                 # -----------------------------------------
                 # RESULTS SUMMARY
                 # -----------------------------------------
-
+ 
                 st.markdown("<br>", unsafe_allow_html=True)
-
+ 
                 st.markdown(
                     '<div class="section-label">'
                     'ASSESSMENT SUMMARY</div>',
                     unsafe_allow_html=True
                 )
-
+ 
                 st.markdown(
                     """
                     <p style="color: #9CA3AF;">
@@ -2895,55 +2895,55 @@ elif page == "Batch Assessment":
                     """,
                     unsafe_allow_html=True
                 )
-
+ 
                 col1, col2, col3, col4 = st.columns(4)
-
+ 
                 col1.metric(
                     "Records Assessed",
                     f"{total_members:,}"
                 )
-
+ 
                 col2.metric(
                     "High Risk",
                     f"{high_risk:,}"
                 )
-
+ 
                 col3.metric(
                     "Medium Risk",
                     f"{medium_risk:,}"
                 )
-
+ 
                 col4.metric(
                     "Low Risk",
                     f"{low_risk:,}"
                 )
-
+ 
                 # -----------------------------------------
                 # RESULTS TABLE
                 # -----------------------------------------
-
+ 
                 st.markdown("<br>", unsafe_allow_html=True)
-
+ 
                 st.markdown(
                     '<div class="section-label">'
                     'MEMBER ASSESSMENT RESULTS</div>',
                     unsafe_allow_html=True
                 )
-
+ 
                 st.dataframe(
                     results,
                     use_container_width=True,
                     hide_index=True
                 )
-
+ 
                 # -----------------------------------------
                 # DOWNLOAD RESULTS
                 # -----------------------------------------
-
+ 
                 csv_output = results.to_csv(
                     index=False
                 ).encode("utf-8")
-
+ 
                 st.download_button(
                     label="Download Assessment Results CSV",
                     data=csv_output,
@@ -2952,54 +2952,54 @@ elif page == "Batch Assessment":
                     use_container_width=True,
                     type="primary"
                 )
-
+ 
                 st.caption(
                     "Results are generated for this session and are "
                     "not saved to a permanent member database. "
                     "Risk estimates are experimental and should not "
                     "be treated as confirmed predictions of cancellation."
                 )
-
+ 
         except Exception as error:
-
+ 
             st.error(
                 "Could not process the uploaded file. "
                 "Check the required columns, values, and file format."
             )
-
+ 
             with st.expander("Technical details"):
-
+ 
                 st.code(str(error))
-
+ 
 # =========================================================
 # 12. MODEL INSIGHTS
 # =========================================================
-
+ 
 elif page == "Model Insights":
-
+ 
     st.markdown("## Model Insights")
-
+ 
     st.write(
         "Explore how the model's estimates change when one input "
         "varies while the other inputs remain constant."
     )
-
+ 
     st.info(
         "This experiment shows how the model responds to different "
         "inputs. It does not establish causation or real world accuracy."
     )
-
+ 
     st.markdown("### Set the baseline member")
-
+ 
     col1, col2 = st.columns(2)
-
+ 
     with col1:
         insight_membership = st.selectbox(
             "Membership type",
             ["Monthly", "Quarterly", "Annual"],
             key="insight_membership"
         )
-
+ 
         insight_previous = st.number_input(
             "Previous 30 day visits",
             min_value=0,
@@ -3007,7 +3007,7 @@ elif page == "Model Insights":
             value=10,
             key="insight_previous"
         )
-
+ 
         insight_recent = st.number_input(
             "Recent 30 day visits",
             min_value=0,
@@ -3015,7 +3015,7 @@ elif page == "Model Insights":
             value=5,
             key="insight_recent"
         )
-
+ 
     with col2:
         insight_renewal = st.number_input(
             "Days until renewal",
@@ -3024,7 +3024,7 @@ elif page == "Model Insights":
             value=14,
             key="insight_renewal"
         )
-
+ 
         insight_pt = st.number_input(
             "PT sessions attended",
             min_value=0,
@@ -3032,23 +3032,23 @@ elif page == "Model Insights":
             value=2,
             key="insight_pt"
         )
-
+ 
         max_days = st.slider(
             "Maximum days since last visit to explore",
             min_value=7,
             max_value=90,
             value=30
         )
-
+ 
     if st.button("Run Sensitivity Experiment", use_container_width=True):
-
+ 
         scenario_days = list(
             range(0, max_days + 1, max(1, max_days // 10))
         )
-
+ 
         if max_days not in scenario_days:
             scenario_days.append(max_days)
-
+ 
         scenarios = pd.DataFrame({
             "membership_type": [insight_membership] * len(scenario_days),
             "days_since_last_visit": scenario_days,
@@ -3057,17 +3057,17 @@ elif page == "Model Insights":
             "renewal_due_days": [insight_renewal] * len(scenario_days),
             "pt_sessions_attended": [insight_pt] * len(scenario_days)
         })
-
+ 
         try:
             sensitivity_results = assess_members(scenarios)
-
+ 
             sensitivity_results = sensitivity_results.sort_values(
                 "days_since_last_visit"
             )
-
+ 
             st.markdown("---")
             st.markdown("### Experimental response")
-
+ 
             chart_data = sensitivity_results.set_index(
                 "days_since_last_visit"
             )[["cancellation_probability"]].rename(
@@ -3076,7 +3076,7 @@ elif page == "Model Insights":
                     "Estimated cancellation probability"
                 }
             )
-
+ 
             st.line_chart(
                 chart_data,
                 y="Estimated cancellation probability",
@@ -3084,7 +3084,7 @@ elif page == "Model Insights":
                 y_label="Estimated probability",
                 use_container_width=True
             )
-
+ 
             display_results = sensitivity_results[
                 [
                     "days_since_last_visit",
@@ -3098,77 +3098,77 @@ elif page == "Model Insights":
                     "risk_category": "Provisional risk category"
                 }
             )
-
+ 
             st.dataframe(
                 display_results,
                 hide_index=True,
                 use_container_width=True
             )
-
+ 
             first_probability = float(
                 sensitivity_results.iloc[0]["cancellation_probability"]
             )
-
+ 
             last_probability = float(
                 sensitivity_results.iloc[-1]["cancellation_probability"]
             )
-
+ 
             st.metric(
                 "Change across tested scenarios",
                 f"{(last_probability - first_probability) * 100:+.1f} percentage points"
             )
-
+ 
             st.caption(
                 "Only days since last visit changes across scenarios. "
                 "All other inputs are held constant. Results describe "
                 "the model's response, not a causal effect."
             )
-
+ 
         except Exception as error:
             st.error("The sensitivity experiment could not be completed.")
-
+ 
             with st.expander("Technical details"):
                 st.code(str(error))
                 
 # =========================================================
 # 13. ABOUT THE MODEL
 # =========================================================
-
+ 
 elif page == "About the Model":
-
+ 
     st.markdown("## About GymPulse AI")
-
+ 
     st.write(
         "GymPulse AI is a machine-learning portfolio project "
         "exploring gym membership cancellation-risk assessment."
     )
-
+ 
     st.markdown("### Model architecture")
-
+ 
     col1, col2, col3 = st.columns(3)
-
+ 
     col1.metric(
         "Algorithm",
         "Logistic Regression"
     )
-
+ 
     col2.metric(
         "Input Features",
         "5"
     )
-
+ 
     col3.metric(
         "Training Dataset",
         "Synthetic"
     )
-
+ 
     st.metric(
         "Medium-Risk Threshold",
         "30%"
     )
-
+ 
     st.markdown("### Features used by the model")
-
+ 
     st.dataframe(
         pd.DataFrame({
             "Feature": [
@@ -3189,9 +3189,9 @@ elif page == "About the Model":
         hide_index=True,
         use_container_width=True
     )
-
+ 
     st.markdown("### Recorded development test results")
-
+ 
     metrics = pd.DataFrame({
         "Metric": [
             "Accuracy",
@@ -3208,22 +3208,22 @@ elif page == "About the Model":
             "65.1%"
         ]
     })
-
+ 
     st.dataframe(
         metrics,
         hide_index=True,
         use_container_width=True
     )
-
+ 
     st.warning(
         "These metrics describe earlier evaluation on synthetic data. "
         "They do not establish performance on real gym members. "
         "Prior exploration of the test set also means the recorded "
         "test results should be interpreted cautiously."
     )
-
+ 
     st.markdown("### Responsible development")
-
+ 
     st.write(
         "Before operational use, the model would require suitable "
         "real-world evaluation, data-quality checks, probability "
@@ -3231,9 +3231,9 @@ elif page == "About the Model":
         "Member data should be handled with appropriate permission "
         "and privacy safeguards."
     )
-
+ 
     st.markdown("### Project scope")
-
+ 
     st.write(
         "This application demonstrates model integration, "
         "input validation, interactive predictions, CSV processing, "
@@ -3243,20 +3243,20 @@ elif page == "About the Model":
 # =========================================================
 # 13B. FAQs
 # =========================================================
-
+ 
 elif page == "FAQs":
-
+ 
     st.markdown("## Frequently Asked Questions")
-
+ 
     st.write(
         "Quick answers to help you get the most out of GymPulse AI."
     )
-
+ 
     st.markdown(
         '<div class="section-label">GETTING STARTED</div>',
         unsafe_allow_html=True
     )
-
+ 
     with st.expander("How do I add members to my gym?"):
         st.write(
             "Open **Member Management**, fill in the member's details, "
@@ -3264,7 +3264,7 @@ elif page == "FAQs":
             "required. Registered members appear in the table below "
             "the form."
         )
-
+ 
     with st.expander("Can I suspend or remove a member?"):
         st.write(
             "Yes. In **Member Management**, scroll to **Registered "
@@ -3273,26 +3273,26 @@ elif page == "FAQs":
             "archived members are left out of risk scoring and can be "
             "reactivated or restored at any time."
         )
-
+ 
     with st.expander("Is my gym's data separate from other gyms?"):
         st.write(
             "Yes. Each account has its own gym workspace, and the "
             "Member Management page only loads members registered "
             "under your gym."
         )
-
+ 
     with st.expander("How do I log out?"):
         st.write(
             "Click **Log Out** at the top right. This ends your "
             "session and returns you to the login page. Always log "
             "out on shared computers."
         )
-
+ 
     st.markdown(
         '<div class="section-label">RISK ASSESSMENTS</div>',
         unsafe_allow_html=True
     )
-
+ 
     with st.expander("What does the cancellation probability mean?"):
         st.write(
             "It is the model's estimate of how likely a member is to "
@@ -3301,7 +3301,7 @@ elif page == "FAQs":
             "training sessions. It is a guide for deciding who to "
             "check in with, not a guarantee."
         )
-
+ 
     with st.expander("What do High, Medium, and Low risk mean?"):
         st.write(
             "- **High**: estimated probability of 50% or more\n"
@@ -3310,7 +3310,7 @@ elif page == "FAQs":
             "These categories are provisional and meant to help you "
             "prioritise follow-ups."
         )
-
+ 
     with st.expander("How accurate are the predictions?"):
         st.write(
             "The model was trained on **synthetic** (simulated) data, "
@@ -3318,7 +3318,7 @@ elif page == "FAQs":
             "established. Treat results as experimental and combine "
             "them with your own knowledge of your members."
         )
-
+ 
     with st.expander("What should I do for a high-risk member?"):
         st.write(
             "Check their recent attendance and renewal date, then "
@@ -3326,12 +3326,12 @@ elif page == "FAQs":
             "training, offer support or a session with a trainer, and "
             "note the outcome so you can follow up."
         )
-
+ 
     st.markdown(
         '<div class="section-label">BATCH ASSESSMENT</div>',
         unsafe_allow_html=True
     )
-
+ 
     with st.expander("What columns does my CSV need?"):
         st.write(
             "Your file must include these exact column names:\n\n"
@@ -3342,7 +3342,7 @@ elif page == "FAQs":
             "- `renewal_due_days`\n"
             "- `pt_sessions_attended`"
         )
-
+ 
     with st.expander("Why did my CSV upload fail?"):
         st.write(
             "The most common causes are a misspelled column name, "
@@ -3350,18 +3350,18 @@ elif page == "FAQs":
             "other than Monthly, Quarterly, or Annual. Fix the file "
             "and upload it again."
         )
-
+ 
     with st.expander("Are my batch results saved?"):
         st.write(
             "No. Batch results exist only for your current session. "
             "Use **Download Assessment Results CSV** to keep a copy."
         )
-
+ 
     st.markdown(
         '<div class="section-label">PRIVACY</div>',
         unsafe_allow_html=True
     )
-
+ 
     with st.expander("How should I handle member data?"):
         st.write(
             "Only collect information members have agreed to share, "
