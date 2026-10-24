@@ -49,8 +49,18 @@ st.markdown(
     }
 
     [data-testid="stHeader"] {
-        background: rgba(11,16,32,0.95);
-    }
+    background: transparent !important;
+    border-bottom: none !important;
+    box-shadow: none !important;
+}
+
+[data-testid="stDecoration"] {
+    display: none !important;
+}
+
+[data-testid="stToolbar"] {
+    background: transparent !important;
+}
 
     [data-testid="stSidebar"] {
         background: #10182A;
