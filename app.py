@@ -776,11 +776,97 @@ st.markdown(
         padding: 20px 0;
     }
 
+    /* ---------- Brand lockup: logo on top, then wordmark, then tagline ---------- */
+    .brand-lockup {
+        text-align: center;
+        margin: 0 auto;
+    }
+    .brand-lockup-logo {
+        display: block;
+        width: 112px;
+        height: auto;
+        margin: 0 auto 14px auto;
+    }
+    .brand-lockup-word {
+        font-size: 34px;
+        line-height: 38px;
+        font-weight: 800;
+        letter-spacing: -1px;
+        color: #F4F7FB;
+    }
+    .brand-lockup-word span {
+        color: var(--lime);
+    }
+    .brand-lockup-tag {
+        font-size: 13px;
+        line-height: 20px;
+        color: #BCC8D8;
+        margin-top: 8px;
+    }
+
+    /* Same lockup, scaled down for the top bar */
+    .nav-brand-logo {
+        display: block;
+        width: 52px;
+        height: auto;
+        margin: 0 auto 4px auto;
+    }
+    .st-key-brand_home {
+        display: flex;
+        justify-content: center;
+    }
+    .st-key-brand_home button {
+        justify-content: center !important;
+    }
+    .st-key-brand_home button p {
+        font-size: 24px !important;
+        text-align: center;
+    }
+    .nav-tagline {
+        color: #BCC8D8 !important;
+        text-align: center;
+    }
+
     </style>
     """,
     unsafe_allow_html=True
 )
 gw.apply_mobile_styles()
+
+# =========================================================
+# BRAND LOGO HELPER (shared by the login page and the top bar)
+# =========================================================
+import base64
+import io
+
+
+@st.cache_resource
+def logo_data_uri(width=256):
+    """Return the logo mark as an inline image so it can sit inside HTML."""
+    path = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "GymPulse_AI_logo_mark.png"
+    )
+    try:
+        img = Image.open(path).convert("RGBA")
+        width = min(width, img.width)
+        height = round(img.height * width / img.width)
+        img = img.resize((width, height), Image.LANCZOS)
+        buffer = io.BytesIO()
+        img.save(buffer, format="PNG", optimize=True)
+        return "data:image/png;base64," + base64.b64encode(
+            buffer.getvalue()
+        ).decode()
+    except Exception:
+        return ""
+
+
+def logo_img_tag(css_class):
+    uri = logo_data_uri()
+    if not uri:
+        return ""
+    return f'<img class="{css_class}" src="{uri}" alt="GymPulse AI logo">'
+
 
 # =========================================================
 # 3. USER AUTHENTICATION
@@ -931,11 +1017,14 @@ if st.session_state.auth_user is None:
         "GymPulse_AI_logo_mark.png"
     )
 
-    # Center the logo
-    logo_col1, logo_col2, logo_col3 = st.columns([1, 1, 1])
-
-    with logo_col2:
-        st.image(LOGO_PATH, width=115)
+    # Brand lockup: logo on top, then wordmark, then tagline
+    html(f"""
+    <div class="brand-lockup">
+      {logo_img_tag('brand-lockup-logo')}
+      <div class="brand-lockup-word">GYM<span>PULSE</span> AI</div>
+      <div class="brand-lockup-tag">Smarter insights. Stronger member retention.</div>
+    </div>
+    """)
 
     # Hero
     html(f"""
@@ -2036,32 +2125,23 @@ with st.container(key="top_nav"):
     )
 
     with brand_col:
-        logo_col, wordmark_col = st.columns(
-            [0.8, 3.2],
-            vertical_alignment="center",
-            gap="small"
+        st.markdown(
+            logo_img_tag("nav-brand-logo"),
+            unsafe_allow_html=True
         )
 
-        with logo_col:
-            logo_path = os.path.join(
-                os.path.dirname(os.path.abspath(__file__)),
-                "GymPulse_AI_logo_mark.png"
-            )
-            st.image(logo_path, width=42)
+        st.button(
+            "PULSE",
+            on_click=go_home,
+            key="brand_home"
+        )
 
-        with wordmark_col:
-            st.button(
-                "PULSE",
-                on_click=go_home,
-                key="brand_home"
-            )
-
-            st.markdown(
-                '<div class="nav-tagline">'
-                'Smarter insights. Stronger member retention.'
-                '</div>',
-                unsafe_allow_html=True
-            )
+        st.markdown(
+            '<div class="nav-tagline">'
+            'Smarter insights. Stronger member retention.'
+            '</div>',
+            unsafe_allow_html=True
+        )
 
     with nav_col:
         radio_col, more_col = st.columns(
