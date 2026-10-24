@@ -48,18 +48,12 @@ st.markdown(
         font-family: 'Inter', sans-serif;
     }
 
-    [data-testid="stHeader"] {
-    background: transparent !important;
-    border-bottom: none !important;
-    box-shadow: none !important;
-}
-
-[data-testid="stDecoration"] {
+    [data-testid="stHeader"],
+[data-testid="stToolbar"],
+[data-testid="stMainMenu"],
+[data-testid="stDecoration"],
+[data-testid="stStatusWidget"] {
     display: none !important;
-}
-
-[data-testid="stToolbar"] {
-    background: transparent !important;
 }
 
     [data-testid="stSidebar"] {
