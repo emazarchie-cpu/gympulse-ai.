@@ -235,12 +235,30 @@ def apply_mobile_styles():
 # ---------------------------------------------------------------- data
 def load_roster(supabase, gym_id, assess_fn):
     """Members + activity, scored by the model. Members without activity
-    data are returned in `missing` so the UI can ask for it."""
-    members = pd.DataFrame(
-        supabase.table("members")
-        .select("id, full_name, email, phone, fitness_goal")
-        .eq("gym_id", gym_id).eq("archived", False).execute().data or []
-    )
+    data are returned in `missing` so the UI can ask for it.
+
+    Archived members are excluded in the query. Suspended members are
+    excluded here too, but safely: if the 'suspended' column has not been
+    added in Supabase yet, everything still loads (nobody is suspended).
+    """
+    base_columns = "id, full_name, email, phone, fitness_goal"
+    try:
+        rows = (
+            supabase.table("members")
+            .select(base_columns + ", suspended")
+            .eq("gym_id", gym_id).eq("archived", False).execute().data or []
+        )
+    except Exception:
+        rows = (
+            supabase.table("members")
+            .select(base_columns)
+            .eq("gym_id", gym_id).eq("archived", False).execute().data or []
+        )
+    members = pd.DataFrame(rows)
+    if "suspended" in members.columns:
+        keep = ~members["suspended"].fillna(False).astype(bool)
+        members = members[keep].drop(columns=["suspended"]).reset_index(drop=True)
+
     activity = pd.DataFrame(
         supabase.table("member_activity").select("*")
         .eq("gym_id", gym_id).execute().data or []
@@ -725,6 +743,8 @@ def _member_manager(supabase, gym_id, roster, missing):
         archived = pd.DataFrame()
 
     with st.expander(f"Archive, restore or delete members ({len(archived)} archived)"):
+        st.caption("You can also suspend, reactivate, archive or delete members "
+                   "from the Member Management page.")
         if names:
             pick = st.selectbox("Member", list(names),
                                 format_func=lambda i: names[i], key="mgr_member")
