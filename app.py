@@ -831,6 +831,21 @@ st.markdown(
         text-align: center;
         width: 100%;
     }
+    .login-brand {
+        text-align: center;
+        width: 100%;
+    }
+    .login-brand-word {
+        font-size: 24px;
+        font-weight: 800;
+        letter-spacing: -1px;
+        line-height: 1.1;
+        color: #F4F7FB;
+        white-space: pre;
+    }
+    .login-brand-word span {
+        color: var(--lime);
+    }
 
     </style>
     """,
@@ -1022,14 +1037,21 @@ if st.session_state.auth_user is None:
         "GymPulse_AI_logo_mark.png"
     )
 
-    # Brand lockup: logo on top, then wordmark, then tagline
-    html(f"""
-    <div class="brand-lockup">
-      {logo_img_tag('brand-lockup-logo')}
-      <div class="brand-lockup-word">GYM<span>PULSE</span> AI</div>
-      <div class="brand-lockup-tag">Smarter insights. Stronger member retention.</div>
-    </div>
-    """)
+    # Brand lockup: identical to the top bar (logo, wordmark, tagline),
+    # placed in the same left-hand column so it lines up exactly
+    login_brand_col, _, _ = st.columns(
+        [3.0, 6.4, 1.1],
+        vertical_alignment="center"
+    )
+
+    with login_brand_col:
+        html(f"""
+        <div class="login-brand">
+          {logo_img_tag('nav-brand-logo')}
+          <div class="login-brand-word">GYM<span>PULSE</span> AI</div>
+          <div class="nav-tagline">Smarter insights. Stronger member retention.</div>
+        </div>
+        """)
 
     # Hero
     html(f"""
