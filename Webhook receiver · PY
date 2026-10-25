@@ -1,0 +1,101 @@
+"""GymPulse AI: receives member replies (WhatsApp + email) and saves them
+to the `messages` table so they show up in the Follow-ups inbox.
+
+Run as its OWN small web service (Streamlit cannot receive webhooks):
+    pip install fastapi uvicorn supabase python-multipart
+    uvicorn webhook_receiver:app --host 0.0.0.0 --port $PORT
+
+Environment variables:
+    SUPABASE_URL, SUPABASE_SERVICE_KEY   (service role key, keep it secret)
+    WHATSAPP_VERIFY_TOKEN                (any text you choose, also typed into Meta)
+    EMAIL_WEBHOOK_SECRET                 (any text you choose, optional but recommended)
+"""
+import os
+import re
+
+from fastapi import FastAPI, Request, Response
+from supabase import create_client
+
+app = FastAPI()
+sb = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SERVICE_KEY"])
+VERIFY_TOKEN = os.environ.get("WHATSAPP_VERIFY_TOKEN", "")
+EMAIL_SECRET = os.environ.get("EMAIL_WEBHOOK_SECRET", "")
+
+
+def digits(phone):
+    d = re.sub(r"\D", "", str(phone or ""))
+    if d.startswith("00"):
+        d = d[2:]
+    elif d.startswith("0") and len(d) == 11:      # Nigerian local format
+        d = "234" + d[1:]
+    return d
+
+
+def members_matching(phone=None, email=None):
+    rows = (sb.table("members").select("id, gym_id, phone, email")
+            .eq("archived", False).execute().data or [])
+    found = []
+    for r in rows:
+        if phone:
+            a, b = digits(r.get("phone")), digits(phone)
+            if a and b and (a == b or a[-10:] == b[-10:]):
+                found.append(r)
+        elif email and (r.get("email") or "").strip().lower() == email.strip().lower():
+            found.append(r)
+    return found
+
+
+def save(member, channel, body, subject=None):
+    sb.table("messages").insert({
+        "gym_id": member["gym_id"], "member_id": member["id"], "channel": channel,
+        "direction": "in", "subject": subject, "body": body or "(no text)",
+        "status": "received", "is_read": False,
+    }).execute()
+
+
+@app.get("/")
+def health():
+    return {"ok": True}
+
+
+@app.get("/whatsapp")
+def whatsapp_verify(request: Request):
+    q = request.query_params
+    if q.get("hub.mode") == "subscribe" and q.get("hub.verify_token") == VERIFY_TOKEN:
+        return Response(content=q.get("hub.challenge", ""), media_type="text/plain")
+    return Response(status_code=403)
+
+
+@app.post("/whatsapp")
+async def whatsapp_incoming(request: Request):
+    data = await request.json()
+    saved = 0
+    for entry in data.get("entry", []):
+        for change in entry.get("changes", []):
+            for msg in change.get("value", {}).get("messages", []):
+                kind = msg.get("type", "text")
+                body = msg.get("text", {}).get("body") if kind == "text" else f"[{kind} message]"
+                for member in members_matching(phone=msg.get("from")):
+                    save(member, "whatsapp", body)
+                    saved += 1
+    return {"saved": saved}
+
+
+@app.post("/email")
+async def email_incoming(request: Request):
+    """Generic inbound email. Point your email provider's inbound webhook here
+    (JSON or form data with from / subject / text)."""
+    if EMAIL_SECRET and request.headers.get("x-webhook-secret") != EMAIL_SECRET:
+        return Response(status_code=403)
+    ctype = request.headers.get("content-type", "")
+    data = await request.json() if "json" in ctype else dict(await request.form())
+    data = data.get("data", data) if isinstance(data.get("data"), dict) else data
+    sender = str(data.get("from") or data.get("from_email") or data.get("sender") or "")
+    match = re.search(r"[\w.+-]+@[\w-]+\.[\w.-]+", sender)
+    body = data.get("text") or data.get("plain") or data.get("body") or ""
+    saved = 0
+    if match:
+        for member in members_matching(email=match.group(0)):
+            save(member, "email", body, subject=data.get("subject"))
+            saved += 1
+    return {"saved": saved}
