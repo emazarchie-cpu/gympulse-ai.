@@ -811,12 +811,16 @@ st.markdown(
         height: auto;
         margin: 0 auto 2px auto;
     }
+    .st-key-top_nav .nav-brand-logo {
+        margin-bottom: 6px;
+    }
     .st-key-top_nav [data-testid="stColumn"]:first-child [data-testid="stMarkdownContainer"] {
         width: 100%;
         text-align: center;
     }
     .st-key-brand_home {
         width: 100%;
+        padding-top: 10px;
     }
     .st-key-brand_home button {
         width: 100% !important;
