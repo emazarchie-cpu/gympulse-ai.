@@ -196,6 +196,20 @@ st.markdown(
         border: none;
     }
 
+    /* Lime buttons: the label must always be dark and easy to read */
+    .stButton > button p,
+    .stFormSubmitButton > button p,
+    .stButton > button:hover p,
+    .stFormSubmitButton > button:hover p {
+        color: #10182A !important;
+        font-weight: 800 !important;
+    }
+
+    .stDownloadButton > button p {
+        color: #0B1020 !important;
+        font-weight: 800 !important;
+    }
+
     .stDownloadButton > button {
         background: var(--cyan);
         color: #0B1020;
@@ -856,6 +870,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 gw.apply_mobile_styles()
+gw.apply_ui_styles()
 
 # =========================================================
 # BRAND LOGO HELPER (shared by the login page and the top bar)
@@ -1846,253 +1861,6 @@ def assess_members(data):
 
 
 # =========================================================
-# 5B. MEMBER LIST WITH SUSPEND / ARCHIVE / DELETE
-# =========================================================
-
-def render_member_list(supabase, gym_id):
-    """Registered members, with suspend, archive, restore and delete controls.
-
-    Works even if the 'suspended' column has not been added in Supabase yet:
-    the list still loads, and a notice explains how to switch suspend on.
-    """
-    from datetime import timezone
-
-    flash = st.session_state.pop("mm_flash", None)
-    if flash:
-        st.success(flash)
-
-    base_columns = (
-        "id, full_name, email, phone, age, weight_kg, height_cm, "
-        "fitness_goal, created_at, archived"
-    )
-
-    suspend_ready = True
-
-    try:
-        try:
-            rows = (
-                supabase.table("members")
-                .select(base_columns + ", suspended")
-                .eq("gym_id", gym_id)
-                .order("created_at", desc=True)
-                .execute()
-                .data or []
-            )
-        except Exception:
-            # The 'suspended' column does not exist yet
-            suspend_ready = False
-            rows = (
-                supabase.table("members")
-                .select(base_columns)
-                .eq("gym_id", gym_id)
-                .order("created_at", desc=True)
-                .execute()
-                .data or []
-            )
-    except Exception as error:
-        st.error("Could not load members.")
-        with st.expander("Technical details"):
-            st.code(str(error))
-        return
-
-    if not suspend_ready:
-        st.warning(
-            "Suspend is not switched on yet. Add the 'suspended' column in "
-            "Supabase (see the SQL step) and refresh this page."
-        )
-
-    members_df = pd.DataFrame(rows)
-
-    if members_df.empty:
-        st.info("No members registered yet. Register your first member above.")
-        return
-
-    if "suspended" not in members_df.columns:
-        members_df["suspended"] = False
-
-    members_df["archived"] = members_df["archived"].fillna(False).astype(bool)
-    members_df["suspended"] = members_df["suspended"].fillna(False).astype(bool)
-
-    members_df["status"] = members_df.apply(
-        lambda r: "Archived" if r["archived"]
-        else "Suspended" if r["suspended"]
-        else "Active",
-        axis=1
-    )
-
-    counts = members_df["status"].value_counts()
-
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Active", int(counts.get("Active", 0)))
-    c2.metric("Suspended", int(counts.get("Suspended", 0)))
-    c3.metric("Archived", int(counts.get("Archived", 0)))
-
-    view = st.radio(
-        "Show",
-        ["Active", "Suspended", "Archived"],
-        horizontal=True,
-        key="mm_view"
-    )
-
-    shown = members_df[members_df["status"] == view]
-
-    focus_member = st.session_state.get("focus_member")
-    if focus_member:
-        shown = shown[shown["full_name"] == focus_member]
-        st.info(f"Showing {focus_member}.")
-        if st.button("Show all members", key="clear_focus_member"):
-            st.session_state.pop("focus_member", None)
-            st.rerun()
-
-    if shown.empty:
-        st.caption(f"No {view.lower()} members.")
-        return
-
-    st.dataframe(
-        shown.drop(columns=["id", "archived", "suspended", "status"]),
-        use_container_width=True,
-        hide_index=True
-    )
-
-    # ---------------- manage one member ----------------
-    st.markdown("#### Manage a member")
-
-    names = dict(zip(shown["id"], shown["full_name"]))
-
-    pick = st.selectbox(
-        "Select a member",
-        list(names),
-        format_func=lambda member_id: names[member_id],
-        key=f"mm_pick_{view}"
-    )
-
-    name = names[pick]
-    now = datetime.now(timezone.utc).isoformat()
-
-    def change(fields, message):
-        try:
-            (
-                supabase.table("members")
-                .update(fields)
-                .eq("id", pick)
-                .eq("gym_id", gym_id)
-                .execute()
-            )
-        except Exception as error:
-            st.error(f"Could not update this member: {error}")
-            return
-
-        st.session_state["mm_flash"] = message
-        st.rerun()
-
-    if view == "Active":
-        a, b = st.columns(2)
-
-        if a.button(
-            "Suspend member",
-            key="mm_suspend",
-            use_container_width=True,
-            disabled=not suspend_ready
-        ):
-            change(
-                {"suspended": True, "suspended_at": now},
-                f"{name} suspended."
-            )
-
-        if b.button(
-            "Archive member",
-            key="mm_archive",
-            use_container_width=True
-        ):
-            change(
-                {"archived": True, "archived_at": now},
-                f"{name} archived."
-            )
-
-    elif view == "Suspended":
-        a, b = st.columns(2)
-
-        if a.button(
-            "Reactivate member",
-            key="mm_reactivate",
-            use_container_width=True
-        ):
-            change(
-                {"suspended": False, "suspended_at": None},
-                f"{name} reactivated."
-            )
-
-        if b.button(
-            "Archive member",
-            key="mm_archive",
-            use_container_width=True
-        ):
-            change(
-                {"archived": True, "archived_at": now},
-                f"{name} archived."
-            )
-
-    else:  # Archived
-        if st.button(
-            "Restore member",
-            key="mm_restore",
-            use_container_width=True
-        ):
-            change(
-                {"archived": False, "archived_at": None},
-                f"{name} restored."
-            )
-
-    st.caption(
-        "Suspend pauses a member and keeps their history. Archive hides them "
-        "from your lists. Delete removes them, their activity and their "
-        "actions for good."
-    )
-
-    # ---------------- permanent delete (asks first) ----------------
-    if st.session_state.get("mm_delete_confirm") == pick:
-        st.warning(f"Permanently delete {name}? This cannot be undone.")
-
-        yes, no = st.columns(2)
-
-        if yes.button(
-            "Yes, delete",
-            key="mm_delete_yes",
-            use_container_width=True
-        ):
-            try:
-                (
-                    supabase.table("members")
-                    .delete()
-                    .eq("id", pick)
-                    .eq("gym_id", gym_id)
-                    .execute()
-                )
-            except Exception as error:
-                st.error(f"Could not delete this member: {error}")
-            else:
-                st.session_state.pop("mm_delete_confirm", None)
-                st.session_state["mm_flash"] = f"{name} deleted."
-                st.rerun()
-
-        if no.button(
-            "Cancel",
-            key="mm_delete_no",
-            use_container_width=True
-        ):
-            st.session_state.pop("mm_delete_confirm", None)
-            st.rerun()
-
-    elif st.button(
-        "Delete permanently",
-        key="mm_delete",
-        use_container_width=True
-    ):
-        st.session_state["mm_delete_confirm"] = pick
-        st.rerun()
-
-
-# =========================================================
 # 6. BRANDING AND SIDEBAR
 # =========================================================
 
@@ -2237,155 +2005,20 @@ safe_user_name = html_escape(str(user_name))
 safe_business_name = html_escape(str(business_name))
    
 # =========================================================
-# 7. SHARED HEADER — DASHBOARD ONLY
-# =========================================================
-
-if page == "Dashboard":
-
-    # YOUR FITNESS WORKSPACE
-    st.markdown(
-        """
-        <div style="
-            background-color: #111827;
-            padding: 24px;
-            border-radius: 16px;
-            border-left: 5px solid var(--lime);
-            margin-bottom: 24px;
-        ">
-            <p style="
-                color: var(--lime);
-                font-size: 14px;
-                margin-bottom: 8px;
-                font-weight: 600;
-            ">
-                YOUR FITNESS WORKSPACE
-            </p>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-    # PERSONALIZED GREETING
-    st.subheader(f"{greeting}, {safe_user_name}! 👋")
-
-    st.markdown(
-        f"Welcome to **{safe_business_name}**. "
-        "Let's build a stronger, smarter fitness business."
-    )
-
-    # FITNESS INTELLIGENCE PLATFORM
-    st.markdown(
-        """
-        <div class="hero">
-            <div class="hero-eyebrow">
-                FITNESS INTELLIGENCE PLATFORM
-            </div>
-            <div class="hero-title">
-                Smarter insights.<br>Stronger member retention.
-            </div>
-            <div class="hero-description">
-                Explore experimental machine-learning estimates
-                using gym membership and attendance information.
-                Turn member activity data into opportunities for
-                further investigation.
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-# =========================================================
-# 8. DASHBOARD
+# 7. DASHBOARD
 # =========================================================
 if page == "Dashboard":
-
-
-# Personalized greeting — Dashboard only
-
-# =====================================================
-# PERSONALIZED GREETING VARIABLES
-# =====================================================
-
-# =====================================================
-# EXISTING DASHBOARD CONTENT
-# =====================================================
-    st.markdown("## Dashboard")
-
-    st.write(
-        "Your starting point for exploring membership "
-        "cancellation-risk estimates."
+    gw.render_dashboard(
+        supabase,
+        st.session_state.get("gym_id"),
+        assess_members,
+        greeting,
+        user_name,
+        business_name
     )
 
-    st.markdown(
-        '<div class="section-label">HOW IT WORKS</div>',
-        unsafe_allow_html=True
-    )
-
-    step1, step2, step3 = st.columns(3)
-
-    with step1:
-        st.markdown("### 01 | Input")
-
-        st.write(
-            "Provide membership, attendance, renewal, "
-            "and personal-training information."
-        )
-
-    with step2:
-        st.markdown("### 02 | Analyse")
-
-        st.write(
-            "The existing model processes five features "
-            "to estimate cancellation probability."
-        )
-
-    with step3:
-        st.markdown("### 03 | Explore")
-
-        st.write(
-            "Review the experimental estimate and investigate "
-            "attendance patterns."
-        )
-
-    st.markdown(
-        '<div class="section-label">GET STARTED</div>',
-        unsafe_allow_html=True
-    )
-
-    left, right = st.columns(2)
-
-    with left:
-        st.markdown("### Individual assessment")
-
-        st.write(
-            "Explore an estimate for one hypothetical member."
-        )
-
-        if st.button(
-            "Open Member Assessment",
-            use_container_width=True
-        ):
-            st.session_state["navigate_to"] = "Member Assessment"
-            st.rerun()
-
-    with right:
-        st.markdown("### Batch assessment")
-
-        st.write(
-            "Explore a CSV of membership records and "
-            "download the resulting estimates."
-        )
-
-        if st.button(
-            "Open Batch Assessment",
-            use_container_width=True
-        ):
-            st.session_state["navigate_to"] = "Batch Assessment"
-            st.rerun()
-
-
-    
 # =========================================================
-# 9. MEMBER MANAGEMENT
+# 8. WORKSPACE PAGES
 # =========================================================
 elif page == "Risk Radar":
     gw.render_risk_radar(supabase, st.session_state.gym_id, assess_members)
@@ -2397,8 +2030,11 @@ elif page == "Archie":
     gw.render_archie(supabase, st.session_state.gym_id, assess_members, business_name, user_name)
 elif page == "Member Management":
 
-    st.markdown("## Member Management")
-    st.write("Register and manage members at your gym.")
+    gw.page_header(
+        "Member Management",
+        "Register members, add their photo, and open any member's full profile.",
+        "Your members"
+    )
 
     gym_id = st.session_state.get("gym_id")
 
@@ -2412,6 +2048,11 @@ elif page == "Member Management":
             full_name = st.text_input("Full name")
             email = st.text_input("Email address")
             phone = st.text_input("Phone number")
+            photo_file = st.file_uploader(
+                "Photo (optional)",
+                type=["jpg", "jpeg", "png"],
+                key="register_photo"
+            )
 
             col1, col2 = st.columns(2)
 
@@ -2475,6 +2116,17 @@ elif page == "Member Management":
                 if phone.strip():
                     member_data["phone"] = phone.strip()
 
+                if photo_file is not None:
+                    try:
+                        member_data["photo"] = gw.process_photo(
+                            photo_file.getvalue()
+                        )
+                    except Exception:
+                        st.warning(
+                            "The photo could not be read, so the member "
+                            "was registered without one."
+                        )
+
                 try:
                     (
                         supabase.table("members")
@@ -2491,20 +2143,29 @@ elif page == "Member Management":
         st.markdown("---")
         st.markdown("### Registered Members")
 
-        render_member_list(supabase, gym_id)
+        gw.render_member_directory(supabase, gym_id)
 
 
 # =========================================================
 # 10. INDIVIDUAL MEMBER ASSESSMENT
 # =========================================================
 
+elif page == "Member Profile":
+
+    gw.render_member_profile(
+        supabase,
+        st.session_state.get("gym_id"),
+        st.session_state.get("profile_member_id"),
+        assess_members
+    )
+
 elif page == "Member Assessment":
 
-    st.markdown("## Member Assessment")
-
-    st.write(
+    gw.page_header(
+        "Member Assessment",
         "Enter a hypothetical member's details to explore "
-        "the output of the trained model."
+        "the output of the trained model.",
+        "Try it out"
     )
 
     with st.form("member_assessment_form"):
@@ -3102,11 +2763,11 @@ elif page == "Batch Assessment":
 
 elif page == "Model Insights":
 
-    st.markdown("## Model Insights")
-
-    st.write(
+    gw.page_header(
+        "Model Insights",
         "Explore how the model's estimates change when one input "
-        "varies while the other inputs remain constant."
+        "varies while the other inputs remain constant.",
+        "Under the hood"
     )
 
     st.info(
@@ -3261,11 +2922,11 @@ elif page == "Model Insights":
 
 elif page == "About the Model":
 
-    st.markdown("## About GymPulse AI")
-
-    st.write(
+    gw.page_header(
+        "About GymPulse AI",
         "GymPulse AI is a machine-learning portfolio project "
-        "exploring gym membership cancellation-risk assessment."
+        "exploring gym membership cancellation-risk assessment.",
+        "The project"
     )
 
     st.markdown("### Model architecture")
@@ -3371,10 +3032,10 @@ elif page == "About the Model":
 
 elif page == "FAQs":
 
-    st.markdown("## Frequently Asked Questions")
-
-    st.write(
-        "Quick answers to help you get the most out of GymPulse AI."
+    gw.page_header(
+        "Frequently Asked Questions",
+        "Quick answers to help you get the most out of GymPulse AI.",
+        "Help"
     )
 
     st.markdown(
@@ -3397,6 +3058,17 @@ elif page == "FAQs":
             "**Archive** or **Delete permanently**. Suspended and "
             "archived members are left out of risk scoring and can be "
             "reactivated or restored at any time."
+        )
+
+    with st.expander("How do I see a member's full details?"):
+        st.write(
+            "Click a member's name in **Member Management**, the "
+            "**Risk Radar** priority list, or the **Action Centre**. "
+            "Their profile shows their photo, contact details, body "
+            "stats and whether their membership is **Active** or "
+            "**Inactive**. A membership is Active until its end date "
+            "passes. Use **Record a renewal** on the Membership tab "
+            "when they renew."
         )
 
     with st.expander("Is my gym's data separate from other gyms?"):
