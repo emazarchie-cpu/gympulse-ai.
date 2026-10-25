@@ -817,7 +817,7 @@ st.markdown(
         color: #BCC8D8;
         margin-top: 8px;
     }
-
+ 
     /* Same lockup, scaled down for the top bar */
     .nav-brand-logo {
         display: block;
@@ -864,14 +864,14 @@ st.markdown(
     .login-brand-word span {
         color: var(--lime);
     }
-
+ 
     </style>
     """,
     unsafe_allow_html=True
 )
 gw.apply_mobile_styles()
 gw.apply_ui_styles()
-
+ 
 # =========================================================
 # BRAND LOGO HELPER (shared by the login page and the top bar)
 # =========================================================
