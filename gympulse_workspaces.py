@@ -3,7 +3,13 @@
 Pure logic (build_roster, drivers, playbook, kpis, archie_context) is separate
 from Streamlit rendering so it can be tested without a database.
 """
+import base64
+import io
+import os
+import re
+from contextlib import contextmanager
 from datetime import date, datetime, timedelta, timezone
+from html import escape as _html_escape
 
 import pandas as pd
 import streamlit as st
@@ -232,32 +238,550 @@ def apply_mobile_styles():
         pass
 
 
+# ======================================================================
+# UI TOOLKIT: one modern look for every workspace page
+# ======================================================================
+HERE = os.path.dirname(os.path.abspath(__file__))
+ARCHIE_AVATAR = os.path.join(HERE, "archie_avatar.png")
+
+TONES = {
+    "lime": "#B7F34A", "red": "#FF6B6B", "amber": "#FFC44D",
+    "cyan": "#35D6ED", "white": "#F4F7FB", "grey": "#9AA8BD",
+}
+PLAN_DAYS = {"Monthly": 30, "Quarterly": 90, "Annual": 365}
+PLAN_MONTHS = {"Monthly": 1, "Quarterly": 3, "Annual": 12}
+PHOTO_SIZE = 192
+GOALS = ["Weight loss", "Muscle gain", "General fitness", "Strength",
+         "Endurance", "Sports performance"]
+CHART_MUTED = "#9AA8BD"
+
+
+def _esc(value):
+    return _html_escape("" if value is None else str(value), quote=True)
+
+
+def _md(markup, target=None):
+    """Render HTML without Markdown mistaking indented lines for code."""
+    flat = " ".join(line.strip() for line in str(markup).splitlines() if line.strip())
+    (target if target is not None else st).markdown(flat, unsafe_allow_html=True)
+
+
+def _text(value, default=""):
+    """Safe text from a database value (None / NaN become the default)."""
+    if value is None:
+        return default
+    try:
+        if pd.isna(value):
+            return default
+    except (TypeError, ValueError):
+        pass
+    return str(value)
+
+
+def _num(value, default):
+    try:
+        if value is None or pd.isna(value):
+            return default
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+# ---------------------------------------------------------------- photos
+def process_photo(raw_bytes, size=PHOTO_SIZE):
+    """Turn an uploaded picture into a small square JPEG data string."""
+    from PIL import Image, ImageOps
+    img = Image.open(io.BytesIO(raw_bytes))
+    img = ImageOps.exif_transpose(img).convert("RGB")
+    img = ImageOps.fit(img, (size, size), method=Image.LANCZOS, centering=(0.5, 0.4))
+    buffer = io.BytesIO()
+    img.save(buffer, format="JPEG", quality=80, optimize=True)
+    return "data:image/jpeg;base64," + base64.b64encode(buffer.getvalue()).decode()
+
+
+@st.cache_resource(show_spinner=False)
+def _file_uri(path, width=256):
+    """A picture file from the app folder as an inline image (cached)."""
+    try:
+        from PIL import Image
+        img = Image.open(path).convert("RGBA")
+        width = min(width, img.width)
+        img = img.resize((width, round(img.height * width / img.width)), Image.LANCZOS)
+        buffer = io.BytesIO()
+        img.save(buffer, format="PNG", optimize=True)
+        return "data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode()
+    except Exception:
+        return ""
+
+
+def initials(name):
+    parts = [p for p in str(name or "").replace("-", " ").split() if p]
+    if not parts:
+        return "?"
+    if len(parts) == 1:
+        return parts[0][:2].upper()
+    return (parts[0][0] + parts[-1][0]).upper()
+
+
+def has_photo(photo):
+    return isinstance(photo, str) and photo.startswith("data:image")
+
+
+def avatar_html(name, photo=None, size=44, extra=""):
+    cls = ("avatar " + extra).strip()
+    style = f"width:{size}px;height:{size}px;font-size:{max(11, int(size * 0.38))}px;"
+    if has_photo(photo):
+        return f'<img class="{cls}" style="{style}" src="{photo}" alt="{_esc(name)}">'
+    return f'<div class="{cls}" style="{style}">{_esc(initials(name))}</div>'
+
+
+def whatsapp_digits(phone):
+    """Digits for a WhatsApp link. Nigerian local numbers (0803...) get 234."""
+    digits = re.sub(r"\D", "", str(phone or ""))
+    if digits.startswith("00"):
+        digits = digits[2:]
+    elif digits.startswith("0") and len(digits) == 11:
+        digits = "234" + digits[1:]
+    return digits
+
+
+# ----------------------------------------------------------- components
+def page_header(title, subtitle="", eyebrow=""):
+    parts = []
+    if eyebrow:
+        parts.append(f'<div class="pg-eyebrow">{_esc(eyebrow)}</div>')
+    parts.append(f'<div class="pg-title">{_esc(title)}</div>')
+    if subtitle:
+        parts.append(f'<div class="pg-sub">{_esc(subtitle)}</div>')
+    _md('<div class="pg-head">' + "".join(parts) + "</div>")
+
+
+def chip(text, tone="grey", dot=False, href=None):
+    cls = f"chip chip-{tone}" + (" chip-dot" if dot else "")
+    if href:
+        return (f'<a class="{cls}" href="{_esc(href)}" target="_blank" '
+                f'rel="noopener">{_esc(text)}</a>')
+    return f'<span class="{cls}">{_esc(text)}</span>'
+
+
+RISK_TONE = {"High": "red", "Medium": "amber", "Low": "lime"}
+
+
+def risk_chip(level, prob=None):
+    text = str(level).upper() if prob is None else f"{str(level).upper()} · {prob:.0%}"
+    return chip(text, RISK_TONE.get(level, "grey"), dot=True)
+
+
+def kpi_card(label, value, tone="lime", hint=""):
+    colour = TONES.get(tone, tone)
+    hint_html = f'<div class="kpi-hint">{_esc(hint)}</div>' if hint else ""
+    return (f'<div class="kpi" style="--tone:{colour}">'
+            f'<div class="kpi-label">{_esc(label)}</div>'
+            f'<div class="kpi-value">{_esc(value)}</div>{hint_html}</div>')
+
+
+def kpi_row(cards):
+    cols = st.columns(len(cards))
+    for col, card in zip(cols, cards):
+        _md(kpi_card(*card), col)
+
+
+def prob_bar(prob, level):
+    colour = TONES[RISK_TONE.get(level, "grey")]
+    width = max(0, min(100, round(float(prob) * 100)))
+    return (f'<div class="pct">{width}%</div><div class="pbar">'
+            f'<span style="width:{width}%;--tone:{colour}"></span></div>')
+
+
+def _bump(key, default, step):
+    st.session_state[key] = st.session_state.get(key, default) + step
+
+
+# ------------------------------------------------- membership status
+def membership_state(end, today=None):
+    """Active while the plan end date has not passed; Inactive once it has."""
+    today = today or date.today()
+    try:
+        stamp = pd.to_datetime(end)
+    except Exception:
+        stamp = None
+    if stamp is None or pd.isna(stamp):
+        return {"key": "none", "label": "No plan set", "tone": "grey",
+                "detail": "Record a renewal to set one", "end": None, "days": None}
+    d = stamp.date()
+    days = (d - today).days
+    if days < 0:
+        return {"key": "inactive", "label": "Inactive", "tone": "red",
+                "detail": f"Expired {abs(days)} day{'s' if abs(days) != 1 else ''} ago",
+                "end": d, "days": days}
+    if days == 0:
+        detail = "Expires today"
+    elif days == 1:
+        detail = "Expires tomorrow"
+    else:
+        detail = f"{days} days left"
+    return {"key": "active", "label": "Active", "tone": "lime",
+            "detail": detail, "end": d, "days": days}
+
+
+def membership_chip(state):
+    return chip(state["label"], state["tone"], dot=True)
+
+
+def due_chip(due, status):
+    if status == "Done":
+        return ""
+    try:
+        d = date.fromisoformat(str(due)[:10])
+    except ValueError:
+        return ""
+    delta = (d - date.today()).days
+    if delta < 0:
+        return chip(f"Overdue {abs(delta)}d", "red")
+    if delta == 0:
+        return chip("Due today", "amber")
+    if delta == 1:
+        return chip("Due tomorrow", "cyan")
+    return chip(f"Due {d:%d %b}", "grey")
+
+
+OUTCOME_TONE = {"Retained": "lime", "Cancelled": "red", "No response": "grey"}
+
+
+def outcome_chip(outcome):
+    if not outcome or (isinstance(outcome, float) and pd.isna(outcome)):
+        return chip("No outcome", "grey")
+    return chip(str(outcome), OUTCOME_TONE.get(str(outcome), "grey"), dot=True)
+
+
+@contextmanager
+def _section(title, use_expander=True, expanded=False):
+    """An expander, or just the content when it already sits inside a tab."""
+    if use_expander:
+        with st.expander(title, expanded=expanded):
+            yield
+    else:
+        yield
+
+
+# ---------------------------------------------------------------- charts
+def _style_chart(chart):
+    return (chart.configure(background="rgba(0,0,0,0)")
+            .configure_axis(labelColor=CHART_MUTED, titleColor=CHART_MUTED,
+                            gridColor="rgba(255,255,255,0.07)",
+                            domainColor="rgba(255,255,255,0.15)",
+                            tickColor="rgba(255,255,255,0.15)")
+            .configure_legend(labelColor="#F4F7FB", titleColor=CHART_MUTED)
+            .configure_view(strokeWidth=0))
+
+
+def _show_chart(chart):
+    try:
+        st.altair_chart(chart, use_container_width=True, theme=None)
+    except TypeError:
+        st.altair_chart(chart, use_container_width=True)
+
+
+# ------------------------------------------------------------------ CSS
+UI_CSS = """
+/* ---------- page header ---------- */
+.pg-head { margin: 2px 0 20px; }
+.pg-eyebrow { color: var(--lime); font-size: 11px; font-weight: 800;
+    letter-spacing: 2px; text-transform: uppercase; margin-bottom: 6px; }
+.pg-title { font-size: 32px; font-weight: 800; letter-spacing: -1.2px;
+    color: #F4F7FB; line-height: 1.12; }
+.pg-sub { color: #9AA8BD; font-size: 14px; line-height: 1.6; margin-top: 6px; max-width: 760px; }
+
+/* ---------- stat cards ---------- */
+.kpi { position: relative; overflow: hidden; height: 100%;
+    background: linear-gradient(160deg, #1A2540 0%, #141C30 100%);
+    border: 1px solid rgba(255,255,255,0.09); border-radius: 18px;
+    padding: 16px 18px 15px 22px; }
+.kpi::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0;
+    width: 5px; background: var(--tone); }
+.kpi::after { content: ""; position: absolute; right: -30px; top: -30px;
+    width: 90px; height: 90px; border-radius: 50%;
+    background: radial-gradient(circle, var(--tone), transparent 70%); opacity: 0.12; }
+.kpi-label { font-size: 11px; font-weight: 800; letter-spacing: 1.2px;
+    text-transform: uppercase; color: #9AA8BD; }
+.kpi-value { font-size: 30px; font-weight: 800; letter-spacing: -1px;
+    color: var(--tone); margin-top: 4px; line-height: 1.1; }
+.kpi-hint { font-size: 12px; color: #9AA8BD; margin-top: 4px; }
+
+/* ---------- chips ---------- */
+.chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px;
+    border-radius: 999px; font-size: 11px; font-weight: 800; letter-spacing: 0.3px;
+    text-decoration: none !important; white-space: nowrap; }
+.chip-dot::before { content: ""; width: 7px; height: 7px; border-radius: 50%;
+    background: currentColor; }
+.chip-lime { background: rgba(183,243,74,0.16); color: #B7F34A !important; }
+.chip-red { background: rgba(255,107,107,0.16); color: #FF8A8A !important; }
+.chip-amber { background: rgba(255,196,77,0.16); color: #FFC44D !important; }
+.chip-cyan { background: rgba(53,214,237,0.14); color: #35D6ED !important; }
+.chip-grey { background: rgba(154,168,189,0.16); color: #D5DDEA !important; }
+a.chip:hover { filter: brightness(1.25); }
+
+/* ---------- avatars ---------- */
+.avatar { border-radius: 50%; object-fit: cover; display: grid; place-items: center;
+    background: linear-gradient(145deg, #B7F34A, #35D6ED); color: #10182A;
+    font-weight: 800; border: 2px solid rgba(255,255,255,0.12); box-sizing: border-box; }
+.avatar-ring { border: 3px solid #B7F34A;
+    box-shadow: 0 0 0 5px rgba(183,243,74,0.14), 0 14px 40px rgba(0,0,0,0.45); }
+
+/* ---------- clickable member names ---------- */
+[class*="st-key-mrow_"] button {
+    background: transparent !important; border: none !important;
+    box-shadow: none !important; min-height: 0 !important;
+    padding: 6px 8px !important; justify-content: flex-start !important; }
+[class*="st-key-mrow_"] button p {
+    color: #F4F7FB !important; font-size: 15px !important;
+    font-weight: 700 !important; text-align: left !important; }
+[class*="st-key-mrow_"] button:hover { background: rgba(183,243,74,0.10) !important; }
+[class*="st-key-mrow_"] button:hover p { color: #B7F34A !important; text-decoration: underline; }
+.why { color: #9AA8BD; font-size: 12px; line-height: 1.4; padding: 0 8px; }
+.pct { font-size: 13px; font-weight: 800; color: #F4F7FB; }
+.pbar { height: 8px; border-radius: 99px; background: rgba(255,255,255,0.08);
+    overflow: hidden; margin-top: 4px; }
+.pbar > span { display: block; height: 100%; border-radius: 99px; background: var(--tone); }
+.th { font-size: 11px; font-weight: 800; letter-spacing: 1.2px; color: #9AA8BD;
+    text-transform: uppercase; padding: 0 4px 6px; }
+.money { font-weight: 700; color: #F4F7FB; font-size: 14px; }
+
+/* ---------- cards (keyed containers) ---------- */
+[class*="st-key-card_"] {
+    background: linear-gradient(160deg, rgba(27,38,59,0.78), rgba(20,28,46,0.92));
+    border: 1px solid rgba(255,255,255,0.09) !important;
+    border-radius: 16px !important; transition: border-color .2s ease; }
+[class*="st-key-card_"]:hover { border-color: rgba(183,243,74,0.35) !important; }
+
+/* ---------- member profile ---------- */
+.profile-hero { display: flex; align-items: center; gap: 24px; padding: 24px 26px;
+    border-radius: 24px; border: 1px solid rgba(255,255,255,0.09); margin: 10px 0 18px;
+    background: radial-gradient(circle at 0% 0%, rgba(183,243,74,0.14), transparent 45%),
+                linear-gradient(120deg, #17243A, #121B2E); }
+.profile-hero .avatar { flex-shrink: 0; }
+.profile-name { font-size: 30px; font-weight: 800; letter-spacing: -1px; color: #F4F7FB; }
+.panel { background: #141C30; border: 1px solid rgba(255,255,255,0.09);
+    border-radius: 18px; padding: 18px 20px; margin: 8px 0 14px; }
+.panel h4 { margin: 0 0 8px; font-size: 15px; color: #F4F7FB; }
+.panel p, .panel div { color: #D5DDEA; }
+.kv { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.07); font-size: 14px; }
+.kv:last-child { border-bottom: none; }
+.kv span { color: #9AA8BD; }
+.kv b { color: #F4F7FB; text-align: right; }
+.status-big { display: flex; align-items: center; gap: 14px; padding: 16px 18px;
+    border-radius: 16px; margin-bottom: 12px; border: 1px solid var(--tone);
+    background: rgba(255,255,255,0.03); }
+.status-big .sb-title { font-size: 22px; font-weight: 800; color: var(--tone); }
+.status-big .sb-sub { color: #BCC8D8; font-size: 13px; }
+
+/* ---------- action board ---------- */
+.kb-head { display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 14px; border-radius: 14px; margin-bottom: 10px;
+    background: rgba(255,255,255,0.04); border-top: 3px solid var(--tone);
+    font-weight: 800; color: #F4F7FB; }
+.kb-head b { background: var(--tone); color: #10182A; border-radius: 999px;
+    padding: 1px 10px; font-size: 12px; }
+.kb-empty { border: 1px dashed rgba(255,255,255,0.14); border-radius: 14px;
+    padding: 18px; text-align: center; color: #9AA8BD; font-size: 13px; }
+.board-progress { padding: 16px 18px; border-radius: 18px; margin: 4px 0 6px;
+    background: linear-gradient(160deg, #1A2540, #141C30);
+    border: 1px solid rgba(255,255,255,0.09); }
+.bp-top { display: flex; justify-content: space-between; color: #F4F7FB;
+    font-weight: 800; font-size: 14px; }
+.bp-top b { color: #B7F34A; }
+.bp-sub { color: #9AA8BD; font-size: 12px; margin-top: 8px; }
+.board-progress .pbar { height: 10px; }
+
+/* ---------- Archie ---------- */
+.archie-hero { position: relative; overflow: hidden; display: flex; align-items: center;
+    gap: 26px; padding: 24px 28px; border-radius: 26px; margin: 4px 0 16px;
+    border: 1px solid rgba(255,255,255,0.09);
+    background: radial-gradient(circle at 0% 0%, rgba(183,243,74,0.16), transparent 42%),
+                radial-gradient(circle at 100% 100%, rgba(53,214,237,0.12), transparent 40%),
+                linear-gradient(120deg, #0D1424, #141C30); }
+.archie-orb { position: relative; width: 128px; height: 128px; flex-shrink: 0; }
+.archie-orb img, .archie-fallback { position: relative; z-index: 2; width: 100%;
+    height: 100%; border-radius: 50%; object-fit: cover;
+    border: 2px solid rgba(183,243,74,0.85); background: #0B1020;
+    animation: arch-breathe 4.5s ease-in-out infinite; }
+.archie-fallback { display: grid; place-items: center; font-size: 46px;
+    font-weight: 800; color: #B7F34A; }
+.archie-orb .ring { position: absolute; inset: 0; border-radius: 50%;
+    border: 2px solid rgba(183,243,74,0.6); animation: arch-ring 2.8s ease-out infinite; }
+.archie-orb .ring.r2 { animation-delay: 1.4s; }
+.archie-orb.thinking .ring { border-color: rgba(53,214,237,0.8); animation-duration: 1.2s; }
+.archie-orb.thinking .ring.r2 { animation-delay: 0.6s; }
+.archie-orb::after { content: ""; position: absolute; inset: 0; z-index: 3;
+    border-radius: 50%; pointer-events: none;
+    background: linear-gradient(180deg, transparent 40%, rgba(183,243,74,0.20) 50%, transparent 60%);
+    background-size: 100% 220%; animation: arch-scan 3.2s linear infinite; }
+.archie-meta { min-width: 0; }
+.archie-name { font-size: 30px; font-weight: 800; letter-spacing: -1px; color: #F4F7FB; }
+.archie-role { color: #BCC8D8; font-size: 14px; margin-top: 2px; }
+.archie-status { display: flex; align-items: center; gap: 8px; margin-top: 12px;
+    color: #B7F34A; font-size: 12px; font-weight: 800; letter-spacing: .4px; }
+.archie-status .dot { width: 8px; height: 8px; border-radius: 50%; background: #B7F34A;
+    animation: lp-pulse 1.8s infinite; }
+.archie-wave { display: inline-flex; align-items: flex-end; gap: 3px; height: 18px; margin-left: 6px; }
+.archie-wave i { width: 3px; height: 5px; border-radius: 3px; background: #B7F34A;
+    animation: arch-wave 1.1s ease-in-out infinite; }
+.archie-wave i:nth-child(2) { animation-delay: .15s; }
+.archie-wave i:nth-child(3) { animation-delay: .30s; }
+.archie-wave i:nth-child(4) { animation-delay: .45s; }
+.archie-wave i:nth-child(5) { animation-delay: .60s; }
+.thinking-on .archie-wave i { background: #35D6ED; animation-duration: .55s; }
+.typing { display: inline-flex; gap: 5px; padding: 6px 2px; }
+.typing i { width: 8px; height: 8px; border-radius: 50%; background: #B7F34A;
+    animation: arch-type 1s ease-in-out infinite; }
+.typing i:nth-child(2) { animation-delay: .15s; }
+.typing i:nth-child(3) { animation-delay: .30s; }
+@keyframes arch-ring { 0% { transform: scale(1); opacity: .9; }
+    100% { transform: scale(1.55); opacity: 0; } }
+@keyframes arch-breathe { 0%,100% { transform: scale(1); } 50% { transform: scale(1.035); } }
+@keyframes arch-scan { 0% { background-position: 0 -120%; } 100% { background-position: 0 120%; } }
+@keyframes arch-wave { 0%,100% { height: 5px; } 50% { height: 18px; } }
+@keyframes arch-type { 0%,100% { transform: translateY(0); opacity: .4; }
+    50% { transform: translateY(-5px); opacity: 1; } }
+[class*="st-key-ap_"] button {
+    background: rgba(255,255,255,0.04) !important; border: 1px solid rgba(255,255,255,0.12) !important;
+    border-radius: 14px !important; min-height: 64px; }
+[class*="st-key-ap_"] button p { color: #F4F7FB !important; font-weight: 700 !important;
+    font-size: 13px !important; line-height: 1.35 !important; }
+[class*="st-key-ap_"] button:hover { background: rgba(183,243,74,0.12) !important;
+    border-color: #B7F34A !important; }
+[class*="st-key-ap_"] button:hover p { color: #B7F34A !important; }
+
+/* ---------- Archie cartoon mascot ---------- */
+.archie-orb { width: 150px; height: 165px; }
+.archie-orb::after, .archie-orb .ring { display: none !important; }
+.archie-bot { width: 100%; height: 100%; overflow: visible;
+    animation: bot-float 3s ease-in-out infinite; filter: drop-shadow(0 12px 18px rgba(0,0,0,.45)); }
+.archie-bot * { transform-box: fill-box; }
+.bot-eye { transform-origin: center; animation: bot-blink 4s ease-in-out infinite; }
+.bot-eye2 { animation-delay: .05s; }
+.bot-ant { transform-origin: bottom center; animation: bot-ant 1.6s ease-in-out infinite; }
+.bot-ball { animation: bot-glow 1.2s ease-in-out infinite; }
+.bot-arm-r { transform-origin: 8% 90%; animation: bot-wave 1.3s ease-in-out infinite; }
+.bot-arm-l { transform-origin: 90% 50%; animation: bot-swing 2.6s ease-in-out infinite; }
+.bot-mouth { transform-origin: center; animation: bot-talk 3s ease-in-out infinite; }
+.bot-pulse { stroke-dasharray: 90; stroke-dashoffset: 90; animation: bot-beat 1.8s ease-in-out infinite; }
+.thinking .bot-eye { animation: bot-look .9s ease-in-out infinite; }
+.thinking .bot-mouth { animation: bot-talk .35s ease-in-out infinite; }
+.thinking .bot-arm-r { animation-duration: .45s; }
+.thinking .bot-ant { animation-duration: .5s; }
+.thinking .bot-pulse { animation-duration: .7s; }
+@keyframes bot-float { 0%,100% { transform: translateY(0) rotate(-1.5deg); }
+    50% { transform: translateY(-10px) rotate(1.5deg); } }
+@keyframes bot-blink { 0%,44%,50%,100% { transform: scaleY(1); } 47% { transform: scaleY(.08); } }
+@keyframes bot-look { 0%,100% { transform: translateX(-4px); } 50% { transform: translateX(4px); } }
+@keyframes bot-ant { 0%,100% { transform: rotate(-12deg); } 50% { transform: rotate(12deg); } }
+@keyframes bot-glow { 0%,100% { opacity: .55; transform: scale(.85); } 50% { opacity: 1; transform: scale(1.2); } }
+@keyframes bot-wave { 0%,100% { transform: rotate(0deg); } 50% { transform: rotate(-38deg); } }
+@keyframes bot-swing { 0%,100% { transform: rotate(0deg); } 50% { transform: rotate(10deg); } }
+@keyframes bot-talk { 0%,100% { transform: scaleY(1); } 50% { transform: scaleY(1.7) translateY(2px); } }
+@keyframes bot-beat { 0% { stroke-dashoffset: 90; } 55%,100% { stroke-dashoffset: 0; } }
+
+/* ---------- dashboard tiles ---------- */
+[class*="st-key-qa_"] button {
+    background: linear-gradient(160deg, #1A2540, #141C30) !important;
+    border: 1px solid rgba(255,255,255,0.10) !important; border-radius: 16px !important;
+    min-height: 74px; justify-content: flex-start !important; padding: 12px 16px !important; }
+[class*="st-key-qa_"] button p { color: #F4F7FB !important; font-weight: 800 !important;
+    font-size: 15px !important; text-align: left !important; }
+[class*="st-key-qa_"] button:hover { border-color: #B7F34A !important;
+    background: rgba(183,243,74,0.10) !important; }
+[class*="st-key-qa_"] button:hover p { color: #B7F34A !important; }
+
+/* ---------- friendlier widgets ---------- */
+[data-testid="stExpander"] { border: 1px solid rgba(255,255,255,0.09) !important;
+    border-radius: 16px !important; background: rgba(21,29,48,0.6); }
+button[data-baseweb="tab"] p { font-weight: 700; }
+button[data-baseweb="tab"][aria-selected="true"] p { color: #B7F34A !important; }
+[data-baseweb="tab-highlight"] { background-color: #B7F34A !important; }
+span[data-baseweb="tag"] { background: rgba(183,243,74,0.16) !important; }
+span[data-baseweb="tag"] span { color: #B7F34A !important; }
+[data-testid="stChatMessage"] { background: rgba(21,29,48,0.7);
+    border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; }
+
+/* ---------- phones ---------- */
+@media (max-width: 640px) {
+    .pg-title { font-size: 26px; }
+    .profile-hero, .archie-hero { flex-direction: column; text-align: center; }
+    .chip-row { justify-content: center; }
+    [data-testid="stHorizontalBlock"]:has(.kpi) { flex-wrap: wrap !important; gap: .6rem !important; }
+    [data-testid="stHorizontalBlock"]:has(.kpi) > [data-testid="stColumn"] {
+        flex: 1 1 calc(50% - .6rem) !important; min-width: calc(50% - .6rem) !important; }
+    [data-testid="stHorizontalBlock"]:has(.row-tight) { flex-wrap: nowrap !important; }
+    [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"] { min-width: 0 !important; }
+}
+"""
+
+
+def apply_ui_styles():
+    """Call once in app.py, right after apply_mobile_styles()."""
+    st.markdown("<style>" + UI_CSS + "</style>", unsafe_allow_html=True)
 # ---------------------------------------------------------------- data
-def load_roster(supabase, gym_id, assess_fn):
+MEMBER_BASE = ["id", "full_name", "email", "phone", "age", "weight_kg",
+               "height_cm", "fitness_goal", "created_at", "archived"]
+MEMBER_SUSPEND = ["suspended"]
+MEMBER_PROFILE = ["photo", "membership_end", "last_renewed_on", "last_payment"]
+MEMBER_PROFILE_LIGHT = ["membership_end", "last_renewed_on", "last_payment"]
+
+
+def fetch_members(supabase, gym_id, archived=None, include_photo=True):
+    """Members for one gym, with the newer columns when the database has them.
+
+    Falls back step by step, so the app keeps working before the one-time
+    SQL upgrade has been run. Returns (DataFrame, features).
+    """
+    profile = MEMBER_PROFILE if include_photo else MEMBER_PROFILE_LIGHT
+    attempts = [MEMBER_BASE + MEMBER_SUSPEND + profile,
+                MEMBER_BASE + MEMBER_SUSPEND,
+                MEMBER_BASE]
+    rows, used, last_error = None, None, None
+    for columns in attempts:
+        try:
+            query = (supabase.table("members").select(", ".join(columns))
+                     .eq("gym_id", gym_id))
+            if archived is not None:
+                query = query.eq("archived", archived)
+            rows = query.order("created_at", desc=True).execute().data or []
+            used = columns
+            break
+        except Exception as error:
+            last_error = error
+    if rows is None:
+        raise last_error or RuntimeError("Could not load members.")
+
+    df = pd.DataFrame(rows)
+    if df.empty:
+        df = pd.DataFrame(columns=MEMBER_BASE + MEMBER_SUSPEND + MEMBER_PROFILE)
+    for column in MEMBER_SUSPEND + MEMBER_PROFILE:
+        if column not in df.columns:
+            df[column] = None
+    df["archived"] = df["archived"].fillna(False).astype(bool)
+    df["suspended"] = df["suspended"].fillna(False).astype(bool)
+    features = {"suspend_ready": "suspended" in used,
+                "profile_ready": "membership_end" in used}
+    return df, features
+
+
+def load_roster(supabase, gym_id, assess_fn, with_photos=True):
     """Members + activity, scored by the model. Members without activity
     data are returned in `missing` so the UI can ask for it.
 
-    Archived members are excluded in the query. Suspended members are
-    excluded here too, but safely: if the 'suspended' column has not been
-    added in Supabase yet, everything still loads (nobody is suspended).
+    Archived and suspended members are left out.
     """
-    base_columns = "id, full_name, email, phone, fitness_goal"
-    try:
-        rows = (
-            supabase.table("members")
-            .select(base_columns + ", suspended")
-            .eq("gym_id", gym_id).eq("archived", False).execute().data or []
-        )
-    except Exception:
-        rows = (
-            supabase.table("members")
-            .select(base_columns)
-            .eq("gym_id", gym_id).eq("archived", False).execute().data or []
-        )
-    members = pd.DataFrame(rows)
-    if "suspended" in members.columns:
-        keep = ~members["suspended"].fillna(False).astype(bool)
-        members = members[keep].drop(columns=["suspended"]).reset_index(drop=True)
+    members_all, _ = fetch_members(supabase, gym_id, archived=False,
+                                   include_photo=with_photos)
+    members = members_all[~members_all["suspended"]]
+    keep = ["id", "full_name", "email", "phone", "fitness_goal", "membership_end"]
+    if with_photos:
+        keep.append("photo")
+    members = members[[c for c in keep if c in members.columns]].reset_index(drop=True)
 
     activity = pd.DataFrame(
         supabase.table("member_activity").select("*")
@@ -291,6 +815,13 @@ def load_actions(supabase, gym_id):
     rows = (supabase.table("retention_actions").select("*")
             .eq("gym_id", gym_id).order("created_at", desc=True).execute().data or [])
     return pd.DataFrame(rows)
+
+
+def open_profile(member_id, back_page="Member Management"):
+    """Button callback: open one member's full profile page."""
+    st.session_state["profile_member_id"] = member_id
+    st.session_state["profile_back"] = back_page
+    st.session_state["navigate_to"] = "Member Profile"
 
 
 # ------------------------------------------------------------- logic
@@ -468,7 +999,7 @@ def _money(x):
     return f"{x:,.0f}"
 
 
-def _activity_editor(supabase, gym_id, roster, missing):
+def _activity_editor(supabase, gym_id, roster, missing, use_expander=True):
     """Add or update visit/renewal data for any member."""
     names, current = {}, {}
     if not roster.empty:
@@ -484,7 +1015,8 @@ def _activity_editor(supabase, gym_id, roster, missing):
 
     plans = ["Monthly", "Quarterly", "Annual"]
 
-    with st.expander("Add or update member activity", expanded=roster.empty):
+    with _section("Add or update member activity", use_expander,
+                  expanded=roster.empty):
         member_id = st.selectbox(
             "Member", list(names),
             format_func=lambda i: names[i], key="act_member"
@@ -635,7 +1167,7 @@ def parse_activity_csv(csv_df, members):
     return list(chosen.values()), issues_df, []
 
 
-def render_csv_import(supabase, gym_id):
+def render_csv_import(supabase, gym_id, use_expander=True):
     try:
         members = pd.DataFrame(
             supabase.table("members").select("id, full_name, email")
@@ -648,7 +1180,7 @@ def render_csv_import(supabase, gym_id):
         return
 
     key = st.session_state.get("csv_up_key", 0)
-    with st.expander("Import activity from CSV"):
+    with _section("Import activity from CSV", use_expander):
         st.caption("One row per member. Members are matched by email (or full_name "
                    "if there is no email column). Existing activity is replaced; "
                    "members not in the file are left unchanged.")
@@ -729,7 +1261,7 @@ def _set_archived(supabase, member_id, flag):
     }).eq("id", member_id).execute()
 
 
-def _member_manager(supabase, gym_id, roster, missing):
+def _member_manager(supabase, gym_id, roster, missing, use_expander=True):
     names = {}
     for df in (roster, missing):
         if not df.empty:
@@ -742,7 +1274,8 @@ def _member_manager(supabase, gym_id, roster, missing):
     except Exception:
         archived = pd.DataFrame()
 
-    with st.expander(f"Archive, restore or delete members ({len(archived)} archived)"):
+    with _section(f"Archive, restore or delete members ({len(archived)} archived)",
+                  use_expander):
         st.caption("You can also suspend, reactivate, archive or delete members "
                    "from the Member Management page.")
         if names:
@@ -808,8 +1341,447 @@ def _delete_action_control(supabase, action_id):
         st.rerun()
 
 
+def _has_open_action(supabase, member_id):
+    rows = (supabase.table("retention_actions").select("id")
+            .eq("member_id", member_id).neq("status", "Done").limit(1).execute().data)
+    return bool(rows)
+
+
+def _create_action(supabase, gym_id, member_id, action_type, renewal_days, note=""):
+    due = date.today() + timedelta(days=1 if renewal_days <= 14 else 3)
+    supabase.table("retention_actions").insert({
+        "gym_id": gym_id, "member_id": member_id, "action_type": action_type,
+        "due_date": due.isoformat(), "note": note}).execute()
+
+
+# ------------------------------------------------- member directory
+def render_member_directory(supabase, gym_id):
+    """Registered members: photo + name rows that open the full profile,
+    plus suspend / archive / restore / delete controls."""
+    from datetime import timezone
+
+    flash = st.session_state.pop("mm_flash", None)
+    if flash:
+        st.success(flash)
+
+    try:
+        df, feat = fetch_members(supabase, gym_id)
+    except Exception as error:
+        st.error("Could not load members.")
+        with st.expander("Technical details"):
+            st.code(str(error))
+        return
+
+    if not feat["profile_ready"]:
+        st.warning(
+            "Photos and membership status need a one-time database update. "
+            "Run member_profile_upgrade.sql in Supabase, then refresh this page."
+        )
+    if not feat["suspend_ready"]:
+        st.warning(
+            "Suspend is not switched on yet. Add the 'suspended' column in "
+            "Supabase and refresh this page."
+        )
+
+    if df.empty:
+        st.info("No members registered yet. Register your first member above.")
+        return
+
+    df["view_status"] = df.apply(
+        lambda r: "Archived" if r["archived"]
+        else "Suspended" if r["suspended"] else "Active",
+        axis=1
+    )
+    counts = df["view_status"].value_counts()
+    kpi_row([
+        ("Active", int(counts.get("Active", 0)), "lime", "Members you are tracking"),
+        ("Suspended", int(counts.get("Suspended", 0)), "amber", "Paused, history kept"),
+        ("Archived", int(counts.get("Archived", 0)), "grey", "Hidden from your lists"),
+    ])
+
+    f1, f2 = st.columns([2, 3])
+    view = f1.radio("Show", ["Active", "Suspended", "Archived"], horizontal=True,
+                    key="mm_view", label_visibility="collapsed")
+    search = f2.text_input("Search members", key="mm_search",
+                           placeholder="Search by name or email",
+                           label_visibility="collapsed")
+
+    shown = df[df["view_status"] == view]
+    if search.strip():
+        needle = search.strip().lower()
+        shown = shown[
+            shown["full_name"].fillna("").str.lower().str.contains(needle, regex=False)
+            | shown["email"].fillna("").str.lower().str.contains(needle, regex=False)
+        ]
+
+    if shown.empty:
+        st.caption(f"No {view.lower()} members found.")
+        return
+
+    st.markdown('<div class="section-label">MEMBERS · CLICK A NAME TO OPEN THEIR PROFILE</div>',
+                unsafe_allow_html=True)
+    limit = st.session_state.get("mm_limit", 12)
+    with st.container(border=True, key="card_dir"):
+        for _, r in shown.head(limit).iterrows():
+            a, b = st.columns([0.7, 6], vertical_alignment="center")
+            _md(avatar_html(r["full_name"], r["photo"], 48, "row-tight"), a)
+            b.button(str(r["full_name"]), key=f"mrow_dir_{r['id']}",
+                     on_click=open_profile, args=(r["id"], "Member Management"),
+                     use_container_width=True)
+    if len(shown) > limit:
+        st.button(f"Show {min(12, len(shown) - limit)} more "
+                  f"({len(shown) - limit} left)", key="mm_more",
+                  on_click=_bump, args=("mm_limit", 12, 12))
+
+    # ---------------- manage one member ----------------
+    st.markdown("#### Manage a member")
+    names = dict(zip(shown["id"], shown["full_name"]))
+    pick = st.selectbox("Select a member", list(names),
+                        format_func=lambda member_id: names[member_id],
+                        key=f"mm_pick_{view}")
+    name = names[pick]
+    now = datetime.now(timezone.utc).isoformat()
+
+    def change(fields, message):
+        try:
+            (supabase.table("members").update(fields)
+             .eq("id", pick).eq("gym_id", gym_id).execute())
+        except Exception as error:
+            st.error(f"Could not update this member: {error}")
+            return
+        st.session_state["mm_flash"] = message
+        st.rerun()
+
+    if view == "Active":
+        a, b = st.columns(2)
+        if a.button("Suspend member", key="mm_suspend", use_container_width=True,
+                    disabled=not feat["suspend_ready"]):
+            change({"suspended": True, "suspended_at": now}, f"{name} suspended.")
+        if b.button("Archive member", key="mm_archive", use_container_width=True):
+            change({"archived": True, "archived_at": now}, f"{name} archived.")
+    elif view == "Suspended":
+        a, b = st.columns(2)
+        if a.button("Reactivate member", key="mm_reactivate", use_container_width=True):
+            change({"suspended": False, "suspended_at": None}, f"{name} reactivated.")
+        if b.button("Archive member", key="mm_archive", use_container_width=True):
+            change({"archived": True, "archived_at": now}, f"{name} archived.")
+    else:
+        if st.button("Restore member", key="mm_restore", use_container_width=True):
+            change({"archived": False, "archived_at": None}, f"{name} restored.")
+
+    st.caption(
+        "Suspend pauses a member and keeps their history. Archive hides them "
+        "from your lists. Delete removes them, their activity and their "
+        "actions for good."
+    )
+
+    if st.session_state.get("mm_delete_confirm") == pick:
+        st.warning(f"Permanently delete {name}? This cannot be undone.")
+        yes, no = st.columns(2)
+        if yes.button("Yes, delete", key="mm_delete_yes", use_container_width=True):
+            try:
+                (supabase.table("members").delete()
+                 .eq("id", pick).eq("gym_id", gym_id).execute())
+            except Exception as error:
+                st.error(f"Could not delete this member: {error}")
+            else:
+                st.session_state.pop("mm_delete_confirm", None)
+                st.session_state["mm_flash"] = f"{name} deleted."
+                st.rerun()
+        if no.button("Cancel", key="mm_delete_no", use_container_width=True):
+            st.session_state.pop("mm_delete_confirm", None)
+            st.rerun()
+    elif st.button("Delete permanently", key="mm_delete", use_container_width=True):
+        st.session_state["mm_delete_confirm"] = pick
+        st.rerun()
+
+
+# --------------------------------------------------- member profile
+def render_member_profile(supabase, gym_id, member_id, assess_fn):
+    """One member's whole record: picture, contact, body stats, plan status."""
+    back = st.session_state.get("profile_back", "Member Management")
+    st.button("← Back", key="profile_back_btn", on_click=_go, args=(back,))
+
+    flash = st.session_state.pop("profile_flash", None)
+    if flash:
+        st.success(flash)
+
+    if not member_id:
+        st.info("Pick a member from Member Management or the Risk Radar "
+                "to see their profile.")
+        return
+
+    try:
+        df, feat = fetch_members(supabase, gym_id)
+    except Exception as error:
+        st.error("Could not load this member.")
+        with st.expander("Technical details"):
+            st.code(str(error))
+        return
+
+    match = df[df["id"] == member_id]
+    if match.empty:
+        st.warning("This member could not be found. They may have been deleted.")
+        return
+    m = match.iloc[0]
+    name = _text(m["full_name"], "Member")
+
+    try:
+        rows = (supabase.table("member_activity").select("*")
+                .eq("member_id", member_id).limit(1).execute().data or [])
+    except Exception:
+        rows = []
+    act = rows[0] if rows else None
+
+    scored, drivers_text, action_text = None, "", ""
+    if act:
+        try:
+            one = pd.DataFrame([{c: act.get(c) for c in ACTIVITY_COLS}])
+            scored = assess_fn(one).iloc[0]
+            drivers_text = drivers(scored)
+            action_text = suggest_action(scored)
+        except Exception:
+            scored = None
+
+    state = membership_state(m["membership_end"])
+    email, phone = _text(m["email"]), _text(m["phone"])
+    goal = _text(m["fitness_goal"])
+
+    chips = [membership_chip(state)]
+    if m["archived"]:
+        chips.append(chip("Archived", "grey"))
+    elif m["suspended"]:
+        chips.append(chip("Suspended", "amber"))
+    if scored is not None:
+        chips.append(risk_chip(scored["risk_category"],
+                               float(scored["cancellation_probability"])))
+    if goal:
+        chips.append(chip(goal, "cyan"))
+
+    contact = []
+    if email:
+        contact.append(chip(email, "grey", href=f"mailto:{email}"))
+    if phone:
+        contact.append(chip(f"Call {phone}", "grey", href=f"tel:{phone}"))
+        digits = whatsapp_digits(phone)
+        if digits:
+            contact.append(chip("WhatsApp", "lime", href=f"https://wa.me/{digits}"))
+
+    _md(f"""
+    <div class="profile-hero">
+      {avatar_html(name, m["photo"], 112, "avatar-ring")}
+      <div>
+        <div class="profile-name">{_esc(name)}</div>
+        <div class="chip-row">{"".join(chips)}</div>
+        <div class="chip-row">{"".join(contact)}</div>
+      </div>
+    </div>
+    """)
+
+    tab_overview, tab_plan, tab_photo, tab_edit = st.tabs(
+        ["Overview", "Membership", "Photo", "Edit details"])
+
+    # ---------------------------------------------------- overview
+    with tab_overview:
+        age = _num(m["age"], None)
+        weight = _num(m["weight_kg"], None)
+        height = _num(m["height_cm"], None)
+        kpi_row([
+            ("Age", "—" if age is None else f"{age:.0f}", "cyan", "years"),
+            ("Weight", "—" if weight is None else f"{weight:g} kg", "lime", ""),
+            ("Height", "—" if height is None else f"{height:g} cm", "lime", ""),
+            ("Fitness goal", goal or "—", "white", ""),
+        ])
+        fee = _num(act.get("monthly_fee") if act else None, None)
+        kpi_row([
+            ("Membership", state["label"], state["tone"], state["detail"]),
+            ("Monthly fee", "—" if fee is None else f"{fee:,.0f}", "lime",
+             _text(act.get("membership_type")) + " plan" if act else "No activity yet"),
+            ("Renewal date",
+             state["end"].strftime("%d %b %Y") if state["end"] else "—", "cyan", ""),
+        ])
+        if scored is not None:
+            level = scored["risk_category"]
+            prob = float(scored["cancellation_probability"])
+            _md(f"""
+            <div class="panel"><h4>Retention risk</h4>
+              <div class="chip-row">{risk_chip(level, prob)}
+                {chip("Suggested: " + action_text, "cyan")}</div>
+              {prob_bar(prob, level)}
+              <div class="why" style="padding:8px 0 0;">Why: {_esc(drivers_text)}</div>
+            </div>
+            """)
+            if st.button("Create a follow-up action", key="prof_create"):
+                if _has_open_action(supabase, member_id):
+                    st.info(f"{name} already has an open action in the Action Centre.")
+                else:
+                    _create_action(supabase, gym_id, member_id, action_text,
+                                   int(scored["renewal_due_days"]))
+                    st.success("Added to the Action Centre.")
+        else:
+            st.info("No activity data yet, so there is no risk estimate. "
+                    "Add it from the Risk Radar under Data tools.")
+
+    # -------------------------------------------------- membership
+    with tab_plan:
+        if not feat["profile_ready"]:
+            st.warning("Run member_profile_upgrade.sql in Supabase to turn on "
+                       "membership dates, then refresh.")
+        _md(f"""
+        <div class="status-big" style="--tone:{TONES[state["tone"]]}">
+          <div>
+            <div class="sb-title">{_esc(state["label"])}</div>
+            <div class="sb-sub">{_esc(state["detail"])}</div>
+          </div>
+        </div>
+        """)
+        renewed = _text(m["last_renewed_on"])[:10]
+        paid = _num(m["last_payment"], None)
+        _md(f"""
+        <div class="panel">
+          <div class="kv"><span>Plan</span><b>{_esc(_text(act.get("membership_type")) if act else "—")}</b></div>
+          <div class="kv"><span>Monthly fee</span><b>{"—" if fee is None else f"{fee:,.0f}"}</b></div>
+          <div class="kv"><span>Plan runs until</span><b>{state["end"].strftime("%d %b %Y") if state["end"] else "—"}</b></div>
+          <div class="kv"><span>Last renewed</span><b>{_esc(renewed) if renewed else "—"}</b></div>
+          <div class="kv"><span>Last payment</span><b>{"—" if paid is None else f"{paid:,.0f}"}</b></div>
+        </div>
+        """)
+
+        st.markdown("#### Record a renewal")
+        plans = list(PLAN_DAYS)
+        current_plan = _text(act.get("membership_type")) if act else "Monthly"
+        if current_plan not in plans:
+            current_plan = "Monthly"
+        r1, r2, r3 = st.columns(3)
+        plan = r1.selectbox("Plan", plans, index=plans.index(current_plan),
+                            key=f"renew_plan_{member_id}")
+        current_end = state["end"]
+        start_default = (current_end if current_end and current_end >= date.today()
+                         else date.today())
+        start = r2.date_input("Starts on", value=start_default,
+                              key=f"renew_start_{member_id}_{plan}")
+        amount = r3.number_input(
+            "Amount paid", min_value=0.0, step=500.0,
+            value=float((fee or 0.0) * PLAN_MONTHS[plan]),
+            key=f"renew_amt_{member_id}_{plan}")
+        new_end = start + timedelta(days=PLAN_DAYS[plan])
+        st.caption(f"The plan will run until **{new_end:%d %b %Y}** "
+                   f"({PLAN_DAYS[plan]} days).")
+        update_fee = st.checkbox(
+            "Also update the monthly fee from this payment", value=bool(act),
+            key=f"renew_fee_{member_id}", disabled=not act)
+        if st.button("Save renewal", key="renew_save",
+                     disabled=not feat["profile_ready"]):
+            try:
+                (supabase.table("members").update({
+                    "membership_end": new_end.isoformat(),
+                    "last_renewed_on": date.today().isoformat(),
+                    "last_payment": float(amount),
+                }).eq("id", member_id).eq("gym_id", gym_id).execute())
+                if act:
+                    changes = {
+                        "membership_type": plan,
+                        "renewal_due_days": int(min(max((new_end - date.today()).days, 0), 730)),
+                    }
+                    if update_fee and amount > 0:
+                        changes["monthly_fee"] = round(float(amount) / PLAN_MONTHS[plan], 2)
+                    (supabase.table("member_activity").update(changes)
+                     .eq("member_id", member_id).execute())
+            except Exception as error:
+                st.error(f"Could not save the renewal: {error}")
+            else:
+                st.session_state["profile_flash"] = (
+                    f"Renewal saved. {name} is Active until {new_end:%d %b %Y}.")
+                st.rerun()
+
+    # -------------------------------------------------------- photo
+    with tab_photo:
+        if not feat["profile_ready"]:
+            st.warning("Run member_profile_upgrade.sql in Supabase to turn on "
+                       "photos, then refresh.")
+        c1, c2 = st.columns([1, 2])
+        with c1:
+            _md(avatar_html(name, m["photo"], 150, "avatar-ring"))
+            st.caption("Current photo" if has_photo(m["photo"]) else "No photo yet")
+        with c2:
+            up = st.file_uploader("Upload a photo (JPG or PNG)",
+                                  type=["jpg", "jpeg", "png"],
+                                  key=f"photo_up_{member_id}")
+            if up is not None:
+                try:
+                    new_photo = process_photo(up.getvalue())
+                except Exception:
+                    new_photo = None
+                    st.error("That image could not be read. Try a different photo.")
+                if new_photo:
+                    _md(avatar_html(name, new_photo, 110))
+                    st.caption("Preview. It is cropped to a square.")
+                    if st.button("Save photo", key="photo_save",
+                                 disabled=not feat["profile_ready"]):
+                        try:
+                            (supabase.table("members").update({"photo": new_photo})
+                             .eq("id", member_id).eq("gym_id", gym_id).execute())
+                        except Exception as error:
+                            st.error(f"Could not save the photo: {error}")
+                        else:
+                            st.session_state["profile_flash"] = "Photo saved."
+                            st.rerun()
+            if has_photo(m["photo"]) and st.button("Remove photo", key="photo_remove"):
+                try:
+                    (supabase.table("members").update({"photo": None})
+                     .eq("id", member_id).eq("gym_id", gym_id).execute())
+                except Exception as error:
+                    st.error(f"Could not remove the photo: {error}")
+                else:
+                    st.session_state["profile_flash"] = "Photo removed."
+                    st.rerun()
+
+    # --------------------------------------------------------- edit
+    with tab_edit:
+        with st.form(f"edit_member_{member_id}"):
+            new_name = st.text_input("Full name", value=name)
+            e1, e2 = st.columns(2)
+            new_email = e1.text_input("Email address", value=email)
+            new_phone = e2.text_input("Phone number", value=phone)
+            g1, g2, g3 = st.columns(3)
+            new_age = g1.number_input("Age", min_value=16, max_value=120,
+                                      value=int(min(max(_num(m["age"], 25), 16), 120)))
+            new_weight = g2.number_input("Weight (kg)", min_value=1.0, max_value=500.0,
+                                         value=float(min(max(_num(m["weight_kg"], 70.0), 1.0), 500.0)),
+                                         step=0.5)
+            new_height = g3.number_input("Height (cm)", min_value=50.0, max_value=260.0,
+                                         value=float(min(max(_num(m["height_cm"], 170.0), 50.0), 260.0)),
+                                         step=0.5)
+            goal_options = GOALS if goal in GOALS or not goal else [goal] + GOALS
+            new_goal = st.selectbox(
+                "Fitness goal", goal_options,
+                index=goal_options.index(goal) if goal in goal_options else 2)
+            saved = st.form_submit_button("Save changes", use_container_width=True)
+        if saved:
+            if not new_name.strip():
+                st.error("Please enter the member's full name.")
+            else:
+                try:
+                    (supabase.table("members").update({
+                        "full_name": new_name.strip(),
+                        "email": new_email.strip() or None,
+                        "phone": new_phone.strip() or None,
+                        "age": int(new_age),
+                        "weight_kg": float(new_weight),
+                        "height_cm": float(new_height),
+                        "fitness_goal": new_goal,
+                    }).eq("id", member_id).eq("gym_id", gym_id).execute())
+                except Exception as error:
+                    st.error(f"Could not save the changes: {error}")
+                else:
+                    st.session_state["profile_flash"] = "Details saved."
+                    st.rerun()
+
+
+# --------------------------------------------------------- radar
 def _radar_chart(view):
-    """Scatter of absence vs risk: fixed colours, 0-100% axis, member tooltips."""
+    """Scatter of absence vs risk on the company colours, with the
+    Medium (30%) and High (50%) lines marked."""
     cols = ["full_name", "days_since_last_visit", "cancellation_probability",
             "risk_category", "monthly_fee"]
     data = view[cols].copy()
@@ -819,16 +1791,17 @@ def _radar_chart(view):
         x_max = max(14, float(data["days_since_last_visit"].max()) * 1.1)
         colours = alt.Scale(domain=["High", "Medium", "Low"],
                             range=["#FF6B6B", "#FFC44D", "#B7F34A"])
-        chart = (
-            alt.Chart(data).mark_circle(opacity=0.85)
+        points = (
+            alt.Chart(data).mark_circle(opacity=0.9, stroke="#0B1020", strokeWidth=1.5)
             .encode(
                 x=alt.X("days_since_last_visit:Q", title="Days since last visit",
-                        scale=alt.Scale(domain=[0, x_max])),
+                        scale=alt.Scale(domain=[0, x_max]),
+                        axis=alt.Axis(tickMinStep=1, format="d")),
                 y=alt.Y("cancellation_probability:Q", title="Cancellation estimate",
                         scale=alt.Scale(domain=[0, 1]), axis=alt.Axis(format="%")),
                 color=alt.Color("risk_category:N", title="Risk", scale=colours),
                 size=alt.Size("monthly_fee:Q", legend=None,
-                              scale=alt.Scale(range=[90, 420])),
+                              scale=alt.Scale(range=[110, 460])),
                 tooltip=[
                     alt.Tooltip("full_name:N", title="Member"),
                     alt.Tooltip("risk_category:N", title="Risk"),
@@ -837,20 +1810,55 @@ def _radar_chart(view):
                     alt.Tooltip("monthly_fee:Q", title="Monthly fee", format=",.0f"),
                 ],
             )
-            .properties(height=320)
         )
-        st.altair_chart(chart, use_container_width=True)
+        lines = (
+            alt.Chart(pd.DataFrame({"y": [0.3, 0.5]}))
+            .mark_rule(strokeDash=[5, 5], color="rgba(255,255,255,0.28)")
+            .encode(y=alt.Y("y:Q", scale=alt.Scale(domain=[0, 1])))
+        )
+        chart = alt.layer(lines, points).properties(height=340)
+        _show_chart(_style_chart(chart))
     except Exception:
         st.scatter_chart(data, x="days_since_last_visit", y="cancellation_probability",
-                         color="risk_category", size="monthly_fee", height=320)
+                         color="risk_category", size="monthly_fee", height=340)
+
+
+PRIORITY_WIDTHS = [0.6, 2.8, 1.1, 1.7, 1.7, 1.0]
+
+
+def _priority_rows(view):
+    """The priority list: photo + name (click to open the profile),
+    risk, probability, suggested action and fee."""
+    head = st.columns(PRIORITY_WIDTHS)
+    for col, label in zip(head, ["", "MEMBER", "RISK", "PROBABILITY",
+                                 "SUGGESTED ACTION", "FEE"]):
+        _md(f'<div class="th">{label}</div>', col)
+
+    limit = st.session_state.get("prio_limit", 10)
+    with st.container(border=True, key="card_priority"):
+        for _, r in view.head(limit).iterrows():
+            c = st.columns(PRIORITY_WIDTHS, vertical_alignment="center")
+            _md(avatar_html(r["full_name"], r.get("photo"), 42, "row-tight"), c[0])
+            c[1].button(str(r["full_name"]), key=f"mrow_prio_{r['id']}",
+                        on_click=open_profile, args=(r["id"], "Risk Radar"),
+                        use_container_width=True)
+            _md(f'<div class="why">{_esc(r["drivers"])}</div>', c[1])
+            _md(risk_chip(r["risk_category"]), c[2])
+            _md(prob_bar(r["cancellation_probability"], r["risk_category"]), c[3])
+            _md(chip(r["suggested_action"], "cyan"), c[4])
+            _md(f'<div class="money">{r["monthly_fee"]:,.0f}</div>', c[5])
+    if len(view) > limit:
+        st.button(f"Show more ({len(view) - limit} left)", key="prio_more",
+                  on_click=_bump, args=("prio_limit", 10, 10))
 
 
 def render_risk_radar(supabase, gym_id, assess_fn):
-    st.markdown("## Member Risk Radar")
+    page_header("Member Risk Radar",
+                "Every member, scored and ranked, with the reasons behind the flag.",
+                "Retention intelligence")
     flash = st.session_state.pop("flash", None)
     if flash:
         st.success(flash)
-    st.write("Every member, scored and ranked, with the reasons behind the flag.")
     try:
         roster, missing = load_roster(supabase, gym_id, assess_fn)
     except Exception as e:
@@ -858,30 +1866,40 @@ def render_risk_radar(supabase, gym_id, assess_fn):
         with st.expander("Technical details"):
             st.code(str(e))
         return
+
+    def data_tools(expanded):
+        with st.expander("Data tools · update activity, import a CSV, archive members",
+                         expanded=expanded):
+            t1, t2, t3 = st.tabs(["Update activity", "Import CSV", "Archive & delete"])
+            with t1:
+                _activity_editor(supabase, gym_id, roster, missing, use_expander=False)
+            with t2:
+                render_csv_import(supabase, gym_id, use_expander=False)
+            with t3:
+                _member_manager(supabase, gym_id, roster, missing, use_expander=False)
+
     if roster.empty:
         st.info("Add attendance data so the model can score your members.")
-        _activity_editor(supabase, gym_id, roster, missing)
-        render_csv_import(supabase, gym_id)
-        _member_manager(supabase, gym_id, roster, missing)
+        data_tools(True)
         return
 
     k = kpis(roster, pd.DataFrame())
-    c = st.columns(5)
-    c[0].metric("Members scored", k["members_scored"])
-    c[1].metric("High risk", k["high"])
-    c[2].metric("Medium risk", k["medium"])
-    c[3].metric("Low risk", k["members_scored"] - k["high"] - k["medium"])
-    c[4].metric("Renewals ≤30d at risk", k["renewals_30d_at_risk"])
+    low = k["members_scored"] - k["high"] - k["medium"]
+    kpi_row([
+        ("Members scored", k["members_scored"], "cyan", "Included in the radar"),
+        ("High risk", k["high"], "red", "Need you first"),
+        ("Medium risk", k["medium"], "amber", "Keep an eye on"),
+        ("Low risk", low, "lime", "Looking healthy"),
+        ("Renewals ≤30d at risk", k["renewals_30d_at_risk"], "white", "Renewing soon"),
+    ])
+    data_tools(False)
 
-    _activity_editor(supabase, gym_id, roster, missing)
-    render_csv_import(supabase, gym_id)
-    _member_manager(supabase, gym_id, roster, missing)
-
+    st.markdown('<div class="section-label">FILTER</div>', unsafe_allow_html=True)
     f1, f2, f3 = st.columns([2, 2, 3])
     levels = f1.multiselect("Risk level", ["High", "Medium", "Low"], ["High", "Medium", "Low"])
     plans = f2.multiselect("Membership", ["Monthly", "Quarterly", "Annual"],
                            ["Monthly", "Quarterly", "Annual"])
-    search = f3.text_input("Search member")
+    search = f3.text_input("Search member", placeholder="Type a name")
     view = roster[roster["risk_category"].isin(levels) & roster["membership_type"].isin(plans)]
     if search:
         view = view[view["full_name"].str.contains(search, case=False, na=False)]
@@ -890,31 +1908,29 @@ def render_risk_radar(supabase, gym_id, assess_fn):
         return
 
     st.markdown('<div class="section-label">THE RADAR</div>', unsafe_allow_html=True)
-    st.caption("Right = longer absent. Up = higher cancellation estimate.")
+    st.caption("Right = longer absent. Up = higher cancellation estimate. "
+               "Dashed lines mark Medium (30%) and High (50%).")
     _radar_chart(view)
 
-    st.markdown('<div class="section-label">PRIORITY LIST</div>', unsafe_allow_html=True)
-    show = view[["full_name", "risk_category", "cancellation_probability",
-                 "suggested_action", "monthly_fee", "drivers"]].rename(columns={
-        "full_name": "Member", "risk_category": "Risk",
-        "cancellation_probability": "Probability", "drivers": "Why flagged",
-        "suggested_action": "Suggested action", "monthly_fee": "Monthly fee"})
-    st.dataframe(show, hide_index=True, use_container_width=True,
-                 column_config={"Probability": st.column_config.ProgressColumn(
-                     format="%.0f%%", min_value=0, max_value=1)})
+    st.markdown('<div class="section-label">PRIORITY LIST · CLICK A NAME TO OPEN THEIR PROFILE</div>',
+                unsafe_allow_html=True)
+    _priority_rows(view)
 
-    if view.empty:
-        return
-    st.markdown('<div class="section-label">MEMBER DETAIL</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">QUICK VIEW</div>', unsafe_allow_html=True)
     pick = st.selectbox("Select a member", view["full_name"], key="radar_pick")
     m = view[view["full_name"] == pick].iloc[0]
     d1, d2, d3 = st.columns(3)
-    d1.metric("Cancellation estimate", f"{m['cancellation_probability']:.0%}")
-    d2.metric("Attendance change", f"{int(m['attendance_change']):+d}")
-    d3.metric("Renews in", f"{int(m['renewal_due_days'])} days")
-    st.write(f"**Why flagged:** {m['drivers']}")
-    st.write(f"**Suggested:** {m['suggested_action']}")
-    if st.button(f"Create action for {pick}", key="radar_create"):
+    _md(kpi_card("Cancellation estimate", f"{m['cancellation_probability']:.0%}",
+                 RISK_TONE.get(m["risk_category"], "lime"), m["risk_category"] + " risk"), d1)
+    _md(kpi_card("Attendance change", f"{int(m['attendance_change']):+d}",
+                 "cyan", "visits vs the previous 30 days"), d2)
+    _md(kpi_card("Renews in", f"{int(m['renewal_due_days'])} days", "white", ""), d3)
+    _md(f'<div class="panel"><div class="kv"><span>Why flagged</span><b>{_esc(m["drivers"])}</b></div>'
+        f'<div class="kv"><span>Suggested</span><b>{_esc(m["suggested_action"])}</b></div></div>')
+    b1, b2 = st.columns(2)
+    b1.button("Open full profile", key="radar_profile", on_click=open_profile,
+              args=(m["id"], "Risk Radar"), use_container_width=True)
+    if b2.button(f"Create action for {pick}", key="radar_create", use_container_width=True):
         if _has_open_action(supabase, m["id"]):
             st.button(f"ℹ️ {pick} already has an open action. Tap to open the Action Centre",
                       key="radar_open_ac", on_click=_go, args=("Action Centre",),
@@ -929,22 +1945,106 @@ def render_risk_radar(supabase, gym_id, assess_fn):
                "to prioritise conversations, not to make decisions about members.")
 
 
-def _has_open_action(supabase, member_id):
-    rows = (supabase.table("retention_actions").select("id")
-            .eq("member_id", member_id).neq("status", "Done").limit(1).execute().data)
-    return bool(rows)
+# ------------------------------------------------------- action centre
+def _action_card(supabase, a, names, photos, status, prefix):
+    """One card on the board: who, what, when, and the next step."""
+    member_id = a["member_id"]
+    who = names.get(member_id, "Archived member")
+    note = a.get("note")
+    note = note if isinstance(note, str) else ""
+    with st.container(border=True, key=f"card_{prefix}_{a['id']}"):
+        ca, cb = st.columns([0.34, 1], vertical_alignment="center")
+        _md(avatar_html(who, photos.get(member_id), 38, "row-tight"), ca)
+        cb.button(str(who), key=f"mrow_{prefix}_{a['id']}", on_click=open_profile,
+                  args=(member_id, "Action Centre"), use_container_width=True)
+        chips = chip(a["action_type"], "cyan") + due_chip(a.get("due_date"), status)
+        if status == "Done":
+            chips += outcome_chip(a.get("outcome"))
+        _md(f'<div class="chip-row">{chips}</div>')
+        if status == "Done":
+            if note:
+                st.caption(note)
+            return
+        new_note = st.text_input("Note", value=note, key=f"{prefix}_n_{a['id']}",
+                                 placeholder="Add a note…", label_visibility="collapsed")
+        if status == "To do":
+            if st.button("Start", key=f"{prefix}_s_{a['id']}", use_container_width=True):
+                (supabase.table("retention_actions")
+                 .update({"status": "In progress", "note": new_note})
+                 .eq("id", a["id"]).execute())
+                st.rerun()
+        else:
+            outcome = st.selectbox("Outcome", OUTCOMES, key=f"{prefix}_o_{a['id']}",
+                                   label_visibility="collapsed")
+            if st.button("Mark done", key=f"{prefix}_d_{a['id']}", use_container_width=True):
+                (supabase.table("retention_actions").update({
+                    "status": "Done", "outcome": outcome, "note": new_note,
+                    "completed_at": date.today().isoformat()})
+                 .eq("id", a["id"]).execute())
+                st.rerun()
 
 
-def _create_action(supabase, gym_id, member_id, action_type, renewal_days, note=""):
-    due = date.today() + timedelta(days=1 if renewal_days <= 14 else 3)
-    supabase.table("retention_actions").insert({
-        "gym_id": gym_id, "member_id": member_id, "action_type": action_type,
-        "due_date": due.isoformat(), "note": note}).execute()
+BOARD_TONES = {"To do": "cyan", "In progress": "amber", "Done": "lime"}
+
+
+def _kanban(supabase, actions, names, photos):
+    cols = st.columns(3)
+    for col, status in zip(cols, STATUSES):
+        sub = actions[actions["status"] == status]
+        if status == "Done" and "completed_at" in sub.columns:
+            sub = sub.sort_values("completed_at", ascending=False, na_position="last")
+        with col:
+            _md(f'<div class="kb-head" style="--tone:{TONES[BOARD_TONES[status]]}">'
+                f'<span>{status}</span><b>{len(sub)}</b></div>')
+            if sub.empty:
+                _md('<div class="kb-empty">Nothing here yet</div>')
+            shown = sub.head(10) if status == "Done" else sub
+            for _, a in shown.iterrows():
+                _action_card(supabase, a, names, photos, status, "kb")
+            if status == "Done" and len(sub) > 10:
+                st.caption(f"+{len(sub) - 10} older ones in the List view.")
+
+
+def _list_board(supabase, actions, names, photos):
+    tabs = st.tabs([f"{s} ({int((actions['status'] == s).sum())})" for s in STATUSES])
+    for tab, status in zip(tabs, STATUSES):
+        with tab:
+            sub = actions[actions["status"] == status]
+            if sub.empty:
+                st.caption("Nothing here.")
+            for _, a in sub.iterrows():
+                with st.container(border=True, key=f"card_ls_{a['id']}"):
+                    member_id = a["member_id"]
+                    who = names.get(member_id, "Archived member")
+                    _md(f'<div class="chip-row">{avatar_html(who, photos.get(member_id), 30)}'
+                        f'<b style="color:#F4F7FB;align-self:center">{_esc(who)}</b>'
+                        f'{chip(a["action_type"], "cyan")}{due_chip(a.get("due_date"), status)}</div>')
+                    if status == "Done":
+                        _md(f'<div class="chip-row">{outcome_chip(a.get("outcome"))}</div>')
+                    else:
+                        note = a.get("note")
+                        n = st.text_input("Note", note if isinstance(note, str) else "",
+                                          key=f"n_{a['id']}")
+                        x, y = st.columns(2)
+                        if status == "To do" and x.button("Start", key=f"s_{a['id']}"):
+                            (supabase.table("retention_actions")
+                             .update({"status": "In progress", "note": n})
+                             .eq("id", a["id"]).execute())
+                            st.rerun()
+                        out = y.selectbox("Outcome", OUTCOMES, key=f"o_{a['id']}")
+                        if y.button("Mark done", key=f"d_{a['id']}"):
+                            (supabase.table("retention_actions").update({
+                                "status": "Done", "outcome": out, "note": n,
+                                "completed_at": date.today().isoformat()})
+                             .eq("id", a["id"]).execute())
+                            st.rerun()
+                    _delete_action_control(supabase, a["id"])
 
 
 def render_action_centre(supabase, gym_id, assess_fn):
-    st.markdown("## Retention Action Centre")
-    st.write("Turn risk into follow-ups, track them, and learn what works.")
+    page_header("Retention Action Centre",
+                "Turn risk into follow-ups, track them, and learn what works.",
+                "Keep your members")
     try:
         roster, _ = load_roster(supabase, gym_id, assess_fn)
         actions = load_actions(supabase, gym_id)
@@ -957,11 +2057,35 @@ def render_action_centre(supabase, gym_id, assess_fn):
         st.info("Score your members in the Risk Radar first.")
         return
     names = roster.set_index("id")["full_name"].to_dict()
+    photos = roster.set_index("id")["photo"].to_dict() if "photo" in roster.columns else {}
     k = kpis(roster, actions)
-    c = st.columns(3)
-    c[0].metric("Open actions", k["open_actions"])
-    c[1].metric("Members saved", k["saves"])
-    c[2].metric("Save rate", "n/a" if k["save_rate"] is None else f"{k['save_rate']:.0%}")
+
+    overdue = 0
+    if not actions.empty:
+        for _, a in actions[actions["status"] != "Done"].iterrows():
+            try:
+                if date.fromisoformat(str(a.get("due_date"))[:10]) < date.today():
+                    overdue += 1
+            except ValueError:
+                pass
+    kpi_row([
+        ("Open actions", k["open_actions"], "cyan", "Still to finish"),
+        ("Overdue", overdue, "red" if overdue else "lime", "Past their due date"),
+        ("Members saved", k["saves"], "lime", "Retained after an action"),
+        ("Save rate", "n/a" if k["save_rate"] is None else f"{k['save_rate']:.0%}",
+         "white", "Retained vs cancelled"),
+    ])
+
+    total = len(actions)
+    done_n = int((actions["status"] == "Done").sum()) if total else 0
+    pct = (done_n / total) if total else 0
+    _md(f"""
+    <div class="board-progress">
+      <div class="bp-top"><span>Board progress</span><b>{pct:.0%}</b></div>
+      <div class="pbar"><span style="width:{pct * 100:.0f}%;--tone:#B7F34A"></span></div>
+      <div class="bp-sub">{done_n} of {total} actions completed · {overdue} overdue</div>
+    </div>
+    """)
 
     todo = members_to_contact(roster, actions)
     st.markdown('<div class="section-label">SUGGESTED TODAY</div>', unsafe_allow_html=True)
@@ -970,15 +2094,20 @@ def render_action_centre(supabase, gym_id, assess_fn):
                    f"contacted in the last {SUGGEST_COOLDOWN_DAYS} days.")
     else:
         top = todo.head(5)
-        for _, r in top.iterrows():
-            a, b = st.columns([5, 1])
-            a.write(f"**{r['full_name']}** · {r['cancellation_probability']:.0%} · "
-                    f"{r['suggested_action']}  \n<small>{r['drivers']}</small>",
-                    unsafe_allow_html=True)
-            if b.button("Add", key=f"add_{r['id']}"):
-                _create_action(supabase, gym_id, r["id"], r["suggested_action"],
-                               r["renewal_due_days"])
-                st.rerun()
+        with st.container(border=True, key="card_suggested"):
+            for _, r in top.iterrows():
+                c = st.columns([0.6, 3.2, 1.6, 1.2], vertical_alignment="center")
+                _md(avatar_html(r["full_name"], r.get("photo"), 42, "row-tight"), c[0])
+                c[1].button(str(r["full_name"]), key=f"mrow_sug_{r['id']}",
+                            on_click=open_profile, args=(r["id"], "Action Centre"),
+                            use_container_width=True)
+                _md(f'<div class="why">{_esc(r["drivers"])}</div>', c[1])
+                _md(risk_chip(r["risk_category"], r["cancellation_probability"])
+                    + chip(r["suggested_action"], "cyan"), c[2])
+                if c[3].button("Add", key=f"add_{r['id']}", use_container_width=True):
+                    _create_action(supabase, gym_id, r["id"], r["suggested_action"],
+                                   r["renewal_due_days"])
+                    st.rerun()
         if len(todo) > 1 and st.button("Add all top 5", use_container_width=True):
             for _, r in top.iterrows():
                 _create_action(supabase, gym_id, r["id"], r["suggested_action"],
@@ -989,38 +2118,62 @@ def render_action_centre(supabase, gym_id, assess_fn):
     if actions.empty:
         st.info("No actions yet. Add one from the suggestions above.")
         return
-    tabs = st.tabs([f"{s} ({int((actions['status'] == s).sum())})" for s in STATUSES])
-    for tab, status in zip(tabs, STATUSES):
-        with tab:
-            sub = actions[actions["status"] == status]
-            if sub.empty:
-                st.caption("Nothing here.")
-            for _, a in sub.iterrows():
-                with st.container(border=True):
-                    who = names.get(a["member_id"], "Archived member")
-                    st.write(f"**{who}** · {a['action_type']} · due {a.get('due_date') or '-'}")
-                    if status == "Done":
-                        st.caption(f"Outcome: {a.get('outcome') or 'not recorded'}")
-                    else:
-                        n = st.text_input("Note", a.get("note") or "", key=f"n_{a['id']}")
-                        x, y = st.columns(2)
-                        if status == "To do" and x.button("Start", key=f"s_{a['id']}"):
-                            supabase.table("retention_actions").update(
-                                {"status": "In progress", "note": n}).eq("id", a["id"]).execute()
-                            st.rerun()
-                        out = y.selectbox("Outcome", OUTCOMES, key=f"o_{a['id']}")
-                        if y.button("Mark done", key=f"d_{a['id']}"):
-                            supabase.table("retention_actions").update({
-                                "status": "Done", "outcome": out, "note": n,
-                                "completed_at": date.today().isoformat()}
-                            ).eq("id", a["id"]).execute()
-                            st.rerun()
-                    _delete_action_control(supabase, a["id"])
+    mode = st.radio("Board view", ["Board", "List"], horizontal=True,
+                    key="ac_view", label_visibility="collapsed")
+    if mode == "Board":
+        _kanban(supabase, actions, names, photos)
+    else:
+        _list_board(supabase, actions, names, photos)
+
+
+# ------------------------------------------------------- insights
+def _insights_charts(roster):
+    """Risk mix and revenue-at-risk charts in the company colours."""
+    mix = (roster["risk_category"].value_counts()
+           .reindex(["High", "Medium", "Low"]).fillna(0).astype(int))
+    by_plan = roster.groupby("membership_type")["revenue_at_risk"].sum()
+    left, right = st.columns(2)
+    try:
+        import altair as alt
+        with left:
+            st.markdown('<div class="section-label">RISK MIX</div>', unsafe_allow_html=True)
+            mix_df = pd.DataFrame({"Risk": mix.index, "Members": mix.values})
+            chart = (alt.Chart(mix_df).mark_bar(cornerRadiusTopLeft=8, cornerRadiusTopRight=8)
+                     .encode(x=alt.X("Risk:N", sort=["High", "Medium", "Low"],
+                                     axis=alt.Axis(labelAngle=0), title=None),
+                             y=alt.Y("Members:Q", axis=alt.Axis(tickMinStep=1, format="d")),
+                             color=alt.Color("Risk:N", legend=None, scale=alt.Scale(
+                                 domain=["High", "Medium", "Low"],
+                                 range=["#FF6B6B", "#FFC44D", "#B7F34A"])),
+                             tooltip=["Risk", "Members"])
+                     .properties(height=260))
+            _show_chart(_style_chart(chart))
+        with right:
+            st.markdown('<div class="section-label">REVENUE AT RISK BY PLAN</div>',
+                        unsafe_allow_html=True)
+            plan_df = pd.DataFrame({"Plan": by_plan.index,
+                                    "Revenue at risk": by_plan.values.round(0)})
+            chart = (alt.Chart(plan_df).mark_bar(cornerRadiusTopLeft=8, cornerRadiusTopRight=8,
+                                                 color="#B7F34A")
+                     .encode(x=alt.X("Plan:N", axis=alt.Axis(labelAngle=0), title=None),
+                             y=alt.Y("Revenue at risk:Q", axis=alt.Axis(format=",.0f")),
+                             tooltip=["Plan", alt.Tooltip("Revenue at risk:Q", format=",.0f")])
+                     .properties(height=260))
+            _show_chart(_style_chart(chart))
+    except Exception:
+        with left:
+            st.markdown('<div class="section-label">RISK MIX</div>', unsafe_allow_html=True)
+            st.bar_chart(mix)
+        with right:
+            st.markdown('<div class="section-label">REVENUE AT RISK BY PLAN</div>',
+                        unsafe_allow_html=True)
+            st.bar_chart(by_plan)
 
 
 def render_business_insights(supabase, gym_id, assess_fn):
-    st.markdown("## Business Insights")
-    st.write("What retention is worth, where it leaks, and what's working.")
+    page_header("Business Insights",
+                "What retention is worth, where it leaks, and what's working.",
+                "Numbers that matter")
     try:
         roster, _ = load_roster(supabase, gym_id, assess_fn)
         actions = load_actions(supabase, gym_id)
@@ -1033,33 +2186,30 @@ def render_business_insights(supabase, gym_id, assess_fn):
         st.info("Score your members in the Risk Radar first.")
         return
     k = kpis(roster, actions)
-    c = st.columns(4)
-    c[0].metric("Monthly revenue", _money(k["monthly_revenue"]))
-    c[1].metric("Expected monthly loss", _money(k["expected_loss"]))
-    c[2].metric("Held by high-risk", _money(k["high_risk_revenue"]))
-    c[3].metric("Revenue saved", _money(k["revenue_saved"]))
+    kpi_row([
+        ("Monthly revenue", _money(k["monthly_revenue"]), "cyan", "From scored members"),
+        ("Expected monthly loss", _money(k["expected_loss"]), "red", "Estimate × monthly fee"),
+        ("Held by high-risk", _money(k["high_risk_revenue"]), "amber", "Fees at stake"),
+        ("Revenue saved", _money(k["revenue_saved"]), "lime", "From retained members"),
+    ])
     st.caption("Expected loss = each member's estimate × their monthly fee. "
                "It is a planning figure from a synthetic-data model, not a forecast.")
 
-    l, r = st.columns(2)
-    with l:
-        st.markdown('<div class="section-label">RISK MIX</div>', unsafe_allow_html=True)
-        mix = roster["risk_category"].value_counts().reindex(["High", "Medium", "Low"]).fillna(0)
-        st.bar_chart(mix)
-    with r:
-        st.markdown('<div class="section-label">REVENUE AT RISK BY PLAN</div>', unsafe_allow_html=True)
-        st.bar_chart(roster.groupby("membership_type")["revenue_at_risk"].sum())
+    _insights_charts(roster)
 
     st.markdown('<div class="section-label">RENEWAL PIPELINE</div>', unsafe_allow_html=True)
-    bins = pd.cut(roster["renewal_due_days"], [-1, 7, 14, 30, 60, 10_000],
-                  labels=["≤7d", "8-14d", "15-30d", "31-60d", "60d+"])
+    labels = ["≤7d", "8-14d", "15-30d", "31-60d", "60d+"]
+    bins = pd.cut(roster["renewal_due_days"], [-1, 7, 14, 30, 60, 10_000], labels=labels)
     pipe = roster.groupby(bins, observed=False).agg(
         members=("id", "count"), avg_risk=("cancellation_probability", "mean"),
         fees=("monthly_fee", "sum"))
-    pipe["avg_risk"] = pipe["avg_risk"].fillna(0).map("{:.0%}".format)
-    st.dataframe(pipe.rename(columns={"members": "Members", "avg_risk": "Avg risk",
-                                      "fees": "Monthly fees"}),
-                 use_container_width=True)
+    cols = st.columns(len(labels))
+    for col, label in zip(cols, labels):
+        row = pipe.loc[label]
+        avg = 0.0 if pd.isna(row["avg_risk"]) else float(row["avg_risk"])
+        tone = "red" if avg >= 0.5 else "amber" if avg >= 0.3 else "lime"
+        _md(kpi_card(f"Renews {label}", int(row["members"]), tone,
+                     f"{avg:.0%} avg risk · {row['fees']:,.0f}"), col)
 
     st.markdown('<div class="section-label">WHAT WORKS</div>', unsafe_allow_html=True)
     done = actions[actions["status"] == "Done"] if not actions.empty else actions
@@ -1083,17 +2233,17 @@ def render_business_insights(supabase, gym_id, assess_fn):
         soon = int(high["_soon"].sum())
         line = f"Contact {'this high-risk member' if len(high) == 1 else 'these high-risk members'}"
         st.write(line + (f" ({soon} renewing within 30 days). Tap a name to open "
-                         "their record:" if soon else ". Tap a name to open their record:"))
-        shown = high.head(6)
-        for start in range(0, len(shown), 3):
-            chunk = shown.iloc[start:start + 3]
-            cols = st.columns(3)
-            for col, (_, r) in zip(cols, chunk.iterrows()):
-                col.button(r["full_name"], key=f"todo_{r['id']}", on_click=_go,
-                           args=("Member Management", r["full_name"]),
-                           use_container_width=True)
-        if len(high) > len(shown):
-            st.caption(f"+{len(high) - len(shown)} more in the Action Centre.")
+                         "their profile:" if soon else ". Tap a name to open their profile:"))
+        with st.container(border=True, key="card_todo_week"):
+            for _, r in high.head(6).iterrows():
+                c = st.columns([0.6, 4, 1.6], vertical_alignment="center")
+                _md(avatar_html(r["full_name"], r.get("photo"), 40, "row-tight"), c[0])
+                c[1].button(str(r["full_name"]), key=f"mrow_todo_{r['id']}",
+                            on_click=open_profile, args=(r["id"], "Business Insights"),
+                            use_container_width=True)
+                _md(risk_chip(r["risk_category"], r["cancellation_probability"]), c[2])
+        if len(high) > 6:
+            st.caption(f"+{len(high) - 6} more in the Action Centre.")
     if k["open_actions"]:
         st.write(f"Close out **{k['open_actions']}** open action(s) and record the outcomes.")
         st.button("Open Action Centre", key="todo_open_ac", on_click=_go,
@@ -1102,6 +2252,7 @@ def render_business_insights(supabase, gym_id, assess_fn):
         st.write("Nothing urgent. Run a goal review with a few Low-risk members.")
 
 
+# ------------------------------------------------------------ Archie
 ARCHIE_PROMPTS = [
     "Who should I call first today?",
     "Write a WhatsApp message for my most at-risk member",
@@ -1110,12 +2261,65 @@ ARCHIE_PROMPTS = [
 ]
 
 
+ARCHIE_BOT_SVG = """
+<svg class="archie-bot" viewBox="0 0 200 220" xmlns="http://www.w3.org/2000/svg">
+  <g class="bot-ant"><line x1="100" y1="34" x2="100" y2="12" stroke="#B7F34A" stroke-width="6" stroke-linecap="round"/>
+    <circle class="bot-ball" cx="100" cy="10" r="9" fill="#35D6ED"/></g>
+  <rect x="26" y="78" width="14" height="38" rx="7" fill="#35D6ED"/>
+  <rect x="160" y="78" width="14" height="38" rx="7" fill="#35D6ED"/>
+  <rect x="36" y="34" width="128" height="100" rx="44" fill="#B7F34A"/>
+  <rect x="48" y="46" width="104" height="76" rx="34" fill="#0B1020"/>
+  <g class="bot-eye"><ellipse cx="78" cy="80" rx="13" ry="16" fill="#B7F34A"/>
+    <circle cx="82" cy="74" r="4.5" fill="#fff"/></g>
+  <g class="bot-eye bot-eye2"><ellipse cx="122" cy="80" rx="13" ry="16" fill="#B7F34A"/>
+    <circle cx="126" cy="74" r="4.5" fill="#fff"/></g>
+  <ellipse cx="62" cy="104" rx="8" ry="5" fill="#FF6B6B" opacity=".55"/>
+  <ellipse cx="138" cy="104" rx="8" ry="5" fill="#FF6B6B" opacity=".55"/>
+  <path class="bot-mouth" d="M84 103 Q100 120 116 103" fill="none" stroke="#B7F34A" stroke-width="5" stroke-linecap="round"/>
+  <rect x="62" y="138" width="76" height="62" rx="26" fill="#B7F34A"/>
+  <rect x="72" y="148" width="56" height="42" rx="18" fill="#0B1020"/>
+  <polyline class="bot-pulse" points="76,170 90,170 96,156 104,184 110,166 124,170"
+    fill="none" stroke="#35D6ED" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect class="bot-arm-l" x="38" y="146" width="26" height="12" rx="6" fill="#B7F34A"/>
+  <g class="bot-arm-r"><rect x="136" y="146" width="30" height="12" rx="6" fill="#B7F34A" transform="rotate(-25 138 152)"/>
+    <circle cx="166" cy="140" r="9" fill="#B7F34A"/></g>
+  <rect x="70" y="200" width="22" height="12" rx="6" fill="#35D6ED"/>
+  <rect x="108" y="200" width="22" height="12" rx="6" fill="#35D6ED"/>
+</svg>
+"""
+
+
+def _archie_hero(thinking=False):
+    state = "thinking" if thinking else ""
+    on = "thinking-on" if thinking else ""
+    status = "Thinking…" if thinking else "Online · reading your live data"
+    return f"""
+    <div class="archie-hero {on}">
+      <div class="archie-orb {state}">{ARCHIE_BOT_SVG}</div>
+      <div class="archie-meta">
+        <div class="archie-name">Archie</div>
+        <div class="archie-role">Your retention assistant. Ask about members, revenue and follow-ups.</div>
+        <div class="archie-status"><span class="dot"></span>{status}
+          <span class="archie-wave"><i></i><i></i><i></i><i></i><i></i></span></div>
+      </div>
+    </div>
+    """
+
+
+def _chat_message(role):
+    if role == "assistant":
+        try:
+            return st.chat_message("assistant", avatar="🤖")
+        except Exception:
+            pass
+    return st.chat_message(role)
+
+
 def render_archie(supabase, gym_id, assess_fn, business_name, owner_name="the gym owner"):
-    st.markdown("## Archie · your retention assistant")
-    st.write("Ask about your members, revenue and follow-ups. Archie reads your "
-             "live GymPulse data.")
+    hero = st.empty()
+    _md(_archie_hero(False), hero)
     try:
-        roster, _ = load_roster(supabase, gym_id, assess_fn)
+        roster, _ = load_roster(supabase, gym_id, assess_fn, with_photos=False)
         actions = load_actions(supabase, gym_id)
     except Exception:
         roster, actions = pd.DataFrame(), pd.DataFrame()
@@ -1127,24 +2331,29 @@ def render_archie(supabase, gym_id, assess_fn, business_name, owner_name="the gy
 
     if "archie_msgs" not in st.session_state:
         st.session_state.archie_msgs = []
+
+    st.markdown('<div class="section-label">TRY ASKING</div>', unsafe_allow_html=True)
     cols = st.columns(len(ARCHIE_PROMPTS))
     picked = None
     for col, p in zip(cols, ARCHIE_PROMPTS):
         if col.button(p, key=f"ap_{p}", use_container_width=True):
             picked = p
     for m in st.session_state.archie_msgs:
-        with st.chat_message(m["role"]):
+        with _chat_message(m["role"]):
             st.markdown(m["content"])
     typed = st.chat_input("Ask Archie...")
     question = typed or picked
     if question:
         st.session_state.archie_msgs.append({"role": "user", "content": question})
-        with st.chat_message("user"):
+        with _chat_message("user"):
             st.markdown(question)
-        with st.chat_message("assistant"):
-            with st.spinner("Archie is thinking..."):
-                reply, live = archie_reply(st.session_state.archie_msgs, context)
-            st.markdown(reply)
+        _md(_archie_hero(True), hero)
+        with _chat_message("assistant"):
+            slot = st.empty()
+            _md('<div class="typing"><i></i><i></i><i></i></div>', slot)
+            reply, live = archie_reply(st.session_state.archie_msgs, context)
+            slot.markdown(reply)
+        _md(_archie_hero(False), hero)
         st.session_state.archie_msgs.append({"role": "assistant", "content": reply})
     if st.session_state.archie_msgs and st.button("Clear chat"):
         st.session_state.archie_msgs = []
@@ -1152,3 +2361,87 @@ def render_archie(supabase, gym_id, assess_fn, business_name, owner_name="the gy
     st.caption("Archie can be wrong. Check details before contacting members. "
                "Only your top at-risk members' names and scores are shared with "
                "the AI service.")
+
+
+# --------------------------------------------------------- dashboard
+def render_dashboard(supabase, gym_id, assess_fn, greeting, user_name, business_name):
+    page_header(f"{greeting}, {user_name} 👋",
+                f"Welcome to {business_name}. Let's build a stronger, smarter fitness business.",
+                "Your fitness workspace")
+    try:
+        roster, _ = load_roster(supabase, gym_id, assess_fn)
+        actions = load_actions(supabase, gym_id)
+    except Exception:
+        roster, actions = pd.DataFrame(), pd.DataFrame()
+
+    if roster.empty:
+        st.markdown('<div class="section-label">GET STARTED IN THREE STEPS</div>',
+                    unsafe_allow_html=True)
+        _md("""
+        <div class="lp-steps">
+          <div class="lp-stepcard"><div class="lp-num">01</div>
+            <h4>Register your members</h4>
+            <p>Add each member with a photo, contact details and goal in Member Management.</p></div>
+          <div class="lp-stepcard"><div class="lp-num">02</div>
+            <h4>Add their activity</h4>
+            <p>Enter visits and renewal timing, or import a CSV from the Risk Radar.</p></div>
+          <div class="lp-stepcard"><div class="lp-num">03</div>
+            <h4>Reach out early</h4>
+            <p>See who is drifting away and follow up from the Action Centre.</p></div>
+        </div>
+        """)
+        st.button("Register your first member", key="qa_register", on_click=_go,
+                  args=("Member Management",), use_container_width=True)
+    else:
+        k = kpis(roster, actions)
+        kpi_row([
+            ("Members scored", k["members_scored"], "cyan", "On your radar"),
+            ("High risk", k["high"], "red", "Need you first"),
+            ("Expected monthly loss", _money(k["expected_loss"]), "amber", "Estimate, not a forecast"),
+            ("Open actions", k["open_actions"], "lime", "Follow-ups to finish"),
+        ])
+        st.markdown('<div class="section-label">WHO NEEDS YOU TODAY</div>',
+                    unsafe_allow_html=True)
+        need = members_to_contact(roster, actions)
+        if need.empty:
+            st.success("Nobody needs a follow-up right now. Nice work.")
+        else:
+            with st.container(border=True, key="card_dash_today"):
+                for _, r in need.head(3).iterrows():
+                    c = st.columns([0.6, 3.4, 2.2], vertical_alignment="center")
+                    _md(avatar_html(r["full_name"], r.get("photo"), 44, "row-tight"), c[0])
+                    c[1].button(str(r["full_name"]), key=f"mrow_dash_{r['id']}",
+                                on_click=open_profile, args=(r["id"], "Dashboard"),
+                                use_container_width=True)
+                    _md(f'<div class="why">{_esc(r["drivers"])}</div>', c[1])
+                    _md(risk_chip(r["risk_category"], r["cancellation_probability"])
+                        + chip(r["suggested_action"], "cyan"), c[2])
+            st.button("See everyone on the Risk Radar", key="qa_radar_more", on_click=_go,
+                      args=("Risk Radar",))
+
+    st.markdown('<div class="section-label">QUICK ACTIONS</div>', unsafe_allow_html=True)
+    tiles = [
+        ("🎯  Risk Radar", "Risk Radar"),
+        ("✅  Action Centre", "Action Centre"),
+        ("🤖  Ask Archie", "Archie"),
+        ("👥  Member Management", "Member Management"),
+        ("🧪  Member Assessment", "Member Assessment"),
+        ("📂  Batch Assessment", "Batch Assessment"),
+    ]
+    for start in range(0, len(tiles), 3):
+        cols = st.columns(3)
+        for col, (label, page) in zip(cols, tiles[start:start + 3]):
+            col.button(label, key=f"qa_{page}", on_click=_go, args=(page,),
+                       use_container_width=True)
+
+    st.markdown('<div class="section-label">HOW IT WORKS</div>', unsafe_allow_html=True)
+    _md("""
+    <div class="lp-steps">
+      <div class="lp-stepcard"><div class="lp-num">01</div><h4>Input</h4>
+        <p>Provide membership, attendance, renewal and personal-training information.</p></div>
+      <div class="lp-stepcard"><div class="lp-num">02</div><h4>Analyse</h4>
+        <p>The model processes five features to estimate cancellation probability.</p></div>
+      <div class="lp-stepcard"><div class="lp-num">03</div><h4>Explore</h4>
+        <p>Review the experimental estimate and investigate attendance patterns.</p></div>
+    </div>
+    """)
