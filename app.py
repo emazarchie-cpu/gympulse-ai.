@@ -2029,46 +2029,92 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
+# --- NAVIGATION CSS ---
+st.markdown("""
+<style>
+/* --- LAPTOP VIEW --- */
+@media (min-width: 769px) {
+    /* Hide mobile menu */
+    .mobile-menu-btn { display: none !important; }
+    
+    /* Force everything onto one line */
+    .st-key-top_nav div[role="radiogroup"] {
+        flex-wrap: nowrap !important;
+        white-space: nowrap !important;
+        gap: 4px !important; /* Tight spacing */
+    }
+    
+    /* Hide the circles */
+    .st-key-top_nav div[role="radiogroup"] label > div:first-child {
+        display: none !important;
+    }
+    
+    /* Style the text as pills */
+    .st-key-top_nav div[role="radiogroup"] label {
+        padding: 6px 10px !important;
+        margin: 0 !important;
+        border-radius: 20px !important;
+        background: transparent !important;
+        border: none !important;
+    }
+    
+    .st-key-top_nav div[role="radiogroup"] label p {
+        color: var(--muted) !important;
+        font-size: 13px !important; /* Slightly smaller to fit 8 items */
+        font-weight: 600 !important;
+    }
+    
+    .st-key-top_nav div[role="radiogroup"] label:hover {
+        background: rgba(255,255,255,0.08) !important;
+    }
+    .st-key-top_nav div[role="radiogroup"] label:hover p {
+        color: var(--white) !important;
+    }
+    
+    /* Active pill */
+    .st-key-top_nav div[role="radiogroup"] label:has(input:checked) {
+        background: rgba(183,243,74,0.15) !important;
+    }
+    .st-key-top_nav div[role="radiogroup"] label:has(input:checked) p {
+        color: var(--lime) !important;
+    }
+}
+
+/* --- MOBILE VIEW --- */
+@media (max-width: 768px) {
+    /* Hide the whole desktop nav and the "More" popover */
+    .st-key-top_nav div[role="radiogroup"] { display: none !important; }
+    .st-key-top_nav .st-key-desktop-more { display: none !important; }
+    
+    /* Show the hamburger menu */
+    .mobile-menu-btn { display: block !important; text-align: right; }
+    .mobile-menu-btn button {
+        background: transparent !important;
+        border: none !important;
+        color: var(--white) !important;
+        font-size: 24px !important;
+        padding: 0 !important;
+        box-shadow: none !important;
+    }
+    .mobile-menu-btn button:hover { color: var(--lime) !important; }
+}
+</style>
+""", unsafe_allow_html=True)
+
+# --- TOP NAV CONTAINER ---
 with st.container(key="top_nav"):
+    # Layout: Brand (left) | Nav (center) | Log out (right)
+    brand_col, nav_col, action_col = st.columns([2.5, 7.0, 1.5], vertical_alignment="center")
 
-    # Top bar layout: Logo (left), Nav (center), Action (right)
-    brand_col, nav_col, action_col = st.columns([2.5, 7.5, 2], vertical_alignment="center")
-
+    # 1. BRAND
     with brand_col:
-        st.markdown(
-            logo_img_tag("nav-brand-logo"),
-            unsafe_allow_html=True
-        )
-        st.button(
-            "PULSE",
-            on_click=go_home,
-            key="brand_home",
-            use_container_width=True
-        )
-        st.markdown(
-            '<div class="nav-tagline">Smarter insights. Stronger member retention.</div>',
-            unsafe_allow_html=True
-        )
+        st.markdown(logo_img_tag("nav-brand-logo"), unsafe_allow_html=True)
+        st.button("PULSE", on_click=go_home, key="brand_home", use_container_width=True)
+        st.markdown('<div class="nav-tagline">Smarter insights. Stronger member retention.</div>', unsafe_allow_html=True)
 
+    # 2. NAVIGATION
     with nav_col:
-        # CSS to switch between desktop links and mobile hamburger
-        st.markdown("""
-        <style>
-        /* DESKTOP: Hide hamburger, show links */
-        @media (min-width: 769px) {
-            .mobile-menu-btn { display: none !important; }
-            .desktop-nav { display: block !important; }
-        }
-        /* MOBILE: Hide links, show hamburger */
-        @media (max-width: 768px) {
-            .desktop-nav { display: none !important; }
-            .mobile-menu-btn { display: block !important; text-align: right; }
-        }
-        </style>
-        """, unsafe_allow_html=True)
-
-        # Desktop Navigation
-        st.markdown('<div class="desktop-nav">', unsafe_allow_html=True)
+        # Desktop: 8 items on one line
         st.radio(
             "WORKSPACE",
             MAIN_PAGES,
@@ -2079,31 +2125,29 @@ with st.container(key="top_nav"):
             horizontal=True,
             label_visibility="collapsed"
         )
+        
+        # Desktop "More" button
+        st.markdown('<div class="st-key-desktop-more">', unsafe_allow_html=True)
+        with st.popover("More", use_container_width=False):
+            for name in MORE_PAGES:
+                st.button(name, key=f"dt_{name}", on_click=show_page, args=(name,), use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-        # Mobile Hamburger Menu
+        # Mobile: Hamburger Menu
         st.markdown('<div class="mobile-menu-btn">', unsafe_allow_html=True)
         with st.popover("☰", use_container_width=False):
-            # Main Pages
             st.markdown("**MAIN**")
             for name in MAIN_PAGES:
                 st.button(name, key=f"mob_{name}", on_click=show_page, args=(name,), use_container_width=True)
-            
             st.markdown("---")
-            
-            # More Pages
             st.markdown("**MORE**")
             for name in MORE_PAGES:
                 st.button(name, key=f"mob_{name}", on_click=show_page, args=(name,), use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
+    # 3. LOG OUT
     with action_col:
-        st.button(
-            "Log Out",
-            on_click=log_out,
-            use_container_width=True,
-            key="logout_button_main"
-        )
+        st.button("Log Out", on_click=log_out, use_container_width=True, key="logout_button_main")
 
     page = st.session_state["current_page"]
 
@@ -2118,11 +2162,9 @@ with st.container(key="top_nav"):
                     _notify_replies(count)
                     if st.session_state.get("current_page") == "Follow-ups":
                         st.rerun()
-
             _watch_inbox()
         except TypeError:
             pass
-
     
     
 # =========================================================
