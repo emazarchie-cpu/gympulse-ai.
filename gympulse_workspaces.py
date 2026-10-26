@@ -39,6 +39,78 @@ OUTCOMES = ["Retained", "Cancelled", "No response"]
 SUGGEST_COOLDOWN_DAYS = 30
 DONE_RETENTION_HOURS = 24
 PURGE_INTERVAL_SECONDS = 600
+MOBILE_PARTS = {
+    "base": """
+@media (max-width: 640px) {
+    .block-container {
+        padding-left: 0.9rem !important;
+        padding-right: 0.9rem !important;
+        padding-top: 0.6rem !important;
+    }
+    .hero { padding: 18px !important; }
+    .hero-title { font-size: 26px !important; }
+    input, textarea, [data-baseweb="select"] input { font-size: 16px !important; }
+    .block-container .stButton > button { min-height: 44px; }
+}
+""",
+    "nav": """
+@media (max-width: 640px) {
+    .nav-tagline { display: none !important; }
+    .st-key-top_nav div[role="radiogroup"] {
+        flex-wrap: wrap !important;
+        gap: 4px !important;
+    }
+    .st-key-top_nav div[role="radiogroup"] label {
+        padding: 8px 10px !important;
+    }
+}
+""",
+    "brand": """
+@media (max-width: 640px) {
+    .st-key-top_nav [data-testid="stColumn"]:first-child [data-testid="stHorizontalBlock"] {
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+    }
+    .st-key-top_nav [data-testid="stColumn"]:first-child [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
+        min-width: 0 !important;
+    }
+}
+""",
+    "metrics": """
+@media (max-width: 640px) {
+    [data-testid="stHorizontalBlock"]:has([data-testid="stMetric"]) {
+        flex-wrap: wrap !important;
+        gap: 0.6rem !important;
+    }
+    [data-testid="stHorizontalBlock"]:has([data-testid="stMetric"]) > [data-testid="stColumn"] {
+        flex: 1 1 calc(50% - 0.6rem) !important;
+        min-width: calc(50% - 0.6rem) !important;
+    }
+    [data-testid="stMetric"] { padding: 14px !important; }
+    [data-testid="stMetricValue"] { font-size: 22px !important; }
+}
+""",
+}
+
+
+def _mobile_css(off=()):
+    keep = "".join(css for name, css in MOBILE_PARTS.items() if name not in off)
+    return "<style>" + keep + "</style>"
+
+
+MOBILE_CSS = _mobile_css()
+
+
+def apply_mobile_styles():
+    off = ()
+    try:
+        params = st.query_params
+        raw = str(params.get("off", ""))
+        off = tuple(MOBILE_PARTS) if raw == "all" else tuple(
+            x.strip() for x in raw.split(",") if x.strip())
+    except Exception:
+        pass
+    st.markdown(_mobile_css(off), unsafe_allow_html=True)
 
 TONES = {
     "lime": "#B7F34A", "red": "#FF6B6B", "amber": "#FFC44D",
