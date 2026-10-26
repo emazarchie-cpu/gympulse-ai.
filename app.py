@@ -2001,38 +2001,77 @@ with st.container(key="top_nav"):
         )
 
     with nav_col:
-        radio_col, more_col = st.columns(
-            [5.2, 1.3],
-            vertical_alignment="center"
+        # DESKTOP LAYOUT: 8 items on a single line
+        # MOBILE LAYOUT: collapses into a hamburger menu dropdown
+        import streamlit.components.v1 as components
+        
+        # CSS to hide default desktop nav on mobile and force single line on desktop
+        st.markdown("""
+        <style>
+        /* Force items on one line on desktop */
+        @media (min-width: 769px) {
+            .st-key-top_nav div[role="radiogroup"] {
+                flex-wrap: nowrap !important;
+                white-space: nowrap !important;
+            }
+            .st-key-top_nav div[role="radiogroup"] label {
+                padding: 8px 6px !important;
+                font-size: 12px !important;
+            }
+            .st-key-mobile-menu {
+                display: none !important;
+            }
+        }
+        /* Hide default radio group on mobile */
+        @media (max-width: 768px) {
+            .st-key-top_nav div[role="radiogroup"] {
+                display: none !important;
+            }
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
+        # Desktop Nav
+        st.radio(
+            "WORKSPACE",
+            MAIN_PAGES,
+            index=None,
+            key="main_nav",
+            on_change=on_main_nav,
+            format_func=nav_label,
+            horizontal=True,
+            label_visibility="collapsed"
         )
 
-        with radio_col:
-            st.radio(
-                "WORKSPACE",
-                MAIN_PAGES,
-                index=None,
-                key="main_nav",
-                on_change=on_main_nav,
-                format_func=nav_label,
-                horizontal=True,
-                label_visibility="collapsed"
-            )
+        # Mobile Nav Popover
+        st.markdown('<div class="st-key-mobile-menu">', unsafe_allow_html=True)
+        with st.popover("☰ Menu", use_container_width=True):
+            # All main pages
+            for name in MAIN_PAGES:
+                st.button(name, key=f"mob_{name}", on_click=show_page, args=(name,), use_container_width=True)
+            st.markdown("---")
+            # All more pages
+            for name in MORE_PAGES:
+                st.button(name, key=f"mob_{name}", on_click=show_page, args=(name,), use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
-        with more_col:
-            current = st.session_state["current_page"]
-            more_label = current if current in MORE_PAGES else "More"
-
-            with st.popover(more_label, use_container_width=True):
-                for name in MORE_PAGES:
-                    st.button(
-                        name,
-                        key=f"more_{name}",
-                        on_click=show_page,
-                        args=(name,),
-                        use_container_width=True
-                    )
+        # Desktop "More" popover
+        st.markdown('<div class="st-key-desktop-more">', unsafe_allow_html=True)
+        with st.popover("More...", use_container_width=True):
+            for name in MORE_PAGES:
+                st.button(name, key=f"dt_{name}", on_click=show_page, args=(name,), use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
     page = st.session_state["current_page"]
+
+    # Hide the desktop More button on mobile so it doesn't appear twice
+    st.markdown("""
+    <style>
+    @media (max-width: 768px) {
+        .st-key-desktop-more { display: none !important; }
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
     _fragment = getattr(st, "fragment", None)
     if _fragment is not None:
