@@ -904,29 +904,29 @@ def _cached(key, fn, ttl=20, skip_empty=False):
     if not (skip_empty and (value is None or value == [])):
         store[key] = (now, version, _clone(value))
     return value
-
-
+ 
+ 
 cached = _cached
-
-
+ 
+ 
 def show_boot_overlay():
     """Cover the screen while the workspace loads after signing in."""
     st.markdown('<div class="boot-overlay"><div class="boot-spin"></div>'
                 '<div>Loading your workspace…</div></div>', unsafe_allow_html=True)
     time.sleep(0.2)
-
-
+ 
+ 
 # ---------------------------------------------------------------- data
 MEMBER_BASE = ["id", "full_name", "email", "phone", "age", "weight_kg",
                "height_cm", "fitness_goal", "created_at", "archived"]
 MEMBER_SUSPEND = ["suspended"]
 MEMBER_PROFILE = ["photo", "membership_end", "last_renewed_on", "last_payment"]
 MEMBER_PROFILE_LIGHT = ["membership_end", "last_renewed_on", "last_payment"]
-
-
+ 
+ 
 def _fetch_members_uncached(supabase, gym_id, archived=None, include_photo=True):
     """Members for one gym, with the newer columns when the database has them.
-
+ 
     Falls back step by step, so the app keeps working before the one-time
     SQL upgrade has been run. Returns (DataFrame, features).
     """
