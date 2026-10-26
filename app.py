@@ -2087,12 +2087,29 @@ st.markdown("""
 
 /* --- MOBILE VIEW --- */
 @media (max-width: 768px) {
-    /* Hide the whole desktop nav and the "More" popover */
-    .st-key-top_nav div[role="radiogroup"] { display: none !important; }
-    .st-key-top_nav .st-key-desktop-more { display: none !important; }
-    
+
+    /* Hide desktop navigation and More menu */
+    .st-key-top_nav div[role="radiogroup"] {
+        display: none !important;
+    }
+
+    .st-key-top_nav .st-key-desktop-more {
+        display: none !important;
+    }
+
+    /* Hide desktop Log Out outside the hamburger */
+    .st-key-logout_button_main {
+        display: none !important;
+    }
+
     /* Show the hamburger menu */
-    .mobile-menu-btn { display: block !important; text-align: right; }
+    .st-key-mobile_menu_btn,
+    .mobile-menu-btn {
+        display: block !important;
+        text-align: right;
+    }
+
+    .st-key-mobile_menu_btn button,
     .mobile-menu-btn button {
         background: transparent !important;
         border: none !important;
@@ -2101,7 +2118,33 @@ st.markdown("""
         padding: 0 !important;
         box-shadow: none !important;
     }
-    .mobile-menu-btn button:hover { color: var(--lime) !important; }
+
+    .st-key-mobile_menu_btn button:hover,
+    .mobile-menu-btn button:hover {
+        color: var(--lime) !important;
+    }
+
+    /* Prevent horizontal scrolling on mobile */
+    html,
+    body,
+    .stApp,
+    [data-testid="stAppViewContainer"],
+    [data-testid="stMain"],
+    section.main {
+        max-width: 100% !important;
+        overflow-x: hidden !important;
+    }
+
+    /* Keep columns and media within the screen */
+    [data-testid="stHorizontalBlock"] {
+        max-width: 100% !important;
+    }
+
+    img,
+    video,
+    iframe {
+        max-width: 100% !important;
+    }
 }
 </style>
 """, unsafe_allow_html=True)
