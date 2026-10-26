@@ -171,9 +171,15 @@ def has_photo(photo):
 
 def avatar_html(name, photo=None, size=44, extra=""):
     cls = ("avatar " + extra).strip()
-    style = f"width:{size}px;height:{size}px;font-size:{max(11, int(size * 0.38))}px;"
+    base = (f"width:{size}px;height:{size}px;"
+            f"min-width:{size}px;flex-shrink:0;")
     if has_photo(photo):
-        return f'<img class="{cls}" style="{style}" src="{photo}" alt="{_esc(name)}">'
+        style = (base + f"background-image:url('{photo}');"
+                 "background-size:cover;background-position:center;"
+                 "background-repeat:no-repeat;")
+        return (f'<div class="{cls}" style="{style}" role="img" '
+                f'aria-label="{_esc(name)}"></div>')
+    style = base + f"font-size:{max(11, int(size * 0.38))}px;"
     return f'<div class="{cls}" style="{style}">{_esc(initials(name))}</div>'
 
 def whatsapp_digits(phone):
@@ -605,9 +611,53 @@ span[data-baseweb="tag"] span { color: #B7F34A !important; }
 }
 """
 
+MOBILE_ROWS_CSS = """
+.avatar { border-radius: 50% !important; overflow: hidden; }
+
+@media (max-width: 640px) {
+
+    /* The column-label row (MEMBER, RISK, FEE...) is not needed on a phone */
+    [data-testid="stHorizontalBlock"]:has(.th) { display: none !important; }
+
+    /* Member rows become small cards that wrap */
+    [data-testid="stHorizontalBlock"]:has(.row-tight):not(:has(.kb-head)) {
+        flex-wrap: wrap !important;
+        gap: 0.4rem 0.6rem !important;
+        align-items: center !important;
+    }
+    [data-testid="stHorizontalBlock"]:has(.row-tight):not(:has(.kb-head)) > [data-testid="stColumn"] {
+        flex: 1 1 calc(50% - 0.6rem) !important;
+        width: auto !important;
+        min-width: calc(50% - 0.6rem) !important;
+    }
+    /* Column 1 = photo, column 2 = name */
+    [data-testid="stHorizontalBlock"]:has(.row-tight):not(:has(.kb-head)) > [data-testid="stColumn"]:nth-child(1) {
+        flex: 0 0 56px !important;
+        width: 56px !important;
+        min-width: 56px !important;
+    }
+    [data-testid="stHorizontalBlock"]:has(.row-tight):not(:has(.kb-head)) > [data-testid="stColumn"]:nth-child(2) {
+        flex: 1 1 calc(100% - 72px) !important;
+        width: calc(100% - 72px) !important;
+        min-width: 0 !important;
+    }
+
+    /* Action Centre board: one column at a time instead of three squeezed */
+    [data-testid="stHorizontalBlock"]:has(.kb-head) {
+        flex-wrap: wrap !important;
+    }
+    [data-testid="stHorizontalBlock"]:has(.kb-head) > [data-testid="stColumn"] {
+        flex: 1 1 100% !important;
+        width: 100% !important;
+        min-width: 100% !important;
+    }
+}
+"""
+
+
 def apply_ui_styles():
     st.markdown("<style>" + UI_CSS + "</style>", unsafe_allow_html=True)
-
+    st.markdown("<style>" + MOBILE_ROWS_CSS + "</style>", unsafe_allow_html=True)
 # ------------------------------------------------------------ speed & caching
 class _TrackedTable:
     def __init__(self, table):
