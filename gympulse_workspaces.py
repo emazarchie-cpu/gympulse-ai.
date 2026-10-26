@@ -555,7 +555,13 @@ a.chip:hover { filter: brightness(1.25); }
 
 [data-testid="stChatMessageAvatarUser"] { background: #35D6ED !important; }
 [data-testid="stChatMessageAvatarUser"] * { color: #0B1020 !important; }
-[data-testid="stChatMessageAvatarAssistant"] { background: transparent !important; }
+[data-testid="stChatMessageAvatarAssistant"] {
+    background: radial-gradient(circle at 35% 30%, #FFFFFF 0%, #B7F34A 28%, #27B35C 100%) !important;
+    border-radius: 50% !important;
+    box-shadow: 0 0 0 3px rgba(53,214,237,0.35), 0 8px 18px rgba(183,243,74,0.35);
+    animation: bot-float 4s ease-in-out infinite;
+}
+[data-testid="stChatMessageAvatarAssistant"] * { opacity: 0 !important; }
 .boot-overlay { position: fixed; inset: 0; z-index: 99999; display: flex;
     flex-direction: column; align-items: center; justify-content: center; gap: 16px;
     background: #0B1020; color: #F4F7FB; font-weight: 700; font-size: 15px; }
@@ -2399,25 +2405,32 @@ def _stream(slot, text):
         time.sleep(0.03)
     slot.markdown(text)
 def archie_context(roster, actions, business_name):
-    """Build a concise business context for Archie's member-retention assistant."""
-
+    """Build a concise business context for Archie."""
     lines = [
         f"Gym business: {business_name}",
         f"Total scored members: {len(roster)}",
     ]
 
-    # Summarize member risk where the expected columns are available.
     if "risk_category" in roster.columns:
         risk_counts = roster["risk_category"].fillna("Unknown").value_counts()
-
         lines.append("Member risk summary:")
         for category, count in risk_counts.items():
             lines.append(f"- {category} risk: {count} members")
 
-    # Include recent actions when useful columns are available.
+    needed = {"full_name", "risk_category", "cancellation_probability"}
+    if needed.issubset(roster.columns) and not roster.empty:
+        lines.append("Top at-risk members:")
+        for _, r in roster.head(5).iterrows():
+            lines.append(
+                f"- {r['full_name']}: {r['risk_category']} risk, "
+                f"{r['cancellation_probability']:.0%}, "
+                f"{int(r.get('days_since_last_visit', 0))} days since last visit, "
+                f"renews in {int(r.get('renewal_due_days', 0))} days, "
+                f"suggested: {r.get('suggested_action', 'check in')}"
+            )
+
     if not actions.empty:
         lines.append(f"Recorded retention actions: {len(actions)}")
-
         for column in ("status", "action_type"):
             if column in actions.columns:
                 counts = actions[column].fillna("Unknown").value_counts()
@@ -2426,7 +2439,47 @@ def archie_context(roster, actions, business_name):
                     lines.append(f"- {label}: {count}")
                 break
 
-    return "\n".join(lines)
+    return "\n".join(lines)    ARCHIE_SYSTEM = (
+    "You are Archie, a warm, upbeat retention assistant for a gym owner. "
+    "Use only the gym data provided below. Be concise and practical. "
+    "When asked for a WhatsApp or email message, write it ready to send, "
+    "friendly and excited, and sign it with the owner's name. "
+    "If the data does not contain the answer, say so instead of guessing."
+)
+
+
+def archie_reply(messages, context):
+    """Ask Claude for Archie's answer. Returns (text, used_live_ai)."""
+    key = os.environ.get("ANTHROPIC_API_KEY")
+    if not key:
+        try:
+            key = st.secrets["ANTHROPIC_API_KEY"]
+        except Exception:
+            key = None
+    if not key:
+        return ("Archie can't find ANTHROPIC_API_KEY. Add it under "
+                "Environment on Render, then redeploy."), False
+
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=key)
+        history = [{"role": m["role"], "content": m["content"]}
+                   for m in messages[-12:]]
+        response = client.messages.create(
+            model=ARCHIE_MODEL,
+            max_tokens=700,
+            system=ARCHIE_SYSTEM + "\n\nGYM DATA:\n" + context,
+            messages=history,
+        )
+        text = "".join(
+            block.text for block in response.content
+            if getattr(block, "type", "") == "text"
+        ).strip()
+        if not text:
+            return "Archie had no answer this time. Please try again.", False
+        return text, True
+    except Exception as error:
+        return f"Archie could not answer right now.\n\nTechnical detail: {error}", False
 def render_archie(supabase, gym_id, assess_fn, business_name, owner_name="the gym owner"):
     hero = st.empty()
     _md(_archie_hero(False), hero)
