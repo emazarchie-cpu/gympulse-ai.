@@ -54,7 +54,7 @@ MOBILE_PARTS = {
 }
 """,
     "nav": """
-.st-key-top_nav .nav-tagline { display: none !important; }
+
     .login-brand .nav-tagline {
         display: block !important;
         white-space: normal !important;
