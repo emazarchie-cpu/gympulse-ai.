@@ -2238,50 +2238,61 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 with st.container(key="top_nav"):
-    brand_col, nav_col, action_col = st.columns([2.0, 7.5, 1.5], vertical_alignment="center")
+    brand_col, nav_col, action_col = st.columns(
+        [2.0, 7.5, 1.5],
+        vertical_alignment="center"
+    )
 
+    # BRAND / LOGO
     with brand_col:
-        st.markdown(logo_img_tag("nav-brand-logo"), unsafe_allow_html=True)
-        st.button("PULSE", on_click=go_home, key="brand_home", use_container_width=True)
-        st.markdown('<div class="nav-tagline">Smarter insights. Stronger member retention.</div>', unsafe_allow_html=True)
-
-    with nav_col:
-
-        # Desktop navigation links and More menu in one row
-        links_col, more_col = st.columns(
-            [12, 1],
-            vertical_alignment="center",
-            gap="small"
+        st.markdown(
+            logo_img_tag("nav-brand-logo"),
+            unsafe_allow_html=True
         )
 
-        with links_col:
-            nav_html = '<div class="custom-nav">'
+        st.button(
+            "PULSE",
+            on_click=go_home,
+            key="brand_home",
+            use_container_width=True
+        )
 
-            for name in MAIN_PAGES:
-                active = (
-                    "active"
-                    if name == st.session_state.get("current_page")
-                    else ""
-                )
+        st.markdown(
+            '<div class="nav-tagline">Smarter insights. Stronger member retention.</div>',
+            unsafe_allow_html=True
+        )
 
-                nav_html += (
-                    f'<a href="?nav={name.replace(" ", "+")}" '
-                    f'target="_self" class="{active}">'
-                    f'{name}</a>'
-                )
+    # DESKTOP NAVIGATION LINKS
+    with nav_col:
+        nav_html = '<div class="custom-nav">'
 
-            nav_html += '</div>'
+        for name in MAIN_PAGES:
+            active = (
+                "active"
+                if name == st.session_state.get("current_page")
+                else ""
+            )
 
-            st.markdown(nav_html, unsafe_allow_html=True)
+            nav_html += (
+                f'<a href="?nav={name.replace(" ", "+")}" '
+                f'target="_self" class="{active}">'
+                f'{name}</a>'
+            )
 
-        with more_col:
-            
-        
+        nav_html += '</div>'
+
+        st.markdown(
+            nav_html,
+            unsafe_allow_html=True
+        )
+
+    # ACTIONS
     with action_col:
 
-        # Mobile Hamburger
+        # MOBILE HAMBURGER MENU
         with st.container(key="mobile_menu_btn"):
             with st.popover("☰", use_container_width=False):
+
                 for name in MAIN_PAGES:
                     st.button(
                         name,
@@ -2302,14 +2313,22 @@ with st.container(key="top_nav"):
                         use_container_width=True
                     )
 
-        # Log Out
+                st.divider()
+
+                st.button(
+                    "Log Out",
+                    key="mobile_logout_button",
+                    on_click=log_out,
+                    use_container_width=True
+                )
+
+        # DESKTOP LOG OUT
         st.button(
             "Log Out",
             on_click=log_out,
             use_container_width=True,
             key="logout_button_main"
         )
-
     # Listen for the custom menu clicks and switch page
     if "nav" in st.query_params:
         page_name = st.query_params["nav"].replace("+", " ")
