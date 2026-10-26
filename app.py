@@ -2104,7 +2104,6 @@ elif page == "Business Insights":
 elif page == "Payments & Renewals":
     gw.render_payments(supabase, st.session_state.gym_id, assess_members)
 elif page == "Follow-ups":
-elif page == "Follow-ups":
     fu.render_followups(
         supabase,
         st.session_state.gym_id,
@@ -2230,6 +2229,7 @@ elif page == "Member Management":
         st.markdown("### Registered Members")
 
         gw.render_member_directory(supabase, gym_id)
+
 
 
 # =========================================================
