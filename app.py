@@ -872,6 +872,39 @@ st.markdown(
 )
 gw.apply_mobile_styles()
 gw.apply_ui_styles()
+st.markdown("""
+<style>
+html, body, .stApp,
+[data-testid="stAppViewContainer"],
+[data-testid="stMain"],
+.block-container {
+    max-width: 100vw !important;
+    overflow-x: hidden !important;
+    overflow-x: clip !important;
+    overscroll-behavior-x: none !important;
+    touch-action: pan-y !important;
+}
+
+/* Let grid columns shrink instead of stretching the page */
+.lp-hero { grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr); }
+.lp-split { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.lp-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.lp-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.lp-bento-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.lp-hero > *, .lp-split > *, .lp-steps > *, .lp-bento { min-width: 0; }
+
+@media (max-width: 900px) {
+    .lp-hero, .lp-split, .lp-steps { grid-template-columns: minmax(0, 1fr); }
+    .lp-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 768px) {
+    .block-container { padding-left: 1rem !important; padding-right: 1rem !important; }
+    .lp-title { font-size: 36px; letter-spacing: -1.5px; word-break: break-word; }
+    .lp-radar, .lp-note, .lp-cta { max-width: 100%; box-sizing: border-box; }
+}
+</style>
+""", unsafe_allow_html=True)
 
 # =========================================================
 # BRAND LOGO HELPER (shared by the login page and the top bar)
@@ -1922,8 +1955,7 @@ if "current_page" not in st.session_state:
 def show_page(name):
     """Open a page and keep the top-bar radio in sync."""
     st.session_state["current_page"] = name
-    st.session_state["main_nav"] = name if name in MAIN_PAGES else None
-
+    st.session_state.pop("main_nav", None)
 
 def on_main_nav():
     if st.session_state.get("main_nav"):
@@ -1946,8 +1978,6 @@ def log_out():
 if "navigate_to" in st.session_state:
     show_page(st.session_state.pop("navigate_to"))
 
-if "main_nav" not in st.session_state:
-    st.session_state["main_nav"] = "Dashboard"
 
 def _unread_now():
     gid = st.session_state.get("gym_id")
@@ -2307,28 +2337,17 @@ with st.container(key="top_nav"):
 
     # DESKTOP NAVIGATION LINKS
     with nav_col:
-        nav_html = '<div class="custom-nav">'
-
-        for name in MAIN_PAGES:
-            active = (
-                "active"
-                if name == st.session_state.get("current_page")
-                else ""
-            )
-
-            nav_html += (
-                f'<a href="?nav={name.replace(" ", "+")}" '
-                f'target="_self" class="{active}">'
-                f'{name}</a>'
-            )
-
-        nav_html += '</div>'
-
-        st.markdown(
-            nav_html,
-            unsafe_allow_html=True
+        _current = st.session_state.get("current_page")
+        st.radio(
+            "Navigation",
+            MAIN_PAGES,
+            index=MAIN_PAGES.index(_current) if _current in MAIN_PAGES else None,
+            format_func=nav_label,
+            horizontal=True,
+            label_visibility="collapsed",
+            key="main_nav",
+            on_change=on_main_nav
         )
-
     # ACTIONS
     with action_col:
 
@@ -2380,7 +2399,6 @@ with st.container(key="top_nav"):
             st.session_state["main_nav"] = page_name
         st.query_params.clear()
         st.rerun()
-
     page = st.session_state["current_page"]
 
     _fragment = getattr(st, "fragment", None)
