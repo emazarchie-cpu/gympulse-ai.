@@ -2102,52 +2102,86 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- TOP NAV CONTAINER ---
-with st.container(key="top_nav"):
-    # Layout: Brand (left) | Nav (center) | Log out (right)
-    brand_col, nav_col, action_col = st.columns([2.5, 7.0, 1.5], vertical_alignment="center")
+# --- NAVIGATION CSS & LOGIC ---
+st.markdown("""
+<style>
+/* --- DESKTOP / LAPTOP VIEW --- */
+@media (min-width: 769px) {
+    .custom-nav { display: flex !important; flex-wrap: nowrap !important; gap: 2px !important; align-items: center; }
+    .custom-nav a {
+        color: var(--muted); text-decoration: none; font-size: 13px; font-weight: 600;
+        padding: 6px 10px; border-radius: 20px; white-space: nowrap; transition: all 0.2s ease;
+    }
+    .custom-nav a:hover { background: rgba(255,255,255,0.08); color: var(--white); }
+    .custom-nav a.active { background: rgba(183,243,74,0.15); color: var(--lime); }
+    
+    .mobile-menu-btn { display: none !important; }
+    .st-key-logout_button_main button { min-width: 100px !important; }
+}
 
-    # 1. BRAND
+/* --- MOBILE VIEW --- */
+@media (max-width: 768px) {
+    .custom-nav { display: none !important; }
+    .st-key-desktop-more { display: none !important; }
+    
+    .mobile-menu-btn { display: block !important; text-align: right; }
+    .mobile-menu-btn button {
+        background: transparent !important; border: none !important; color: var(--white) !important;
+        font-size: 26px !important; padding: 0 !important; box-shadow: none !important;
+    }
+    .mobile-menu-btn button:hover { color: var(--lime) !important; }
+    
+    /* Compact Logout */
+    .st-key-logout_button_main button { min-height: 38px !important; padding: 0 12px !important; font-size: 13px !important; }
+}
+</style>
+""", unsafe_allow_html=True)
+
+with st.container(key="top_nav"):
+    brand_col, nav_col, action_col = st.columns([2.0, 7.5, 1.5], vertical_alignment="center")
+
     with brand_col:
         st.markdown(logo_img_tag("nav-brand-logo"), unsafe_allow_html=True)
         st.button("PULSE", on_click=go_home, key="brand_home", use_container_width=True)
         st.markdown('<div class="nav-tagline">Smarter insights. Stronger member retention.</div>', unsafe_allow_html=True)
 
-    # 2. NAVIGATION
     with nav_col:
-        # Desktop: 8 items on one line
-        st.radio(
-            "WORKSPACE",
-            MAIN_PAGES,
-            index=None,
-            key="main_nav",
-            on_change=on_main_nav,
-            format_func=nav_label,
-            horizontal=True,
-            label_visibility="collapsed"
-        )
-        
-        # Desktop "More" button
+        # 1. Custom Desktop Menu (Single Line via HTML)
+        nav_html = '<div class="custom-nav">'
+        for name in MAIN_PAGES:
+            active = "active" if name == st.session_state.get("current_page") else ""
+            nav_html += f'<a href="?nav={name.replace(" ", "+")}" target="_self" class="{active}">{name}</a>'
+        nav_html += '</div>'
+        st.markdown(nav_html, unsafe_allow_html=True)
+
+        # 2. Desktop "More" button
         st.markdown('<div class="st-key-desktop-more">', unsafe_allow_html=True)
         with st.popover("More", use_container_width=False):
             for name in MORE_PAGES:
                 st.button(name, key=f"dt_{name}", on_click=show_page, args=(name,), use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-        # Mobile: Hamburger Menu
+        # 3. Mobile Hamburger
         st.markdown('<div class="mobile-menu-btn">', unsafe_allow_html=True)
         with st.popover("☰", use_container_width=False):
-            st.markdown("**MAIN**")
             for name in MAIN_PAGES:
                 st.button(name, key=f"mob_{name}", on_click=show_page, args=(name,), use_container_width=True)
             st.markdown("---")
-            st.markdown("**MORE**")
             for name in MORE_PAGES:
                 st.button(name, key=f"mob_{name}", on_click=show_page, args=(name,), use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # 3. LOG OUT
     with action_col:
         st.button("Log Out", on_click=log_out, use_container_width=True, key="logout_button_main")
+
+    # Listen for the custom menu clicks and switch page
+    if "nav" in st.query_params:
+        page_name = st.query_params["nav"].replace("+", " ")
+        if page_name in MAIN_PAGES:
+            st.session_state["current_page"] = page_name
+            st.session_state["main_nav"] = page_name
+        st.query_params.clear()
+        st.rerun()
 
     page = st.session_state["current_page"]
 
