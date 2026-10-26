@@ -2123,14 +2123,7 @@ with st.container(key="top_nav"):
         except TypeError:
             pass
 
-    with user_col:
-        st.button(
-            "Log Out",
-            on_click=log_out,
-            use_container_width=True,
-            key="logout_button_main"
-        )
-
+    
     
 # =========================================================
 # PERSONALIZED GREETING VARIABLES
