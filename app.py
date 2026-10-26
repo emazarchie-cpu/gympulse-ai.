@@ -404,14 +404,14 @@ st.markdown(
         color: var(--lime);
     }
 
-    /* Hover: lime box for as long as the mouse is over it */
+    /* Hover: subtle neutral tint so the lime accent stays for the current page */
     .st-key-top_nav div[role="radiogroup"] label:hover {
-        background: var(--lime) !important;
+        background: rgba(255,255,255,0.06) !important;
         border-radius: 10px;
     }
 
     .st-key-top_nav div[role="radiogroup"] label:hover p {
-        color: #10182A !important;
+        color: var(--white) !important;
     }
     /* ---------- Landing page 2026 ---------- */
     .lp-hero {
