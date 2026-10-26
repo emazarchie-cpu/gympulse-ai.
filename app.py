@@ -1900,6 +1900,7 @@ MAIN_PAGES = [
     "Dashboard",
     "Risk Radar",
     "Action Centre",
+    "Payments & Renewals",
     "Follow-ups",
     "Business Insights",
     "Archie",
@@ -2100,6 +2101,9 @@ elif page == "Action Centre":
     gw.render_action_centre(supabase, st.session_state.gym_id, assess_members)
 elif page == "Business Insights":
     gw.render_business_insights(supabase, st.session_state.gym_id, assess_members)
+elif page == "Payments & Renewals":
+    gw.render_payments(supabase, st.session_state.gym_id, assess_members)
+elif page == "Follow-ups":
 elif page == "Follow-ups":
     fu.render_followups(
         supabase,
@@ -2852,6 +2856,13 @@ elif page == "Model Insights":
         "Under the hood"
     )
 
+    st.write(
+        "**What this page is for:** it is a *teaching tool*. Every input is "
+        "held constant except one — days since last visit — and you see how "
+        "the model's estimate moves as that single number grows. Use it to "
+        "judge whether the model's logic makes sense, not to forecast real "
+        "members."
+    )
     st.info(
         "This experiment shows how the model responds to different "
         "inputs. It does not establish causation or real world accuracy."
@@ -3000,107 +3011,42 @@ elif page == "About the Model":
 
     gw.page_header(
         "About GymPulse AI",
-        "GymPulse AI is a machine-learning portfolio project "
-        "exploring gym membership cancellation-risk assessment.",
+        "A machine-learning portfolio project exploring gym membership "
+        "cancellation-risk assessment.",
         "The project"
     )
 
     st.markdown("### Model architecture")
 
     col1, col2, col3 = st.columns(3)
-
-    col1.metric(
-        "Algorithm",
-        "Logistic Regression"
-    )
-
-    col2.metric(
-        "Input Features",
-        "5"
-    )
-
-    col3.metric(
-        "Training Dataset",
-        "Synthetic"
-    )
-
-    st.metric(
-        "Medium-Risk Threshold",
-        "30%"
-    )
+    col1.metric("Algorithm", "Logistic Regression")
+    col2.metric("Input Features", "5")
+    col3.metric("Training Dataset", "Synthetic")
 
     st.markdown("### Features used by the model")
 
-    st.dataframe(
-        pd.DataFrame({
-            "Feature": [
-                "Membership type",
-                "Days since last visit",
-                "Attendance change",
-                "Days until renewal",
-                "PT sessions attended"
-            ],
-            "Description": [
-                "Member's membership category",
-                "Time since the most recent visit",
-                "Recent visits minus previous-period visits",
-                "Days remaining before renewal",
-                "Recorded personal-training attendance"
-            ]
-        }),
-        hide_index=True,
-        use_container_width=True
-    )
-
-    st.markdown("### Recorded development test results")
-
-    metrics = pd.DataFrame({
-        "Metric": [
-            "Accuracy",
-            "Precision",
-            "Recall",
-            "F1-score",
-            "ROC-AUC"
-        ],
-        "Recorded result": [
-            "59.0%",
-            "44.9%",
-            "75.7%",
-            "56.4%",
-            "65.1%"
-        ]
-    })
-
-    st.dataframe(
-        metrics,
-        hide_index=True,
-        use_container_width=True
-    )
+    rows = [
+        {"feature": "Membership type", "use": "Member's membership category"},
+        {"feature": "Days since last visit", "use": "Time since the most recent visit"},
+        {"feature": "Attendance change", "use": "Recent visits minus previous-period visits"},
+        {"feature": "Days until renewal", "use": "Days remaining before renewal"},
+        {"feature": "PT sessions attended", "use": "Recorded personal-training attendance"},
+    ]
+    gw.data_card(rows, [("feature", "Feature"), ("use", "Description")],
+                 key_prefix="model_features", tone="lime")
 
     st.warning(
-        "These metrics describe earlier evaluation on synthetic data. "
-        "They do not establish performance on real gym members. "
-        "Prior exploration of the test set also means the recorded "
-        "test results should be interpreted cautiously."
+        "The model is trained on synthetic (simulated) data. Its accuracy on "
+        "real gym members has not been established, and recorded test results "
+        "from earlier development should not be treated as a real-world "
+        "performance guarantee."
     )
 
-    st.markdown("### Responsible development")
-
     st.write(
-        "Before operational use, the model would require suitable "
-        "real-world evaluation, data-quality checks, probability "
-        "calibration, and assessment of errors and potential bias. "
-        "Member data should be handled with appropriate permission "
-        "and privacy safeguards."
-    )
-
-    st.markdown("### Project scope")
-
-    st.write(
-        "This application demonstrates model integration, "
-        "input validation, interactive predictions, CSV processing, "
-        "and controlled sensitivity analysis. It is an educational "
-        "prototype rather than a validated commercial prediction system."
+        "Before operational use, the model would need real-world evaluation, "
+        "calibration and a bias assessment. Member data must be handled with "
+        "permission and privacy safeguards. This is an educational prototype, "
+        "not a validated commercial prediction system."
     )
 # =========================================================
 # 13B. FAQs
