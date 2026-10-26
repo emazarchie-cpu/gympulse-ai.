@@ -2105,35 +2105,130 @@ st.markdown("""
 # --- NAVIGATION CSS & LOGIC ---
 st.markdown("""
 <style>
-/* --- DESKTOP / LAPTOP VIEW --- */
+
+/* =====================================
+   DESKTOP / LAPTOP
+   ===================================== */
+
 @media (min-width: 769px) {
-    .custom-nav { display: flex !important; flex-wrap: nowrap !important; gap: 2px !important; align-items: center; }
-    .custom-nav a {
-        color: var(--muted); text-decoration: none; font-size: 13px; font-weight: 600;
-        padding: 6px 10px; border-radius: 20px; white-space: nowrap; transition: all 0.2s ease;
+
+    .custom-nav {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        gap: 2px !important;
+        width: 100% !important;
+        white-space: nowrap !important;
     }
-    .custom-nav a:hover { background: rgba(255,255,255,0.08); color: var(--white); }
-    .custom-nav a.active { background: rgba(183,243,74,0.15); color: var(--lime); }
-    
-    .mobile-menu-btn { display: none !important; }
-    .st-key-logout_button_main button { min-width: 100px !important; }
+
+    .custom-nav a {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        color: var(--muted) !important;
+        text-decoration: none !important;
+        font-size: 12px !important;
+        font-weight: 600 !important;
+        padding: 6px 5px !important;
+        border-radius: 20px;
+        white-space: nowrap !important;
+        flex-shrink: 0 !important;
+        transition: all 0.2s ease;
+    }
+
+    .custom-nav a:hover {
+        background: rgba(255,255,255,0.08);
+        color: var(--white) !important;
+    }
+
+    .custom-nav a.active {
+        background: rgba(183,243,74,0.15);
+        color: var(--lime) !important;
+    }
+
+    .mobile-menu-btn {
+        display: none !important;
+    }
+
+    .st-key-logout_button_main button {
+        min-width: 85px !important;
+        white-space: nowrap !important;
+    }
+
 }
 
-/* --- MOBILE VIEW --- */
+/* =====================================
+   MOBILE
+   ===================================== */
+
 @media (max-width: 768px) {
-    .custom-nav { display: none !important; }
-    .st-key-desktop-more { display: none !important; }
-    
-    .mobile-menu-btn { display: block !important; text-align: right; }
-    .mobile-menu-btn button {
-        background: transparent !important; border: none !important; color: var(--white) !important;
-        font-size: 26px !important; padding: 0 !important; box-shadow: none !important;
+
+    /* Hide desktop navigation */
+    .custom-nav {
+        display: none !important;
     }
-    .mobile-menu-btn button:hover { color: var(--lime) !important; }
-    
-    /* Compact Logout */
-    .st-key-logout_button_main button { min-height: 38px !important; padding: 0 12px !important; font-size: 13px !important; }
+
+    /* Hide desktop More popover */
+    .st-key-desktop-more {
+        display: none !important;
+    }
+
+    /* Hide the desktop navigation column */
+    .st-key-top_nav [data-testid="stHorizontalBlock"]
+    > [data-testid="stColumn"]:nth-child(2) {
+        display: none !important;
+    }
+
+    /* Keep logo and action controls visible */
+    .st-key-top_nav [data-testid="stHorizontalBlock"] {
+        align-items: center !important;
+        gap: 8px !important;
+    }
+
+    .st-key-top_nav [data-testid="stHorizontalBlock"]
+    > [data-testid="stColumn"]:first-child {
+        flex: 1 1 auto !important;
+        min-width: 0 !important;
+    }
+
+    .st-key-top_nav [data-testid="stHorizontalBlock"]
+    > [data-testid="stColumn"]:last-child {
+        flex: 0 0 auto !important;
+        min-width: 0 !important;
+    }
+
+    /* Hamburger */
+    .mobile-menu-btn {
+        display: block !important;
+    }
+
+    .mobile-menu-btn button {
+        background: transparent !important;
+        border: none !important;
+        color: var(--white) !important;
+        font-size: 25px !important;
+        padding: 4px 8px !important;
+        min-height: 36px !important;
+        box-shadow: none !important;
+    }
+
+    .mobile-menu-btn button:hover {
+        color: var(--lime) !important;
+    }
+
+    /* Compact logout */
+    .st-key-logout_button_main button {
+        min-width: 0 !important;
+        width: auto !important;
+        min-height: 36px !important;
+        padding: 0 10px !important;
+        font-size: 12px !important;
+        white-space: nowrap !important;
+    }
+
 }
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -2146,33 +2241,78 @@ with st.container(key="top_nav"):
         st.markdown('<div class="nav-tagline">Smarter insights. Stronger member retention.</div>', unsafe_allow_html=True)
 
     with nav_col:
-        # 1. Custom Desktop Menu (Single Line via HTML)
-        nav_html = '<div class="custom-nav">'
-        for name in MAIN_PAGES:
-            active = "active" if name == st.session_state.get("current_page") else ""
-            nav_html += f'<a href="?nav={name.replace(" ", "+")}" target="_self" class="{active}">{name}</a>'
-        nav_html += '</div>'
-        st.markdown(nav_html, unsafe_allow_html=True)
 
-        # 2. Desktop "More" button
-        st.markdown('<div class="st-key-desktop-more">', unsafe_allow_html=True)
-        with st.popover("More", use_container_width=False):
-            for name in MORE_PAGES:
-                st.button(name, key=f"dt_{name}", on_click=show_page, args=(name,), use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+        # Desktop navigation links and More menu in one row
+        links_col, more_col = st.columns(
+            [12, 1],
+            vertical_alignment="center",
+            gap="small"
+        )
 
-        # 3. Mobile Hamburger
-        st.markdown('<div class="mobile-menu-btn">', unsafe_allow_html=True)
-        with st.popover("☰", use_container_width=False):
+        with links_col:
+            nav_html = '<div class="custom-nav">'
+
             for name in MAIN_PAGES:
-                st.button(name, key=f"mob_{name}", on_click=show_page, args=(name,), use_container_width=True)
-            st.markdown("---")
-            for name in MORE_PAGES:
-                st.button(name, key=f"mob_{name}", on_click=show_page, args=(name,), use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+                active = (
+                    "active"
+                    if name == st.session_state.get("current_page")
+                    else ""
+                )
 
+                nav_html += (
+                    f'<a href="?nav={name.replace(" ", "+")}" '
+                    f'target="_self" class="{active}">'
+                    f'{name}</a>'
+                )
+
+            nav_html += '</div>'
+
+            st.markdown(nav_html, unsafe_allow_html=True)
+
+        with more_col:
+            with st.popover("More", use_container_width=True):
+                for name in MORE_PAGES:
+                    st.button(
+                        name,
+                        key=f"dt_{name}",
+                        on_click=show_page,
+                        args=(name,),
+                        use_container_width=True
+                    )
+
+        
     with action_col:
-        st.button("Log Out", on_click=log_out, use_container_width=True, key="logout_button_main")
+
+        # Mobile Hamburger
+        with st.container(key="mobile_menu_btn"):
+            with st.popover("☰", use_container_width=False):
+                for name in MAIN_PAGES:
+                    st.button(
+                        name,
+                        key=f"mob_main_{name}",
+                        on_click=show_page,
+                        args=(name,),
+                        use_container_width=True
+                    )
+
+                st.divider()
+
+                for name in MORE_PAGES:
+                    st.button(
+                        name,
+                        key=f"mob_more_{name}",
+                        on_click=show_page,
+                        args=(name,),
+                        use_container_width=True
+                    )
+
+        # Log Out
+        st.button(
+            "Log Out",
+            on_click=log_out,
+            use_container_width=True,
+            key="logout_button_main"
+        )
 
     # Listen for the custom menu clicks and switch page
     if "nav" in st.query_params:
