@@ -2309,7 +2309,85 @@ st.markdown("""
 
 </style>
 """, unsafe_allow_html=True)
+st.markdown("""
+<style>
+/* ===== LAPTOP: logo | nav | logout in one row, no overlap ===== */
+@media (min-width: 769px) {
 
+    /* Left column (logo) gets a fixed width so it can't cover the nav */
+    .st-key-top_nav [data-testid="stHorizontalBlock"] {
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        gap: 12px !important;
+    }
+    .st-key-top_nav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(1) {
+        flex: 0 0 190px !important;
+        width: 190px !important;
+        min-width: 190px !important;
+    }
+    /* Middle column takes the remaining space */
+    .st-key-top_nav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(2) {
+        flex: 1 1 0 !important;
+        width: auto !important;
+        min-width: 0 !important;
+    }
+    /* Right column (Log Out) fixed width */
+    .st-key-top_nav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(3) {
+        flex: 0 0 110px !important;
+        width: 110px !important;
+        min-width: 110px !important;
+    }
+
+    /* Smaller logo so it never pushes into the nav */
+    .st-key-top_nav .nav-brand-logo { width: 40px !important; }
+
+    /* Nav pills: one line, evenly spaced */
+    .st-key-top_nav [data-testid="stRadio"] { width: 100% !important; }
+    .st-key-top_nav div[role="radiogroup"] {
+        flex-wrap: nowrap !important;
+        gap: 2px !important;
+        justify-content: flex-start !important;
+    }
+    .st-key-top_nav div[role="radiogroup"] label {
+        margin: 0 !important;
+        padding: 6px 9px !important;
+        white-space: nowrap !important;
+    }
+    .st-key-top_nav div[role="radiogroup"] label p {
+        font-size: 12.5px !important;
+        white-space: nowrap !important;
+    }
+}
+
+/* Smaller laptops: tighten a little more */
+@media (min-width: 769px) and (max-width: 1150px) {
+    .st-key-top_nav div[role="radiogroup"] label { padding: 5px 6px !important; }
+    .st-key-top_nav div[role="radiogroup"] label p { font-size: 11.5px !important; }
+}
+
+
+
+/* Logo shown inside the hamburger menu */
+.pop-logo {
+    display: block;
+    width: 56px;
+    height: auto;
+    margin: 0 auto 6px auto;
+}
+
+/* ===== Remove the red ring/dot that appears after tapping a button ===== */
+.stButton > button:focus,
+.stButton > button:focus-visible,
+.stButton > button:active,
+[data-testid="stPopover"] button:focus,
+[data-testid="stPopover"] button:focus-visible,
+[data-testid="stPopover"] button:active {
+    outline: none !important;
+    box-shadow: none !important;
+    border-color: transparent !important;
+}
+</style>
+""", unsafe_allow_html=True) 
 with st.container(key="top_nav"):
     brand_col, nav_col, action_col = st.columns(
         [2.0, 7.5, 1.5],
