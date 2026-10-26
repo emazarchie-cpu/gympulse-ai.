@@ -1973,65 +1973,102 @@ def nav_label(name):
     return name
 
 
+st.markdown("""
+<style>
+    /* ---------- TYMS STYLE NAV ---------- */
+    /* 1. Hide the default radio circle */
+    .st-key-top_nav div[role="radiogroup"] label > div:first-child {
+        display: none !important;
+    }
+    
+    /* 2. Style the nav links as pills */
+    .st-key-top_nav div[role="radiogroup"] label {
+        padding: 8px 12px !important;
+        margin: 0 2px !important;
+        background: transparent !important;
+        border-radius: 20px !important; 
+        border: none !important;
+        transition: all 0.2s ease !important;
+    }
+
+    /* 3. The text styling */
+    .st-key-top_nav div[role="radiogroup"] label p {
+        color: var(--muted) !important;
+        font-size: 14px !important;
+        font-weight: 600 !important;
+    }
+
+    /* 4. Hover effect */
+    .st-key-top_nav div[role="radiogroup"] label:hover {
+        background: rgba(255,255,255,0.08) !important;
+    }
+    .st-key-top_nav div[role="radiogroup"] label:hover p {
+        color: var(--white) !important;
+    }
+
+    /* 5. Active state */
+    .st-key-top_nav div[role="radiogroup"] label:has(input:checked) {
+        background: rgba(183,243,74,0.15) !important; 
+    }
+    .st-key-top_nav div[role="radiogroup"] label:has(input:checked) p {
+        color: var(--lime) !important; 
+    }
+    
+    /* 6. Clean mobile hamburger button */
+    .mobile-menu-btn button {
+        background: transparent !important;
+        border: none !important;
+        color: var(--white) !important;
+        font-size: 24px !important;
+        padding: 0 !important;
+        box-shadow: none !important;
+    }
+    .mobile-menu-btn button:hover {
+        color: var(--lime) !important;
+        background: transparent !important;
+    }
+</style>
+""", unsafe_allow_html=True)
 with st.container(key="top_nav"):
 
-    brand_col, nav_col, user_col = st.columns(
-        [3.0, 6.4, 1.1],
-        vertical_alignment="center"
-    )
+    # Top bar layout: Logo (left), Nav (center), Action (right)
+    brand_col, nav_col, action_col = st.columns([2.5, 7.5, 2], vertical_alignment="center")
 
     with brand_col:
         st.markdown(
             logo_img_tag("nav-brand-logo"),
             unsafe_allow_html=True
         )
-
         st.button(
             "PULSE",
             on_click=go_home,
             key="brand_home",
             use_container_width=True
         )
-
         st.markdown(
-            '<div class="nav-tagline">'
-            'Smarter insights. Stronger member retention.'
-            '</div>',
+            '<div class="nav-tagline">Smarter insights. Stronger member retention.</div>',
             unsafe_allow_html=True
         )
 
     with nav_col:
-        # DESKTOP LAYOUT: 8 items on a single line
-        # MOBILE LAYOUT: collapses into a hamburger menu dropdown
-        import streamlit.components.v1 as components
-        
-        # CSS to hide default desktop nav on mobile and force single line on desktop
+        # CSS to switch between desktop links and mobile hamburger
         st.markdown("""
         <style>
-        /* Force items on one line on desktop */
+        /* DESKTOP: Hide hamburger, show links */
         @media (min-width: 769px) {
-            .st-key-top_nav div[role="radiogroup"] {
-                flex-wrap: nowrap !important;
-                white-space: nowrap !important;
-            }
-            .st-key-top_nav div[role="radiogroup"] label {
-                padding: 8px 6px !important;
-                font-size: 12px !important;
-            }
-            .st-key-mobile-menu {
-                display: none !important;
-            }
+            .mobile-menu-btn { display: none !important; }
+            .desktop-nav { display: block !important; }
         }
-        /* Hide default radio group on mobile */
+        /* MOBILE: Hide links, show hamburger */
         @media (max-width: 768px) {
-            .st-key-top_nav div[role="radiogroup"] {
-                display: none !important;
-            }
+            .desktop-nav { display: none !important; }
+            .mobile-menu-btn { display: block !important; text-align: right; }
         }
         </style>
         """, unsafe_allow_html=True)
 
-        # Desktop Nav
+        # Desktop Navigation
+        st.markdown('<div class="desktop-nav">', unsafe_allow_html=True)
         st.radio(
             "WORKSPACE",
             MAIN_PAGES,
@@ -2042,36 +2079,33 @@ with st.container(key="top_nav"):
             horizontal=True,
             label_visibility="collapsed"
         )
+        st.markdown('</div>', unsafe_allow_html=True)
 
-        # Mobile Nav Popover
-        st.markdown('<div class="st-key-mobile-menu">', unsafe_allow_html=True)
-        with st.popover("☰ Menu", use_container_width=True):
-            # All main pages
+        # Mobile Hamburger Menu
+        st.markdown('<div class="mobile-menu-btn">', unsafe_allow_html=True)
+        with st.popover("☰", use_container_width=False):
+            # Main Pages
+            st.markdown("**MAIN**")
             for name in MAIN_PAGES:
                 st.button(name, key=f"mob_{name}", on_click=show_page, args=(name,), use_container_width=True)
+            
             st.markdown("---")
-            # All more pages
+            
+            # More Pages
+            st.markdown("**MORE**")
             for name in MORE_PAGES:
                 st.button(name, key=f"mob_{name}", on_click=show_page, args=(name,), use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-        # Desktop "More" popover
-        st.markdown('<div class="st-key-desktop-more">', unsafe_allow_html=True)
-        with st.popover("More...", use_container_width=True):
-            for name in MORE_PAGES:
-                st.button(name, key=f"dt_{name}", on_click=show_page, args=(name,), use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+    with action_col:
+        st.button(
+            "Log Out",
+            on_click=log_out,
+            use_container_width=True,
+            key="logout_button_main"
+        )
 
     page = st.session_state["current_page"]
-
-    # Hide the desktop More button on mobile so it doesn't appear twice
-    st.markdown("""
-    <style>
-    @media (max-width: 768px) {
-        .st-key-desktop-more { display: none !important; }
-    }
-    </style>
-    """, unsafe_allow_html=True)
 
     _fragment = getattr(st, "fragment", None)
     if _fragment is not None:
