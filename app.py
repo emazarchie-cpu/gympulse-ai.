@@ -1934,13 +1934,13 @@ MAIN_PAGES = [
     "Risk Radar",
     "Action Centre",
     "Payments & Renewals",
-    "Follow-ups",
     "Business Insights",
     "Archie",
     "Member Management",
 ]
 
 MORE_PAGES = [
+    "Follow-ups",
     "Member Assessment",
     "Batch Assessment",
     "Model Insights",
@@ -2311,37 +2311,29 @@ st.markdown("""
 """, unsafe_allow_html=True)
 st.markdown("""
 <style>
-/* ===== LAPTOP: logo | nav | logout in one row, no overlap ===== */
-@media (min-width: 769px) {
+/* ================= TOP BAR ================= */
 
-    /* Left column (logo) gets a fixed width so it can't cover the nav */
+/* ---------- Laptop: logo | 7 pages | Log Out | hamburger ---------- */
+@media (min-width: 769px) {
     .st-key-top_nav [data-testid="stHorizontalBlock"] {
         flex-wrap: nowrap !important;
         align-items: center !important;
-        gap: 12px !important;
+        gap: 10px !important;
     }
     .st-key-top_nav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(1) {
-        flex: 0 0 190px !important;
-        width: 190px !important;
-        min-width: 190px !important;
+        flex: 0 0 190px !important; width: 190px !important; min-width: 190px !important;
     }
-    /* Middle column takes the remaining space */
     .st-key-top_nav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(2) {
-        flex: 1 1 0 !important;
-        width: auto !important;
-        min-width: 0 !important;
+        flex: 1 1 0 !important; width: auto !important; min-width: 0 !important;
     }
-    /* Right column (Log Out) fixed width */
     .st-key-top_nav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(3) {
-        flex: 0 0 110px !important;
-        width: 110px !important;
-        min-width: 110px !important;
+        flex: 0 0 90px !important; width: 90px !important; min-width: 90px !important;
+    }
+    .st-key-top_nav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(4) {
+        flex: 0 0 52px !important; width: 52px !important; min-width: 52px !important;
     }
 
-    /* Smaller logo so it never pushes into the nav */
-    .st-key-top_nav .nav-brand-logo { width: 40px !important; }
-
-    /* Nav pills: one line, evenly spaced */
+    /* Page links shrink a little on smaller laptops so all 7 always fit */
     .st-key-top_nav [data-testid="stRadio"] { width: 100% !important; }
     .st-key-top_nav div[role="radiogroup"] {
         flex-wrap: nowrap !important;
@@ -2350,32 +2342,71 @@ st.markdown("""
     }
     .st-key-top_nav div[role="radiogroup"] label {
         margin: 0 !important;
-        padding: 6px 9px !important;
+        padding: 6px clamp(4px, 0.5vw, 10px) !important;
         white-space: nowrap !important;
     }
     .st-key-top_nav div[role="radiogroup"] label p {
-        font-size: 12.5px !important;
+        font-size: clamp(10px, 0.85vw, 13px) !important;
         white-space: nowrap !important;
     }
+
+    /* Page list inside the hamburger is mobile only */
+    .st-key-pop_main, .st-key-pop_logout { display: none !important; }
 }
 
-/* Smaller laptops: tighten a little more */
-@media (min-width: 769px) and (max-width: 1150px) {
-    .st-key-top_nav div[role="radiogroup"] label { padding: 5px 6px !important; }
-    .st-key-top_nav div[role="radiogroup"] label p { font-size: 11.5px !important; }
+/* ---------- Phone: logo + tagline on the left, hamburger on the right ---------- */
+@media (max-width: 768px) {
+    .st-key-top_nav [data-testid="stHorizontalBlock"] {
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        gap: 8px !important;
+    }
+    .st-key-top_nav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(2),
+    .st-key-top_nav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(3) {
+        display: none !important;
+    }
+    .st-key-top_nav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(1) {
+        flex: 1 1 auto !important; width: auto !important; min-width: 0 !important;
+    }
+    .st-key-top_nav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(4) {
+        flex: 0 0 auto !important; width: auto !important; min-width: 0 !important;
+    }
+    .st-key-top_nav .nav-tagline { font-size: 9px !important; }
 }
 
-
-
-/* Logo shown inside the hamburger menu */
-.pop-logo {
-    display: block;
-    width: 56px;
-    height: auto;
-    margin: 0 auto 6px auto;
+/* ---------- Logo and tagline (both screens) ---------- */
+.st-key-top_nav .nav-brand-logo { display: block !important; width: 40px !important; }
+.st-key-top_nav .nav-tagline {
+    display: block !important;
+    white-space: normal !important;
+    font-size: 10px;
+    line-height: 1.25 !important;
+    text-align: center;
+    margin: 2px auto 0 auto !important;
 }
+.pop-logo { display: none !important; }
 
-/* ===== Remove the red ring/dot that appears after tapping a button ===== */
+/* ---------- Hamburger button, top right ---------- */
+.st-key-top_menu { display: flex; justify-content: flex-end; }
+.st-key-top_menu button {
+    background: rgba(255,255,255,0.06) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 10px !important;
+    min-height: 38px !important;
+    padding: 0 12px !important;
+    box-shadow: none !important;
+}
+.st-key-top_menu button p {
+    color: var(--white) !important;
+    font-size: 20px !important;
+    font-weight: 700 !important;
+    margin: 0 !important;
+}
+.st-key-top_menu button:hover { border-color: var(--lime) !important; }
+.st-key-top_menu button:hover p { color: var(--lime) !important; }
+.st-key-top_menu [data-testid="stIconMaterial"] { display: none !important; }
+
+/* ---------- Remove the red focus ring after a tap ---------- */
 .stButton > button:focus,
 .stButton > button:focus-visible,
 .stButton > button:active,
@@ -2389,8 +2420,8 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True) 
 with st.container(key="top_nav"):
-    brand_col, nav_col, action_col = st.columns(
-        [2.0, 7.5, 1.5],
+    brand_col, nav_col, logout_col, menu_col = st.columns(
+        [2.0, 8.0, 1.0, 0.6],
         vertical_alignment="center"
     )
 
@@ -2413,7 +2444,7 @@ with st.container(key="top_nav"):
             unsafe_allow_html=True
         )
 
-    # DESKTOP NAVIGATION LINKS
+    # MAIN NAVIGATION (7 pages)
     with nav_col:
         _current = st.session_state.get("current_page")
         st.radio(
@@ -2426,49 +2457,53 @@ with st.container(key="top_nav"):
             key="main_nav",
             on_change=on_main_nav
         )
-    # ACTIONS
-    with action_col:
 
-        # MOBILE HAMBURGER MENU
-        with st.container(key="mobile_menu_btn"):
-            with st.popover("☰", use_container_width=False):
-
-                for name in MAIN_PAGES:
-                    st.button(
-                        name,
-                        key=f"mob_main_{name}",
-                        on_click=show_page,
-                        args=(name,),
-                        use_container_width=True
-                    )
-
-                st.divider()
-
-                for name in MORE_PAGES:
-                    st.button(
-                        name,
-                        key=f"mob_more_{name}",
-                        on_click=show_page,
-                        args=(name,),
-                        use_container_width=True
-                    )
-
-                st.divider()
-
-                st.button(
-                    "Log Out",
-                    key="mobile_logout_button",
-                    on_click=log_out,
-                    use_container_width=True
-                )
-
-        # DESKTOP LOG OUT
+    # LOG OUT (laptop)
+    with logout_col:
         st.button(
             "Log Out",
             on_click=log_out,
             use_container_width=True,
             key="logout_button_main"
         )
+
+    # HAMBURGER MENU (top right)
+    with menu_col:
+        with st.container(key="top_menu"):
+            menu_label = f"☰ {unread_replies}" if unread_replies else "☰"
+            with st.popover(menu_label, use_container_width=False):
+
+                # Main pages: shown on phones only
+                with st.container(key="pop_main"):
+                    for name in MAIN_PAGES:
+                        st.button(
+                            name,
+                            key=f"mob_main_{name}",
+                            on_click=show_page,
+                            args=(name,),
+                            use_container_width=True
+                        )
+                    st.divider()
+
+                # Extra pages: shown on laptop and phone
+                for name in MORE_PAGES:
+                    st.button(
+                        nav_label(name),
+                        key=f"mob_more_{name}",
+                        on_click=show_page,
+                        args=(name,),
+                        use_container_width=True
+                    )
+
+                # Log Out: phones only
+                with st.container(key="pop_logout"):
+                    st.divider()
+                    st.button(
+                        "Log Out",
+                        key="mobile_logout_button",
+                        on_click=log_out,
+                        use_container_width=True
+                    )
     # Listen for the custom menu clicks and switch page
     if "nav" in st.query_params:
         page_name = st.query_params["nav"].replace("+", " ")
