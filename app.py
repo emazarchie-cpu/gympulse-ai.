@@ -2034,8 +2034,13 @@ st.markdown("""
 <style>
 /* --- LAPTOP VIEW --- */
 @media (min-width: 769px) {
-    /* Hide mobile menu */
-    .mobile-menu-btn { display: none !important; }
+    /* Hide mobile hamburger and desktop More menu */
+    .mobile-menu-btn,
+    .st-key-mobile_menu_btn,
+    .st-key-desktop-more {
+        display: none !important;
+    }
+}
     
     /* Force everything onto one line */
     .st-key-top_nav div[role="radiogroup"] {
@@ -2270,16 +2275,7 @@ with st.container(key="top_nav"):
             st.markdown(nav_html, unsafe_allow_html=True)
 
         with more_col:
-            with st.popover("More", use_container_width=True):
-                for name in MORE_PAGES:
-                    st.button(
-                        name,
-                        key=f"dt_{name}",
-                        on_click=show_page,
-                        args=(name,),
-                        use_container_width=True
-                    )
-
+            
         
     with action_col:
 
