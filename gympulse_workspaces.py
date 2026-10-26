@@ -1,8 +1,5 @@
 """GymPulse AI: Risk Radar, Retention Action Centre, Payments & Renewals,
 Business Insights, Archie.
-
-Pure logic (build_roster, drivers, playbook, kpis, archie_context) is separate
-from Streamlit rendering so it can be tested without a database.
 """
 import base64
 import io
@@ -41,195 +38,7 @@ STATUSES = ["To do", "In progress", "Done"]
 OUTCOMES = ["Retained", "Cancelled", "No response"]
 SUGGEST_COOLDOWN_DAYS = 30
 DONE_RETENTION_HOURS = 24
-PURGE_INTERVAL_SECONDS = 600   # run the auto-archive at most every 10 minutes
-
-
-MOBILE_PARTS = {
-    "base": """
-@media (max-width: 640px) {
-    .block-container {
-        padding-left: 0.9rem !important;
-        padding-right: 0.9rem !important;
-        padding-top: 0.6rem !important;
-    }
-    .hero { padding: 18px !important; }
-    .hero-title { font-size: 26px !important; }
-    input, textarea, [data-baseweb="select"] input { font-size: 16px !important; }
-    .block-container .stButton > button { min-height: 44px; }
-}
-""",
-    "nav": """
-@media (max-width: 640px) {
-    .nav-tagline { display: none !important; }
-    .st-key-top_nav div[role="radiogroup"] {
-        flex-wrap: wrap !important;
-        gap: 4px !important;
-    }
-    .st-key-top_nav div[role="radiogroup"] label {
-        padding: 8px 10px !important;
-    }
-}
-""",
-    "brand": """
-@media (max-width: 640px) {
-    .st-key-top_nav [data-testid="stColumn"]:first-child [data-testid="stHorizontalBlock"] {
-        flex-direction: row !important;
-        flex-wrap: nowrap !important;
-    }
-    .st-key-top_nav [data-testid="stColumn"]:first-child [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
-        min-width: 0 !important;
-    }
-}
-""",
-    "metrics": """
-@media (max-width: 640px) {
-    [data-testid="stHorizontalBlock"]:has([data-testid="stMetric"]) {
-        flex-wrap: wrap !important;
-        gap: 0.6rem !important;
-    }
-    [data-testid="stHorizontalBlock"]:has([data-testid="stMetric"]) > [data-testid="stColumn"] {
-        flex: 1 1 calc(50% - 0.6rem) !important;
-        min-width: calc(50% - 0.6rem) !important;
-    }
-    [data-testid="stMetric"] { padding: 14px !important; }
-    [data-testid="stMetricValue"] { font-size: 22px !important; }
-}
-""",
-}
-
-
-def _mobile_css(off=()):
-    keep = "".join(css for name, css in MOBILE_PARTS.items() if name not in off)
-    return "<style>" + keep + "</style>"
-
-
-MOBILE_CSS = _mobile_css()
-
-
-OVERFLOW_JS = r"""
-<div id="out" style="font:12px monospace;color:#fff;background:#111;padding:8px;
- white-space:pre-wrap;word-break:break-all">scanning...</div>
-<script>
-function scan() {
-  try {
-    const d = window.parent.document, w = d.documentElement.clientWidth;
-    const clipped = (el) => {
-      for (let a = el.parentElement; a && a !== d.body; a = a.parentElement) {
-        const o = window.parent.getComputedStyle(a).overflowX;
-        if (['auto', 'scroll', 'hidden', 'clip'].includes(o)) {
-          const r = a.getBoundingClientRect();
-          if (r.right <= w + 1 && r.left >= -1) return true;
-        }
-      }
-      return false;
-    };
-    const bad = [];
-    d.querySelectorAll('body *').forEach(el => {
-      const r = el.getBoundingClientRect();
-      if (r.width > 0 && (r.right > w + 1 || r.left < -1) && !clipped(el)) {
-        const tid = el.getAttribute('data-testid');
-        const cls = (typeof el.className === 'string' && el.className)
-          ? '.' + el.className.split(' ').filter(Boolean).slice(0, 2).join('.') : '';
-        bad.push(el.tagName.toLowerCase() + (tid ? '[' + tid + ']' : '') + cls
-          + '  right=' + Math.round(r.right) + ' width=' + Math.round(r.width));
-      }
-    });
-    const doc = d.documentElement;
-    document.getElementById('out').textContent =
-      'viewport=' + w + 'px  scrollWidth=' + doc.scrollWidth + 'px\n'
-      + (bad.slice(0, 20).join('\n') || 'no overflowing elements found');
-  } catch (e) {
-    document.getElementById('out').textContent = 'scan failed: ' + e;
-  }
-}
-scan();
-setInterval(scan, 2000);
-</script>
-"""
-
-
-LOCK_JS = r"""
-<script>
-function lockFn() {
-  let sx = 0, sy = 0, dir = null;
-  const SAFE = '[role="slider"],[data-baseweb="slider"],input,textarea,select,' +
-    '[data-testid="stDataFrame"],.vega-embed,[role="radiogroup"],pre,code,canvas';
-  function insideScroller(el) {
-    for (let n = el; n && n !== document.body && n !== document.documentElement;
-         n = n.parentElement) {
-      if (n.matches && n.matches(SAFE)) return true;
-      const cs = getComputedStyle(n);
-      if ((cs.overflowX === 'auto' || cs.overflowX === 'scroll') &&
-          n.scrollWidth > n.clientWidth + 1) return true;
-    }
-    return false;
-  }
-  document.addEventListener('touchstart', function (e) {
-    dir = null;
-    if (e.touches.length === 1) { sx = e.touches[0].clientX; sy = e.touches[0].clientY; }
-  }, {passive: true});
-  document.addEventListener('touchmove', function (e) {
-    if (e.touches.length !== 1) return;
-    const dx = e.touches[0].clientX - sx, dy = e.touches[0].clientY - sy;
-    if (dir === null && (Math.abs(dx) > 6 || Math.abs(dy) > 6)) {
-      dir = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v';
-    }
-    if (dir === 'h' && e.cancelable && !insideScroller(e.target)) e.preventDefault();
-  }, {passive: false});
-}
-(function () {
-  try {
-    var d = window.parent.document;
-    if (d.getElementById('gp-hlock')) return;
-    var s = d.createElement('script');
-    s.id = 'gp-hlock';
-    s.textContent = '(' + lockFn.toString() + ')();';
-    d.head.appendChild(s);
-  } catch (e) {}
-})();
-</script>
-"""
-
-
-HELPER_CSS = """
-<style>
-[data-testid="stElementContainer"]:has(iframe[height="0"]) {
-    position: absolute !important;
-    width: 0 !important; height: 0 !important;
-    margin: 0 !important; padding: 0 !important;
-    overflow: hidden !important;
-}
-</style>
-"""
-
-
-def apply_mobile_styles():
-    off = ()
-    try:
-        params = st.query_params
-        raw = str(params.get("off", ""))
-        off = tuple(MOBILE_PARTS) if raw == "all" else tuple(
-            x.strip() for x in raw.split(",") if x.strip())
-    except Exception:
-        params = {}
-    st.markdown(_mobile_css(off), unsafe_allow_html=True)
-    try:
-        if str(params.get("lock", "")) in ("1", "js"):
-            import streamlit.components.v1 as components
-            st.markdown(HELPER_CSS, unsafe_allow_html=True)
-            components.html(LOCK_JS, height=0)
-        if params.get("debug") == "overflow":
-            import streamlit.components.v1 as components
-            components.html(OVERFLOW_JS, height=320, scrolling=True)
-    except Exception:
-        pass
-
-
-# ======================================================================
-# UI TOOLKIT
-# ======================================================================
-HERE = os.path.dirname(os.path.abspath(__file__))
-ARCHIE_AVATAR = os.path.join(HERE, "archie_avatar.png")
+PURGE_INTERVAL_SECONDS = 600
 
 TONES = {
     "lime": "#B7F34A", "red": "#FF6B6B", "amber": "#FFC44D",
@@ -242,15 +51,12 @@ GOALS = ["Weight loss", "Muscle gain", "General fitness", "Strength",
          "Endurance", "Sports performance"]
 CHART_MUTED = "#9AA8BD"
 
-
 def _esc(value):
     return _html_escape("" if value is None else str(value), quote=True)
-
 
 def _md(markup, target=None):
     flat = " ".join(line.strip() for line in str(markup).splitlines() if line.strip())
     (target if target is not None else st).markdown(flat, unsafe_allow_html=True)
-
 
 def _text(value, default=""):
     if value is None:
@@ -262,7 +68,6 @@ def _text(value, default=""):
         pass
     return str(value)
 
-
 def _num(value, default):
     try:
         if value is None or pd.isna(value):
@@ -270,7 +75,6 @@ def _num(value, default):
         return float(value)
     except (TypeError, ValueError):
         return default
-
 
 # ---------------------------------------------------------------- photos
 def process_photo(raw_bytes, size=PHOTO_SIZE):
@@ -282,21 +86,6 @@ def process_photo(raw_bytes, size=PHOTO_SIZE):
     img.save(buffer, format="JPEG", quality=80, optimize=True)
     return "data:image/jpeg;base64," + base64.b64encode(buffer.getvalue()).decode()
 
-
-@st.cache_resource(show_spinner=False)
-def _file_uri(path, width=256):
-    try:
-        from PIL import Image
-        img = Image.open(path).convert("RGBA")
-        width = min(width, img.width)
-        img = img.resize((width, round(img.height * width / img.width)), Image.LANCZOS)
-        buffer = io.BytesIO()
-        img.save(buffer, format="PNG", optimize=True)
-        return "data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode()
-    except Exception:
-        return ""
-
-
 def initials(name):
     parts = [p for p in str(name or "").replace("-", " ").split() if p]
     if not parts:
@@ -305,10 +94,8 @@ def initials(name):
         return parts[0][:2].upper()
     return (parts[0][0] + parts[-1][0]).upper()
 
-
 def has_photo(photo):
     return isinstance(photo, str) and photo.startswith("data:image")
-
 
 def avatar_html(name, photo=None, size=44, extra=""):
     cls = ("avatar " + extra).strip()
@@ -317,7 +104,6 @@ def avatar_html(name, photo=None, size=44, extra=""):
         return f'<img class="{cls}" style="{style}" src="{photo}" alt="{_esc(name)}">'
     return f'<div class="{cls}" style="{style}">{_esc(initials(name))}</div>'
 
-
 def whatsapp_digits(phone):
     digits = re.sub(r"\D", "", str(phone or ""))
     if digits.startswith("00"):
@@ -325,7 +111,6 @@ def whatsapp_digits(phone):
     elif digits.startswith("0") and len(digits) == 11:
         digits = "234" + digits[1:]
     return digits
-
 
 # ----------------------------------------------------------- components
 def page_header(title, subtitle="", eyebrow=""):
@@ -337,7 +122,6 @@ def page_header(title, subtitle="", eyebrow=""):
         parts.append(f'<div class="pg-sub">{_esc(subtitle)}</div>')
     _md('<div class="pg-head">' + "".join(parts) + "</div>")
 
-
 def chip(text, tone="grey", dot=False, href=None):
     cls = f"chip chip-{tone}" + (" chip-dot" if dot else "")
     if href:
@@ -345,14 +129,11 @@ def chip(text, tone="grey", dot=False, href=None):
                 f'rel="noopener">{_esc(text)}</a>')
     return f'<span class="{cls}">{_esc(text)}</span>'
 
-
 RISK_TONE = {"High": "red", "Medium": "amber", "Low": "lime"}
-
 
 def risk_chip(level, prob=None):
     text = str(level).upper() if prob is None else f"{str(level).upper()} · {prob:.0%}"
     return chip(text, RISK_TONE.get(level, "grey"), dot=True)
-
 
 def kpi_card(label, value, tone="lime", hint=""):
     colour = TONES.get(tone, tone)
@@ -361,19 +142,16 @@ def kpi_card(label, value, tone="lime", hint=""):
             f'<div class="kpi-label">{_esc(label)}</div>'
             f'<div class="kpi-value">{_esc(value)}</div>{hint_html}</div>')
 
-
 def kpi_row(cards):
     cols = st.columns(len(cards))
     for col, card in zip(cols, cards):
         _md(kpi_card(*card), col)
-
 
 def prob_bar(prob, level):
     colour = TONES[RISK_TONE.get(level, "grey")]
     width = max(0, min(100, round(float(prob) * 100)))
     return (f'<div class="pct">{width}%</div><div class="pbar">'
             f'<span style="width:{width}%;--tone:{colour}"></span></div>')
-
 
 ICON_PATHS = {
     "chat": '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>',
@@ -382,12 +160,10 @@ ICON_PATHS = {
     "heart": '<path d="M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.8 0-3 .5-4.5 2-1.5-1.5-2.7-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7Z"/>',
 }
 
-
 def ic(name, size=22):
     return (f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" '
             'stroke="currentColor" stroke-width="1.8" stroke-linecap="round" '
             f'stroke-linejoin="round">{ICON_PATHS[name]}</svg>')
-
 
 def _ibtn(target, label, icon=None, **kw):
     if icon:
@@ -397,10 +173,8 @@ def _ibtn(target, label, icon=None, **kw):
             pass
     return target.button(label, **kw)
 
-
 def _bump(key, default, step):
     st.session_state[key] = st.session_state.get(key, default) + step
-
 
 # ------------------------------------------------- membership status
 def membership_state(end, today=None):
@@ -427,10 +201,8 @@ def membership_state(end, today=None):
     return {"key": "active", "label": "Active", "tone": "lime",
             "detail": detail, "end": d, "days": days}
 
-
 def membership_chip(state):
     return chip(state["label"], state["tone"], dot=True)
-
 
 def due_chip(due, status):
     if status == "Done":
@@ -448,15 +220,12 @@ def due_chip(due, status):
         return chip("Due tomorrow", "cyan")
     return chip(f"Due {d:%d %b}", "grey")
 
-
 OUTCOME_TONE = {"Retained": "lime", "Cancelled": "red", "No response": "grey"}
-
 
 def outcome_chip(outcome):
     if not outcome or (isinstance(outcome, float) and pd.isna(outcome)):
         return chip("No outcome", "grey")
     return chip(str(outcome), OUTCOME_TONE.get(str(outcome), "grey"), dot=True)
-
 
 @contextmanager
 def _section(title, use_expander=True, expanded=False):
@@ -465,7 +234,6 @@ def _section(title, use_expander=True, expanded=False):
             yield
     else:
         yield
-
 
 # ---------------------------------------------------------------- charts
 def _style_chart(chart):
@@ -477,38 +245,11 @@ def _style_chart(chart):
             .configure_legend(labelColor="#F4F7FB", titleColor=CHART_MUTED)
             .configure_view(strokeWidth=0))
 
-
-def modern_line_chart(df):
-    data = df[["days_since_last_visit", "cancellation_probability"]].copy()
-    try:
-        import altair as alt
-        base = alt.Chart(data).encode(
-            x=alt.X("days_since_last_visit:Q", title="Days since last visit",
-                    axis=alt.Axis(tickMinStep=1, format="d")),
-            y=alt.Y("cancellation_probability:Q", title="Estimated probability",
-                    scale=alt.Scale(domain=[0, 1]), axis=alt.Axis(format="%")),
-            tooltip=[alt.Tooltip("days_since_last_visit:Q", title="Days away"),
-                     alt.Tooltip("cancellation_probability:Q", title="Estimate", format=".0%")])
-        area = base.mark_area(
-            interpolate="monotone", line={"color": "#B7F34A", "strokeWidth": 3},
-            color=alt.Gradient(gradient="linear", x1=1, x2=1, y1=1, y2=0, stops=[
-                alt.GradientStop(color="rgba(183,243,74,0.0)", offset=0),
-                alt.GradientStop(color="rgba(183,243,74,0.38)", offset=1)]))
-        dots = base.mark_circle(size=80, color="#B7F34A", stroke="#0B1020", strokeWidth=2)
-        lines = (alt.Chart(pd.DataFrame({"y": [0.3, 0.5]}))
-                 .mark_rule(strokeDash=[5, 5], color="rgba(255,255,255,0.28)")
-                 .encode(y=alt.Y("y:Q", scale=alt.Scale(domain=[0, 1]))))
-        _show_chart(_style_chart(alt.layer(lines, area, dots).properties(height=320)))
-    except Exception:
-        st.line_chart(data.set_index("days_since_last_visit"))
-
-
 def _show_chart(chart):
     try:
         st.altair_chart(chart, use_container_width=True, theme=None)
     except TypeError:
         st.altair_chart(chart, use_container_width=True)
-
 
 def data_card(rows, cols, key_prefix, tone="cyan", empty="Nothing here yet."):
     if not rows:
@@ -526,7 +267,6 @@ def data_card(rows, cols, key_prefix, tone="cyan", empty="Nothing here yet."):
             _md(divider + f'<div class="panel" style="margin:0 0 4px;'
                 f'border-top:3px solid {TONES[tone]};padding:12px 16px;">'
                 f'{kv}</div>')
-
 
 # ------------------------------------------------------------------ CSS
 UI_CSS = """
@@ -793,16 +533,13 @@ span[data-baseweb="tag"] span { color: #B7F34A !important; }
 }
 """
 
-
 def apply_ui_styles():
     st.markdown("<style>" + UI_CSS + "</style>", unsafe_allow_html=True)
 
-
-# ------------------------------------------------------------ speed
+# ------------------------------------------------------------ speed & caching
 class _TrackedTable:
     def __init__(self, table):
         self._t = table
-
     def __getattr__(self, name):
         attr = getattr(self._t, name)
         if name in ("insert", "update", "upsert", "delete"):
@@ -812,17 +549,13 @@ class _TrackedTable:
             return wrapper
         return attr
 
-
 class TrackedClient:
     def __init__(self, client):
         self._client = client
-
     def __getattr__(self, name):
         return getattr(self._client, name)
-
     def table(self, name):
         return _TrackedTable(self._client.table(name))
-
 
 def _clone(value):
     if isinstance(value, pd.DataFrame):
@@ -831,12 +564,8 @@ def _clone(value):
         return tuple(_clone(v) for v in value)
     return value
 
-
 def _cached(key, fn, ttl=60, skip_empty=False):
-    """Reuse a database read for a short while (cleared by any write).
-
-    TTL raised to 60s to reduce read pressure on Render + Supabase free tier.
-    """
+    # Increased TTL to 60s to avoid re-fetching on every page switch
     store = st.session_state.get("_cache")
     if not isinstance(store, dict):
         store = {}
@@ -851,24 +580,19 @@ def _cached(key, fn, ttl=60, skip_empty=False):
         store[key] = (now, version, _clone(value))
     return value
 
-
 cached = _cached
-
 
 def show_boot_overlay():
     st.markdown('<div class="boot-overlay"><div class="boot-spin"></div>'
                 '<div>Loading your workspace…</div></div>', unsafe_allow_html=True)
     time.sleep(0.2)
 
-
 # ---------------------------------------------------------------- data
-# Include payment columns in the base so Payments page always works
 MEMBER_BASE = ["id", "full_name", "email", "phone", "age", "weight_kg",
                "height_cm", "fitness_goal", "created_at", "archived"]
 MEMBER_SUSPEND = ["suspended"]
 MEMBER_PROFILE = ["photo", "membership_end", "last_renewed_on", "last_payment"]
 MEMBER_PROFILE_LIGHT = ["membership_end", "last_renewed_on", "last_payment"]
-
 
 def _fetch_members_uncached(supabase, gym_id, archived=None, include_photo=True):
     profile = MEMBER_PROFILE if include_photo else MEMBER_PROFILE_LIGHT
@@ -889,7 +613,6 @@ def _fetch_members_uncached(supabase, gym_id, archived=None, include_photo=True)
             last_error = error
     if rows is None:
         raise last_error or RuntimeError("Could not load members.")
-
     df = pd.DataFrame(rows)
     if df.empty:
         df = pd.DataFrame(columns=MEMBER_BASE + MEMBER_SUSPEND + MEMBER_PROFILE)
@@ -902,12 +625,11 @@ def _fetch_members_uncached(supabase, gym_id, archived=None, include_photo=True)
                 "profile_ready": "membership_end" in used}
     return df, features
 
-
 def _load_roster_uncached(supabase, gym_id, assess_fn, with_photos=True):
-    members_all, _ = fetch_members(supabase, gym_id, archived=False,
-                                   include_photo=with_photos)
+    members_all, _ = fetch_members(supabase, gym_id, archived=False, include_photo=with_photos)
     members = members_all[~members_all["suspended"]]
-    # carry through payment / renewal columns so Payments page works
+    
+    # Carry through payment / renewal columns so Payments page works
     keep = ["id", "full_name", "email", "phone", "fitness_goal",
             "membership_end", "last_payment", "last_renewed_on"]
     if with_photos:
@@ -919,7 +641,6 @@ def _load_roster_uncached(supabase, gym_id, assess_fn, with_photos=True):
         .eq("gym_id", gym_id).execute().data or []
     )
     return build_roster(members, activity, assess_fn)
-
 
 def build_roster(members, activity, assess_fn):
     if members.empty:
@@ -941,10 +662,8 @@ def build_roster(members, activity, assess_fn):
     scored["suggested_action"] = scored.apply(suggest_action, axis=1)
     return scored.sort_values("cancellation_probability", ascending=False), missing
 
-
 def _load_actions_uncached(supabase, gym_id, include_archived=False):
-    query = (supabase.table("retention_actions").select("*")
-             .eq("gym_id", gym_id))
+    query = (supabase.table("retention_actions").select("*").eq("gym_id", gym_id))
     if not include_archived:
         try:
             query = query.is_("archived_at", "null")
@@ -953,27 +672,19 @@ def _load_actions_uncached(supabase, gym_id, include_archived=False):
     rows = query.order("created_at", desc=True).execute().data or []
     return pd.DataFrame(rows)
 
-
 def fetch_members(supabase, gym_id, archived=None, include_photo=True):
     return _cached(("members", gym_id, archived, include_photo),
                    lambda: _fetch_members_uncached(supabase, gym_id, archived, include_photo))
-
 
 def load_roster(supabase, gym_id, assess_fn, with_photos=True):
     return _cached(("roster", gym_id, with_photos),
                    lambda: _load_roster_uncached(supabase, gym_id, assess_fn, with_photos))
 
-
 def load_actions(supabase, gym_id, include_archived=False):
     return _cached(("actions", gym_id, include_archived),
                    lambda: _load_actions_uncached(supabase, gym_id, include_archived))
 
-
 def purge_old_done_actions(supabase, gym_id, hours=DONE_RETENTION_HOURS):
-    """Hide Done + Retained cards after `hours`, at most once per
-    PURGE_INTERVAL_SECONDS so it doesn't hit the DB every render.
-    Never raises.
-    """
     stamp_key = f"_purge_{gym_id}"
     last = st.session_state.get(stamp_key, 0)
     if time.time() - last < PURGE_INTERVAL_SECONDS:
@@ -1007,19 +718,16 @@ def purge_old_done_actions(supabase, gym_id, hours=DONE_RETENTION_HOURS):
         return 0
     return len(stale)
 
-
 def open_profile(member_id, back_page="Member Management"):
     st.session_state["profile_member_id"] = member_id
     st.session_state["profile_back"] = back_page
     st.session_state["navigate_to"] = "Member Profile"
-
 
 def open_followup(member_id, back_page="Risk Radar"):
     st.session_state["fu_member"] = member_id
     st.session_state["fu_view"] = "Compose"
     st.session_state["followup_back"] = back_page
     st.session_state["navigate_to"] = "Follow-ups"
-
 
 # ------------------------------------------------------------- logic
 def drivers(row):
@@ -1037,7 +745,6 @@ def drivers(row):
         out.append("monthly plan (easy to leave)")
     return ", ".join(out) or "no major warning signs"
 
-
 def suggest_action(row):
     if row["renewal_due_days"] <= 14 and row["risk_category"] != "Low":
         return "Renewal offer"
@@ -1048,7 +755,6 @@ def suggest_action(row):
     if row["risk_category"] == "Low":
         return "Goal review"
     return "WhatsApp check-in"
-
 
 def members_to_contact(roster, actions, cooldown_days=SUGGEST_COOLDOWN_DAYS, today=None):
     if roster.empty:
@@ -1066,12 +772,10 @@ def members_to_contact(roster, actions, cooldown_days=SUGGEST_COOLDOWN_DAYS, tod
         blocked |= set(done.loc[done["outcome"] == "Cancelled", "member_id"])
     return roster[(roster["risk_category"] != "Low") & ~roster["id"].isin(blocked)]
 
-
 def _go(page, member=None):
     st.session_state["navigate_to"] = page
     if member is not None:
         st.session_state["focus_member"] = member
-
 
 def kpis(roster, actions):
     n = len(roster)
@@ -1097,94 +801,9 @@ def kpis(roster, actions):
             )["monthly_fee"].sum()) if retained and n else 0.0,
     }
 
-
-def archie_context(roster, actions, business_name):
-    k = kpis(roster, actions)
-    lines = [f"Gym: {business_name}. Members scored: {k['members_scored']}.",
-             f"High risk: {k['high']}, Medium: {k['medium']}.",
-             f"Monthly revenue: {k['monthly_revenue']:,.0f}; held by high-risk members: "
-             f"{k['high_risk_revenue']:,.0f}; expected monthly loss: {k['expected_loss']:,.0f}.",
-             f"Renewals in 30 days that are at risk: {k['renewals_30d_at_risk']}.",
-             f"Open retention actions: {k['open_actions']}; members saved: {k['saves']}."]
-    if len(roster):
-        need = members_to_contact(roster, actions)
-        if need.empty:
-            lines.append("Every at-risk member already has an action in progress "
-                         "or was contacted recently.")
-        else:
-            lines.append("Top at-risk members still needing a follow-up "
-                         "(name | risk% | reasons | suggested action):")
-        for _, r in need.head(10).iterrows():
-            lines.append(f"- {r['full_name']} | {r['cancellation_probability']:.0%} | "
-                         f"{r['drivers']} | {r['suggested_action']}")
-    return "\n".join(lines)
-
-
-ARCHIE_SYSTEM = (
-    "You are Archie, the retention assistant inside GymPulse AI. You help gym "
-    "owners keep members. Use ONLY the data provided; if something is not in it, "
-    "say so. The risk scores come from a model trained on synthetic data, so call "
-    "them estimates, never facts. Be warm, upbeat and concrete, and sound genuinely excited to help. When asked for a "
-    "message to a member, write it ready to send (WhatsApp length, excited and friendly, at most two emojis, no "
-    "pressure, no mention of 'risk' or 'cancellation'). "
-    "Never leave placeholders like [your name] in a message; sign it with the "
-    "owner's name from the data."
-)
-
-
-def _clean_key(raw):
-    return str(raw).strip().strip('"').strip("'").strip()
-
-
-def key_check():
-    try:
-        raw = st.secrets.get("ANTHROPIC_API_KEY")
-    except Exception:
-        raw = None
-    if not raw:
-        return "No ANTHROPIC_API_KEY found in secrets."
-    key = _clean_key(raw)
-    return (f"Key found: {len(key)} characters, starts with "
-            f"'{key[:7]}', ends with '...{key[-3:]}', "
-            f"valid prefix: {key.startswith('sk-ant-')}.")
-
-
-def archie_reply(history, context):
-    try:
-        raw = st.secrets.get("ANTHROPIC_API_KEY")
-    except Exception:
-        raw = None
-    if not raw:
-        return _offline_reply(history[-1]["content"], context), False
-    try:
-        import anthropic
-        client = anthropic.Anthropic(api_key=_clean_key(raw))
-        resp = client.messages.create(
-            model=ARCHIE_MODEL, max_tokens=1000,
-            system=ARCHIE_SYSTEM + "\n\nGYM DATA:\n" + context,
-            messages=history[-12:],
-        )
-        text = "".join(
-            block.text for block in resp.content
-            if getattr(block, "type", None) == "text"
-        ).strip()
-        return (text or "Archie had no answer this time. Please try again."), True
-    except Exception as e:
-        detail = str(e)[:300]
-        return (f"Archie couldn't reach the AI service "
-                f"({type(e).__name__}): {detail}\n\n"
-                + _offline_reply(history[-1]["content"], context)), False
-
-
-def _offline_reply(question, context):
-    return ("Here is today's snapshot from your data:\n\n" + context
-            + "\n\n(AI answers are off. " + key_check() + ")")
-
-
 # ------------------------------------------------------- rendering
 def _money(x):
     return f"{x:,.0f}"
-
 
 def _activity_editor(supabase, gym_id, roster, missing, use_expander=True):
     names, current = {}, {}
@@ -1257,7 +876,6 @@ def _activity_editor(supabase, gym_id, roster, missing, use_expander=True):
     if not missing.empty:
         st.caption(f"{len(missing)} member(s) still need activity data.")
 
-
 IMPORT_NUMERIC = {
     "days_since_last_visit": (0, 3650),
     "visits_previous_30_days": (0, 200),
@@ -1267,7 +885,6 @@ IMPORT_NUMERIC = {
 }
 IMPORT_PLANS = {"monthly": "Monthly", "quarterly": "Quarterly", "annual": "Annual"}
 ISSUE_COLS = ["Row", "Member", "Problem", "Result"]
-
 
 def parse_activity_csv(csv_df, members):
     df = csv_df.copy()
@@ -1344,7 +961,6 @@ def parse_activity_csv(csv_df, members):
 
     issues_df = pd.DataFrame(issues, columns=ISSUE_COLS) if issues else empty
     return list(chosen.values()), issues_df, []
-
 
 def render_csv_import(supabase, gym_id, use_expander=True):
     try:
@@ -1432,13 +1048,11 @@ def render_csv_import(supabase, gym_id, use_expander=True):
             st.session_state["csv_up_key"] = key + 1
             st.rerun()
 
-
 def _set_archived(supabase, member_id, flag):
     supabase.table("members").update({
         "archived": flag,
         "archived_at": datetime.now(timezone.utc).isoformat() if flag else None,
     }).eq("id", member_id).execute()
-
 
 def _member_manager(supabase, gym_id, roster, missing, use_expander=True):
     names = {}
@@ -1508,7 +1122,6 @@ def _member_manager(supabase, gym_id, roster, missing, use_expander=True):
                     st.session_state["flash"] = f"{r['full_name']} restored."
                     st.rerun()
 
-
 def _delete_action_control(supabase, action_id):
     if st.session_state.get("del_action") == action_id:
         st.warning("Delete this action permanently?")
@@ -1524,19 +1137,16 @@ def _delete_action_control(supabase, action_id):
         st.session_state["del_action"] = action_id
         st.rerun()
 
-
 def _has_open_action(supabase, member_id):
     rows = (supabase.table("retention_actions").select("id")
             .eq("member_id", member_id).neq("status", "Done").limit(1).execute().data)
     return bool(rows)
-
 
 def _create_action(supabase, gym_id, member_id, action_type, renewal_days, note=""):
     due = date.today() + timedelta(days=1 if renewal_days <= 14 else 3)
     supabase.table("retention_actions").insert({
         "gym_id": gym_id, "member_id": member_id, "action_type": action_type,
         "due_date": due.isoformat(), "note": note}).execute()
-
 
 # ------------------------------------------------- member directory
 def render_member_directory(supabase, gym_id):
@@ -1673,7 +1283,6 @@ def render_member_directory(supabase, gym_id):
     elif st.button("Delete permanently", key="mm_delete", use_container_width=True):
         st.session_state["mm_delete_confirm"] = pick
         st.rerun()
-
 
 # --------------------------------------------------- member profile
 def render_member_profile(supabase, gym_id, member_id, assess_fn):
@@ -1951,12 +1560,8 @@ def render_member_profile(supabase, gym_id, member_id, assess_fn):
                     st.session_state["profile_flash"] = "Details saved."
                     st.rerun()
 
-
 # --------------------------------------------------------- radar
 def _radar_chart(view):
-    """Scatter of absence vs risk. Uses Altair explicitly; robust fallback if
-    the dependency is missing or the chart errors.
-    """
     cols = ["full_name", "days_since_last_visit", "cancellation_probability",
             "risk_category", "monthly_fee"]
     data = view[cols].copy()
@@ -2004,7 +1609,6 @@ def _radar_chart(view):
     except Exception:
         pass
 
-    # fallback — numeric columns only, no size encoding, tolerant of pandas quirks
     try:
         fallback = data.copy()
         fallback["risk"] = pd.Categorical(fallback["risk_category"],
@@ -2027,9 +1631,7 @@ def _radar_chart(view):
             hide_index=True, use_container_width=True,
         )
 
-
 PRIORITY_WIDTHS = [0.6, 2.4, 1.0, 1.5, 1.6, 0.9, 1.2]
-
 
 def _priority_rows(view):
     head = st.columns(PRIORITY_WIDTHS)
@@ -2058,7 +1660,6 @@ def _priority_rows(view):
     if len(view) > limit:
         st.button(f"Show more ({len(view) - limit} left)", key="prio_more",
                   on_click=_bump, args=("prio_limit", 10, 10))
-
 
 def render_risk_radar(supabase, gym_id, assess_fn):
     page_header("Member Risk Radar",
@@ -2152,7 +1753,6 @@ def render_risk_radar(supabase, gym_id, assess_fn):
     st.caption("Estimates come from a model trained on synthetic data. Use them "
                "to prioritise conversations, not to make decisions about members.")
 
-
 # ------------------------------------------------------- action centre
 def _action_card(supabase, a, names, photos, status, prefix):
     member_id = a["member_id"]
@@ -2193,9 +1793,7 @@ def _action_card(supabase, a, names, photos, status, prefix):
                  .eq("id", a["id"]).execute())
                 st.rerun()
 
-
 BOARD_TONES = {"To do": "cyan", "In progress": "amber", "Done": "lime"}
-
 
 def _visible_actions(actions):
     if actions.empty:
@@ -2203,7 +1801,6 @@ def _visible_actions(actions):
     if "archived_at" in actions.columns:
         return actions[actions["archived_at"].isna()]
     return actions
-
 
 def _kanban(supabase, actions, names, photos):
     cols = st.columns(3)
@@ -2221,7 +1818,6 @@ def _kanban(supabase, actions, names, photos):
                 _action_card(supabase, a, names, photos, status, "kb")
             if status == "Done" and len(sub) > 10:
                 st.caption(f"+{len(sub) - 10} older ones in the List view.")
-
 
 def _list_board(supabase, actions, names, photos):
     tabs = st.tabs([f"{s} ({int((actions['status'] == s).sum())})" for s in STATUSES])
@@ -2258,7 +1854,6 @@ def _list_board(supabase, actions, names, photos):
                             st.rerun()
                     _delete_action_control(supabase, a["id"])
 
-
 def _pillars_panel(supabase, gym_id, roster, actions):
     st.markdown('<div class="section-label">RETENTION PILLARS</div>', unsafe_allow_html=True)
     st.caption("Members stay when they feel part of something, know their trainer "
@@ -2285,7 +1880,6 @@ def _pillars_panel(supabase, gym_id, roster, actions):
             _create_action(supabase, gym_id, who, play[1], int(row["renewal_due_days"]))
             st.rerun()
 
-
 def render_action_centre(supabase, gym_id, assess_fn):
     page_header("Retention Action Centre",
                 "Turn risk into follow-ups, track them, and learn what works.",
@@ -2300,7 +1894,6 @@ def render_action_centre(supabase, gym_id, assess_fn):
 
     try:
         roster, _ = load_roster(supabase, gym_id, assess_fn)
-        # Load all actions (including archived) so What Works counts stay stable
         actions_all = load_actions(supabase, gym_id, include_archived=True)
     except Exception as e:
         st.error("Couldn't load actions. Have you run schema.sql?")
@@ -2330,7 +1923,6 @@ def render_action_centre(supabase, gym_id, assess_fn):
          "white", "Retained vs cancelled"),
     ])
 
-    # progress based on visible (non-archived) actions
     visible_actions = _visible_actions(actions_all)
     total = len(visible_actions)
     done_n = int((visible_actions["status"] == "Done").sum()) if total else 0
@@ -2383,7 +1975,6 @@ def render_action_centre(supabase, gym_id, assess_fn):
     else:
         _list_board(supabase, visible_actions, names, photos)
 
-
 # ------------------------------------------------------ payments
 def render_payments(supabase, gym_id, assess_fn):
     page_header(
@@ -2406,7 +1997,6 @@ def render_payments(supabase, gym_id, assess_fn):
         st.info("Add members and activity data first.")
         return
 
-    # tolerate missing payment columns
     if "last_payment" not in roster.columns:
         roster["last_payment"] = None
     if "membership_end" not in roster.columns:
@@ -2468,9 +2058,16 @@ def render_payments(supabase, gym_id, assess_fn):
                         on_click=open_profile,
                         args=(r["id"], "Payments & Renewals"),
                         use_container_width=True)
-            end_txt = r["_end"].strftime("%d %b %Y") if isinstance(r["_end"], date) else "—"
+            
+            # FIX NaT Type error
+            if isinstance(r["_end"], date):
+                end_txt = r["_end"].strftime("%d %b %Y")
+            else:
+                end_txt = "—"
+                
             days = r["_days_left"]
             days_txt = "—" if pd.isna(days) else f"{int(days):+d} days"
+            
             _md(f'<div class="why">Renews {_esc(end_txt)} · {_esc(days_txt)}</div>',
                 c[1])
             _md(f'<div class="money">{r["monthly_fee"]:,.0f} / mo</div>', c[2])
@@ -2483,7 +2080,6 @@ def render_payments(supabase, gym_id, assess_fn):
     st.caption("Renewals are recorded from each member's profile → Membership "
                "tab → Record a renewal. Update the amount there to keep this "
                "page accurate.")
-
 
 # ------------------------------------------------------- insights
 def _insights_charts(roster):
@@ -2623,7 +2219,6 @@ def render_business_insights(supabase, gym_id, assess_fn):
     if high.empty and not k["open_actions"]:
         st.write("Nothing urgent. Run a goal review with a few Low-risk members.")
 
-
 # ------------------------------------------------------------ Archie
 ARCHIE_PROMPTS = [
     "Who should I call first today?",
@@ -2631,7 +2226,6 @@ ARCHIE_PROMPTS = [
     "Why is revenue at risk this month?",
     "Give me a 3-step plan for this week",
 ]
-
 
 ARCHIE_BOT_SVG = """
 <svg class="archie-bot" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
@@ -2649,7 +2243,6 @@ ARCHIE_BOT_SVG = """
 </svg>
 """
 
-
 def _archie_hero(thinking=False):
     state = "thinking" if thinking else ""
     on = "thinking-on" if thinking else ""
@@ -2666,28 +2259,11 @@ def _archie_hero(thinking=False):
     </div>
     """
 
-
-ARCHIE_CHAT_B64 = "iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHLAAAWfmNhQlgAABZ+anVtYgAAAB5qdW1kYzJwYQARABCAAACqADibcQNjMnBhAAAAFlhqdW1iAAAAR2p1bWRjMm1hABEAEIAAAKoAOJtxA3VybjpjMnBhOmVjMTg3NWEwLWI3YjktNDY1OC1iYmY1LTQzYTMxNjE1YjdjYQAAAAOTanVtYgAAAClqdW1kYzJhcwARABCAAACqADibcQNjMnBhLmFzc2VydGlvbnMAAAAAuGp1bWIAAABEanVtZGNib3IAEQAQgAAAqgA4m3ETYzJwYS5pbmdyZWRpZW50LnYzAAAAABhjMnNoLCH17awYBAMdILOQqJTMoQAAAGxjYm9yo2lkYzpmb3JtYXRpaW1hZ2UvcG5namluc3RhbmNlSUR4LHhtcDppaWQ6YjUwNDE4MmMtZjhmNC00ODAyLWJkYTMtZWJkZjg5ZWJmMWYxbHJlbGF0aW9uc2hpcGhwYXJlbnRPZgAAAeJqdW1iAAAAQWp1bWRjYm9yABEAEIAAAKoAOJtxE2MycGEuYWN0aW9ucy52MgAAAAAYYzJzaLPC7rmiXwAZcrmycbvb+2wAAAGZY2JvcqJnYWN0aW9uc4KiZmFjdGlvbmtjMnBhLm9wZW5lZGpwYXJhbWV0ZXJzoWtpbmdyZWRpZW50c4GiY3VybHgtc2VsZiNqdW1iZj1jMnBhLmFzc2VydGlvbnMvYzJwYS5pbmdyZWRpZW50LnYzZGhhc2hYIISR239Zj7nzbBqfKjdlvdh/7+Ln5oE3bNSc093BvvcfpGZhY3Rpb254HWNvbS5hbnRocm9waWMuY2xhdWRlLnByb3ZpZGVkanBhcmFtZXRlcnOheB9jb20uYW50aHJvcGljLm9yaWdpbi1jb25maWRlbmNlZ3Vua25vd25rZGVzY3JpcHRpb254ZkNsYXVkZSBwcm92aWRlZCB0aGlzIGZpbGUgYXQgdGhlIHJlcXVlc3Qgb2YgYSB1c2VyIGFuZCBtYXkgaGF2ZSBjcmVhdGVkIG9yIG1vZGlmaWVkIHRoZSBmaWxlIGNvbnRlbnRzLm1zb2Z0d2FyZUFnZW50oWRuYW1lZkNsYXVkZXJhbGxBY3Rpb25zSW5jbHVkZWT1AAAAyGp1bWIAAABAanVtZGNib3IAEQAQgAAAqgA4m3ETYzJwYS5oYXNoLmRhdGEAAAAAGGMyc2jxbBBO+boT7Hs3/YeAAShHAAAAgGNib3KlY2FsZ2ZzaGEyNTZjcGFkTQAAAAAAAAAAAAAAAABkaGFzaFggkjGXaw+/ps5Gm0IYUw3GeN9u1Q1gIZIyhyS7iWhWPvNkbmFtZW5qdW1iZiBtYW5pZmVzdGpleGNsdXNpb25zgaJlc3RhcnQYIWZsZW5ndGgZFooAAAI+anVtYgAAACdqdW1kYzJjbAARABCAAACqADibcQNjMnBhLmNsYWltLnYyAAAAAg9jYm9ypWNhbGdmc2hhMjU2aXNpZ25hdHVyZXhNc2VsZiNqdW1iZj0vYzJwYS91cm46YzJwYTplYzE4NzVhMC1iN2I5LTQ2NTgtYmJmNS00M2EzMTYxNWI3Y2EvYzJwYS5zaWduYXR1cmVqaW5zdGFuY2VJRHgseG1wOmlpZDoyZDg1N2I2Mi0yNTg4LTQ4Y2MtYWRiMi03YmQ3YmU0ODg4NTByY3JlYXRlZF9hc3NlcnRpb25zg6JjdXJseC1zZWxmI2p1bWJmPWMycGEuYXNzZXJ0aW9ucy9jMnBhLmluZ3JlZGllbnQudjNkaGFzaFgghJHbf1mPufNsGp8qN2W92H/v4ufmgTds1JzT3cG+9x+iY3VybHgqc2VsZiNqdW1iZj1jMnBhLmFzc2VydGlvbnMvYzJwYS5hY3Rpb25zLnYyZGhhc2hYIIBgOYxsp069hiBln7+VzKh+O1oQa9hvosDXXvnbXKwXomN1cmx4KXNlbGYjanVtYmY9YzJwYS5hc3NlcnRpb25zL2MycGEuaGFzaC5kYXRhZGhhc2hYIMnfECcFdVNlaol9I024Muv/CLMV2Jp6wRx55IbRids7dGNsYWltX2dlbmVyYXRvcl9pbmZvo2RuYW1lb0FudGhyb3BpYyBGaWxlc2d2ZXJzaW9uZTEuMC4wa3NwZWNWZXJzaW9uZTIuNC4wAAAQOGp1bWIAAAAoanVtZGMyY3MAEQAQgAAAqgA4m3EDYzJwYS5zaWduYXR1cmUAAAAQCGNib3LShFkCEqIBJhghWQIKMIICBjCCAY2gAwIBAgIUQOWgCu7COdC+uIP6BkIFPWdVEwAwCgYIKoZIzj0EAwMwSTEXMBUGA1UEChMOQW50aHJvcGljLCBQQkMxLjAsBgNVBAMTJUFudGhyb3BpYyBDb250ZW50IENyZWRlbnRpYWxzIFJvb3QgQ0EwHhcNMjYwODA3MTg0MzU2WhcNMjgwODA2MTk0MzU2WjBEMRcwFQYDVQQKEw5BbnRocm9waWMsIFBCQzEpMCcGA1UEAxMgQW50aHJvcGljIENsYXVkZSBDb250ZW50IFNpZ25pbmcwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAASYegpry1AYBRTVNL1CpTlbROnY3dey+UrsF9C3phYrATN3ZHf93Mo8RQN0KOUuOn19P4oWNFWe5n2/She9N7eTo1gwVjAOBgNVHQ8BAf8EBAMCB4AwFQYDVR0lBA4wDAYKKwYBBAGD6F4CATAMBgNVHRMBAf8EAjAAMB8GA1UdIwQYMBaAFM5R4gSBTmRbI/jjxM+aPpzB11zCMAoGCCqGSM49BAMDA2cAMGQCMDFzHRSeAXrSy1WOzkbhPZ6Km2wGTmZ/2gK18k8BQGXyqz88Rdrz6CTX9flAnYNVxgIwcF9c3fVhqmJKpi+UhasNUMko69cyX6STPfta3Q8EjyzDjzoyrol46FP6VFHhvUcJoWNwYWRZDZ4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA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"
-
-
 def _chat_message(role):
     if role == "assistant":
-        try:
-            from PIL import Image
-            avatar = Image.open(io.BytesIO(base64.b64decode(ARCHIE_CHAT_B64)))
-        except Exception:
-            avatar = ":material/smart_toy:"
-        try:
-            return st.chat_message("assistant", avatar=avatar)
-        except Exception:
-            pass
+        return st.chat_message("assistant", avatar=":material/smart_toy:")
     else:
-        try:
-            return st.chat_message("user", avatar=":material/person:")
-        except Exception:
-            pass
-    return st.chat_message(role)
-
+        return st.chat_message("user", avatar=":material/person:")
 
 def _stream(slot, text):
     words = text.split(" ")
@@ -2696,7 +2272,6 @@ def _stream(slot, text):
         slot.markdown(" ".join(words[:i]) + " ▍")
         time.sleep(0.03)
     slot.markdown(text)
-
 
 def render_archie(supabase, gym_id, assess_fn, business_name, owner_name="the gym owner"):
     hero = st.empty()
@@ -2745,7 +2320,6 @@ def render_archie(supabase, gym_id, assess_fn, business_name, owner_name="the gy
     st.caption("Archie can be wrong. Check details before contacting members. "
                "Only your top at-risk members' names and scores are shared with "
                "the AI service.")
-
 
 # --------------------------------------------------------- dashboard
 def render_dashboard(supabase, gym_id, assess_fn, greeting, user_name, business_name):
@@ -2804,6 +2378,7 @@ def render_dashboard(supabase, gym_id, assess_fn, greeting, user_name, business_
                       args=("Risk Radar",))
 
     st.markdown('<div class="section-label">QUICK ACTIONS</div>', unsafe_allow_html=True)
+    # Only 4 columns per row to make it fit standard desktop widths
     tiles = [
         ("Risk Radar", "Risk Radar", ":material/radar:"),
         ("Member Management", "Member Management", ":material/group:"),
@@ -2814,10 +2389,13 @@ def render_dashboard(supabase, gym_id, assess_fn, greeting, user_name, business_
         ("Member Assessment", "Member Assessment", ":material/science:"),
         ("Model Insights", "Model Insights", ":material/insights:"),
     ]
-    cols = st.columns(len(tiles))
-    for col, (label, page, icon) in zip(cols, tiles):
-        _ibtn(col, label, icon, key=f"qa_{page}", on_click=_go, args=(page,),
-              use_container_width=True)
+    
+    # Split into 2 rows of 4
+    for i in range(0, len(tiles), 4):
+        cols = st.columns(4)
+        for col, (label, page, icon) in zip(cols, tiles[i:i+4]):
+            _ibtn(col, label, icon, key=f"qa_{page}", on_click=_go, args=(page,),
+                  use_container_width=True)
 
     st.markdown('<div class="section-label">HOW IT WORKS</div>', unsafe_allow_html=True)
     _md("""
