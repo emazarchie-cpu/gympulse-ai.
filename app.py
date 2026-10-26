@@ -918,9 +918,11 @@ from zoneinfo import ZoneInfo
 
 # Connect to Supabase once per user session
 if "supabase_client" not in st.session_state:
-    st.session_state.supabase_client = create_client(
-        st.secrets["SUPABASE_URL"],
-        st.secrets["SUPABASE_KEY"]
+    st.session_state.supabase_client = gw.TrackedClient(
+        create_client(
+            st.secrets["SUPABASE_URL"],
+            st.secrets["SUPABASE_KEY"]
+        )
     )
 
 supabase = st.session_state.supabase_client
@@ -1231,6 +1233,7 @@ if st.session_state.auth_user is None:
                                         "business_name": "My Gym"
                                     }
 
+                                gw.show_boot_overlay()
                                 st.rerun()
 
                         except Exception:
@@ -1333,6 +1336,7 @@ if st.session_state.auth_user is None:
                                         "business_name": business_name.strip()
                                     }
 
+                                gw.show_boot_overlay()
                                 st.rerun()
 
                             else:
@@ -1473,145 +1477,145 @@ if st.session_state.auth_user is None:
 
     # LANDING PAGE SECTIONS
 
-        # The quiet exit
-        html(f"""
-        <div class="lp-kicker">The problem</div>
-        <div class="lp-h2">Members rarely say goodbye.<br>They just fade.</div>
-        <div class="lp-lead">By the time a cancellation lands, the warning signs
-          have been there for weeks.</div>
-        <div class="lp-split">
-          <div>
-            <div class="lp-ic">{icon('down')}</div>
-            <h3>Attendance slips first. Cancellation follows.</h3>
-            <p>A drop from regular visits to almost none is easy to miss in a
-              busy gym. GymPulse AI watches that pattern together with renewal
-              timing and personal-training activity, then tells you where to
-              look first.</p>
-          </div>
-          <div>
-            <div class="lp-bars">
-              <div class="lp-bar-col"><div class="lp-bar-fill" style="height:92%"></div><div class="lp-bar-lbl">W1</div></div>
-              <div class="lp-bar-col"><div class="lp-bar-fill" style="height:84%"></div><div class="lp-bar-lbl">W2</div></div>
-              <div class="lp-bar-col"><div class="lp-bar-fill" style="height:70%"></div><div class="lp-bar-lbl">W3</div></div>
-              <div class="lp-bar-col"><div class="lp-bar-fill warn" style="height:46%"></div><div class="lp-bar-lbl">W4</div></div>
-              <div class="lp-bar-col"><div class="lp-bar-fill warn" style="height:28%"></div><div class="lp-bar-lbl">W5</div></div>
-              <div class="lp-bar-col"><div class="lp-bar-fill warn" style="height:14%"></div><div class="lp-bar-lbl">W6</div></div>
-            </div>
-            <div class="lp-bar-cap">Illustrative weekly visits for one member</div>
-          </div>
+    # The quiet exit
+    html(f"""
+    <div class="lp-kicker">The problem</div>
+    <div class="lp-h2">Members rarely say goodbye.<br>They just fade.</div>
+    <div class="lp-lead">By the time a cancellation lands, the warning signs
+      have been there for weeks.</div>
+    <div class="lp-split">
+      <div>
+        <div class="lp-ic">{icon('down')}</div>
+        <h3>Attendance slips first. Cancellation follows.</h3>
+        <p>A drop from regular visits to almost none is easy to miss in a
+          busy gym. GymPulse AI watches that pattern together with renewal
+          timing and personal-training activity, then tells you where to
+          look first.</p>
+      </div>
+      <div>
+        <div class="lp-bars">
+          <div class="lp-bar-col"><div class="lp-bar-fill" style="height:92%"></div><div class="lp-bar-lbl">W1</div></div>
+          <div class="lp-bar-col"><div class="lp-bar-fill" style="height:84%"></div><div class="lp-bar-lbl">W2</div></div>
+          <div class="lp-bar-col"><div class="lp-bar-fill" style="height:70%"></div><div class="lp-bar-lbl">W3</div></div>
+          <div class="lp-bar-col"><div class="lp-bar-fill warn" style="height:46%"></div><div class="lp-bar-lbl">W4</div></div>
+          <div class="lp-bar-col"><div class="lp-bar-fill warn" style="height:28%"></div><div class="lp-bar-lbl">W5</div></div>
+          <div class="lp-bar-col"><div class="lp-bar-fill warn" style="height:14%"></div><div class="lp-bar-lbl">W6</div></div>
         </div>
-        """)
+        <div class="lp-bar-cap">Illustrative weekly visits for one member</div>
+      </div>
+    </div>
+    """)
 
-        # How it works
-        html(f"""
-        <div class="lp-kicker">How it works</div>
-        <div class="lp-h2">From spreadsheet to action<br>in three moves</div>
-        <div class="lp-lead">Bring the information you already have. No hardware,
-          no installs.</div>
-        <div class="lp-steps">
-          <div class="lp-stepcard"><div class="lp-num">01</div>
-            <div class="lp-ic">{icon('upload')}</div>
-            <h4>Bring your data</h4>
-            <p>Register members one at a time or upload a CSV with membership
-              type, visits, renewal timing and PT sessions.</p></div>
-          <div class="lp-stepcard"><div class="lp-num">02</div>
-            <div class="lp-ic">{icon('gauge')}</div>
-            <h4>Get risk estimates</h4>
-            <p>Each member gets a cancellation probability and a High, Medium
-              or Low level you can read at a glance.</p></div>
-          <div class="lp-stepcard"><div class="lp-num">03</div>
-            <div class="lp-ic">{icon('chat')}</div>
-            <h4>Reach out early</h4>
-            <p>Start with the members who need you most, check in personally and
-              download the results for your team.</p></div>
-        </div>
-        """)
+    # How it works
+    html(f"""
+    <div class="lp-kicker">How it works</div>
+    <div class="lp-h2">From spreadsheet to action<br>in three moves</div>
+    <div class="lp-lead">Bring the information you already have. No hardware,
+      no installs.</div>
+    <div class="lp-steps">
+      <div class="lp-stepcard"><div class="lp-num">01</div>
+        <div class="lp-ic">{icon('upload')}</div>
+        <h4>Bring your data</h4>
+        <p>Register members one at a time or upload a CSV with membership
+          type, visits, renewal timing and PT sessions.</p></div>
+      <div class="lp-stepcard"><div class="lp-num">02</div>
+        <div class="lp-ic">{icon('gauge')}</div>
+        <h4>Get risk estimates</h4>
+        <p>Each member gets a cancellation probability and a High, Medium
+          or Low level you can read at a glance.</p></div>
+      <div class="lp-stepcard"><div class="lp-num">03</div>
+        <div class="lp-ic">{icon('chat')}</div>
+        <h4>Reach out early</h4>
+        <p>Start with the members who need you most, check in personally and
+          download the results for your team.</p></div>
+    </div>
+    """)
 
-        # Meet Archie
-        html(f"""
-        <div class="lp-kicker">Meet Archie</div>
-        <div class="lp-h2">Your AI retention assistant</div>
-        <div class="lp-lead">Archie reads your live member data, tells you who needs
-          you first, and writes excited, ready-to-send messages for WhatsApp and email.</div>
-        <div class="lp-archie">
-          <div class="lp-archie-bot">{gw.ARCHIE_BOT_SVG}</div>
-          <div class="lp-chat">
-            <div class="lp-msg me">Who should I call first today?</div>
-            <div class="lp-msg ai">Great news, I found three members who would love to hear
-              from you. Ada has not visited in 18 days and renews this week, so she is first.</div>
-            <div class="lp-msg ai">Here is a message ready to send: "Hi Ada! We have missed you
-              at the gym and we are so excited to help you reach your goal. Can we chat this week?"</div>
-            <div class="lp-send">WHATSAPP · EMAIL · SEND IN ONE CLICK</div>
-          </div>
-        </div>
-        """)
+    # Meet Archie
+    html(f"""
+    <div class="lp-kicker">Meet Archie</div>
+    <div class="lp-h2">Your AI retention assistant</div>
+    <div class="lp-lead">Archie reads your live member data, tells you who needs
+      you first, and writes excited, ready-to-send messages for WhatsApp and email.</div>
+    <div class="lp-archie">
+      <div class="lp-archie-bot">{gw.ARCHIE_BOT_SVG}</div>
+      <div class="lp-chat">
+        <div class="lp-msg me">Who should I call first today?</div>
+        <div class="lp-msg ai">Great news, I found three members who would love to hear
+          from you. Ada has not visited in 18 days and renews this week, so she is first.</div>
+        <div class="lp-msg ai">Here is a message ready to send: "Hi Ada! We have missed you
+          at the gym and we are so excited to help you reach your goal. Can we chat this week?"</div>
+        <div class="lp-send">WHATSAPP · EMAIL · SEND IN ONE CLICK</div>
+      </div>
+    </div>
+    """)
 
-        # Bento features
-        html(f"""
-        <div class="lp-kicker">Features</div>
-        <div class="lp-h2">Built for one job:<br>keeping your members</div>
-        <div class="lp-lead">Focused tools, no clutter.</div>
-        <div class="lp-bento-grid">
-          <div class="lp-bento b-4">
-            <div class="lp-ic">{icon('upload')}</div>
-            <h4>Batch CSV assessment</h4>
-            <p>Upload your whole membership list, preview the records, and
-              download an estimate for every member in a single file.</p>
-            <div class="lp-mini">
-              <span class="lp-risk lp-high">HIGH</span>
-              <span class="lp-risk lp-med">MEDIUM</span>
-              <span class="lp-risk lp-low">LOW</span>
-            </div>
-          </div>
-          <div class="lp-bento b-2">
-            <div class="lp-ic">{icon('user')}</div>
-            <h4>Individual assessment</h4>
-            <p>One member, instant estimate, plus suggested next steps.</p>
-          </div>
-          <div class="lp-bento b-2">
-            <div class="lp-ic">{icon('users')}</div>
-            <h4>Member management</h4>
-            <p>A private register with goals, contact details and body metrics.</p>
-          </div>
-          <div class="lp-bento b-2">
-            <div class="lp-ic">{icon('sliders')}</div>
-            <h4>What-if explorer</h4>
-            <p>See how the estimate shifts as time since the last visit grows.</p>
-          </div>
-          <div class="lp-bento b-2">
-            <div class="lp-ic">{icon('target')}</div>
-            <h4>Priority follow-up</h4>
-            <p>Plain-language guidance on who to contact first.</p>
-          </div>
+    # Bento features
+    html(f"""
+    <div class="lp-kicker">Features</div>
+    <div class="lp-h2">Built for one job:<br>keeping your members</div>
+    <div class="lp-lead">Focused tools, no clutter.</div>
+    <div class="lp-bento-grid">
+      <div class="lp-bento b-4">
+        <div class="lp-ic">{icon('upload')}</div>
+        <h4>Batch CSV assessment</h4>
+        <p>Upload your whole membership list, preview the records, and
+          download an estimate for every member in a single file.</p>
+        <div class="lp-mini">
+          <span class="lp-risk lp-high">HIGH</span>
+          <span class="lp-risk lp-med">MEDIUM</span>
+          <span class="lp-risk lp-low">LOW</span>
         </div>
-        """)
+      </div>
+      <div class="lp-bento b-2">
+        <div class="lp-ic">{icon('user')}</div>
+        <h4>Individual assessment</h4>
+        <p>One member, instant estimate, plus suggested next steps.</p>
+      </div>
+      <div class="lp-bento b-2">
+        <div class="lp-ic">{icon('users')}</div>
+        <h4>Member management</h4>
+        <p>A private register with goals, contact details and body metrics.</p>
+      </div>
+      <div class="lp-bento b-2">
+        <div class="lp-ic">{icon('sliders')}</div>
+        <h4>What-if explorer</h4>
+        <p>See how the estimate shifts as time since the last visit grows.</p>
+      </div>
+      <div class="lp-bento b-2">
+        <div class="lp-ic">{icon('target')}</div>
+        <h4>Priority follow-up</h4>
+        <p>Plain-language guidance on who to contact first.</p>
+      </div>
+    </div>
+    """)
 
-        # Transparency
-        html(f"""
-        <div class="lp-kicker">Transparency</div>
-        <div class="lp-note">
-          <div class="lp-ic">{icon('shield')}</div>
-          <div>
-            <h4>Experimental estimates, clearly labelled</h4>
-            <p>GymPulse AI is an early-stage project and its model is trained on
-              synthetic data. Treat results as a guide for deciding who to check
-              in with, not a guarantee. Your own knowledge of your members always
-              comes first.</p>
-          </div>
-        </div>
-        """)
+    # Transparency
+    html(f"""
+    <div class="lp-kicker">Transparency</div>
+    <div class="lp-note">
+      <div class="lp-ic">{icon('shield')}</div>
+      <div>
+        <h4>Experimental estimates, clearly labelled</h4>
+        <p>GymPulse AI is an early-stage project and its model is trained on
+          synthetic data. Treat results as a guide for deciding who to check
+          in with, not a guarantee. Your own knowledge of your members always
+          comes first.</p>
+      </div>
+    </div>
+    """)
 
-        # Closing call to action
-        html(f"""
-        <div class="lp-cta">
-          <div class="lp-cta-title">Keep more members.<br>
-            <span class="lp-grad">Start with GymPulse AI.</span></div>
-          <p>Create your free account at the top of this page
-            <span class="lp-arrow">{icon('arrow', 16)}</span></p>
-        </div>
-        <div class="footer">© GymPulse AI · Smarter insights. Stronger member retention.</div>
-        """)
-        st.stop()
+    # Closing call to action
+    html(f"""
+    <div class="lp-cta">
+      <div class="lp-cta-title">Keep more members.<br>
+        <span class="lp-grad">Start with GymPulse AI.</span></div>
+      <p>Create your free account at the top of this page
+        <span class="lp-arrow">{icon('arrow', 16)}</span></p>
+    </div>
+    <div class="footer">© GymPulse AI · Smarter insights. Stronger member retention.</div>
+    """)
+    st.stop()
 
 # =========================================================
 # 4. PERSONALIZED WORKSPACE HEADER
@@ -1627,17 +1631,23 @@ owner_id = st.session_state.auth_user["id"]
 
 try:
     # Retrieve the gym belonging to the authenticated owner
-    gym_result = (
-        supabase.table("gyms")
-        .select("*")
-        .eq("owner_id", owner_id)
-        .limit(1)
-        .execute()
+    gym_rows = gw.cached(
+        ("gym", owner_id),
+        lambda: (
+            supabase.table("gyms")
+            .select("*")
+            .eq("owner_id", owner_id)
+            .limit(1)
+            .execute()
+            .data or []
+        ),
+        ttl=600,
+        skip_empty=True
     )
 
     # Create a workspace if this owner does not have one
-    if gym_result.data:
-        gym = gym_result.data[0]
+    if gym_rows:
+        gym = gym_rows[0]
 
     else:
         new_gym = (
