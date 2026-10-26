@@ -122,7 +122,11 @@ def log_message(supabase, gym_id, member_id, channel, direction, body,
 
 
 def unread_count(supabase, gym_id):
-    """Unread replies, or None when the messages table is not set up yet."""
+    """Unread replies (reused for 10 seconds), or None when the table is not set up."""
+    return gw._cached(("unread", gym_id), lambda: _unread_uncached(supabase, gym_id), ttl=10)
+
+
+def _unread_uncached(supabase, gym_id):
     try:
         rows = (supabase.table("messages").select("id").eq("gym_id", gym_id)
                 .eq("direction", "in").eq("is_read", False).execute().data or [])
