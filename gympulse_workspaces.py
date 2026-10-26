@@ -2344,7 +2344,35 @@ def _stream(slot, text):
         slot.markdown(" ".join(words[:i]) + " ▍")
         time.sleep(0.03)
     slot.markdown(text)
+def archie_context(roster, actions, business_name):
+    """Build a concise business context for Archie's member-retention assistant."""
 
+    lines = [
+        f"Gym business: {business_name}",
+        f"Total scored members: {len(roster)}",
+    ]
+
+    # Summarize member risk where the expected columns are available.
+    if "risk_category" in roster.columns:
+        risk_counts = roster["risk_category"].fillna("Unknown").value_counts()
+
+        lines.append("Member risk summary:")
+        for category, count in risk_counts.items():
+            lines.append(f"- {category} risk: {count} members")
+
+    # Include recent actions when useful columns are available.
+    if not actions.empty:
+        lines.append(f"Recorded retention actions: {len(actions)}")
+
+        for column in ("status", "action_type"):
+            if column in actions.columns:
+                counts = actions[column].fillna("Unknown").value_counts()
+                lines.append(f"Actions by {column}:")
+                for label, count in counts.items():
+                    lines.append(f"- {label}: {count}")
+                break
+
+    return "\n".join(lines)
 def render_archie(supabase, gym_id, assess_fn, business_name, owner_name="the gym owner"):
     hero = st.empty()
     _md(_archie_hero(False), hero)
