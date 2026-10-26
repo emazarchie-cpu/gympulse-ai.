@@ -2185,11 +2185,11 @@ def render_payments(supabase, gym_id, assess_fn):
                         args=(r["id"], "Payments & Renewals"),
                         use_container_width=True)
             
-            # FIX NaT Type error
-            if isinstance(r["_end"], date):
-                end_txt = r["_end"].strftime("%d %b %Y")
-            else:
+            # Members with no renewal date hold an empty value (NaT)
+            if pd.isna(r["_end"]):
                 end_txt = "—"
+            else:
+                end_txt = r["_end"].strftime("%d %b %Y")
                 
             days = r["_days_left"]
             days_txt = "—" if pd.isna(days) else f"{int(days):+d} days"
