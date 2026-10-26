@@ -2231,7 +2231,6 @@ elif page == "Member Management":
         gw.render_member_directory(supabase, gym_id)
 
 
-
 # =========================================================
 # 10. INDIVIDUAL MEMBER ASSESSMENT
 # =========================================================
