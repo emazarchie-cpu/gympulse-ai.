@@ -1,4 +1,5 @@
 import gympulse_workspaces as gw
+import gympulse_followups as fu
 import os
 import textwrap
 
@@ -817,7 +818,7 @@ st.markdown(
         color: #BCC8D8;
         margin-top: 8px;
     }
- 
+
     /* Same lockup, scaled down for the top bar */
     .nav-brand-logo {
         display: block;
@@ -864,14 +865,14 @@ st.markdown(
     .login-brand-word span {
         color: var(--lime);
     }
- 
+
     </style>
     """,
     unsafe_allow_html=True
 )
 gw.apply_mobile_styles()
 gw.apply_ui_styles()
- 
+
 # =========================================================
 # BRAND LOGO HELPER (shared by the login page and the top bar)
 # =========================================================
@@ -1088,6 +1089,7 @@ if st.session_state.auth_user is None:
           <div class="lp-chip">{icon('check', 14)} Free to start</div>
           <div class="lp-chip">{icon('check', 14)} Runs in your browser</div>
           <div class="lp-chip">{icon('check', 14)} Works with a simple CSV</div>
+          <div class="lp-chip">{icon('check', 14)} Archie AI assistant</div>
         </div>
       </div>
       <div class="lp-radar">
@@ -1525,6 +1527,25 @@ if st.session_state.auth_user is None:
         </div>
         """)
 
+        # Meet Archie
+        html(f"""
+        <div class="lp-kicker">Meet Archie</div>
+        <div class="lp-h2">Your AI retention assistant</div>
+        <div class="lp-lead">Archie reads your live member data, tells you who needs
+          you first, and writes excited, ready-to-send messages for WhatsApp and email.</div>
+        <div class="lp-archie">
+          <div class="lp-archie-bot">{gw.ARCHIE_BOT_SVG}</div>
+          <div class="lp-chat">
+            <div class="lp-msg me">Who should I call first today?</div>
+            <div class="lp-msg ai">Great news, I found three members who would love to hear
+              from you. Ada has not visited in 18 days and renews this week, so she is first.</div>
+            <div class="lp-msg ai">Here is a message ready to send: "Hi Ada! We have missed you
+              at the gym and we are so excited to help you reach your goal. Can we chat this week?"</div>
+            <div class="lp-send">WHATSAPP · EMAIL · SEND IN ONE CLICK</div>
+          </div>
+        </div>
+        """)
+
         # Bento features
         html(f"""
         <div class="lp-kicker">Features</div>
@@ -1869,6 +1890,7 @@ MAIN_PAGES = [
     "Dashboard",
     "Risk Radar",
     "Action Centre",
+    "Follow-ups",
     "Business Insights",
     "Archie",
     "Member Management",
@@ -1916,6 +1938,30 @@ if "navigate_to" in st.session_state:
 if "main_nav" not in st.session_state:
     st.session_state["main_nav"] = "Dashboard"
 
+def _unread_now():
+    gid = st.session_state.get("gym_id")
+    return fu.unread_count(supabase, gid) if gid else None
+
+
+def _notify_replies(count):
+    try:
+        st.toast(f"{count} new repl{'y' if count == 1 else 'ies'} from your members")
+    except Exception:
+        pass
+
+
+unread_replies = _unread_now() or 0
+if unread_replies > st.session_state.get("last_unread", 0):
+    _notify_replies(unread_replies)
+st.session_state["last_unread"] = unread_replies
+
+
+def nav_label(name):
+    if name == "Follow-ups" and unread_replies:
+        return f"{name} ({unread_replies})"
+    return name
+
+
 with st.container(key="top_nav"):
 
     brand_col, nav_col, user_col = st.columns(
@@ -1956,6 +2002,7 @@ with st.container(key="top_nav"):
                 index=None,
                 key="main_nav",
                 on_change=on_main_nav,
+                format_func=nav_label,
                 horizontal=True,
                 label_visibility="collapsed"
             )
@@ -1975,6 +2022,23 @@ with st.container(key="top_nav"):
                     )
 
     page = st.session_state["current_page"]
+
+    _fragment = getattr(st, "fragment", None)
+    if _fragment is not None:
+        try:
+            @_fragment(run_every=30)
+            def _watch_inbox():
+                count = _unread_now()
+                if count and count > st.session_state.get("last_unread", 0):
+                    st.session_state["last_unread"] = count
+                    _notify_replies(count)
+                    if st.session_state.get("current_page") == "Follow-ups":
+                        st.rerun()
+
+            _watch_inbox()
+        except TypeError:
+            pass
+
     with user_col:
         st.button(
             "Log Out",
@@ -2026,6 +2090,14 @@ elif page == "Action Centre":
     gw.render_action_centre(supabase, st.session_state.gym_id, assess_members)
 elif page == "Business Insights":
     gw.render_business_insights(supabase, st.session_state.gym_id, assess_members)
+elif page == "Follow-ups":
+    fu.render_followups(
+        supabase,
+        st.session_state.gym_id,
+        assess_members,
+        user_name,
+        business_name
+    )
 elif page == "Archie":
     gw.render_archie(supabase, st.session_state.gym_id, assess_members, business_name, user_name)
 elif page == "Member Management":
@@ -2863,13 +2935,7 @@ elif page == "Model Insights":
                 }
             )
 
-            st.line_chart(
-                chart_data,
-                y="Estimated cancellation probability",
-                x_label="Days since last visit",
-                y_label="Estimated probability",
-                use_container_width=True
-            )
+            gw.modern_line_chart(sensitivity_results)
 
             display_results = sensitivity_results[
                 [
