@@ -20,8 +20,21 @@ ACTIVITY_COLS = [
     "membership_type", "days_since_last_visit", "visits_previous_30_days",
     "visits_last_30_days", "renewal_due_days", "pt_sessions_attended",
 ]
-ACTION_TYPES = ["Personal call", "WhatsApp check-in", "Free PT session",
-                "Renewal offer", "Class invite", "Goal review"]
+PILLARS = {
+    "Customer experience": {"icon": "chat", "tone": "cyan",
+        "blurb": "Clear, warm communication so every member feels looked after.",
+        "plays": ["Personal call", "WhatsApp check-in", "Feedback request", "Renewal offer"]},
+    "Trainer relationship": {"icon": "user", "tone": "lime",
+        "blurb": "Members stay for people. Connect each one with a trainer.",
+        "plays": ["Free PT session", "Trainer intro", "Goal review"]},
+    "Community": {"icon": "users", "tone": "amber",
+        "blurb": "Belonging beats discounts. Bring members together.",
+        "plays": ["Class invite", "Group challenge", "Bring-a-friend invite"]},
+    "Culture": {"icon": "heart", "tone": "red",
+        "blurb": "Celebrate wins and make every return feel special.",
+        "plays": ["Milestone shout-out", "Welcome-back note"]},
+}
+ACTION_TYPES = [p for info in PILLARS.values() for p in info["plays"]]
 STATUSES = ["To do", "In progress", "Done"]
 OUTCOMES = ["Retained", "Cancelled", "No response"]
 SUGGEST_COOLDOWN_DAYS = 30   # a member you finished with stays out of "Suggested today" this long
@@ -393,6 +406,30 @@ def prob_bar(prob, level):
             f'<span style="width:{width}%;--tone:{colour}"></span></div>')
 
 
+ICON_PATHS = {
+    "chat": '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>',
+    "user": '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+    "users": '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
+    "heart": '<path d="M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.8 0-3 .5-4.5 2-1.5-1.5-2.7-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7Z"/>',
+}
+
+
+def ic(name, size=22):
+    return (f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" '
+            'stroke="currentColor" stroke-width="1.8" stroke-linecap="round" '
+            f'stroke-linejoin="round">{ICON_PATHS[name]}</svg>')
+
+
+def _ibtn(target, label, icon=None, **kw):
+    """A button with a modern icon (falls back to plain on older Streamlit)."""
+    if icon:
+        try:
+            return target.button(label, icon=icon, **kw)
+        except TypeError:
+            pass
+    return target.button(label, **kw)
+
+
 def _bump(key, default, step):
     st.session_state[key] = st.session_state.get(key, default) + step
 
@@ -473,6 +510,32 @@ def _style_chart(chart):
                             tickColor="rgba(255,255,255,0.15)")
             .configure_legend(labelColor="#F4F7FB", titleColor=CHART_MUTED)
             .configure_view(strokeWidth=0))
+
+
+def modern_line_chart(df):
+    """Soft glowing area + line chart for the what-if experiment."""
+    data = df[["days_since_last_visit", "cancellation_probability"]].copy()
+    try:
+        import altair as alt
+        base = alt.Chart(data).encode(
+            x=alt.X("days_since_last_visit:Q", title="Days since last visit",
+                    axis=alt.Axis(tickMinStep=1, format="d")),
+            y=alt.Y("cancellation_probability:Q", title="Estimated probability",
+                    scale=alt.Scale(domain=[0, 1]), axis=alt.Axis(format="%")),
+            tooltip=[alt.Tooltip("days_since_last_visit:Q", title="Days away"),
+                     alt.Tooltip("cancellation_probability:Q", title="Estimate", format=".0%")])
+        area = base.mark_area(
+            interpolate="monotone", line={"color": "#B7F34A", "strokeWidth": 3},
+            color=alt.Gradient(gradient="linear", x1=1, x2=1, y1=1, y2=0, stops=[
+                alt.GradientStop(color="rgba(183,243,74,0.0)", offset=0),
+                alt.GradientStop(color="rgba(183,243,74,0.38)", offset=1)]))
+        dots = base.mark_circle(size=80, color="#B7F34A", stroke="#0B1020", strokeWidth=2)
+        lines = (alt.Chart(pd.DataFrame({"y": [0.3, 0.5]}))
+                 .mark_rule(strokeDash=[5, 5], color="rgba(255,255,255,0.28)")
+                 .encode(y=alt.Y("y:Q", scale=alt.Scale(domain=[0, 1]))))
+        _show_chart(_style_chart(alt.layer(lines, area, dots).properties(height=320)))
+    except Exception:
+        st.line_chart(data.set_index("days_since_last_visit"))
 
 
 def _show_chart(chart):
@@ -654,35 +717,88 @@ a.chip:hover { filter: brightness(1.25); }
     border-color: #B7F34A !important; }
 [class*="st-key-ap_"] button:hover p { color: #B7F34A !important; }
 
-/* ---------- Archie cartoon mascot ---------- */
-.archie-orb { width: 150px; height: 165px; }
+/* ---------- Archie orb (modern) ---------- */
+.archie-orb { width: 150px; height: 150px; }
 .archie-orb::after, .archie-orb .ring { display: none !important; }
 .archie-bot { width: 100%; height: 100%; overflow: visible;
-    animation: bot-float 3s ease-in-out infinite; filter: drop-shadow(0 12px 18px rgba(0,0,0,.45)); }
+    animation: bot-float 4s ease-in-out infinite;
+    filter: drop-shadow(0 14px 26px rgba(183,243,74,.30)); }
 .archie-bot * { transform-box: fill-box; }
-.bot-eye { transform-origin: center; animation: bot-blink 4s ease-in-out infinite; }
+.bot-halo { transform-origin: center; animation: bot-halo 3s ease-in-out infinite; }
+.bot-eye { transform-origin: center; animation: bot-blink 4.5s ease-in-out infinite; }
 .bot-eye2 { animation-delay: .05s; }
-.bot-ant { transform-origin: bottom center; animation: bot-ant 1.6s ease-in-out infinite; }
-.bot-ball { animation: bot-glow 1.2s ease-in-out infinite; }
-.bot-arm-r { transform-origin: 8% 90%; animation: bot-wave 1.3s ease-in-out infinite; }
-.bot-arm-l { transform-origin: 90% 50%; animation: bot-swing 2.6s ease-in-out infinite; }
-.bot-mouth { transform-origin: center; animation: bot-talk 3s ease-in-out infinite; }
-.bot-pulse { stroke-dasharray: 90; stroke-dashoffset: 90; animation: bot-beat 1.8s ease-in-out infinite; }
-.thinking .bot-eye { animation: bot-look .9s ease-in-out infinite; }
-.thinking .bot-mouth { animation: bot-talk .35s ease-in-out infinite; }
-.thinking .bot-arm-r { animation-duration: .45s; }
-.thinking .bot-ant { animation-duration: .5s; }
-.thinking .bot-pulse { animation-duration: .7s; }
-@keyframes bot-float { 0%,100% { transform: translateY(0) rotate(-1.5deg); }
-    50% { transform: translateY(-10px) rotate(1.5deg); } }
+.bot-mouth { transform-origin: center; animation: bot-talk 3.4s ease-in-out infinite; }
+.bot-ball { transform-origin: center; animation: bot-glow 1.6s ease-in-out infinite; }
+.thinking .bot-halo { animation-duration: .9s; }
+.thinking .bot-eye { animation: bot-look 1s ease-in-out infinite; }
+.thinking .bot-mouth { animation-duration: .4s; }
+.archie-hero.thinking-on { border-color: rgba(183,243,74,.55);
+    box-shadow: 0 0 44px rgba(183,243,74,.16); }
+@keyframes bot-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-9px); } }
+@keyframes bot-halo { 0%,100% { transform: scale(.94); opacity: .22; } 50% { transform: scale(1.06); opacity: .45; } }
 @keyframes bot-blink { 0%,44%,50%,100% { transform: scaleY(1); } 47% { transform: scaleY(.08); } }
-@keyframes bot-look { 0%,100% { transform: translateX(-4px); } 50% { transform: translateX(4px); } }
-@keyframes bot-ant { 0%,100% { transform: rotate(-12deg); } 50% { transform: rotate(12deg); } }
-@keyframes bot-glow { 0%,100% { opacity: .55; transform: scale(.85); } 50% { opacity: 1; transform: scale(1.2); } }
-@keyframes bot-wave { 0%,100% { transform: rotate(0deg); } 50% { transform: rotate(-38deg); } }
-@keyframes bot-swing { 0%,100% { transform: rotate(0deg); } 50% { transform: rotate(10deg); } }
-@keyframes bot-talk { 0%,100% { transform: scaleY(1); } 50% { transform: scaleY(1.7) translateY(2px); } }
-@keyframes bot-beat { 0% { stroke-dashoffset: 90; } 55%,100% { stroke-dashoffset: 0; } }
+@keyframes bot-look { 0%,100% { transform: translateX(-5px); } 50% { transform: translateX(5px); } }
+@keyframes bot-glow { 0%,100% { opacity: .55; transform: scale(.85); } 50% { opacity: 1; transform: scale(1.25); } }
+@keyframes bot-talk { 0%,100% { transform: scaleY(1); } 50% { transform: scaleY(1.8) translateY(1px); } }
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+.think-label { font-size: 13px; font-weight: 700; color: transparent;
+    background: linear-gradient(90deg, #9AA8BD, #F4F7FB, #9AA8BD); background-size: 200% 100%;
+    -webkit-background-clip: text; background-clip: text; animation: shimmer 1.6s linear infinite; }
+.skel i { display: block; height: 10px; border-radius: 6px; margin-top: 9px;
+    background: linear-gradient(90deg, rgba(255,255,255,.06), rgba(183,243,74,.30), rgba(255,255,255,.06));
+    background-size: 200% 100%; animation: shimmer 1.4s linear infinite; }
+.skel i:nth-child(1) { width: 92%; } .skel i:nth-child(2) { width: 78%; } .skel i:nth-child(3) { width: 55%; }
+
+/* ---------- follow-ups, pillars, landing Archie ---------- */
+.bubble-in, .bubble-out { padding: 10px 14px; font-size: 14px; line-height: 1.55;
+    color: #F4F7FB; white-space: pre-wrap; margin-top: 6px; max-width: 760px; }
+.bubble-in { background: rgba(255,255,255,0.06); border-radius: 4px 16px 16px 16px; }
+.bubble-out { background: rgba(183,243,74,0.13); border: 1px solid rgba(183,243,74,.28);
+    border-radius: 16px 4px 16px 16px; }
+.pillar { height: 100%; padding: 16px 16px 14px; border-radius: 18px;
+    background: linear-gradient(160deg, #1A2540, #141C30); border: 1px solid rgba(255,255,255,0.09);
+    border-top: 3px solid var(--tone); }
+.pillar-ic { color: var(--tone); margin-bottom: 8px; }
+.pillar h4 { margin: 0 0 4px; font-size: 15px; color: #F4F7FB; }
+.pillar p { margin: 0 0 8px; font-size: 12px; line-height: 1.5; color: #9AA8BD; }
+.pillar .pn { font-size: 11px; color: #9AA8BD; margin-top: 6px; }
+[class*="st-key-follow_"] button {
+    background: transparent !important; border: 1px solid rgba(183,243,74,.6) !important;
+    border-radius: 999px !important; min-height: 34px !important; box-shadow: none !important; }
+[class*="st-key-follow_"] button p { color: #B7F34A !important; font-size: 12px !important; }
+[class*="st-key-follow_"] button:hover { background: #B7F34A !important; }
+[class*="st-key-follow_"] button:hover p { color: #10182A !important; }
+.lp-archie { display: grid; grid-template-columns: 220px 1fr; gap: 28px; align-items: center;
+    padding: 28px; border-radius: 26px; border: 1px solid rgba(255,255,255,0.09);
+    background: radial-gradient(circle at 0% 0%, rgba(183,243,74,0.14), transparent 45%),
+                linear-gradient(120deg, #17243A, #121B2E); }
+.lp-archie-bot { width: 190px; height: 190px; margin: 0 auto; }
+.lp-archie-bot .archie-bot { animation: bot-float 4s ease-in-out infinite; }
+.lp-chat { display: flex; flex-direction: column; gap: 10px; }
+.lp-msg { max-width: 560px; padding: 11px 15px; border-radius: 16px; font-size: 14px; line-height: 1.55; }
+.lp-msg.me { align-self: flex-end; background: #B7F34A; color: #10182A; font-weight: 700; border-radius: 16px 16px 4px 16px; }
+.lp-msg.ai { align-self: flex-start; background: rgba(255,255,255,0.07); color: #F4F7FB; border-radius: 16px 16px 16px 4px; }
+.lp-send { align-self: flex-start; font-size: 12px; font-weight: 800; letter-spacing: .6px; color: #B7F34A; }
+
+/* ---------- overall polish ---------- */
+.stApp { background:
+    radial-gradient(1100px 560px at 8% -8%, rgba(183,243,74,0.07), transparent 60%),
+    radial-gradient(900px 480px at 100% 0%, rgba(53,214,237,0.06), transparent 55%), #0B1020 !important; }
+[data-stale="true"] { opacity: 1 !important; transition: none !important; }
+.lp-hero::before, .lp-hero::after { filter: none !important; }
+.lp-radar, .lp-pill, .st-key-auth_card { backdrop-filter: none !important; }
+.stButton > button { box-shadow: 0 6px 18px rgba(183,243,74,.16);
+    transition: transform .15s ease, box-shadow .15s ease; }
+.stButton > button:hover { transform: translateY(-1px); box-shadow: 0 10px 24px rgba(183,243,74,.24); }
+div[data-baseweb="input"]:focus-within, div[data-baseweb="select"]:focus-within > div,
+textarea:focus { border-color: #B7F34A !important; box-shadow: 0 0 0 2px rgba(183,243,74,.22) !important; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,.14); border-radius: 8px; }
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+@media (max-width: 800px) { .lp-archie { grid-template-columns: 1fr; } }
 
 /* ---------- dashboard tiles ---------- */
 [class*="st-key-qa_"] button {
@@ -824,6 +940,14 @@ def open_profile(member_id, back_page="Member Management"):
     st.session_state["navigate_to"] = "Member Profile"
 
 
+def open_followup(member_id, back_page="Risk Radar"):
+    """Button callback: go straight to the message composer for one member."""
+    st.session_state["fu_member"] = member_id
+    st.session_state["fu_view"] = "Compose"
+    st.session_state["followup_back"] = back_page
+    st.session_state["navigate_to"] = "Follow-ups"
+
+
 # ------------------------------------------------------------- logic
 def drivers(row):
     """Plain-language reasons a member is flagged (rule-based, transparent)."""
@@ -934,8 +1058,8 @@ ARCHIE_SYSTEM = (
     "You are Archie, the retention assistant inside GymPulse AI. You help gym "
     "owners keep members. Use ONLY the data provided; if something is not in it, "
     "say so. The risk scores come from a model trained on synthetic data, so call "
-    "them estimates, never facts. Be warm, concrete and brief. When asked for a "
-    "message to a member, write it ready to send (WhatsApp length, friendly, no "
+    "them estimates, never facts. Be warm, upbeat and concrete, and sound genuinely excited to help. When asked for a "
+    "message to a member, write it ready to send (WhatsApp length, excited and friendly, at most two emojis, no "
     "pressure, no mention of 'risk' or 'cancellation'). "
     "Never leave placeholders like [your name] in a message; sign it with the "
     "owner's name from the data."
@@ -1823,7 +1947,7 @@ def _radar_chart(view):
                          color="risk_category", size="monthly_fee", height=340)
 
 
-PRIORITY_WIDTHS = [0.6, 2.8, 1.1, 1.7, 1.7, 1.0]
+PRIORITY_WIDTHS = [0.6, 2.4, 1.0, 1.5, 1.6, 0.9, 1.2]
 
 
 def _priority_rows(view):
@@ -1831,7 +1955,7 @@ def _priority_rows(view):
     risk, probability, suggested action and fee."""
     head = st.columns(PRIORITY_WIDTHS)
     for col, label in zip(head, ["", "MEMBER", "RISK", "PROBABILITY",
-                                 "SUGGESTED ACTION", "FEE"]):
+                                 "SUGGESTED ACTION", "FEE", "FOLLOW UP"]):
         _md(f'<div class="th">{label}</div>', col)
 
     limit = st.session_state.get("prio_limit", 10)
@@ -1847,6 +1971,8 @@ def _priority_rows(view):
             _md(prob_bar(r["cancellation_probability"], r["risk_category"]), c[3])
             _md(chip(r["suggested_action"], "cyan"), c[4])
             _md(f'<div class="money">{r["monthly_fee"]:,.0f}</div>', c[5])
+            c[6].button("Follow up", key=f"follow_prio_{r['id']}", on_click=open_followup,
+                        args=(r["id"], "Risk Radar"), use_container_width=True)
     if len(view) > limit:
         st.button(f"Show more ({len(view) - limit} left)", key="prio_more",
                   on_click=_bump, args=("prio_limit", 10, 10))
@@ -1927,20 +2053,20 @@ def render_risk_radar(supabase, gym_id, assess_fn):
     _md(kpi_card("Renews in", f"{int(m['renewal_due_days'])} days", "white", ""), d3)
     _md(f'<div class="panel"><div class="kv"><span>Why flagged</span><b>{_esc(m["drivers"])}</b></div>'
         f'<div class="kv"><span>Suggested</span><b>{_esc(m["suggested_action"])}</b></div></div>')
-    b1, b2 = st.columns(2)
+    b1, b3, b2 = st.columns(3)
     b1.button("Open full profile", key="radar_profile", on_click=open_profile,
               args=(m["id"], "Risk Radar"), use_container_width=True)
-    if b2.button(f"Create action for {pick}", key="radar_create", use_container_width=True):
-        if _has_open_action(supabase, m["id"]):
-            st.button(f"ℹ️ {pick} already has an open action. Tap to open the Action Centre",
-                      key="radar_open_ac", on_click=_go, args=("Action Centre",),
-                      use_container_width=True)
-        else:
+    b3.button("Message this member", key="radar_followup", on_click=open_followup,
+              args=(m["id"], "Risk Radar"), use_container_width=True)
+    if b2.button("Create follow-up action", key="radar_create", use_container_width=True):
+        if not _has_open_action(supabase, m["id"]):
             _create_action(supabase, gym_id, m["id"], m["suggested_action"],
                            m["renewal_due_days"])
-            st.button("✅ Added to the Retention Action Centre. Tap to open it",
-                      key="radar_open_ac", on_click=_go, args=("Action Centre",),
-                      use_container_width=True)
+            st.session_state["ac_flash"] = f"Follow-up action added for {pick}."
+        else:
+            st.session_state["ac_flash"] = f"{pick} already has an open action. Here it is."
+        st.session_state["navigate_to"] = "Action Centre"
+        st.rerun()
     st.caption("Estimates come from a model trained on synthetic data. Use them "
                "to prioritise conversations, not to make decisions about members.")
 
@@ -1961,6 +2087,9 @@ def _action_card(supabase, a, names, photos, status, prefix):
         if status == "Done":
             chips += outcome_chip(a.get("outcome"))
         _md(f'<div class="chip-row">{chips}</div>')
+        if status != "Done":
+            st.button("Message", key=f"follow_{prefix}_{a['id']}", on_click=open_followup,
+                      args=(member_id, "Action Centre"), use_container_width=True)
         if status == "Done":
             if note:
                 st.caption(note)
@@ -2041,10 +2170,42 @@ def _list_board(supabase, actions, names, photos):
                     _delete_action_control(supabase, a["id"])
 
 
+def _pillars_panel(supabase, gym_id, roster, actions):
+    """Culture, community, trainer relationship and customer experience:
+    the four things that keep members, each with plays you can start."""
+    st.markdown('<div class="section-label">RETENTION PILLARS</div>', unsafe_allow_html=True)
+    st.caption("Members stay when they feel part of something, know their trainer "
+               "and feel looked after. Start a play for any pillar.")
+    cols = st.columns(len(PILLARS))
+    for col, (name, info) in zip(cols, PILLARS.items()):
+        own = actions[actions["action_type"].isin(info["plays"])] if not actions.empty else actions
+        done_n = int((own["status"] == "Done").sum()) if len(own) else 0
+        open_n = len(own) - done_n
+        chips = "".join(chip(p, info["tone"]) for p in info["plays"])
+        _md(f'<div class="pillar" style="--tone:{TONES[info["tone"]]}">'
+            f'<div class="pillar-ic">{ic(info["icon"], 24)}</div><h4>{_esc(name)}</h4>'
+            f'<p>{_esc(info["blurb"])}</p><div class="chip-row">{chips}</div>'
+            f'<div class="pn">{done_n} done · {open_n} open</div></div>', col)
+    with st.expander("Start a play for a member"):
+        names = roster.set_index("id")["full_name"].to_dict()
+        ids = list(names)
+        c1, c2 = st.columns(2)
+        who = c1.selectbox("Member", ids, format_func=lambda i: names[i], key="play_member")
+        plays = [(pn, p) for pn, info in PILLARS.items() for p in info["plays"]]
+        play = c2.selectbox("Play", plays, format_func=lambda t: f"{t[0]} · {t[1]}", key="play_type")
+        if st.button("Add to the board", key="play_add"):
+            row = roster[roster["id"] == who].iloc[0]
+            _create_action(supabase, gym_id, who, play[1], int(row["renewal_due_days"]))
+            st.rerun()
+
+
 def render_action_centre(supabase, gym_id, assess_fn):
     page_header("Retention Action Centre",
                 "Turn risk into follow-ups, track them, and learn what works.",
                 "Keep your members")
+    flash = st.session_state.pop("ac_flash", None)
+    if flash:
+        st.success(flash)
     try:
         roster, _ = load_roster(supabase, gym_id, assess_fn)
         actions = load_actions(supabase, gym_id)
@@ -2113,6 +2274,8 @@ def render_action_centre(supabase, gym_id, assess_fn):
                 _create_action(supabase, gym_id, r["id"], r["suggested_action"],
                                r["renewal_due_days"])
             st.rerun()
+
+    _pillars_panel(supabase, gym_id, roster, actions)
 
     st.markdown('<div class="section-label">YOUR BOARD</div>', unsafe_allow_html=True)
     if actions.empty:
@@ -2262,29 +2425,18 @@ ARCHIE_PROMPTS = [
 
 
 ARCHIE_BOT_SVG = """
-<svg class="archie-bot" viewBox="0 0 200 220" xmlns="http://www.w3.org/2000/svg">
-  <g class="bot-ant"><line x1="100" y1="34" x2="100" y2="12" stroke="#B7F34A" stroke-width="6" stroke-linecap="round"/>
-    <circle class="bot-ball" cx="100" cy="10" r="9" fill="#35D6ED"/></g>
-  <rect x="26" y="78" width="14" height="38" rx="7" fill="#35D6ED"/>
-  <rect x="160" y="78" width="14" height="38" rx="7" fill="#35D6ED"/>
-  <rect x="36" y="34" width="128" height="100" rx="44" fill="#B7F34A"/>
-  <rect x="48" y="46" width="104" height="76" rx="34" fill="#0B1020"/>
-  <g class="bot-eye"><ellipse cx="78" cy="80" rx="13" ry="16" fill="#B7F34A"/>
-    <circle cx="82" cy="74" r="4.5" fill="#fff"/></g>
-  <g class="bot-eye bot-eye2"><ellipse cx="122" cy="80" rx="13" ry="16" fill="#B7F34A"/>
-    <circle cx="126" cy="74" r="4.5" fill="#fff"/></g>
-  <ellipse cx="62" cy="104" rx="8" ry="5" fill="#FF6B6B" opacity=".55"/>
-  <ellipse cx="138" cy="104" rx="8" ry="5" fill="#FF6B6B" opacity=".55"/>
-  <path class="bot-mouth" d="M84 103 Q100 120 116 103" fill="none" stroke="#B7F34A" stroke-width="5" stroke-linecap="round"/>
-  <rect x="62" y="138" width="76" height="62" rx="26" fill="#B7F34A"/>
-  <rect x="72" y="148" width="56" height="42" rx="18" fill="#0B1020"/>
-  <polyline class="bot-pulse" points="76,170 90,170 96,156 104,184 110,166 124,170"
-    fill="none" stroke="#35D6ED" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-  <rect class="bot-arm-l" x="38" y="146" width="26" height="12" rx="6" fill="#B7F34A"/>
-  <g class="bot-arm-r"><rect x="136" y="146" width="30" height="12" rx="6" fill="#B7F34A" transform="rotate(-25 138 152)"/>
-    <circle cx="166" cy="140" r="9" fill="#B7F34A"/></g>
-  <rect x="70" y="200" width="22" height="12" rx="6" fill="#35D6ED"/>
-  <rect x="108" y="200" width="22" height="12" rx="6" fill="#35D6ED"/>
+<svg class="archie-bot" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <circle class="bot-halo" cx="100" cy="100" r="94" fill="#35D6ED"/>
+  <circle cx="100" cy="100" r="76" fill="#B7F34A"/>
+  <circle cx="116" cy="124" r="62" fill="#27B35C" opacity=".28"/>
+  <ellipse cx="74" cy="56" rx="30" ry="15" fill="#fff" opacity=".38" transform="rotate(-28 74 56)"/>
+  <rect x="48" y="78" width="104" height="62" rx="31" fill="#0B1020"/>
+  <g class="bot-eye"><ellipse cx="80" cy="106" rx="9" ry="14" fill="#B7F34A"/>
+    <circle cx="83" cy="101" r="3.4" fill="#fff"/></g>
+  <g class="bot-eye bot-eye2"><ellipse cx="120" cy="106" rx="9" ry="14" fill="#B7F34A"/>
+    <circle cx="123" cy="101" r="3.4" fill="#fff"/></g>
+  <path class="bot-mouth" d="M90 122 Q100 131 110 122" fill="none" stroke="#35D6ED" stroke-width="4" stroke-linecap="round"/>
+  <circle class="bot-ball" cx="152" cy="52" r="9" fill="#35D6ED"/>
 </svg>
 """
 
@@ -2309,10 +2461,26 @@ def _archie_hero(thinking=False):
 def _chat_message(role):
     if role == "assistant":
         try:
-            return st.chat_message("assistant", avatar="🤖")
+            from PIL import Image
+            avatar = Image.open(os.path.join(HERE, "archie_chat.png"))
+        except Exception:
+            avatar = ":material/smart_toy:"
+        try:
+            return st.chat_message("assistant", avatar=avatar)
         except Exception:
             pass
     return st.chat_message(role)
+
+
+def _stream(slot, text):
+    """Reveal the reply progressively, like a modern AI chat."""
+    import time
+    words = text.split(" ")
+    step = max(1, len(words) // 40)
+    for i in range(step, len(words), step):
+        slot.markdown(" ".join(words[:i]) + " ▍")
+        time.sleep(0.03)
+    slot.markdown(text)
 
 
 def render_archie(supabase, gym_id, assess_fn, business_name, owner_name="the gym owner"):
@@ -2350,9 +2518,10 @@ def render_archie(supabase, gym_id, assess_fn, business_name, owner_name="the gy
         _md(_archie_hero(True), hero)
         with _chat_message("assistant"):
             slot = st.empty()
-            _md('<div class="typing"><i></i><i></i><i></i></div>', slot)
+            _md('<div class="think"><span class="think-label">Archie is thinking</span>'
+                '<div class="skel"><i></i><i></i><i></i></div></div>', slot)
             reply, live = archie_reply(st.session_state.archie_msgs, context)
-            slot.markdown(reply)
+            _stream(slot, reply)
         _md(_archie_hero(False), hero)
         st.session_state.archie_msgs.append({"role": "assistant", "content": reply})
     if st.session_state.archie_msgs and st.button("Clear chat"):
@@ -2365,7 +2534,7 @@ def render_archie(supabase, gym_id, assess_fn, business_name, owner_name="the gy
 
 # --------------------------------------------------------- dashboard
 def render_dashboard(supabase, gym_id, assess_fn, greeting, user_name, business_name):
-    page_header(f"{greeting}, {user_name} 👋",
+    page_header(f"{greeting}, {user_name}",
                 f"Welcome to {business_name}. Let's build a stronger, smarter fitness business.",
                 "Your fitness workspace")
     try:
@@ -2421,18 +2590,20 @@ def render_dashboard(supabase, gym_id, assess_fn, greeting, user_name, business_
 
     st.markdown('<div class="section-label">QUICK ACTIONS</div>', unsafe_allow_html=True)
     tiles = [
-        ("🎯  Risk Radar", "Risk Radar"),
-        ("✅  Action Centre", "Action Centre"),
-        ("🤖  Ask Archie", "Archie"),
-        ("👥  Member Management", "Member Management"),
-        ("🧪  Member Assessment", "Member Assessment"),
-        ("📂  Batch Assessment", "Batch Assessment"),
+        ("Risk Radar", "Risk Radar", ":material/radar:"),
+        ("Action Centre", "Action Centre", ":material/task_alt:"),
+        ("Follow-ups", "Follow-ups", ":material/forum:"),
+        ("Ask Archie", "Archie", ":material/smart_toy:"),
+        ("Member Management", "Member Management", ":material/group:"),
+        ("Member Assessment", "Member Assessment", ":material/science:"),
+        ("Batch Assessment", "Batch Assessment", ":material/upload_file:"),
+        ("Model Insights", "Model Insights", ":material/insights:"),
     ]
-    for start in range(0, len(tiles), 3):
-        cols = st.columns(3)
-        for col, (label, page) in zip(cols, tiles[start:start + 3]):
-            col.button(label, key=f"qa_{page}", on_click=_go, args=(page,),
-                       use_container_width=True)
+    for start in range(0, len(tiles), 4):
+        cols = st.columns(4)
+        for col, (label, page, icon) in zip(cols, tiles[start:start + 4]):
+            _ibtn(col, label, icon, key=f"qa_{page}", on_click=_go, args=(page,),
+                  use_container_width=True)
 
     st.markdown('<div class="section-label">HOW IT WORKS</div>', unsafe_allow_html=True)
     _md("""
