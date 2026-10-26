@@ -54,8 +54,12 @@ MOBILE_PARTS = {
 }
 """,
     "nav": """
-@media (max-width: 640px) {
-    .nav-tagline { display: none !important; }
+.st-key-top_nav .nav-tagline { display: none !important; }
+    .login-brand .nav-tagline {
+        display: block !important;
+        white-space: normal !important;
+        font-size: 11px !important;
+    }
     .st-key-top_nav div[role="radiogroup"] {
         flex-wrap: wrap !important;
         gap: 4px !important;
