@@ -885,7 +885,7 @@ CHAT_CSS = """
     border: 1px solid rgba(183,243,74,0.45) !important;
     border-radius: 999px !important;
     min-height: 36px !important;
-    padding: 0 16px !important;
+    padding: 0 16px 0 8px !important;
     box-shadow: none !important;
     justify-content: flex-start !important;
 }
@@ -2874,7 +2874,55 @@ def archie_reply(messages, context):
         return text, True
     except Exception as error:
         return f"Archie could not answer right now.\n\nTechnical detail: {error}", False
-def _mention_buttons(text, roster, tag):
+def _member_photos(supabase, gym_id, ids):
+    try:
+        rows = (supabase.table("members").select("id, photo")
+                .eq("gym_id", gym_id).in_("id", list(ids)).execute().data or [])
+    except Exception:
+        return {}
+    return {r["id"]: r.get("photo") for r in rows}
+
+
+def _mention_buttons(text, roster, tag, supabase=None, gym_id=None):
+    """A pill button, with the member's photo or initials, for each name in Archie's reply."""
+    if roster is None or roster.empty or "full_name" not in roster.columns:
+        return
+    lowered = str(text).lower()
+    found, seen = [], set()
+    people = sorted(roster[["id", "full_name"]].dropna().itertuples(index=False),
+                    key=lambda p: len(str(p.full_name)), reverse=True)
+    for p in people:
+        name = str(p.full_name).strip()
+        if len(name) >= 3 and name.lower() in lowered and p.id not in seen:
+            seen.add(p.id)
+            found.append((p.id, name))
+    if not found:
+        return
+    found = found[:6]
+
+    photos = {}
+    if "photo" in roster.columns:
+        photos = dict(zip(roster["id"], roster["photo"]))
+    elif supabase is not None and gym_id:
+        photos = _member_photos(supabase, gym_id, [i for i, _ in found])
+
+    rules = []
+    for member_id, name in found:
+        pic = photos.get(member_id)
+        src = pic if has_photo(pic) else _user_avatar(name)
+        rules.append(
+            f'[class*="st-key-mention_{tag}_{member_id}"] button::before {{'
+            f'content:"";display:inline-block;width:26px;height:26px;'
+            f'border-radius:50%;flex-shrink:0;margin-right:10px;'
+            f'background:url("{src}") center/cover no-repeat;'
+            f'border:2px solid rgba(183,243,74,0.6);box-sizing:border-box;}}'
+        )
+    st.markdown("<style>" + "".join(rules) + "</style>", unsafe_allow_html=True)
+
+    st.caption("Tap a name to open their profile")
+    for member_id, name in found:
+        st.button(name, key=f"mention_{tag}_{member_id}",
+                  on_click=open_profile, args=(member_id, "Archie"))
     """Show a button for every member whose name appears in Archie's reply."""
     if roster is None or roster.empty or "full_name" not in roster.columns:
         return
@@ -2923,7 +2971,7 @@ def render_archie(supabase, gym_id, assess_fn, business_name, owner_name="the gy
         with _chat_message(m["role"]):
             st.markdown(m["content"])
             if m["role"] == "assistant":
-                _mention_buttons(m["content"], roster, f"h{i}")
+                _mention_buttons(m["content"], roster, f"h{i}", supabase, gym_id)
     typed = st.chat_input("Ask Archie...")
     question = typed or picked
     if question:
@@ -2937,7 +2985,7 @@ def render_archie(supabase, gym_id, assess_fn, business_name, owner_name="the gy
                 '<div class="skel"><i></i><i></i><i></i></div></div>', slot)
             reply, live = archie_reply(st.session_state.archie_msgs, context)
             _stream(slot, reply)
-            _mention_buttons(reply, roster, f"n{len(st.session_state.archie_msgs)}")
+            _mention_buttons(reply, roster, f"n{len(st.session_state.archie_msgs)}", supabase, gym_id)
         _md(_archie_hero(False), hero)
         st.session_state.archie_msgs.append({"role": "assistant", "content": reply})
     if st.session_state.archie_msgs and st.button("Clear chat"):
