@@ -2555,13 +2555,13 @@ with profile_col:
                 use_container_width=True
             )
                 st.divider()
-                st.button(
-                    "Profile & settings",
-                    key="open_settings",
-                    on_click=show_page,
-                    args=("Settings",),
-                    use_container_width=True
-                )
+            st.button(
+                "Profile & settings",
+                key="open_settings",
+                on_click=show_page,
+                args=("Settings",),
+                use_container_width=True
+            )
                 st.button(
                     "Log Out",
                     key="logout_button_main",
