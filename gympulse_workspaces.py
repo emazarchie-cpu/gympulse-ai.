@@ -401,6 +401,268 @@ def modern_line_chart(df):
         _show_chart(_style_chart(alt.layer(rules, line).properties(height=320)))
     except Exception:
         st.line_chart(data.set_index("days_since_last_visit"))
+LIGHT_CSS = """
+html { filter: invert(1) hue-rotate(180deg); background: #fff; }
+img, video, .archie-bot, [style*="background-image"],
+.st-key-top_profile button::before,
+[class*="st-key-mention_"] button::before {
+    filter: invert(1) hue-rotate(180deg);
+}
+"""
+
+
+def apply_theme(theme):
+    if theme == "light":
+        st.markdown("<style>" + LIGHT_CSS + "</style>", unsafe_allow_html=True)
+
+
+LANGUAGES = ["English", "French", "Spanish", "Portuguese", "Arabic",
+             "Yoruba", "Igbo", "Hausa", "Nigerian Pidgin"]
+
+
+def render_settings(supabase, owner_id, gym_id, log_out):
+    page_header("Settings", "Your profile, gym details and preferences.", "Account")
+    flash = st.session_state.pop("settings_flash", None)
+    if flash:
+        st.success(flash)
+
+    profile = st.session_state.get("user_profile")
+    if not isinstance(profile, dict):
+        profile = {}
+        st.session_state["user_profile"] = profile
+    email = (st.session_state.get("auth_user") or {}).get("email", "")
+    full = _text(profile.get("full_name"))
+    first, _, last = full.partition(" ")
+    gym_name = _text(profile.get("business_name"), "My Gym")
+    avatar = profile.get("avatar")
+
+    _md(f"""
+    <div class="profile-hero">
+      {avatar_html(full or "User", avatar, 96, "avatar-ring")}
+      <div>
+        <div class="profile-name">{_esc(full or "Your name")}</div>
+        <div class="chip-row">{chip(gym_name, "cyan")}{chip(email, "grey") if email else ""}</div>
+      </div>
+    </div>
+    """)
+
+    def save(fields, message):
+        try:
+            supabase.table("profiles").update(fields).eq("id", owner_id).execute()
+            saved = fields
+        except Exception:
+            saved = {k: v for k, v in fields.items()
+                     if k in ("full_name", "business_name")}
+            try:
+                if saved:
+                    supabase.table("profiles").update(saved).eq("id", owner_id).execute()
+            except Exception as error:
+                st.error(f"Could not save: {error}")
+                return
+            if len(saved) < len(fields):
+                st.warning("Some settings need the one-time database update "
+                           "(the SQL in the setup notes). Name and gym name were saved.")
+        profile.update(saved)
+        if "business_name" in saved and gym_id:
+            try:
+                (supabase.table("gyms").update({"business_name": saved["business_name"]})
+                 .eq("id", gym_id).execute())
+            except Exception:
+                pass
+        st.session_state["settings_flash"] = message
+        st.rerun()
+
+    t_profile, t_photo, t_gym, t_pref, t_account = st.tabs(
+        ["Personal info", "Photo", "Gym", "Preferences", "Account"])
+
+    with t_profile:
+        with st.form("settings_profile"):
+            c1, c2 = st.columns(2)
+            f_first = c1.text_input("First name", value=first)
+            f_last = c2.text_input("Last name", value=last)
+            f_user = st.text_input("Username", value=_text(profile.get("username")))
+            st.text_input("Email address", value=email, disabled=True)
+            ok = st.form_submit_button("Save personal info", use_container_width=True)
+        if ok:
+            name = f"{f_first.strip()} {f_last.strip()}".strip()
+            if not name:
+                st.error("Please enter your name.")
+            else:
+                save({"full_name": name, "username": f_user.strip() or None},
+                     "Personal info saved.")
+
+    with t_photo:
+        c1, c2 = st.columns([1, 2])
+        with c1:
+            _md(avatar_html(full or "User", avatar, 130, "avatar-ring"))
+        with c2:
+            up = st.file_uploader("Upload a profile photo (JPG or PNG)",
+                                  type=["jpg", "jpeg", "png"], key="settings_photo")
+            if up is not None:
+                try:
+                    new_photo = process_photo(up.getvalue())
+                except Exception:
+                    new_photo = None
+                    st.error("That image could not be read.")
+                if new_photo:
+                    _md(avatar_html(full or "User", new_photo, 90))
+                    if st.button("Save photo", key="settings_photo_save"):
+                        save({"avatar": new_photo}, "Profile photo saved.")
+            if has_photo(avatar) and st.button("Remove photo", key="settings_photo_rm"):
+                save({"avatar": None}, "Profile photo removed.")
+
+    with t_gym:
+        with st.form("settings_gym"):
+            g_name = st.text_input("Gym or company name", value=gym_name)
+            ok = st.form_submit_button("Save gym name", use_container_width=True)
+        if ok:
+            if not g_name.strip():
+                st.error("Please enter a gym name.")
+            else:
+                save({"business_name": g_name.strip()}, "Gym name saved.")
+
+    with t_pref:
+        current = _text(profile.get("language"), "English")
+        options = LANGUAGES if current in LANGUAGES else [current] + LANGUAGES
+        lang = st.selectbox("Language", options, index=options.index(current))
+        st.caption("Archie replies in your language. Screen labels are still in English.")
+        if st.button("Save language", key="settings_lang"):
+            save({"language": lang}, "Language saved.")
+
+    with t_account:
+        st.caption("Signing out ends your session on this device.")
+        st.button("Log Out", key="settings_logout", on_click=log_out)
+LIGHT_CSS = """
+html { filter: invert(1) hue-rotate(180deg); background: #fff; }
+img, video, .archie-bot, [style*="background-image"],
+.st-key-top_profile button::before,
+[class*="st-key-mention_"] button::before {
+    filter: invert(1) hue-rotate(180deg);
+}
+"""
+
+
+def apply_theme(theme):
+    if theme == "light":
+        st.markdown("<style>" + LIGHT_CSS + "</style>", unsafe_allow_html=True)
+
+
+LANGUAGES = ["English", "French", "Spanish", "Portuguese", "Arabic",
+             "Yoruba", "Igbo", "Hausa", "Nigerian Pidgin"]
+
+
+def render_settings(supabase, owner_id, gym_id, log_out):
+    page_header("Settings", "Your profile, gym details and preferences.", "Account")
+    flash = st.session_state.pop("settings_flash", None)
+    if flash:
+        st.success(flash)
+
+    profile = st.session_state.get("user_profile")
+    if not isinstance(profile, dict):
+        profile = {}
+        st.session_state["user_profile"] = profile
+    email = (st.session_state.get("auth_user") or {}).get("email", "")
+    full = _text(profile.get("full_name"))
+    first, _, last = full.partition(" ")
+    gym_name = _text(profile.get("business_name"), "My Gym")
+    avatar = profile.get("avatar")
+
+    _md(f"""
+    <div class="profile-hero">
+      {avatar_html(full or "User", avatar, 96, "avatar-ring")}
+      <div>
+        <div class="profile-name">{_esc(full or "Your name")}</div>
+        <div class="chip-row">{chip(gym_name, "cyan")}{chip(email, "grey") if email else ""}</div>
+      </div>
+    </div>
+    """)
+
+    def save(fields, message):
+        try:
+            supabase.table("profiles").update(fields).eq("id", owner_id).execute()
+            saved = fields
+        except Exception:
+            saved = {k: v for k, v in fields.items()
+                     if k in ("full_name", "business_name")}
+            try:
+                if saved:
+                    supabase.table("profiles").update(saved).eq("id", owner_id).execute()
+            except Exception as error:
+                st.error(f"Could not save: {error}")
+                return
+            if len(saved) < len(fields):
+                st.warning("Some settings need the one-time database update "
+                           "(the SQL in the setup notes). Name and gym name were saved.")
+        profile.update(saved)
+        if "business_name" in saved and gym_id:
+            try:
+                (supabase.table("gyms").update({"business_name": saved["business_name"]})
+                 .eq("id", gym_id).execute())
+            except Exception:
+                pass
+        st.session_state["settings_flash"] = message
+        st.rerun()
+
+    t_profile, t_photo, t_gym, t_pref, t_account = st.tabs(
+        ["Personal info", "Photo", "Gym", "Preferences", "Account"])
+
+    with t_profile:
+        with st.form("settings_profile"):
+            c1, c2 = st.columns(2)
+            f_first = c1.text_input("First name", value=first)
+            f_last = c2.text_input("Last name", value=last)
+            f_user = st.text_input("Username", value=_text(profile.get("username")))
+            st.text_input("Email address", value=email, disabled=True)
+            ok = st.form_submit_button("Save personal info", use_container_width=True)
+        if ok:
+            name = f"{f_first.strip()} {f_last.strip()}".strip()
+            if not name:
+                st.error("Please enter your name.")
+            else:
+                save({"full_name": name, "username": f_user.strip() or None},
+                     "Personal info saved.")
+
+    with t_photo:
+        c1, c2 = st.columns([1, 2])
+        with c1:
+            _md(avatar_html(full or "User", avatar, 130, "avatar-ring"))
+        with c2:
+            up = st.file_uploader("Upload a profile photo (JPG or PNG)",
+                                  type=["jpg", "jpeg", "png"], key="settings_photo")
+            if up is not None:
+                try:
+                    new_photo = process_photo(up.getvalue())
+                except Exception:
+                    new_photo = None
+                    st.error("That image could not be read.")
+                if new_photo:
+                    _md(avatar_html(full or "User", new_photo, 90))
+                    if st.button("Save photo", key="settings_photo_save"):
+                        save({"avatar": new_photo}, "Profile photo saved.")
+            if has_photo(avatar) and st.button("Remove photo", key="settings_photo_rm"):
+                save({"avatar": None}, "Profile photo removed.")
+
+    with t_gym:
+        with st.form("settings_gym"):
+            g_name = st.text_input("Gym or company name", value=gym_name)
+            ok = st.form_submit_button("Save gym name", use_container_width=True)
+        if ok:
+            if not g_name.strip():
+                st.error("Please enter a gym name.")
+            else:
+                save({"business_name": g_name.strip()}, "Gym name saved.")
+
+    with t_pref:
+        current = _text(profile.get("language"), "English")
+        options = LANGUAGES if current in LANGUAGES else [current] + LANGUAGES
+        lang = st.selectbox("Language", options, index=options.index(current))
+        st.caption("Archie replies in your language. Screen labels are still in English.")
+        if st.button("Save language", key="settings_lang"):
+            save({"language": lang}, "Language saved.")
+
+    with t_account:
+        st.caption("Signing out ends your session on this device.")
+        st.button("Log Out", key="settings_logout", on_click=log_out)        
 def data_card(rows, cols, key_prefix, tone="cyan", empty="Nothing here yet."):
     if not rows:
         st.caption(empty)
@@ -2870,6 +3132,8 @@ def render_archie(supabase, gym_id, assess_fn, business_name, owner_name="the gy
     else:
         context = f"Gym: {business_name}. No scored members yet."
     context += f"\nThe owner's name is {owner_name}. Sign messages with this name."
+    _lang = (st.session_state.get("user_profile") or {}).get("language") or "English"
+    context += f"\nReply in {_lang}."
 
     if "archie_msgs" not in st.session_state:
         st.session_state.archie_msgs = []
@@ -2978,7 +3242,6 @@ def render_dashboard(supabase, gym_id, assess_fn, greeting, user_name, business_
     tiles = [
         ("Member Management", "Member Management", ":material/group:"),
         ("Action Centre", "Action Centre", ":material/task_alt:"),
-        ("Follow-ups", "Follow-ups", ":material/forum:"),
         ("Ask Archie", "Archie", ":material/smart_toy:"),
         ("Payments & Renewals", "Payments & Renewals", ":material/payments:"),
         ("Member Assessment", "Member Assessment", ":material/science:"),
