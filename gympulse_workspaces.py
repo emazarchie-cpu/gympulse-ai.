@@ -665,9 +665,147 @@ MOBILE_ROWS_CSS = """
 """
 
 
+DASH_TODAY_MOBILE_CSS = """
+@media (max-width: 640px) {
+    .st-key-card_dash_today [data-testid="stHorizontalBlock"]:has(.row-tight):not(:has(.kb-head)) {
+        display: grid !important;
+        grid-template-columns: 52px minmax(0, 1fr) !important;
+        column-gap: 12px !important;
+        row-gap: 6px !important;
+        align-items: center !important;
+        padding: 6px 0 10px !important;
+    }
+    .st-key-card_dash_today [data-testid="stHorizontalBlock"]:has(.row-tight):not(:has(.kb-head)) > [data-testid="stColumn"] {
+        width: auto !important;
+        min-width: 0 !important;
+        flex: none !important;
+    }
+    /* Photo */
+    .st-key-card_dash_today [data-testid="stHorizontalBlock"]:has(.row-tight):not(:has(.kb-head)) > [data-testid="stColumn"]:nth-child(1) {
+        grid-column: 1 !important;
+        grid-row: 1 / span 2 !important;
+        align-self: start !important;
+    }
+    /* Name + reason */
+    .st-key-card_dash_today [data-testid="stHorizontalBlock"]:has(.row-tight):not(:has(.kb-head)) > [data-testid="stColumn"]:nth-child(2) {
+        grid-column: 2 !important;
+        grid-row: 1 !important;
+    }
+    /* Risk and suggested action chips */
+    .st-key-card_dash_today [data-testid="stHorizontalBlock"]:has(.row-tight):not(:has(.kb-head)) > [data-testid="stColumn"]:nth-child(3) {
+        grid-column: 2 !important;
+        grid-row: 2 !important;
+    }
+    .st-key-card_dash_today [class*="st-key-mrow_"] button {
+        justify-content: flex-start !important;
+        text-align: left !important;
+        padding-left: 0 !important;
+    }
+    .st-key-card_dash_today [class*="st-key-mrow_"] button p {
+        text-align: left !important;
+    }
+    .st-key-card_dash_today .why {
+        padding: 0 !important;
+        text-align: left !important;
+        white-space: normal !important;
+    }
+    .st-key-card_dash_today [data-testid="stColumn"]:nth-child(3) [data-testid="stMarkdownContainer"] {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 6px !important;
+    }
+}
+"""
+
+ALL_ROWS_MOBILE_CSS = """
+@media (max-width: 768px) {
+
+    /* ---- Shared: every member row becomes a tidy grid ---- */
+    :is(.st-key-card_priority, .st-key-card_suggested, [class*="st-key-card_pay_"],
+        .st-key-card_todo_week, .st-key-card_dir)
+    [data-testid="stHorizontalBlock"]:has(.row-tight) {
+        display: grid !important;
+        grid-template-columns: 52px minmax(0, 1fr) minmax(0, 1fr) !important;
+        column-gap: 12px !important;
+        row-gap: 6px !important;
+        align-items: center !important;
+        padding: 6px 0 10px !important;
+    }
+    :is(.st-key-card_priority, .st-key-card_suggested, [class*="st-key-card_pay_"],
+        .st-key-card_todo_week, .st-key-card_dir)
+    [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"] {
+        width: auto !important;
+        min-width: 0 !important;
+        flex: none !important;
+    }
+
+    /* Photo: always column 1, spans the rows beside it */
+    :is(.st-key-card_priority, .st-key-card_suggested, [class*="st-key-card_pay_"],
+        .st-key-card_todo_week, .st-key-card_dir)
+    [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"]:nth-child(1) {
+        grid-column: 1 !important;
+        grid-row: 1 / span 4 !important;
+        align-self: start !important;
+    }
+    /* Name + reason: always the top line beside the photo */
+    :is(.st-key-card_priority, .st-key-card_suggested, [class*="st-key-card_pay_"],
+        .st-key-card_todo_week, .st-key-card_dir)
+    [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"]:nth-child(2) {
+        grid-column: 2 / -1 !important;
+        grid-row: 1 !important;
+    }
+
+    /* Names left-aligned, reasons wrap */
+    :is(.st-key-card_priority, .st-key-card_suggested, [class*="st-key-card_pay_"],
+        .st-key-card_todo_week, .st-key-card_dir) [class*="st-key-mrow_"] button {
+        justify-content: flex-start !important;
+        text-align: left !important;
+        padding-left: 0 !important;
+    }
+    :is(.st-key-card_priority, .st-key-card_suggested, [class*="st-key-card_pay_"],
+        .st-key-card_todo_week, .st-key-card_dir) [class*="st-key-mrow_"] button p {
+        text-align: left !important;
+    }
+    :is(.st-key-card_priority, .st-key-card_suggested, [class*="st-key-card_pay_"],
+        .st-key-card_todo_week, .st-key-card_dir) .why {
+        padding: 0 !important;
+        text-align: left !important;
+        white-space: normal !important;
+    }
+
+    /* ---- Risk Radar priority list (7 parts) ---- */
+    .st-key-card_priority [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"]:nth-child(3) { grid-column: 2 !important;  grid-row: 2 !important; }  /* risk chip */
+    .st-key-card_priority [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"]:nth-child(5) { grid-column: 3 !important;  grid-row: 2 !important; }  /* suggested action */
+    .st-key-card_priority [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"]:nth-child(4) { grid-column: 2 / -1 !important; grid-row: 3 !important; } /* probability bar */
+    .st-key-card_priority [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"]:nth-child(6) { grid-column: 2 !important;  grid-row: 4 !important; }  /* fee */
+    .st-key-card_priority [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"]:nth-child(7) { grid-column: 3 !important;  grid-row: 4 !important; }  /* follow up */
+
+    /* ---- Suggested Today (4 parts) ---- */
+    .st-key-card_suggested [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"]:nth-child(3) { grid-column: 2 / -1 !important; grid-row: 2 !important; } /* chips */
+    .st-key-card_suggested [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"]:nth-child(4) { grid-column: 2 / -1 !important; grid-row: 3 !important; } /* Add button */
+
+    /* ---- Payments & Renewals (5 parts) ---- */
+    [class*="st-key-card_pay_"] [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"]:nth-child(3) { grid-column: 2 !important;  grid-row: 2 !important; }  /* fee */
+    [class*="st-key-card_pay_"] [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"]:nth-child(4) { grid-column: 3 !important;  grid-row: 2 !important; }  /* status chip */
+    [class*="st-key-card_pay_"] [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"]:nth-child(5) { grid-column: 2 / -1 !important; grid-row: 3 !important; } /* Message button */
+
+    /* ---- To do this week (3 parts) ---- */
+    .st-key-card_todo_week [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"]:nth-child(3) { grid-column: 2 / -1 !important; grid-row: 2 !important; }
+
+    /* Chips sit side by side and wrap */
+    :is(.st-key-card_priority, .st-key-card_suggested, [class*="st-key-card_pay_"],
+        .st-key-card_todo_week) [data-testid="stColumn"] [data-testid="stMarkdownContainer"] {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 6px !important;
+    }
+}
+"""
 def apply_ui_styles():
     st.markdown("<style>" + UI_CSS + "</style>", unsafe_allow_html=True)
     st.markdown("<style>" + MOBILE_ROWS_CSS + "</style>", unsafe_allow_html=True)
+    st.markdown("<style>" + DASH_TODAY_MOBILE_CSS + "</style>", unsafe_allow_html=True)
+    st.markdown("<style>" + ALL_ROWS_MOBILE_CSS + "</style>", unsafe_allow_html=True)
 # ------------------------------------------------------------ speed & caching
 class _TrackedTable:
     def __init__(self, table):
