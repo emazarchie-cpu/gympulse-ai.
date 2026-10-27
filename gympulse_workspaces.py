@@ -801,11 +801,64 @@ ALL_ROWS_MOBILE_CSS = """
     }
 }
 """
+_ROW_CARDS = [
+    ".st-key-card_priority",
+    ".st-key-card_suggested",
+    ".st-key-card_dash_today",
+    ".st-key-card_todo_week",
+    ".st-key-card_dir",
+]
+
+_ROW_TEMPLATE = """
+R {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 6px 12px !important;
+    padding: 6px 0 10px !important;
+}
+R > [data-testid="stColumn"] {
+    flex: 1 1 calc(100% - 64px) !important;
+    width: calc(100% - 64px) !important;
+    min-width: 0 !important;
+    margin-left: 64px !important;
+}
+R > [data-testid="stColumn"]:nth-child(1) {
+    flex: 0 0 52px !important;
+    width: 52px !important;
+    margin-left: 0 !important;
+}
+R > [data-testid="stColumn"]:nth-child(2) {
+    margin-left: 0 !important;
+}
+R [class*="st-key-mrow_"] button,
+R [class*="st-key-mrow_"] button > div {
+    justify-content: flex-start !important;
+    text-align: left !important;
+    padding-left: 0 !important;
+    width: 100% !important;
+}
+R [class*="st-key-mrow_"] button p { text-align: left !important; }
+R .why { padding: 4px 0 0 !important; text-align: left !important; white-space: normal !important; }
+R [data-testid="stColumn"]:nth-child(n+3) [data-testid="stMarkdownContainer"] {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+}
+"""
+
+ROWS_FLOW_CSS = "@media (max-width: 768px) {" + "".join(
+    _ROW_TEMPLATE.replace("R ", f'{card} [data-testid="stHorizontalBlock"]:has(.row-tight) ', 1)
+    .replace("\nR ", f'\n{card} [data-testid="stHorizontalBlock"]:has(.row-tight) ')
+    for card in _ROW_CARDS
+) + "}"            
 def apply_ui_styles():
     st.markdown("<style>" + UI_CSS + "</style>", unsafe_allow_html=True)
     st.markdown("<style>" + MOBILE_ROWS_CSS + "</style>", unsafe_allow_html=True)
     st.markdown("<style>" + DASH_TODAY_MOBILE_CSS + "</style>", unsafe_allow_html=True)
     st.markdown("<style>" + ALL_ROWS_MOBILE_CSS + "</style>", unsafe_allow_html=True)
+    st.markdown("<style>" + ROWS_FLOW_CSS + "</style>", unsafe_allow_html=True)
 # ------------------------------------------------------------ speed & caching
 class _TrackedTable:
     def __init__(self, table):
