@@ -2663,17 +2663,28 @@ elif page == "Follow-ups":
         business_name
     )
 elif page == "Archie":
-    gw.render_archie(supabase, st.session_state.gym_id, assess_members, business_name, user_name)
-    elif page == "Settings":
-gw.render_settings(supabase, owner_id, st.session_state.gym_id, log_out)        
-elif page == "Member Management":
+    gw.render_archie(
+        supabase,
+        st.session_state.gym_id,
+        assess_members,
+        business_name,
+        user_name
+    )
 
+elif page == "Settings":
+    gw.render_settings(
+        supabase,
+        owner_id,
+        st.session_state.gym_id,
+        log_out
+    )
+
+elif page == "Member Management":
     gw.page_header(
         "Member Management",
         "Register members, add their photo, and open any member's full profile.",
         "Your members"
     )
-
     gym_id = st.session_state.get("gym_id")
 
     if not gym_id:
