@@ -143,7 +143,42 @@ def _text(value, default=""):
     except (TypeError, ValueError):
         pass
     return str(value)
+from zoneinfo import ZoneInfo
 
+APP_TZ = ZoneInfo("Africa/Lagos")
+
+
+def today_local():
+    return datetime.now(APP_TZ).date()
+
+
+def apply_live_dates(df):
+    """Move 'days since last visit' and 'days until renewal' forward to today."""
+    df = df.copy()
+    today = pd.Timestamp(today_local())
+
+    stamp = None
+    for col in ("updated_at", "created_at"):
+        if col in df.columns:
+            s = pd.to_datetime(df[col], errors="coerce", utc=True)
+            s = s.dt.tz_convert(APP_TZ).dt.tz_localize(None).dt.normalize()
+            stamp = s if stamp is None else stamp.fillna(s)
+    if stamp is None:
+        return df
+
+    elapsed = (today - stamp).dt.days.fillna(0).clip(lower=0)
+
+    visits = pd.to_numeric(df["days_since_last_visit"], errors="coerce").fillna(0)
+    df["days_since_last_visit"] = (visits + elapsed).astype(int)
+
+    renewal = pd.to_numeric(df["renewal_due_days"], errors="coerce").fillna(0)
+    fallback = (renewal - elapsed).clip(lower=0)
+    if "membership_end" in df.columns:
+        end = pd.to_datetime(df["membership_end"], errors="coerce").dt.normalize()
+        from_end = (end - today).dt.days.clip(lower=0)
+        fallback = from_end.where(end.notna(), fallback)
+    df["renewal_due_days"] = fallback.astype(int)
+    return df
 def _num(value, default):
     try:
         if value is None or pd.isna(value):
@@ -202,6 +237,7 @@ def page_header(title, subtitle="", eyebrow=""):
     parts.append(f'<div class="pg-title">{_esc(title)}</div>')
     if subtitle:
         parts.append(f'<div class="pg-sub">{_esc(subtitle)}</div>')
+        parts.append(f'<div class="pg-date">{today_local():%A, %d %B %Y}</div>')
     _md('<div class="pg-head">' + "".join(parts) + "</div>")
 
 def chip(text, tone="grey", dot=False, href=None):
@@ -389,6 +425,7 @@ UI_CSS = """
     letter-spacing: 2px; text-transform: uppercase; margin-bottom: 6px; }
 .pg-title { font-size: 32px; font-weight: 800; letter-spacing: -1.2px;
     color: #F4F7FB; line-height: 1.12; }
+    .pg-date { color: #9AA8BD; font-size: 12px; font-weight: 600; margin-top: 8px; letter-spacing: .3px; }
 .pg-sub { color: #9AA8BD; font-size: 14px; line-height: 1.6; margin-top: 6px; max-width: 760px; }
 
 .kpi { position: relative; overflow: hidden; height: 100%;
@@ -966,6 +1003,7 @@ def build_roster(members, activity, assess_fn):
     if scored.empty:
         return pd.DataFrame(), missing
     scored["monthly_fee"] = pd.to_numeric(scored["monthly_fee"]).fillna(0)
+    scored = apply_live_dates(scored)
     scored = assess_fn(scored.reset_index(drop=True))
     scored["attendance_change"] = (scored["visits_last_30_days"]
                                    - scored["visits_previous_30_days"])
@@ -1182,6 +1220,7 @@ def _activity_editor(supabase, gym_id, roster, missing, use_expander=True):
                     "visits_last_30_days": int(last),
                     "renewal_due_days": int(ren),
                     "pt_sessions_attended": int(pt),
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
                 }).execute()
                 st.rerun()
 
@@ -1642,7 +1681,13 @@ def render_member_profile(supabase, gym_id, member_id, assess_fn):
     scored, drivers_text, action_text = None, "", ""
     if act:
         try:
-            one = pd.DataFrame([{c: act.get(c) for c in ACTIVITY_COLS}])
+            one = pd.DataFrame([{
+                **{c: act.get(c) for c in ACTIVITY_COLS},
+                "updated_at": act.get("updated_at"),
+                "created_at": act.get("created_at"),
+                "membership_end": m["membership_end"],
+            }])
+            one = apply_live_dates(one)
             scored = assess_fn(one).iloc[0]
             drivers_text = drivers(scored)
             action_text = suggest_action(scored)
