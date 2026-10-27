@@ -1656,7 +1656,9 @@ if st.session_state.auth_user is None:
 if st.session_state.auth_user is None:
     st.stop()
 profile = st.session_state.user_profile or {}
-
+if "theme" not in st.session_state:
+    st.session_state["theme"] = profile.get("theme") or "dark"
+gw.apply_theme(st.session_state["theme"])
 user_name = profile.get("full_name", "User")
 business_name = profile.get("business_name", "My Gym")
 
@@ -2433,32 +2435,78 @@ st.markdown("""
 }
 </style>
 """, unsafe_allow_html=True) 
+def toggle_theme():
+    new = "light" if st.session_state.get("theme", "dark") == "dark" else "dark"
+    st.session_state["theme"] = new
+    try:
+        (supabase.table("profiles").update({"theme": new})
+         .eq("id", st.session_state.auth_user["id"]).execute())
+    except Exception:
+        pass
+
+
+_av = profile.get("avatar")
+_av_src = _av if gw.has_photo(_av) else gw._user_avatar(user_name)
+
+st.markdown(f"""
+<style>
+.st-key-top_profile button::before {{
+    content: ""; display: block; width: 34px; height: 34px; border-radius: 50%;
+    background: url('{_av_src}') center/cover no-repeat;
+    border: 2px solid #B7F34A; box-sizing: border-box;
+}}
+.st-key-top_msg, .st-key-top_profile {{ display: flex; justify-content: flex-end; }}
+.st-key-top_msg button, .st-key-top_profile button {{
+    background: rgba(255,255,255,0.06) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: 10px !important; min-height: 38px !important;
+    padding: 0 10px !important; box-shadow: none !important;
+}}
+.st-key-top_profile button {{
+    border-radius: 50% !important; width: 42px !important;
+    min-height: 42px !important; padding: 0 !important;
+    justify-content: center !important;
+}}
+.st-key-top_profile button p,
+.st-key-top_profile [data-testid="stIconMaterial"] {{ display: none !important; }}
+.st-key-top_msg [data-testid="stIconMaterial"] {{ font-size: 22px !important; color: var(--white) !important; }}
+.st-key-top_msg button p {{ color: var(--white) !important; font-weight: 800 !important; margin: 0 !important; }}
+.st-key-top_msg button:hover, .st-key-top_profile button:hover {{ border-color: var(--lime) !important; }}
+
+@media (min-width: 769px) {{
+    .st-key-top_nav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(3),
+    .st-key-top_nav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(4),
+    .st-key-top_nav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(5) {{
+        flex: 0 0 52px !important; width: 52px !important; min-width: 52px !important;
+    }}
+}}
+@media (max-width: 768px) {{
+    .st-key-top_nav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(3),
+    .st-key-top_nav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(4),
+    .st-key-top_nav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(5) {{
+        display: flex !important; flex: 0 0 auto !important;
+        width: auto !important; min-width: 0 !important;
+    }}
+}}
+</style>
+""", unsafe_allow_html=True)
+
 with st.container(key="top_nav"):
-    brand_col, nav_col, logout_col, menu_col = st.columns(
-        [2.0, 8.0, 1.0, 0.6],
+    brand_col, nav_col, msg_col, profile_col, menu_col = st.columns(
+        [2.0, 8.0, 0.55, 0.55, 0.55],
         vertical_alignment="center"
     )
 
     # BRAND / LOGO
     with brand_col:
-        st.markdown(
-            logo_img_tag("nav-brand-logo"),
-            unsafe_allow_html=True
-        )
-
-        st.button(
-            "PULSE",
-            on_click=go_home,
-            key="brand_home",
-            use_container_width=True
-        )
-
+        st.markdown(logo_img_tag("nav-brand-logo"), unsafe_allow_html=True)
+        st.button("PULSE", on_click=go_home, key="brand_home", use_container_width=True)
         st.markdown(
             '<div class="nav-tagline">Smarter insights. Stronger member retention.</div>',
             unsafe_allow_html=True
         )
 
-    # MAIN NAVIGATION (7 pages)
+    # MAIN NAVIGATION (laptop only)
     with nav_col:
         if not _is_mobile():
             _current = st.session_state.get("current_page")
@@ -2473,20 +2521,51 @@ with st.container(key="top_nav"):
                 on_change=on_main_nav
             )
 
-    # LOG OUT (laptop)
-    with logout_col:
-        st.button(
-            "Log Out",
-            on_click=log_out,
-            use_container_width=True,
-            key="logout_button_main"
-        )
+    # MESSAGES ICON -> Follow-ups
+    with msg_col:
+        with st.container(key="top_msg"):
+            st.button(
+                f":material/forum: {unread_replies}" if unread_replies else ":material/forum:",
+                key="top_msg_btn",
+                on_click=show_page,
+                args=("Follow-ups",),
+                help="Follow-ups"
+            )
+
+    # PROFILE ICON -> dropdown
+    with profile_col:
+        with st.container(key="top_profile"):
+            with st.popover("Profile"):
+                st.markdown(f"**{safe_user_name}**")
+                st.caption(f"{safe_business_name}")
+                st.caption("APPEARANCE")
+                st.button(
+                    "☀️ Switch to light mode"
+                    if st.session_state.get("theme", "dark") == "dark"
+                    else "🌙 Switch to dark mode",
+                    key="theme_toggle",
+                    on_click=toggle_theme,
+                    use_container_width=True
+                )
+                st.divider()
+                st.button(
+                    "Profile & settings",
+                    key="open_settings",
+                    on_click=show_page,
+                    args=("Settings",),
+                    use_container_width=True
+                )
+                st.button(
+                    "Log Out",
+                    key="logout_button_main",
+                    on_click=log_out,
+                    use_container_width=True
+                )
 
     # HAMBURGER MENU (top right)
     with menu_col:
         with st.container(key="top_menu"):
-            menu_label = f"☰ {unread_replies}" if unread_replies else "☰"
-            with st.popover(menu_label, use_container_width=False):
+            with st.popover("☰", use_container_width=False):
 
                 # Main pages: shown on phones only
                 with st.container(key="pop_main"):
@@ -2500,33 +2579,17 @@ with st.container(key="top_nav"):
                         )
                     st.divider()
 
-                # Extra pages: shown on laptop and phone
+                # Extra pages (Follow-ups now lives in the message icon)
                 for name in MORE_PAGES:
+                    if name == "Follow-ups":
+                        continue
                     st.button(
-                        nav_label(name),
+                        name,
                         key=f"mob_more_{name}",
                         on_click=show_page,
                         args=(name,),
                         use_container_width=True
                     )
-
-                # Log Out: phones only
-                with st.container(key="pop_logout"):
-                    st.divider()
-                    st.button(
-                        "Log Out",
-                        key="mobile_logout_button",
-                        on_click=log_out,
-                        use_container_width=True
-                    )
-    # Listen for the custom menu clicks and switch page
-    if "nav" in st.query_params:
-        page_name = st.query_params["nav"].replace("+", " ")
-        if page_name in MAIN_PAGES:
-            st.session_state["current_page"] = page_name
-            st.session_state["main_nav"] = page_name
-        st.query_params.clear()
-        st.rerun()
     page = st.session_state["current_page"]
     if page in MAIN_PAGES + MORE_PAGES and st.query_params.get("p") != page:
         st.query_params["p"] = page
@@ -2601,6 +2664,8 @@ elif page == "Follow-ups":
     )
 elif page == "Archie":
     gw.render_archie(supabase, st.session_state.gym_id, assess_members, business_name, user_name)
+    elif page == "Settings":
+    gw.render_settings(supabase, owner_id, st.session_state.gym_id, log_out)
 elif page == "Member Management":
 
     gw.page_header(
