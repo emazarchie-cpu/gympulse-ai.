@@ -1983,6 +1983,11 @@ def log_out():
     for key in list(st.session_state.keys()):
         del st.session_state[key]
 
+    try:
+        st.query_params.clear()
+    except Exception:
+        pass
+
 # Dashboard buttons still set "navigate_to"
 if "navigate_to" in st.session_state:
     show_page(st.session_state.pop("navigate_to"))
