@@ -2665,7 +2665,7 @@ elif page == "Follow-ups":
 elif page == "Archie":
     gw.render_archie(supabase, st.session_state.gym_id, assess_members, business_name, user_name)
     elif page == "Settings":
-    gw.render_settings(supabase, owner_id, st.session_state.gym_id, log_out)
+gw.render_settings(supabase, owner_id, st.session_state.gym_id, log_out)        
 elif page == "Member Management":
 
     gw.page_header(
