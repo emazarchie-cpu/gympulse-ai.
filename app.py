@@ -2554,7 +2554,7 @@ with profile_col:
                 on_click=toggle_theme,
                 use_container_width=True
             )
-                st.divider()
+            st.divider()
             st.button(
                 "Profile & settings",
                 key="open_settings",
