@@ -2562,7 +2562,7 @@ with profile_col:
                 args=("Settings",),
                 use_container_width=True
             )
-                st.button(
+            st.button(
                     "Log Out",
                     key="logout_button_main",
                     on_click=log_out,
