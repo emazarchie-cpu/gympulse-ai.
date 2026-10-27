@@ -849,7 +849,36 @@ ROW > [data-testid="stColumn"]:nth-child(n+3) [data-testid="stMarkdownContainer"
 
 ROWS_FLOW_CSS = "\n".join(
     line for line in _ROWS_FLOW_RAW.replace("ROW", _ROW).splitlines() if line.strip()
-)            
+)
+def _mobile():
+    try:
+        ua = st.context.headers.get("User-Agent", "").lower()
+    except Exception:
+        return False
+    return any(w in ua for w in ("iphone", "android", "mobile"))
+
+
+def mobile_member_card(r, key, why="", chips="", bar="", meta="", actions=()):
+    """One stacked card per member for phones. No columns, so nothing overlaps."""
+    with st.container(border=True, key=f"card_m_{key}_{r['id']}"):
+        head = (
+            '<div style="display:flex;align-items:center;gap:12px;">'
+            + avatar_html(r["full_name"], r.get("photo"), 48)
+            + '<div style="min-width:0;">'
+            + f'<div style="font-weight:800;color:#F4F7FB;font-size:16px;">{_esc(r["full_name"])}</div>'
+            + (f'<div class="why" style="padding:2px 0 0;">{_esc(why)}</div>' if why else "")
+            + "</div></div>"
+        )
+        _md(head)
+        if chips:
+            _md(f'<div class="chip-row">{chips}</div>')
+        if bar:
+            _md(bar)
+        if meta:
+            _md(meta)
+        for label, k, callback, args in actions:
+            st.button(label, key=f"{k}_{r['id']}", on_click=callback,
+                      args=args, use_container_width=True)
 def apply_ui_styles():
     st.markdown("<style>" + UI_CSS + "</style>", unsafe_allow_html=True)
     st.markdown("<style>" + MOBILE_ROWS_CSS + "</style>", unsafe_allow_html=True)
@@ -1531,13 +1560,20 @@ def render_member_directory(supabase, gym_id):
     st.markdown('<div class="section-label">MEMBERS · CLICK A NAME TO OPEN THEIR PROFILE</div>',
                 unsafe_allow_html=True)
     limit = st.session_state.get("mm_limit", 12)
-    with st.container(border=True, key="card_dir"):
+    if _mobile():
         for _, r in shown.head(limit).iterrows():
-            a, b = st.columns([0.7, 6], vertical_alignment="center")
-            _md(avatar_html(r["full_name"], r["photo"], 48, "row-tight"), a)
-            b.button(str(r["full_name"]), key=f"mrow_dir_{r['id']}",
-                     on_click=open_profile, args=(r["id"], "Member Management"),
-                     use_container_width=True)
+            mobile_member_card(
+                r, "dir", why=_text(r["email"]),
+                actions=[("Open profile", "mopen_dir", open_profile,
+                          (r["id"], "Member Management"))])
+    else:
+        with st.container(border=True, key="card_dir"):
+            for _, r in shown.head(limit).iterrows():
+                a, b = st.columns([0.7, 6], vertical_alignment="center")
+                _md(avatar_html(r["full_name"], r["photo"], 48, "row-tight"), a)
+                b.button(str(r["full_name"]), key=f"mrow_dir_{r['id']}",
+                         on_click=open_profile, args=(r["id"], "Member Management"),
+                         use_container_width=True)
     if len(shown) > limit:
         st.button(f"Show {min(12, len(shown) - limit)} more "
                   f"({len(shown) - limit} left)", key="mm_more",
@@ -1954,6 +1990,22 @@ def _radar_chart(view):
 PRIORITY_WIDTHS = [0.6, 2.4, 1.0, 1.5, 1.6, 0.9, 1.2]
 
 def _priority_rows(view):
+    if _mobile():
+        limit = st.session_state.get("prio_limit", 10)
+        for _, r in view.head(limit).iterrows():
+            mobile_member_card(
+                r, "prio", why=r["drivers"],
+                chips=risk_chip(r["risk_category"]) + chip(r["suggested_action"], "cyan"),
+                bar=prob_bar(r["cancellation_probability"], r["risk_category"]),
+                meta=f'<div class="money">{r["monthly_fee"]:,.0f} / mo</div>',
+                actions=[
+                    ("Open profile", "mopen_prio", open_profile, (r["id"], "Risk Radar")),
+                    ("Follow up", "mfollow_prio", open_followup, (r["id"], "Risk Radar")),
+                ])
+        if len(view) > limit:
+            st.button(f"Show more ({len(view) - limit} left)", key="prio_more_m",
+                      on_click=_bump, args=("prio_limit", 10, 10))
+        return
     head = st.columns(PRIORITY_WIDTHS)
     for col, label in zip(head, ["", "MEMBER", "RISK", "PROBABILITY",
                                  "SUGGESTED ACTION", "FEE", "FOLLOW UP"]):
@@ -2262,20 +2314,32 @@ def render_action_centre(supabase, gym_id, assess_fn):
                    f"contacted in the last {SUGGEST_COOLDOWN_DAYS} days.")
     else:
         top = todo.head(5)
-        with st.container(border=True, key="card_suggested"):
+        if _mobile():
             for _, r in top.iterrows():
-                c = st.columns([0.6, 3.2, 1.6, 1.2], vertical_alignment="center")
-                _md(avatar_html(r["full_name"], r.get("photo"), 42, "row-tight"), c[0])
-                c[1].button(str(r["full_name"]), key=f"mrow_sug_{r['id']}",
-                            on_click=open_profile, args=(r["id"], "Action Centre"),
-                            use_container_width=True)
-                _md(f'<div class="why">{_esc(r["drivers"])}</div>', c[1])
-                _md(risk_chip(r["risk_category"], r["cancellation_probability"])
-                    + chip(r["suggested_action"], "cyan"), c[2])
-                if c[3].button("Add", key=f"add_{r['id']}", use_container_width=True):
-                    _create_action(supabase, gym_id, r["id"], r["suggested_action"],
-                                   r["renewal_due_days"])
-                    st.rerun()
+                mobile_member_card(
+                    r, "sug", why=r["drivers"],
+                    chips=risk_chip(r["risk_category"], r["cancellation_probability"])
+                          + chip(r["suggested_action"], "cyan"),
+                    actions=[
+                        ("Open profile", "mopen_sug", open_profile, (r["id"], "Action Centre")),
+                        ("Add to Action Centre", "madd_sug", _create_action,
+                         (supabase, gym_id, r["id"], r["suggested_action"], r["renewal_due_days"])),
+                    ])
+        else:
+            with st.container(border=True, key="card_suggested"):
+                for _, r in top.iterrows():
+                    c = st.columns([0.6, 3.2, 1.6, 1.2], vertical_alignment="center")
+                    _md(avatar_html(r["full_name"], r.get("photo"), 42, "row-tight"), c[0])
+                    c[1].button(str(r["full_name"]), key=f"mrow_sug_{r['id']}",
+                                on_click=open_profile, args=(r["id"], "Action Centre"),
+                                use_container_width=True)
+                    _md(f'<div class="why">{_esc(r["drivers"])}</div>', c[1])
+                    _md(risk_chip(r["risk_category"], r["cancellation_probability"])
+                        + chip(r["suggested_action"], "cyan"), c[2])
+                    if c[3].button("Add", key=f"add_{r['id']}", use_container_width=True):
+                        _create_action(supabase, gym_id, r["id"], r["suggested_action"],
+                                       r["renewal_due_days"])
+                        st.rerun()
         if len(todo) > 1 and st.button("Add all top 5", use_container_width=True):
             for _, r in top.iterrows():
                 _create_action(supabase, gym_id, r["id"], r["suggested_action"],
@@ -2522,14 +2586,22 @@ def render_business_insights(supabase, gym_id, assess_fn):
         line = f"Contact {'this high-risk member' if len(high) == 1 else 'these high-risk members'}"
         st.write(line + (f" ({soon} renewing within 30 days). Tap a name to open "
                          "their profile:" if soon else ". Tap a name to open their profile:"))
-        with st.container(border=True, key="card_todo_week"):
+        if _mobile():
             for _, r in high.head(6).iterrows():
-                c = st.columns([0.6, 4, 1.6], vertical_alignment="center")
-                _md(avatar_html(r["full_name"], r.get("photo"), 40, "row-tight"), c[0])
-                c[1].button(str(r["full_name"]), key=f"mrow_todo_{r['id']}",
-                            on_click=open_profile, args=(r["id"], "Business Insights"),
-                            use_container_width=True)
-                _md(risk_chip(r["risk_category"], r["cancellation_probability"]), c[2])
+                mobile_member_card(
+                    r, "todo",
+                    chips=risk_chip(r["risk_category"], r["cancellation_probability"]),
+                    actions=[("Open profile", "mopen_todo", open_profile,
+                              (r["id"], "Business Insights"))])
+        else:
+            with st.container(border=True, key="card_todo_week"):
+                for _, r in high.head(6).iterrows():
+                    c = st.columns([0.6, 4, 1.6], vertical_alignment="center")
+                    _md(avatar_html(r["full_name"], r.get("photo"), 40, "row-tight"), c[0])
+                    c[1].button(str(r["full_name"]), key=f"mrow_todo_{r['id']}",
+                                on_click=open_profile, args=(r["id"], "Business Insights"),
+                                use_container_width=True)
+                    _md(risk_chip(r["risk_category"], r["cancellation_probability"]), c[2])
         if len(high) > 6:
             st.caption(f"+{len(high) - 6} more in the Action Centre.")
     if k["open_actions"]:
@@ -2762,16 +2834,25 @@ def render_dashboard(supabase, gym_id, assess_fn, greeting, user_name, business_
         if need.empty:
             st.success("Nobody needs a follow-up right now. Nice work.")
         else:
-            with st.container(border=True, key="card_dash_today"):
+            if _mobile():
                 for _, r in need.head(3).iterrows():
-                    c = st.columns([0.6, 3.4, 2.2], vertical_alignment="center")
-                    _md(avatar_html(r["full_name"], r.get("photo"), 44, "row-tight"), c[0])
-                    c[1].button(str(r["full_name"]), key=f"mrow_dash_{r['id']}",
-                                on_click=open_profile, args=(r["id"], "Dashboard"),
-                                use_container_width=True)
-                    _md(f'<div class="why">{_esc(r["drivers"])}</div>', c[1])
-                    _md(risk_chip(r["risk_category"], r["cancellation_probability"])
-                        + chip(r["suggested_action"], "cyan"), c[2])
+                    mobile_member_card(
+                        r, "dash", why=r["drivers"],
+                        chips=risk_chip(r["risk_category"], r["cancellation_probability"])
+                              + chip(r["suggested_action"], "cyan"),
+                        actions=[("Open profile", "mopen_dash", open_profile,
+                                  (r["id"], "Dashboard"))])
+            else:
+                with st.container(border=True, key="card_dash_today"):
+                    for _, r in need.head(3).iterrows():
+                        c = st.columns([0.6, 3.4, 2.2], vertical_alignment="center")
+                        _md(avatar_html(r["full_name"], r.get("photo"), 44, "row-tight"), c[0])
+                        c[1].button(str(r["full_name"]), key=f"mrow_dash_{r['id']}",
+                                    on_click=open_profile, args=(r["id"], "Dashboard"),
+                                    use_container_width=True)
+                        _md(f'<div class="why">{_esc(r["drivers"])}</div>', c[1])
+                        _md(risk_chip(r["risk_category"], r["cancellation_probability"])
+                            + chip(r["suggested_action"], "cyan"), c[2])
             st.button("See everyone on the Risk Radar", key="qa_radar_more", on_click=_go,
                       args=("Risk Radar",))
 
