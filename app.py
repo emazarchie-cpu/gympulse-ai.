@@ -1963,12 +1963,13 @@ def _is_mobile():
 def show_page(name):
     """Open a page and keep the top-bar radio in sync."""
     st.session_state["current_page"] = name
-    st.session_state.pop("main_nav", None)
+    
 
 def on_main_nav():
-    if st.session_state.get("main_nav"):
-        st.session_state["current_page"] = st.session_state["main_nav"]
-
+    cur = st.session_state.get("current_page")
+    choice = st.session_state.get(f"main_nav_{cur}")
+    if choice:
+        st.session_state["current_page"] = choice
 
 def go_home():
     show_page("Dashboard")
@@ -2463,7 +2464,7 @@ with st.container(key="top_nav"):
                 format_func=nav_label,
                 horizontal=True,
                 label_visibility="collapsed",
-                key="main_nav",
+                key=f"main_nav_{_current}",
                 on_change=on_main_nav
             )
 
