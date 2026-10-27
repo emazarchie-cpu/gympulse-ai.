@@ -2590,7 +2590,7 @@ def render_dashboard(supabase, gym_id, assess_fn, greeting, user_name, business_
     st.markdown('<div class="section-label">QUICK ACTIONS</div>', unsafe_allow_html=True)
     # Only 4 columns per row to make it fit standard desktop widths
     tiles = [
-        ("Risk Radar", "Risk Radar", ":material/radar:"),
+        
         ("Member Management", "Member Management", ":material/group:"),
         ("Action Centre", "Action Centre", ":material/task_alt:"),
         ("Follow-ups", "Follow-ups", ":material/forum:"),
