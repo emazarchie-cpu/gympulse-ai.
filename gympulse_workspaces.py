@@ -880,6 +880,22 @@ def mobile_member_card(r, key, why="", chips="", bar="", meta="", actions=()):
             st.button(label, key=f"{k}_{r['id']}", on_click=callback,
                       args=args, use_container_width=True)
 CHAT_CSS = """
+[class*="st-key-mention_"] button {
+    background: rgba(183,243,74,0.12) !important;
+    border: 1px solid rgba(183,243,74,0.45) !important;
+    border-radius: 999px !important;
+    min-height: 36px !important;
+    padding: 0 16px !important;
+    box-shadow: none !important;
+    justify-content: flex-start !important;
+}
+[class*="st-key-mention_"] button p {
+    color: #B7F34A !important;
+    font-size: 13px !important;
+    font-weight: 800 !important;
+}
+[class*="st-key-mention_"] button:hover { background: #B7F34A !important; }
+[class*="st-key-mention_"] button:hover p { color: #10182A !important; }
 [data-testid="stChatMessage"] {
     background: linear-gradient(160deg, rgba(27,38,59,0.85), rgba(16,24,42,0.95)) !important;
     border: 1px solid rgba(255,255,255,0.08) !important;
@@ -2858,6 +2874,26 @@ def archie_reply(messages, context):
         return text, True
     except Exception as error:
         return f"Archie could not answer right now.\n\nTechnical detail: {error}", False
+def _mention_buttons(text, roster, tag):
+    """Show a button for every member whose name appears in Archie's reply."""
+    if roster is None or roster.empty or "full_name" not in roster.columns:
+        return
+    lowered = str(text).lower()
+    found, seen = [], set()
+    # Longest names first so "Ann Lee" is matched before "Ann"
+    people = sorted(roster[["id", "full_name"]].dropna().itertuples(index=False),
+                    key=lambda p: len(str(p.full_name)), reverse=True)
+    for p in people:
+        name = str(p.full_name).strip()
+        if len(name) >= 3 and name.lower() in lowered and p.id not in seen:
+            seen.add(p.id)
+            found.append((p.id, name))
+    if not found:
+        return
+    st.caption("Tap a name to open their profile")
+    for member_id, name in found[:6]:
+        st.button(f"👤 {name}", key=f"mention_{tag}_{member_id}",
+                  on_click=open_profile, args=(member_id, "Archie"))        
 def render_archie(supabase, gym_id, assess_fn, business_name, owner_name="the gym owner"):
     st.session_state["_chat_owner"] = owner_name
     st.session_state["_chat_biz"] = business_name
@@ -2883,9 +2919,11 @@ def render_archie(supabase, gym_id, assess_fn, business_name, owner_name="the gy
     for col, p in zip(cols, ARCHIE_PROMPTS):
         if col.button(p, key=f"ap_{p}", use_container_width=True):
             picked = p
-    for m in st.session_state.archie_msgs:
+    for i, m in enumerate(st.session_state.archie_msgs):
         with _chat_message(m["role"]):
             st.markdown(m["content"])
+            if m["role"] == "assistant":
+                _mention_buttons(m["content"], roster, f"h{i}")
     typed = st.chat_input("Ask Archie...")
     question = typed or picked
     if question:
@@ -2899,6 +2937,7 @@ def render_archie(supabase, gym_id, assess_fn, business_name, owner_name="the gy
                 '<div class="skel"><i></i><i></i><i></i></div></div>', slot)
             reply, live = archie_reply(st.session_state.archie_msgs, context)
             _stream(slot, reply)
+            _mention_buttons(reply, roster, f"n{len(st.session_state.archie_msgs)}")
         _md(_archie_hero(False), hero)
         st.session_state.archie_msgs.append({"role": "assistant", "content": reply})
     if st.session_state.archie_msgs and st.button("Clear chat"):
