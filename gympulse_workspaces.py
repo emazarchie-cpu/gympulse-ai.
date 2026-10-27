@@ -879,12 +879,76 @@ def mobile_member_card(r, key, why="", chips="", bar="", meta="", actions=()):
         for label, k, callback, args in actions:
             st.button(label, key=f"{k}_{r['id']}", on_click=callback,
                       args=args, use_container_width=True)
+CHAT_CSS = """
+[data-testid="stChatMessage"] {
+    background: linear-gradient(160deg, rgba(27,38,59,0.85), rgba(16,24,42,0.95)) !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    border-left: 3px solid #B7F34A !important;
+    border-radius: 6px 22px 22px 22px !important;
+    padding: 14px 18px !important;
+    gap: 14px !important;
+    margin-bottom: 10px !important;
+    max-width: 880px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+}
+[data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]) {
+    flex-direction: row-reverse !important;
+    margin-left: auto !important;
+    max-width: 82%;
+    background: linear-gradient(160deg, rgba(183,243,74,0.16), rgba(53,214,237,0.08)) !important;
+    border: 1px solid rgba(183,243,74,0.30) !important;
+    border-radius: 22px 6px 22px 22px !important;
+}
+[data-testid="stChatMessageContent"] { min-width: 0; }
+[data-testid="stChatMessageAvatarAssistant"],
+[data-testid="stChatMessageAvatarUser"] {
+    width: 44px !important; height: 44px !important; min-width: 44px !important;
+    border-radius: 50% !important; background: transparent !important;
+    overflow: visible !important;
+}
+[data-testid="stChatMessageAvatarAssistant"] {
+    box-shadow: 0 0 24px rgba(183,243,74,0.35) !important;
+    animation: bot-float 4s ease-in-out infinite !important;
+}
+[data-testid="stChatMessageAvatarAssistant"] *,
+[data-testid="stChatMessageAvatarUser"] * { opacity: 1 !important; }
+[data-testid="stChatMessageAvatarAssistant"] img,
+[data-testid="stChatMessageAvatarUser"] img {
+    width: 100% !important; height: 100% !important;
+    border-radius: 50% !important; object-fit: cover !important;
+}
+.chat-who { display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    margin-bottom: 4px; font-size: 13px; color: #F4F7FB; }
+.chat-who b { font-weight: 800; }
+.chat-who-user { justify-content: flex-end; }
+.chat-tag { font-size: 10px; font-weight: 800; letter-spacing: .6px;
+    text-transform: uppercase; padding: 2px 9px; border-radius: 999px;
+    background: rgba(183,243,74,0.16); color: #B7F34A; }
+.chat-gym { background: rgba(53,214,237,0.14); color: #35D6ED; }
+[data-testid="stChatInput"] { border-radius: 999px !important;
+    background: #111B2D !important; border: 1px solid rgba(255,255,255,0.14) !important; }
+[data-testid="stChatInput"]:focus-within { border-color: #B7F34A !important;
+    box-shadow: 0 0 0 2px rgba(183,243,74,0.22) !important; }
+[class*="st-key-ap_"] button p { white-space: normal !important;
+    overflow: visible !important; text-overflow: clip !important; }
+
+@media (max-width: 768px) {
+    [data-testid="stChatMessage"] { padding: 12px 14px !important; gap: 10px !important; }
+    [data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]) { max-width: 94%; }
+    [data-testid="stChatMessageAvatarAssistant"],
+    [data-testid="stChatMessageAvatarUser"] {
+        width: 36px !important; height: 36px !important; min-width: 36px !important;
+    }
+    .chat-who { font-size: 12px; }
+}
+"""            
 def apply_ui_styles():
     st.markdown("<style>" + UI_CSS + "</style>", unsafe_allow_html=True)
     st.markdown("<style>" + MOBILE_ROWS_CSS + "</style>", unsafe_allow_html=True)
     st.markdown("<style>" + DASH_TODAY_MOBILE_CSS + "</style>", unsafe_allow_html=True)
     st.markdown("<style>" + ALL_ROWS_MOBILE_CSS + "</style>", unsafe_allow_html=True)
     st.markdown("<style>" + ROWS_FLOW_CSS + "</style>", unsafe_allow_html=True)
+    st.markdown("<style>" + CHAT_CSS + "</style>", unsafe_allow_html=True)
 # ------------------------------------------------------------ speed & caching
 class _TrackedTable:
     def __init__(self, table):
@@ -2651,11 +2715,58 @@ def _archie_hero(thinking=False):
     </div>
     """
 
+ARCHIE_ORB_AVATAR = "data:image/svg+xml;base64," + base64.b64encode("""
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+<defs><radialGradient id="g" cx="35%" cy="30%" r="75%">
+<stop offset="0" stop-color="#F4FFD6"/><stop offset=".35" stop-color="#B7F34A"/>
+<stop offset="1" stop-color="#1E9E55"/></radialGradient></defs>
+<g><animateTransform attributeName="transform" type="translate"
+values="0 1.5;0 -1.5;0 1.5" dur="3.2s" repeatCount="indefinite"/>
+<circle cx="32" cy="32" r="26" fill="#35D6ED" opacity=".25"/>
+<circle cx="32" cy="32" r="23" fill="url(#g)"/>
+<rect x="17" y="25" width="30" height="17" rx="8.5" fill="#0B1020"/>
+<ellipse cx="26" cy="33" rx="3" ry="4.4" fill="#B7F34A"/>
+<ellipse cx="38" cy="33" rx="3" ry="4.4" fill="#B7F34A"/>
+<path d="M29 39 Q32 41.5 35 39" stroke="#35D6ED" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+<circle cx="47" cy="17" r="3.2" fill="#35D6ED"/></g></svg>
+""".strip().encode()).decode()
+
+
+def _user_avatar(name):
+    svg = (
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">'
+        '<defs><linearGradient id="u" x1="0" y1="0" x2="1" y2="1">'
+        '<stop offset="0" stop-color="#B7F34A"/><stop offset="1" stop-color="#35D6ED"/>'
+        '</linearGradient></defs><circle cx="32" cy="32" r="30" fill="url(#u)"/>'
+        '<text x="32" y="32" text-anchor="middle" dominant-baseline="central" '
+        'font-family="Inter,Arial,sans-serif" font-weight="800" font-size="24" '
+        f'fill="#10182A">{_esc(initials(name))}</text></svg>'
+    )
+    return "data:image/svg+xml;base64," + base64.b64encode(svg.encode()).decode()
+
+
+@contextmanager
 def _chat_message(role):
+    owner = st.session_state.get("_chat_owner") or "You"
+    biz = st.session_state.get("_chat_biz") or ""
     if role == "assistant":
-        return st.chat_message("assistant", avatar=":material/smart_toy:")
+        try:
+            box = st.chat_message("assistant", avatar=ARCHIE_ORB_AVATAR)
+        except Exception:
+            box = st.chat_message("assistant", avatar=":material/smart_toy:")
+        who = ('<div class="chat-who"><b>Archie</b>'
+               '<span class="chat-tag">AI assistant</span></div>')
     else:
-        return st.chat_message("user", avatar=":material/person:")
+        try:
+            box = st.chat_message("user", avatar=_user_avatar(owner))
+        except Exception:
+            box = st.chat_message("user", avatar=":material/person:")
+        who = (f'<div class="chat-who chat-who-user"><b>{_esc(owner)}</b>'
+               + (f'<span class="chat-tag chat-gym">{_esc(biz)}</span>' if biz else "")
+               + "</div>")
+    with box:
+        _md(who)
+        yield
 
 def _stream(slot, text):
     words = text.split(" ")
@@ -2670,6 +2781,10 @@ def archie_context(roster, actions, business_name):
         f"Gym business: {business_name}",
         f"Total scored members: {len(roster)}",
     ]
+    if "monthly_fee" in roster.columns:
+        lines.append(f"Total monthly fees: {roster['monthly_fee'].sum():,.0f}")
+    if "revenue_at_risk" in roster.columns:
+        lines.append(f"Expected monthly revenue at risk: {roster['revenue_at_risk'].sum():,.0f}")
 
     if "risk_category" in roster.columns:
         risk_counts = roster["risk_category"].fillna("Unknown").value_counts()
@@ -2744,6 +2859,8 @@ def archie_reply(messages, context):
     except Exception as error:
         return f"Archie could not answer right now.\n\nTechnical detail: {error}", False
 def render_archie(supabase, gym_id, assess_fn, business_name, owner_name="the gym owner"):
+    st.session_state["_chat_owner"] = owner_name
+    st.session_state["_chat_biz"] = business_name
     hero = st.empty()
     _md(_archie_hero(False), hero)
     try:
