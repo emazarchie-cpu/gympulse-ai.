@@ -2531,7 +2531,9 @@ with st.container(key="top_nav"):
                 args=("Follow-ups",),
                 help="Follow-ups"
             )
-
+# Define safe display names
+safe_user_name = str(user_name or "User")
+safe_business_name = str(business_name or "Your Business")
     # PROFILE ICON -> dropdown
     with profile_col:
         with st.container(key="top_profile"):
