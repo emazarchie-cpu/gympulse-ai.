@@ -54,7 +54,7 @@ MOBILE_PARTS = {
 }
 """,
     "nav": """
-
+@media (max-width: 640px) {
     .login-brand .nav-tagline {
         display: block !important;
         white-space: normal !important;
@@ -553,15 +553,6 @@ a.chip:hover { filter: brightness(1.25); }
 .lp-msg.ai { align-self: flex-start; background: rgba(255,255,255,0.07); color: #F4F7FB; border-radius: 16px 16px 16px 4px; }
 .lp-send { align-self: flex-start; font-size: 12px; font-weight: 800; letter-spacing: .6px; color: #B7F34A; }
 
-[data-testid="stChatMessageAvatarUser"] { background: #35D6ED !important; }
-[data-testid="stChatMessageAvatarUser"] * { color: #0B1020 !important; }
-[data-testid="stChatMessageAvatarAssistant"] {
-    background: radial-gradient(circle at 35% 30%, #FFFFFF 0%, #B7F34A 28%, #27B35C 100%) !important;
-    border-radius: 50% !important;
-    box-shadow: 0 0 0 3px rgba(53,214,237,0.35), 0 8px 18px rgba(183,243,74,0.35);
-    animation: bot-float 4s ease-in-out infinite;
-}
-[data-testid="stChatMessageAvatarAssistant"] * { opacity: 0 !important; }
 .boot-overlay { position: fixed; inset: 0; z-index: 99999; display: flex;
     flex-direction: column; align-items: center; justify-content: center; gap: 16px;
     background: #0B1020; color: #F4F7FB; font-weight: 700; font-size: 15px; }
@@ -606,8 +597,6 @@ button[data-baseweb="tab"][aria-selected="true"] p { color: #B7F34A !important; 
 [data-baseweb="tab-highlight"] { background-color: #B7F34A !important; }
 span[data-baseweb="tag"] { background: rgba(183,243,74,0.16) !important; }
 span[data-baseweb="tag"] span { color: #B7F34A !important; }
-[data-testid="stChatMessage"] { background: rgba(21,29,48,0.7);
-    border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; }
 
 @media (max-width: 640px) {
     .pg-title { font-size: 26px; }
@@ -640,7 +629,6 @@ MOBILE_ROWS_CSS = """
         width: auto !important;
         min-width: calc(50% - 0.6rem) !important;
     }
-    /* Column 1 = photo, column 2 = name */
     [data-testid="stHorizontalBlock"]:has(.row-tight):not(:has(.kb-head)) > [data-testid="stColumn"]:nth-child(1) {
         flex: 0 0 56px !important;
         width: 56px !important;
@@ -664,66 +652,10 @@ MOBILE_ROWS_CSS = """
 }
 """
 
-
-DASH_TODAY_MOBILE_CSS = """
-@media (max-width: 640px) {
-    .st-key-card_dash_today [data-testid="stHorizontalBlock"]:has(.row-tight):not(:has(.kb-head)) {
-        display: grid !important;
-        grid-template-columns: 52px minmax(0, 1fr) !important;
-        column-gap: 12px !important;
-        row-gap: 6px !important;
-        align-items: center !important;
-        padding: 6px 0 10px !important;
-    }
-    .st-key-card_dash_today [data-testid="stHorizontalBlock"]:has(.row-tight):not(:has(.kb-head)) > [data-testid="stColumn"] {
-        width: auto !important;
-        min-width: 0 !important;
-        flex: none !important;
-    }
-    /* Photo */
-    .st-key-card_dash_today [data-testid="stHorizontalBlock"]:has(.row-tight):not(:has(.kb-head)) > [data-testid="stColumn"]:nth-child(1) {
-        grid-column: 1 !important;
-        grid-row: 1 / span 2 !important;
-        align-self: start !important;
-    }
-    /* Name + reason */
-    .st-key-card_dash_today [data-testid="stHorizontalBlock"]:has(.row-tight):not(:has(.kb-head)) > [data-testid="stColumn"]:nth-child(2) {
-        grid-column: 2 !important;
-        grid-row: 1 !important;
-    }
-    /* Risk and suggested action chips */
-    .st-key-card_dash_today [data-testid="stHorizontalBlock"]:has(.row-tight):not(:has(.kb-head)) > [data-testid="stColumn"]:nth-child(3) {
-        grid-column: 2 !important;
-        grid-row: 2 !important;
-    }
-    .st-key-card_dash_today [class*="st-key-mrow_"] button {
-        justify-content: flex-start !important;
-        text-align: left !important;
-        padding-left: 0 !important;
-    }
-    .st-key-card_dash_today [class*="st-key-mrow_"] button p {
-        text-align: left !important;
-    }
-    .st-key-card_dash_today .why {
-        padding: 0 !important;
-        text-align: left !important;
-        white-space: normal !important;
-    }
-    .st-key-card_dash_today [data-testid="stColumn"]:nth-child(3) [data-testid="stMarkdownContainer"] {
-        display: flex !important;
-        flex-wrap: wrap !important;
-        gap: 6px !important;
-    }
-}
-"""
-
+# Payments & Renewals keeps this grid layout (it looks good on phones).
 ALL_ROWS_MOBILE_CSS = """
 @media (max-width: 768px) {
-
-    /* ---- Shared: every member row becomes a tidy grid ---- */
-    :is(.st-key-card_priority, .st-key-card_suggested, [class*="st-key-card_pay_"],
-        .st-key-card_todo_week, .st-key-card_dir)
-    [data-testid="stHorizontalBlock"]:has(.row-tight) {
+    [class*="st-key-card_pay_"] [data-testid="stHorizontalBlock"]:has(.row-tight) {
         display: grid !important;
         grid-template-columns: 52px minmax(0, 1fr) minmax(0, 1fr) !important;
         column-gap: 12px !important;
@@ -731,125 +663,43 @@ ALL_ROWS_MOBILE_CSS = """
         align-items: center !important;
         padding: 6px 0 10px !important;
     }
-    :is(.st-key-card_priority, .st-key-card_suggested, [class*="st-key-card_pay_"],
-        .st-key-card_todo_week, .st-key-card_dir)
-    [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"] {
+    [class*="st-key-card_pay_"] [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"] {
         width: auto !important;
         min-width: 0 !important;
         flex: none !important;
     }
-
-    /* Photo: always column 1, spans the rows beside it */
-    :is(.st-key-card_priority, .st-key-card_suggested, [class*="st-key-card_pay_"],
-        .st-key-card_todo_week, .st-key-card_dir)
-    [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"]:nth-child(1) {
+    [class*="st-key-card_pay_"] [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"]:nth-child(1) {
         grid-column: 1 !important;
         grid-row: 1 / span 4 !important;
         align-self: start !important;
     }
-    /* Name + reason: always the top line beside the photo */
-    :is(.st-key-card_priority, .st-key-card_suggested, [class*="st-key-card_pay_"],
-        .st-key-card_todo_week, .st-key-card_dir)
-    [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"]:nth-child(2) {
+    [class*="st-key-card_pay_"] [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"]:nth-child(2) {
         grid-column: 2 / -1 !important;
         grid-row: 1 !important;
     }
-
-    /* Names left-aligned, reasons wrap */
-    :is(.st-key-card_priority, .st-key-card_suggested, [class*="st-key-card_pay_"],
-        .st-key-card_todo_week, .st-key-card_dir) [class*="st-key-mrow_"] button {
+    [class*="st-key-card_pay_"] [class*="st-key-mrow_"] button {
         justify-content: flex-start !important;
         text-align: left !important;
         padding-left: 0 !important;
     }
-    :is(.st-key-card_priority, .st-key-card_suggested, [class*="st-key-card_pay_"],
-        .st-key-card_todo_week, .st-key-card_dir) [class*="st-key-mrow_"] button p {
-        text-align: left !important;
-    }
-    :is(.st-key-card_priority, .st-key-card_suggested, [class*="st-key-card_pay_"],
-        .st-key-card_todo_week, .st-key-card_dir) .why {
+    [class*="st-key-card_pay_"] [class*="st-key-mrow_"] button p { text-align: left !important; }
+    [class*="st-key-card_pay_"] .why {
         padding: 0 !important;
         text-align: left !important;
         white-space: normal !important;
     }
-
-    /* ---- Risk Radar priority list (7 parts) ---- */
-    .st-key-card_priority [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"]:nth-child(3) { grid-column: 2 !important;  grid-row: 2 !important; }  /* risk chip */
-    .st-key-card_priority [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"]:nth-child(5) { grid-column: 3 !important;  grid-row: 2 !important; }  /* suggested action */
-    .st-key-card_priority [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"]:nth-child(4) { grid-column: 2 / -1 !important; grid-row: 3 !important; } /* probability bar */
-    .st-key-card_priority [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"]:nth-child(6) { grid-column: 2 !important;  grid-row: 4 !important; }  /* fee */
-    .st-key-card_priority [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"]:nth-child(7) { grid-column: 3 !important;  grid-row: 4 !important; }  /* follow up */
-
-    /* ---- Suggested Today (4 parts) ---- */
-    .st-key-card_suggested [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"]:nth-child(3) { grid-column: 2 / -1 !important; grid-row: 2 !important; } /* chips */
-    .st-key-card_suggested [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"]:nth-child(4) { grid-column: 2 / -1 !important; grid-row: 3 !important; } /* Add button */
-
-    /* ---- Payments & Renewals (5 parts) ---- */
-    [class*="st-key-card_pay_"] [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"]:nth-child(3) { grid-column: 2 !important;  grid-row: 2 !important; }  /* fee */
-    [class*="st-key-card_pay_"] [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"]:nth-child(4) { grid-column: 3 !important;  grid-row: 2 !important; }  /* status chip */
-    [class*="st-key-card_pay_"] [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"]:nth-child(5) { grid-column: 2 / -1 !important; grid-row: 3 !important; } /* Message button */
-
-    /* ---- To do this week (3 parts) ---- */
-    .st-key-card_todo_week [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"]:nth-child(3) { grid-column: 2 / -1 !important; grid-row: 2 !important; }
-
-    /* Chips sit side by side and wrap */
-    :is(.st-key-card_priority, .st-key-card_suggested, [class*="st-key-card_pay_"],
-        .st-key-card_todo_week) [data-testid="stColumn"] [data-testid="stMarkdownContainer"] {
+    [class*="st-key-card_pay_"] [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"]:nth-child(3) { grid-column: 2 !important; grid-row: 2 !important; }
+    [class*="st-key-card_pay_"] [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"]:nth-child(4) { grid-column: 3 !important; grid-row: 2 !important; }
+    [class*="st-key-card_pay_"] [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"]:nth-child(5) { grid-column: 2 / -1 !important; grid-row: 3 !important; }
+    [class*="st-key-card_pay_"] [data-testid="stColumn"] [data-testid="stMarkdownContainer"] {
         display: flex !important;
         flex-wrap: wrap !important;
         gap: 6px !important;
     }
 }
 """
-_ROW_SEL = (":is(.st-key-card_priority, .st-key-card_suggested, "
-            ".st-key-card_dash_today, .st-key-card_todo_week, .st-key-card_dir)")
-_ROW = f'html body {_ROW_SEL} [data-testid="stHorizontalBlock"]:has(.row-tight)'
 
-_ROWS_FLOW_RAW = """
-@media (max-width: 768px) {
-ROW {
-    display: flex !important;
-    flex-direction: row !important;
-    flex-wrap: wrap !important;
-    align-items: center !important;
-    gap: 6px 12px !important;
-    padding: 6px 0 10px !important;
-}
-ROW > [data-testid="stColumn"] {
-    flex: 0 0 calc(100% - 64px) !important;
-    width: calc(100% - 64px) !important;
-    min-width: 0 !important;
-    margin-left: 64px !important;
-}
-ROW > [data-testid="stColumn"]:nth-child(1) {
-    flex: 0 0 52px !important;
-    width: 52px !important;
-    margin-left: 0 !important;
-}
-ROW > [data-testid="stColumn"]:nth-child(2) {
-    flex: 1 1 calc(100% - 64px) !important;
-    margin-left: 0 !important;
-}
-ROW [class*="st-key-mrow_"] button,
-ROW [class*="st-key-mrow_"] button > div {
-    justify-content: flex-start !important;
-    text-align: left !important;
-    padding-left: 0 !important;
-    width: 100% !important;
-}
-ROW [class*="st-key-mrow_"] button p { text-align: left !important; }
-ROW .why { padding: 4px 0 0 !important; text-align: left !important; white-space: normal !important; }
-ROW > [data-testid="stColumn"]:nth-child(n+3) [data-testid="stMarkdownContainer"] {
-    display: flex !important;
-    flex-wrap: wrap !important;
-    gap: 6px !important;
-}
-}
-"""
 
-ROWS_FLOW_CSS = "\n".join(
-    line for line in _ROWS_FLOW_RAW.replace("ROW", _ROW).splitlines() if line.strip()
-)
 def _mobile():
     try:
         ua = st.context.headers.get("User-Agent", "").lower()
@@ -879,6 +729,8 @@ def mobile_member_card(r, key, why="", chips="", bar="", meta="", actions=()):
         for label, k, callback, args in actions:
             st.button(label, key=f"{k}_{r['id']}", on_click=callback,
                       args=args, use_container_width=True)
+
+
 CHAT_CSS = """
 [class*="st-key-mention_"] button {
     background: rgba(183,243,74,0.12) !important;
@@ -957,14 +809,15 @@ CHAT_CSS = """
     }
     .chat-who { font-size: 12px; }
 }
-"""            
+"""
+
+
 def apply_ui_styles():
     st.markdown("<style>" + UI_CSS + "</style>", unsafe_allow_html=True)
     st.markdown("<style>" + MOBILE_ROWS_CSS + "</style>", unsafe_allow_html=True)
-    st.markdown("<style>" + DASH_TODAY_MOBILE_CSS + "</style>", unsafe_allow_html=True)
     st.markdown("<style>" + ALL_ROWS_MOBILE_CSS + "</style>", unsafe_allow_html=True)
-    st.markdown("<style>" + ROWS_FLOW_CSS + "</style>", unsafe_allow_html=True)
     st.markdown("<style>" + CHAT_CSS + "</style>", unsafe_allow_html=True)
+
 # ------------------------------------------------------------ speed & caching
 class _TrackedTable:
     def __init__(self, table):
@@ -994,7 +847,6 @@ def _clone(value):
     return value
 
 def _cached(key, fn, ttl=60, skip_empty=False):
-    # Increased TTL to 60s to avoid re-fetching on every page switch
     store = st.session_state.get("_cache")
     if not isinstance(store, dict):
         store = {}
@@ -1057,8 +909,7 @@ def _fetch_members_uncached(supabase, gym_id, archived=None, include_photo=True)
 def _load_roster_uncached(supabase, gym_id, assess_fn, with_photos=True):
     members_all, _ = fetch_members(supabase, gym_id, archived=False, include_photo=with_photos)
     members = members_all[~members_all["suspended"]]
-    
-    # Carry through payment / renewal columns so Payments page works
+
     keep = ["id", "full_name", "email", "phone", "fitness_goal",
             "membership_end", "last_payment", "last_renewed_on"]
     if with_photos:
@@ -2522,16 +2373,16 @@ def render_payments(supabase, gym_id, assess_fn):
                         on_click=open_profile,
                         args=(r["id"], "Payments & Renewals"),
                         use_container_width=True)
-            
+
             # Members with no renewal date hold an empty value (NaT)
             if pd.isna(r["_end"]):
                 end_txt = "—"
             else:
                 end_txt = r["_end"].strftime("%d %b %Y")
-                
+
             days = r["_days_left"]
             days_txt = "—" if pd.isna(days) else f"{int(days):+d} days"
-            
+
             _md(f'<div class="why">Renews {_esc(end_txt)} · {_esc(days_txt)}</div>',
                 c[1])
             _md(f'<div class="money">{r["monthly_fee"]:,.0f} / mo</div>', c[2])
@@ -2594,7 +2445,6 @@ def render_business_insights(supabase, gym_id, assess_fn):
                 "Numbers that matter")
     try:
         roster, _ = load_roster(supabase, gym_id, assess_fn)
-        # include archived for accurate What Works history
         actions = load_actions(supabase, gym_id, include_archived=True)
     except Exception as e:
         st.error("Couldn't load insights. Have you run schema.sql?")
@@ -2636,7 +2486,6 @@ def render_business_insights(supabase, gym_id, assess_fn):
         st.info("Complete some actions with outcomes and this will show which "
                 "tactics keep members.")
     else:
-        # Count ALL Done actions (including archived) for accuracy
         tbl = done.groupby("action_type")["outcome"].agg(
             Done="count", Retained=lambda s: int((s == "Retained").sum()))
         tbl["Save rate"] = (tbl["Retained"] / tbl["Done"]).map("{:.0%}".format)
@@ -2791,6 +2640,8 @@ def _stream(slot, text):
         slot.markdown(" ".join(words[:i]) + " ▍")
         time.sleep(0.03)
     slot.markdown(text)
+
+
 def archie_context(roster, actions, business_name):
     """Build a concise business context for Archie."""
     lines = [
@@ -2874,6 +2725,8 @@ def archie_reply(messages, context):
         return text, True
     except Exception as error:
         return f"Archie could not answer right now.\n\nTechnical detail: {error}", False
+
+
 def _member_photos(supabase, gym_id, ids):
     try:
         rows = (supabase.table("members").select("id, photo")
@@ -2923,25 +2776,8 @@ def _mention_buttons(text, roster, tag, supabase=None, gym_id=None):
     for member_id, name in found:
         st.button(name, key=f"mention_{tag}_{member_id}",
                   on_click=open_profile, args=(member_id, "Archie"))
-    """Show a button for every member whose name appears in Archie's reply."""
-    if roster is None or roster.empty or "full_name" not in roster.columns:
-        return
-    lowered = str(text).lower()
-    found, seen = [], set()
-    # Longest names first so "Ann Lee" is matched before "Ann"
-    people = sorted(roster[["id", "full_name"]].dropna().itertuples(index=False),
-                    key=lambda p: len(str(p.full_name)), reverse=True)
-    for p in people:
-        name = str(p.full_name).strip()
-        if len(name) >= 3 and name.lower() in lowered and p.id not in seen:
-            seen.add(p.id)
-            found.append((p.id, name))
-    if not found:
-        return
-    st.caption("Tap a name to open their profile")
-    for member_id, name in found[:6]:
-        st.button(f"👤 {name}", key=f"mention_{tag}_{member_id}",
-                  on_click=open_profile, args=(member_id, "Archie"))        
+
+
 def render_archie(supabase, gym_id, assess_fn, business_name, owner_name="the gym owner"):
     st.session_state["_chat_owner"] = owner_name
     st.session_state["_chat_biz"] = business_name
@@ -2985,7 +2821,8 @@ def render_archie(supabase, gym_id, assess_fn, business_name, owner_name="the gy
                 '<div class="skel"><i></i><i></i><i></i></div></div>', slot)
             reply, live = archie_reply(st.session_state.archie_msgs, context)
             _stream(slot, reply)
-            _mention_buttons(reply, roster, f"n{len(st.session_state.archie_msgs)}", supabase, gym_id)
+            _mention_buttons(reply, roster, f"n{len(st.session_state.archie_msgs)}",
+                             supabase, gym_id)
         _md(_archie_hero(False), hero)
         st.session_state.archie_msgs.append({"role": "assistant", "content": reply})
     if st.session_state.archie_msgs and st.button("Clear chat"):
@@ -3061,9 +2898,7 @@ def render_dashboard(supabase, gym_id, assess_fn, greeting, user_name, business_
                       args=("Risk Radar",))
 
     st.markdown('<div class="section-label">QUICK ACTIONS</div>', unsafe_allow_html=True)
-    # Only 4 columns per row to make it fit standard desktop widths
     tiles = [
-        
         ("Member Management", "Member Management", ":material/group:"),
         ("Action Centre", "Action Centre", ":material/task_alt:"),
         ("Follow-ups", "Follow-ups", ":material/forum:"),
@@ -3072,8 +2907,7 @@ def render_dashboard(supabase, gym_id, assess_fn, greeting, user_name, business_
         ("Member Assessment", "Member Assessment", ":material/science:"),
         ("Model Insights", "Model Insights", ":material/insights:"),
     ]
-    
-    # Split into 2 rows of 4
+
     for i in range(0, len(tiles), 4):
         cols = st.columns(4)
         for col, (label, page, icon) in zip(cols, tiles[i:i+4]):
