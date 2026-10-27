@@ -1949,9 +1949,17 @@ MORE_PAGES = [
 ]
 
 if "current_page" not in st.session_state:
-    st.session_state["current_page"] = "Dashboard"
+    _saved = st.query_params.get("p", "")
+    st.session_state["current_page"] = (
+        _saved if _saved in MAIN_PAGES + MORE_PAGES else "Dashboard"
+    )
 
-
+def _is_mobile():
+    try:
+        ua = st.context.headers.get("User-Agent", "").lower()
+    except Exception:
+        return False
+    return any(w in ua for w in ("iphone", "android", "ipad", "mobile"))
 def show_page(name):
     """Open a page and keep the top-bar radio in sync."""
     st.session_state["current_page"] = name
@@ -2446,17 +2454,18 @@ with st.container(key="top_nav"):
 
     # MAIN NAVIGATION (7 pages)
     with nav_col:
-        _current = st.session_state.get("current_page")
-        st.radio(
-            "Navigation",
-            MAIN_PAGES,
-            index=MAIN_PAGES.index(_current) if _current in MAIN_PAGES else None,
-            format_func=nav_label,
-            horizontal=True,
-            label_visibility="collapsed",
-            key="main_nav",
-            on_change=on_main_nav
-        )
+        if not _is_mobile():
+            _current = st.session_state.get("current_page")
+            st.radio(
+                "Navigation",
+                MAIN_PAGES,
+                index=MAIN_PAGES.index(_current) if _current in MAIN_PAGES else None,
+                format_func=nav_label,
+                horizontal=True,
+                label_visibility="collapsed",
+                key="main_nav",
+                on_change=on_main_nav
+            )
 
     # LOG OUT (laptop)
     with logout_col:
@@ -2513,11 +2522,13 @@ with st.container(key="top_nav"):
         st.query_params.clear()
         st.rerun()
     page = st.session_state["current_page"]
+    if page in MAIN_PAGES + MORE_PAGES and st.query_params.get("p") != page:
+        st.query_params["p"] = page
 
     _fragment = getattr(st, "fragment", None)
     if _fragment is not None:
         try:
-            @_fragment(run_every=30)
+            @_fragment(run_every=None if page == "Archie" else 30)
             def _watch_inbox():
                 count = _unread_now()
                 if count and count > st.session_state.get("last_unread", 0):
