@@ -332,7 +332,39 @@ def _show_chart(chart):
         st.altair_chart(chart, use_container_width=True, theme=None)
     except TypeError:
         st.altair_chart(chart, use_container_width=True)
-
+def modern_line_chart(df):
+    """Line chart of cancellation estimate vs days since last visit."""
+    data = df[["days_since_last_visit", "cancellation_probability"]].copy()
+    data["days_since_last_visit"] = pd.to_numeric(
+        data["days_since_last_visit"], errors="coerce")
+    data["cancellation_probability"] = pd.to_numeric(
+        data["cancellation_probability"], errors="coerce")
+    data = data.dropna()
+    try:
+        import altair as alt
+        line = (
+            alt.Chart(data)
+            .mark_line(color="#B7F34A", strokeWidth=3, interpolate="monotone",
+                       point=alt.OverlayMarkDef(color="#B7F34A", size=70, filled=True))
+            .encode(
+                x=alt.X("days_since_last_visit:Q", title="Days since last visit",
+                        axis=alt.Axis(tickMinStep=1, format="d")),
+                y=alt.Y("cancellation_probability:Q", title="Cancellation estimate",
+                        scale=alt.Scale(domain=[0, 1]), axis=alt.Axis(format="%")),
+                tooltip=[
+                    alt.Tooltip("days_since_last_visit:Q", title="Days away"),
+                    alt.Tooltip("cancellation_probability:Q", title="Estimate", format=".0%"),
+                ],
+            )
+        )
+        rules = (
+            alt.Chart(pd.DataFrame({"y": [0.3, 0.5]}))
+            .mark_rule(strokeDash=[5, 5], color="rgba(255,255,255,0.28)")
+            .encode(y=alt.Y("y:Q", scale=alt.Scale(domain=[0, 1])))
+        )
+        _show_chart(_style_chart(alt.layer(rules, line).properties(height=320)))
+    except Exception:
+        st.line_chart(data.set_index("days_since_last_visit"))
 def data_card(rows, cols, key_prefix, tone="cyan", empty="Nothing here yet."):
     if not rows:
         st.caption(empty)
