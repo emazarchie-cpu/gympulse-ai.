@@ -2532,23 +2532,28 @@ with st.container(key="top_nav"):
                 help="Follow-ups"
             )
 # Define safe display names
-safe_user_name = str(user_name or "User")
-safe_business_name = str(business_name or "Your Business")
-    # PROFILE ICON -> dropdown
-    with profile_col:
-        with st.container(key="top_profile"):
-            with st.popover("Profile"):
-                st.markdown(f"**{safe_user_name}**")
-                st.caption(f"{safe_business_name}")
-                st.caption("APPEARANCE")
-                st.button(
-                    "☀️ Switch to light mode"
-                    if st.session_state.get("theme", "dark") == "dark"
-                    else "🌙 Switch to dark mode",
-                    key="theme_toggle",
-                    on_click=toggle_theme,
-                    use_container_width=True
-                )
+# Define safe display names
+safe_user_name = str(st.session_state.get("user_name") or "User")
+safe_business_name = str(
+    st.session_state.get("business_name") or "Your Business"
+)
+
+# PROFILE ICON -> dropdown
+with profile_col:
+    with st.container(key="top_profile"):
+        with st.popover("Profile"):
+            st.markdown(f"**{safe_user_name}**")
+            st.caption(safe_business_name)
+            st.caption("APPEARANCE")
+
+            st.button(
+                "☀️ Switch to light mode"
+                if st.session_state.get("theme", "dark") == "dark"
+                else "🌙 Switch to dark mode",
+                key="theme_toggle",
+                on_click=toggle_theme,
+                use_container_width=True
+            )
                 st.divider()
                 st.button(
                     "Profile & settings",
