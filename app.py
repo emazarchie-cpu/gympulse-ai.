@@ -1309,7 +1309,7 @@ if st.session_state.auth_user is None:
                                 st.error("Too many attempts. Please wait a few minutes and try again.")
                             else:
                                 st.error("Wrong email or password. If you haven't registered yet, tap Sign up.")
-   resend_block()
+            resend_block()
             # ---------------- SIGNUP PAGE ----------------
             elif st.session_state.auth_mode == "signup":
 
