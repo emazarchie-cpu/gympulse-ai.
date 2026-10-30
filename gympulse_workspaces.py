@@ -190,12 +190,11 @@ def _num(value, default):
 # ---------------------------------------------------------------- photos
 def process_photo(raw_bytes, size=PHOTO_SIZE):
     from PIL import Image, ImageOps
-        try:
+    try:
         import pillow_heif
         pillow_heif.register_heif_opener()
     except Exception:
         pass
-
     img = Image.open(io.BytesIO(raw_bytes))
     img = ImageOps.exif_transpose(img).convert("RGB")
     img = ImageOps.fit(img, (size, size), method=Image.LANCZOS, centering=(0.5, 0.4))
@@ -2543,7 +2542,9 @@ def _list_board(supabase, actions, names, photos):
                              .eq("id", a["id"]).execute())
                             st.rerun()
                     _delete_action_control(supabase, a["id"])
-
+def _pick_play(pillar, play):
+    st.session_state["play_type"] = (pillar, play)
+    st.session_state["play_open"] = True
 def _pillars_panel(supabase, gym_id, roster, actions):
     st.markdown('<div class="section-label">RETENTION PILLARS</div>', unsafe_allow_html=True)
     st.caption("Members stay when they feel part of something, know their trainer "
