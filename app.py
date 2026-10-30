@@ -874,6 +874,16 @@ gw.apply_mobile_styles()
 gw.apply_ui_styles()
 st.markdown("""
 <style>
+button, [role="radio"], label, a { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+@media (hover: none) {
+    .stButton > button:hover, [class*="st-key-"] button:hover {
+        transform: none !important; box-shadow: none !important;
+    }
+}
+</style>
+""", unsafe_allow_html=True)
+st.markdown("""
+<style>
 html, body, .stApp,
 [data-testid="stAppViewContainer"],
 [data-testid="stMain"],
@@ -1195,7 +1205,20 @@ if st.session_state.auth_user is None:
         st.session_state.auth_mode = mode
         st.session_state.reset_email_sent = False
 
-
+    def resend_block():
+        pending = st.session_state.get("pending_confirm_email")
+        if not pending:
+            return
+        if st.button(f"Resend confirmation email to {pending}",
+                     key="resend_confirm", use_container_width=True):
+            try:
+                supabase.auth.resend({"type": "signup", "email": pending})
+                st.success("Sent. Check your inbox and spam folder.")
+            except Exception as error:
+                if "rate" in str(error).lower():
+                    st.error("Too many emails were sent to this address. Wait a few minutes and try again.")
+                else:
+                    st.error("Could not resend right now. Please try again shortly.")
     _, auth_col, _ = st.columns([1, 1.4, 1])
 
     with auth_col:
@@ -1261,20 +1284,32 @@ if st.session_state.auth_user is None:
                                 if profile_result.data:
                                     st.session_state.user_profile = profile_result.data[0]
                                 else:
-                                    st.session_state.user_profile = {
-                                        "full_name": "User",
-                                        "business_name": "My Gym"
+                                    meta = result.user.user_metadata or {}
+                                    fallback = {
+                                        "id": str(result.user.id),
+                                        "full_name": meta.get("full_name") or "User",
+                                        "business_name": meta.get("business_name") or "My Gym",
                                     }
+                                    try:
+                                        supabase.table("profiles").insert(fallback).execute()
+                                    except Exception:
+                                        pass
+                                    st.session_state.user_profile = fallback
 
                                 gw.show_boot_overlay()
                                 st.rerun()
 
-                        except Exception:
-                            st.error(
-                                "Login failed. Check your credentials and confirm "
-                                "your email address."
-                            )
-
+                        except Exception as error:
+                            reason = str(error).lower()
+                            if "not confirmed" in reason:
+                                st.session_state["pending_confirm_email"] = login_email.strip()
+                                st.warning("Your email isn't confirmed yet. Open the confirmation "
+                                           "email (check spam), or resend it below.")
+                            elif "rate" in reason:
+                                st.error("Too many attempts. Please wait a few minutes and try again.")
+                            else:
+                                st.error("Wrong email or password. If you haven't registered yet, tap Sign up.")
+   resend_block()
             # ---------------- SIGNUP PAGE ----------------
             elif st.session_state.auth_mode == "signup":
 
@@ -1339,6 +1374,7 @@ if st.session_state.auth_user is None:
                                     "email": signup_email.strip(),
                                     "password": signup_password,
                                     "options": {
+                                        "email_redirect_to": "https://usegympulseai.com",
                                         "data": {
                                             "full_name": full_name.strip(),
                                             "business_name": business_name.strip(),
@@ -1373,18 +1409,25 @@ if st.session_state.auth_user is None:
                                 st.rerun()
 
                             else:
-                                st.success(
-                                    "Registration submitted! Check your email for a "
-                                    "confirmation link, then return and sign in."
-                                )
+                                if result.user and not (result.user.identities or []):
+                                    st.error("This email is already registered. Sign in instead, "
+                                             "or tap Forgot password.")
+                                else:
+                                    st.session_state["pending_confirm_email"] = signup_email.strip()
+                                    st.success("Registration submitted! Check your email (and spam) "
+                                               "for the confirmation link, then come back and sign in.")
 
-                        except Exception:
-                            st.error(
-                                "Registration failed. Your email may already be "
-                                "registered, or the request may have failed. "
-                                "Please try again."
-                            )
-
+                        except Exception as error:
+                            reason = str(error).lower()
+                            if "rate" in reason:
+                                st.session_state["pending_confirm_email"] = signup_email.strip()
+                                st.error("Several emails were sent to this address recently. "
+                                         "Wait a few minutes, then tap Resend below.")
+                            elif "already" in reason:
+                                st.error("This email is already registered. Sign in instead.")
+                            else:
+                                st.error("Registration failed. Please check your details and try again.")
+   resend_block()
             # ---------------- FORGOT PASSWORD PAGE ----------------
             elif st.session_state.auth_mode == "forgot":
 
