@@ -5,3 +5,4 @@ joblib
 supabase
 numpy
 anthropic
+pillow-heif
