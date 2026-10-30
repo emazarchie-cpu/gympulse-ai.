@@ -2874,7 +2874,7 @@ def render_business_insights(supabase, gym_id, assess_fn):
         st.info("Complete some actions with outcomes and this will show which "
                 "tactics keep members.")
     else:
-                rows = []
+        rows = []
         for at, grp in done.groupby("action_type"):
             out = grp["outcome"].fillna("").astype(str)
             kept = int((out == "Retained").sum())
