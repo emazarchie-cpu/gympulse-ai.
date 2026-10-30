@@ -1690,6 +1690,15 @@ def mobile_member_card(r, key, why="", chips="", bar="", meta="", actions=()):
 
 
 CHAT_CSS = """
+[class*="st-key-pp_"] button {
+    background: rgba(255,255,255,0.05) !important;
+    border: 1px solid rgba(255,255,255,0.14) !important;
+    border-radius: 999px !important; min-height: 32px !important;
+    box-shadow: none !important; margin-top: 4px;
+}
+[class*="st-key-pp_"] button p { font-size: 12px !important; font-weight: 700 !important; color: #F4F7FB !important; }
+[class*="st-key-pp_"] button:hover { background: #B7F34A !important; border-color: #B7F34A !important; }
+[class*="st-key-pp_"] button:hover p { color: #10182A !important; }
 [class*="st-key-mention_"] button {
     background: rgba(183,243,74,0.12) !important;
     border: 1px solid rgba(183,243,74,0.45) !important;
@@ -3915,7 +3924,12 @@ def render_dashboard(supabase, gym_id, assess_fn, greeting, user_name, business_
             ("High risk", k["high"], "red", "Need you first"),
             ("Expected monthly loss", _money(k["expected_loss"]), "amber", "Estimate, not a forecast"),
             ("Open actions", k["open_actions"], "lime", "Follow-ups to finish"),
-        ])
+        ])  due_n = renewal_due_count(supabase, gym_id, roster)
+        if due_n:
+            st.info(f"{due_n} renewal reminder{'s' if due_n != 1 else ''} due. "
+                    "Unpaid members get a gentle weekly nudge until they renew.")
+            st.button("Open renewal reminders", key="dash_rem", on_click=_go,
+                      args=("Payments & Renewals",))
         st.markdown('<div class="section-label">WHO NEEDS YOU TODAY</div>',
                     unsafe_allow_html=True)
         need = members_to_contact(roster, actions)
