@@ -497,7 +497,7 @@ def render_settings(supabase, owner_id, gym_id, log_out):
             _md(avatar_html(full or "User", avatar, 130, "avatar-ring"))
         with c2:
             up = st.file_uploader("Upload a profile photo (JPG or PNG)",
-                                  type=["jpg", "jpeg", "png"], key="settings_photo")
+                                  type=["jpg", "jpeg", "png", "heic", "heif", "webp"], key="settings_photo")
             if up is not None:
                 try:
                     new_photo = process_photo(up.getvalue())
@@ -628,7 +628,7 @@ def render_settings(supabase, owner_id, gym_id, log_out):
             _md(avatar_html(full or "User", avatar, 130, "avatar-ring"))
         with c2:
             up = st.file_uploader("Upload a profile photo (JPG or PNG)",
-                                  type=["jpg", "jpeg", "png"], key="settings_photo")
+                                  type=["jpg", "jpeg", "png", "heic", "heif", "webp"], key="settings_photo")
             if up is not None:
                 try:
                     new_photo = process_photo(up.getvalue())
@@ -2115,7 +2115,7 @@ def render_member_profile(supabase, gym_id, member_id, assess_fn):
             st.caption("Current photo" if has_photo(m["photo"]) else "No photo yet")
         with c2:
             up = st.file_uploader("Upload a photo (JPG or PNG)",
-                                  type=["jpg", "jpeg", "png"],
+                                  type=["jpg", "jpeg", "png", "heic", "heif", "webp"],
                                   key=f"photo_up_{member_id}")
             if up is not None:
                 try:
