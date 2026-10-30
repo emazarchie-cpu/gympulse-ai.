@@ -3202,13 +3202,13 @@ def render_archie(supabase, gym_id, assess_fn, business_name, owner_name="the gy
         if col.button(p, key=f"ap_{p}", use_container_width=True):
             picked = p
         if not st.session_state.archie_msgs:
-        hour = datetime.now(APP_TZ).hour
-        hello = ("Good morning" if hour < 12
-                 else "Good afternoon" if hour < 17 else "Good evening")
-        with _chat_message("assistant"):
-            st.markdown(
-                f"{hello}, {owner_name}! Welcome to **{business_name}**. "
-                "I'm Archie. Ask me who needs a call today, or tap a question above.")
+            hour = datetime.now(APP_TZ).hour
+            hello = ("Good morning" if hour < 12
+                     else "Good afternoon" if hour < 17 else "Good evening")
+            with _chat_message("assistant"):
+                st.markdown(
+                    f"{hello}, {owner_name}! Welcome to **{business_name}**. "
+                    "I'm Archie. Ask me who needs a call today, or tap a question above.")
 
     for i, m in enumerate(st.session_state.archie_msgs):
         with _chat_message(m["role"]):
