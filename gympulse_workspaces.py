@@ -190,6 +190,12 @@ def _num(value, default):
 # ---------------------------------------------------------------- photos
 def process_photo(raw_bytes, size=PHOTO_SIZE):
     from PIL import Image, ImageOps
+        try:
+        import pillow_heif
+        pillow_heif.register_heif_opener()
+    except Exception:
+        pass
+
     img = Image.open(io.BytesIO(raw_bytes))
     img = ImageOps.exif_transpose(img).convert("RGB")
     img = ImageOps.fit(img, (size, size), method=Image.LANCZOS, centering=(0.5, 0.4))
@@ -521,13 +527,30 @@ def render_settings(supabase, owner_id, gym_id, log_out):
             else:
                 save({"business_name": g_name.strip()}, "Gym name saved.")
 
-    with t_pref:
-        current = _text(profile.get("language"), "English")
+        with t_pref:
+        s = dict(profile.get("settings") or {})
+        current = s.get("language") or _text(profile.get("language"), "English")
         options = LANGUAGES if current in LANGUAGES else [current] + LANGUAGES
         lang = st.selectbox("Language", options, index=options.index(current))
-        st.caption("Archie replies in your language. Screen labels are still in English.")
-        if st.button("Save language", key="settings_lang"):
-            save({"language": lang}, "Language saved.")
+        tones = ["Warm and friendly", "Professional", "Short and casual"]
+        tone = st.selectbox("Message tone", tones,
+                            index=tones.index(s["tone"]) if s.get("tone") in tones else 0)
+        biz_phone = st.text_input("Business phone or WhatsApp number",
+                                  value=s.get("biz_phone", ""))
+        signoff = st.text_input("Sign-off on messages", value=s.get("signoff", ""),
+                                placeholder=f"The {gym_name} team")
+        auto = st.toggle("Automatic renewal reminders", value=s.get("auto_reminders", True))
+        days = st.slider("Start reminding this many days before renewal", 3, 14,
+                         int(s.get("remind_days", 7)))
+        notify = st.toggle("Notify me of new member replies", value=s.get("notify", True))
+        if st.button("Save preferences", key="settings_prefs"):
+            save({"language": lang,
+                  "settings": {**s, "language": lang, "tone": tone,
+                               "biz_phone": biz_phone.strip(), "signoff": signoff.strip(),
+                               "auto_reminders": auto, "remind_days": days,
+                               "notify": notify}},
+                 "Preferences saved.")
+
 
     with t_account:
         st.caption("Signing out ends your session on this device.")
@@ -2396,6 +2419,30 @@ def render_risk_radar(supabase, gym_id, assess_fn):
                "to prioritise conversations, not to make decisions about members.")
 
 # ------------------------------------------------------- action centre
+def _remove_from_board(supabase, a):
+    aid = a["id"]
+    done = a.get("status") == "Done"
+    if st.session_state.get("rm_action") == aid:
+        st.warning("Remove from the board?" + (" Its result stays in Business Insights." if done else ""))
+        y, n = st.columns(2)
+        if y.button("Yes, remove", key=f"ry_{aid}", use_container_width=True):
+            if done:
+                (supabase.table("retention_actions")
+                 .update({"archived_at": datetime.now(timezone.utc).isoformat()})
+                 .eq("id", aid).execute())
+            else:
+                supabase.table("retention_actions").delete().eq("id", aid).execute()
+            st.session_state.pop("rm_action", None)
+            st.rerun()
+        if n.button("Cancel", key=f"rn_{aid}", use_container_width=True):
+            st.session_state.pop("rm_action", None)
+            st.rerun()
+    elif st.button("Remove from board", key=f"rx_{aid}", use_container_width=True):
+        st.session_state["rm_action"] = aid
+        st.rerun()
+
+
+
 def _action_card(supabase, a, names, photos, status, prefix):
     member_id = a["member_id"]
     who = names.get(member_id, "Archived member")
@@ -2410,6 +2457,7 @@ def _action_card(supabase, a, names, photos, status, prefix):
         if status == "Done":
             chips += outcome_chip(a.get("outcome"))
         _md(f'<div class="chip-row">{chips}</div>')
+          _remove_from_board(supabase, a)
         if status != "Done":
             st.button("Message", key=f"follow_{prefix}_{a['id']}", on_click=open_followup,
                       args=(member_id, "Action Centre"), use_container_width=True)
@@ -2825,20 +2873,26 @@ def render_business_insights(supabase, gym_id, assess_fn):
         st.info("Complete some actions with outcomes and this will show which "
                 "tactics keep members.")
     else:
-        tbl = done.groupby("action_type")["outcome"].agg(
-            Done="count", Retained=lambda s: int((s == "Retained").sum()))
-        tbl["Save rate"] = (tbl["Retained"] / tbl["Done"]).map("{:.0%}".format)
-        rows = [
-            {"action": at, "done": int(r["Done"]),
-             "retained": int(r["Retained"]), "rate": r["Save rate"]}
-            for at, r in tbl.iterrows()
-        ]
+                rows = []
+        for at, grp in done.groupby("action_type"):
+            out = grp["outcome"].fillna("").astype(str)
+            kept = int((out == "Retained").sum())
+            lost = int((out == "Cancelled").sum())
+            decided = kept + lost
+            rows.append({
+                "action": at, "done": len(grp), "retained": kept,
+                "cancelled": lost, "open": len(grp) - decided,
+                "rate": f"{kept / decided:.0%}" if decided else "n/a"})
+        rows.sort(key=lambda r: r["done"], reverse=True)
         data_card(rows, [
-            ("action", "Action"),
-            ("done", "Completed"),
-            ("retained", "Retained"),
-            ("rate", "Save rate"),
+            ("action", "Action"), ("done", "Completed"),
+            ("retained", "Retained"), ("cancelled", "Cancelled"),
+            ("open", "No response"), ("rate", "Save rate"),
         ], key_prefix="what_works", tone="lime")
+        st.caption("Save rate = Retained ÷ (Retained + Cancelled). "
+                   "No-response results are shown but not counted either way, "
+                   "because the real outcome is unknown.")
+
         if len(done) < 20:
             st.caption("Small sample, so treat these as early signals only. "
                        "This table counts every completed action, including "
@@ -3132,7 +3186,9 @@ def render_archie(supabase, gym_id, assess_fn, business_name, owner_name="the gy
     else:
         context = f"Gym: {business_name}. No scored members yet."
     context += f"\nThe owner's name is {owner_name}. Sign messages with this name."
-    _lang = (st.session_state.get("user_profile") or {}).get("language") or "English"
+        _p = st.session_state.get("user_profile") or {}
+    _lang = (_p.get("settings") or {}).get("language") or _p.get("language") or "English"
+
     context += f"\nReply in {_lang}."
 
     if "archie_msgs" not in st.session_state:
@@ -3144,6 +3200,15 @@ def render_archie(supabase, gym_id, assess_fn, business_name, owner_name="the gy
     for col, p in zip(cols, ARCHIE_PROMPTS):
         if col.button(p, key=f"ap_{p}", use_container_width=True):
             picked = p
+        if not st.session_state.archie_msgs:
+        hour = datetime.now(APP_TZ).hour
+        hello = ("Good morning" if hour < 12
+                 else "Good afternoon" if hour < 17 else "Good evening")
+        with _chat_message("assistant"):
+            st.markdown(
+                f"{hello}, {owner_name}! Welcome to **{business_name}**. "
+                "I'm Archie. Ask me who needs a call today, or tap a question above.")
+
     for i, m in enumerate(st.session_state.archie_msgs):
         with _chat_message(m["role"]):
             st.markdown(m["content"])
