@@ -527,7 +527,7 @@ def render_settings(supabase, owner_id, gym_id, log_out):
                 save({"business_name": g_name.strip()}, "Gym name saved.")
 
         with t_pref:
-        s = dict(profile.get("settings") or {})
+           s = dict(profile.get("settings") or {})
         current = s.get("language") or _text(profile.get("language"), "English")
         options = LANGUAGES if current in LANGUAGES else [current] + LANGUAGES
         lang = st.selectbox("Language", options, index=options.index(current))
