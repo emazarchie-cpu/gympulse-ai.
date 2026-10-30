@@ -525,7 +525,8 @@ def render_settings(supabase, owner_id, gym_id, log_out):
                 st.error("Please enter a gym name.")
             else:
                 save({"business_name": g_name.strip()}, "Gym name saved.")
-
+        with t_trainers:
+        render_trainers_editor(supabase, gym_id)
         with t_pref:
            s = dict(profile.get("settings") or {})
         current = s.get("language") or _text(profile.get("language"), "English")
@@ -625,8 +626,8 @@ def render_settings(supabase, owner_id, gym_id, log_out):
         st.session_state["settings_flash"] = message
         st.rerun()
 
-    t_profile, t_photo, t_gym, t_pref, t_account = st.tabs(
-        ["Personal info", "Photo", "Gym", "Preferences", "Account"])
+    t_profile, t_photo, t_gym, t_trainers, t_pref, t_account = st.tabs(
+        ["Personal info", "Photo", "Gym", "Trainers", "Preferences", "Account"])
 
     with t_profile:
         with st.form("settings_profile"):
@@ -685,6 +686,610 @@ def render_settings(supabase, owner_id, gym_id, log_out):
     with t_account:
         st.caption("Signing out ends your session on this device.")
         st.button("Log Out", key="settings_logout", on_click=log_out)        
+from urllib.parse import quote
+
+TRAINER_PLAYS = {"Free PT session", "Trainer intro", "Goal review"}
+
+PLAY_TEXT = {
+    "Personal call": "Hi {first}, it's {owner} from {biz}. I'd love to give you a quick call to hear how your training is going and see how we can help. When is a good time for you?",
+    "WhatsApp check-in": "Hi {first}! This is {owner} from {biz}. Just checking in to see how you're finding your workouts. Is there anything we can do to make your experience even better?",
+    "Feedback request": "Hi {first}, your opinion matters a lot to us at {biz}. Could you spare a minute to tell us what we're doing well and what we could improve? Reply here and I'll read every word.",
+    "Renewal offer": "Hi {first}! Your membership at {biz} is coming up for renewal and we'd love to keep you with us. Reply and I'll set up a renewal offer that works for you.",
+    "Free PT session": "Hi {first}! {biz} would like to gift you a free personal training session with {tname}{tspec}. It's a great way to fine-tune your plan{goal_part}. Call or message {tphone} to book your slot, or reply here and I'll arrange it.",
+    "Trainer intro": "Hi {first}, I'd like you to meet {tname}{tspec}, one of our trainers at {biz}. {tname} would love to support you{goal_part}. You can reach them on {tphone}, or reply here and I'll introduce you at the gym.",
+    "Goal review": "Hi {first}! It's time for a quick goal review at {biz}{goal_part}. {tname}{tspec} can sit down with you for 15 minutes to check your progress and update your plan. Message {tphone} to book a time.",
+    "Class invite": "Hi {first}! We have a class coming up at {biz} that we think you'll enjoy, and we'd love to see you there. Reply and I'll save you a spot.",
+    "Group challenge": "Hi {first}! {biz} is running a friendly group challenge and you'd be a great fit. It's a fun way to stay motivated alongside other members. Want me to add you?",
+    "Bring-a-friend invite": "Hi {first}! Training is better with a friend. Bring someone along to {biz} as your guest and let us know when you're coming, so we can welcome you both.",
+    "Milestone shout-out": "Hi {first}! Congratulations from all of us at {biz}. Your consistency has really paid off and we're proud of your progress. Keep it up!",
+    "Welcome-back note": "Hi {first}, it's so good to see you back at {biz}! We missed you, and we're here to help you get back into your rhythm. Let me know if you need anything.",
+}
+
+
+def _biz_ctx():
+    p = st.session_state.get("user_profile") or {}
+    return {"biz": _text(p.get("business_name"), "our gym"),
+            "owner": _text(p.get("full_name"), ""),
+            "s": dict(p.get("settings") or {})}
+
+
+def _signoff(ctx):
+    return ctx["s"].get("signoff") or "\n".join(
+        x for x in (ctx["owner"], ctx["biz"]) if x)
+
+
+def play_message(play, member, trainer, ctx):
+    s = ctx["s"]
+    first = (member.get("name") or "").split(" ")[0] or "there"
+    goal = member.get("goal") or ""
+    text = PLAY_TEXT.get(play, "Hi {first}, it's {owner} from {biz}. Just checking in.")
+    return text.format(
+        first=first, biz=ctx["biz"], owner=ctx["owner"] or "the team",
+        tname=trainer["full_name"] if trainer else "one of our trainers",
+        tspec=f" ({trainer['specialty']})" if trainer and trainer.get("specialty") else "",
+        tphone=(trainer.get("phone") if trainer and trainer.get("phone")
+                else s.get("biz_phone") or "our front desk"),
+        goal_part=f" towards your goal of {goal.lower()}" if goal else "",
+    ) + "\n\n" + _signoff(ctx)
+
+
+def renewal_message(name, days, ctx):
+    s = ctx["s"]
+    first = (name or "").split(" ")[0] or "there"
+    if days > 1:
+        when = f"your membership with {ctx['biz']} is due for renewal in {days} days."
+    elif days == 1:
+        when = f"your membership with {ctx['biz']} is due for renewal tomorrow."
+    elif days == 0:
+        when = f"your membership with {ctx['biz']} is due for renewal today."
+    else:
+        n = abs(days)
+        when = (f"your membership with {ctx['biz']} ended {n} day"
+                f"{'s' if n != 1 else ''} ago.")
+    phone = f" You can reach us on {s['biz_phone']}." if s.get("biz_phone") else ""
+    return (f"Hi {first}, I hope you're doing well! Just a gentle note that {when} "
+            f"We'd truly love to keep seeing you at {ctx['biz']}, and whenever it suits you "
+            f"we're happy to help you renew or answer any questions.{phone} "
+            f"No pressure at all, and thank you for being part of our family.\n\n"
+            + _signoff(ctx))
+
+
+def _fetch_trainers(supabase, gym_id):
+    try:
+        return (supabase.table("trainers").select("*").eq("gym_id", gym_id)
+                .order("created_at").execute().data or [])
+    except Exception:
+        return []
+
+
+def load_trainers(supabase, gym_id):
+    return _cached(("trainers", gym_id), lambda: _fetch_trainers(supabase, gym_id))
+
+
+def trainer_card_html(t):
+    name = _text(t.get("full_name"), "Trainer")
+    phone = _text(t.get("phone"))
+    chips = chip(_text(t.get("specialty"), "Trainer"), "cyan")
+    if phone:
+        chips += chip(f"Call {phone}", "grey", href=f"tel:{phone}")
+        digits = whatsapp_digits(phone)
+        if digits:
+            chips += chip("WhatsApp", "lime", href=f"https://wa.me/{digits}")
+    bio = _text(t.get("bio"))
+    bio_html = f'<div class="why" style="padding:6px 0 0;">{_esc(bio)}</div>' if bio else ""
+    return (f'<div class="profile-hero" style="padding:16px 18px;margin:8px 0;">'
+            f'{avatar_html(name, t.get("photo"), 76, "avatar-ring")}'
+            f'<div><div class="profile-name" style="font-size:22px;">{_esc(name)}</div>'
+            f'<div class="chip-row">{chips}</div>{bio_html}</div></div>')
+
+
+def render_trainers_editor(supabase, gym_id):
+    st.caption("Trainers you add here can be introduced to members from the "
+               "Retention Pillars plays.")
+    trainers = load_trainers(supabase, gym_id)
+    for t in trainers:
+        with st.expander(f"{t['full_name']} · {_text(t.get('specialty'), 'Trainer')}"):
+            _md(trainer_card_html(t))
+            with st.form(f"edit_tr_{t['id']}"):
+                n = st.text_input("Full name", value=_text(t.get("full_name")))
+                sp = st.text_input("Specialty", value=_text(t.get("specialty")))
+                ph = st.text_input("Phone number", value=_text(t.get("phone")))
+                bio = st.text_area("Short bio", value=_text(t.get("bio")))
+                pic = st.file_uploader("New photo (optional)",
+                                       type=["jpg", "jpeg", "png", "heic", "heif", "webp"],
+                                       key=f"tr_pic_{t['id']}")
+                ok = st.form_submit_button("Save trainer", use_container_width=True)
+            if ok and n.strip():
+                fields = {"full_name": n.strip(), "specialty": sp.strip() or None,
+                          "phone": ph.strip() or None, "bio": bio.strip() or None}
+                if pic is not None:
+                    try:
+                        fields["photo"] = process_photo(pic.getvalue())
+                    except Exception:
+                        st.warning("The photo could not be read, so it was not changed.")
+                (supabase.table("trainers").update(fields)
+                 .eq("id", t["id"]).eq("gym_id", gym_id).execute())
+                st.session_state["settings_flash"] = "Trainer saved."
+                st.rerun()
+            if st.button("Remove trainer", key=f"tr_rm_{t['id']}"):
+                (supabase.table("trainers").delete()
+                 .eq("id", t["id"]).eq("gym_id", gym_id).execute())
+                st.session_state["settings_flash"] = "Trainer removed."
+                st.rerun()
+    st.markdown("#### Add a trainer")
+    with st.form("add_trainer", clear_on_submit=True):
+        n = st.text_input("Full name")
+        sp = st.text_input("Specialty", placeholder="e.g. Strength and conditioning")
+        ph = st.text_input("Phone number")
+        bio = st.text_area("Short bio (optional)")
+        pic = st.file_uploader("Photo", type=["jpg", "jpeg", "png", "heic", "heif", "webp"],
+                               key="tr_new_pic")
+        ok = st.form_submit_button("Add trainer", use_container_width=True)
+    if ok:
+        if not n.strip():
+            st.error("Please enter the trainer's name.")
+        else:
+            row = {"gym_id": gym_id, "full_name": n.strip(),
+                   "specialty": sp.strip() or None, "phone": ph.strip() or None,
+                   "bio": bio.strip() or None}
+            if pic is not None:
+                try:
+                    row["photo"] = process_photo(pic.getvalue())
+                except Exception:
+                    st.warning("The photo could not be read, so the trainer was added without one.")
+            try:
+                supabase.table("trainers").insert(row).execute()
+            except Exception as error:
+                st.error(f"Could not add the trainer. Have you run the SQL? {error}")
+            else:
+                st.session_state["settings_flash"] = "Trainer added."
+                st.rerun()
+
+
+def _play_panel(a):
+    ctx_play = st.session_state.get("_play_ctx") or {}
+    member = (ctx_play.get("contacts") or {}).get(a["member_id"])
+    if not member:
+        return
+    ctx = _biz_ctx()
+    play = a["action_type"]
+    trainers = ctx_play.get("trainers") or {}
+    trainer = trainers.get(a.get("trainer_id")) if play in TRAINER_PLAYS else None
+    with st.expander("Do this play"):
+        if play in TRAINER_PLAYS:
+            if trainer:
+                _md(trainer_card_html(trainer))
+            elif trainers:
+                st.caption("No trainer was chosen for this play.")
+            else:
+                st.caption("Add trainers in Settings → Trainers to attach a profile.")
+        msg = st.text_area("Message", value=play_message(play, member, trainer, ctx),
+                           key=f"pm_{a['id']}", height=150)
+        c1, c2, c3 = st.columns(3)
+        digits = whatsapp_digits(member.get("phone"))
+        if digits:
+            c1.link_button("WhatsApp", f"https://wa.me/{digits}?text={quote(msg)}",
+                           use_container_width=True)
+        if member.get("email"):
+            c2.link_button("Email", f"mailto:{member['email']}?subject="
+                           f"{quote('A note from ' + ctx['biz'])}&body={quote(msg)}",
+                           use_container_width=True)
+        if member.get("phone"):
+            c3.link_button("Call", f"tel:{member['phone']}", use_container_width=True)
+        if not (digits or member.get("email")):
+            st.caption("This member has no phone or email yet. Add one on their profile.")
+
+
+def _fetch_sent(supabase, gym_id):
+    try:
+        rows = (supabase.table("reminder_log").select("member_id, sent_at")
+                .eq("gym_id", gym_id).eq("kind", "renewal").execute().data or [])
+    except Exception:
+        return None
+    sent = {}
+    for r in rows:
+        t = pd.to_datetime(r.get("sent_at"), errors="coerce", utc=True)
+        if pd.isna(t):
+            continue
+        t = t.tz_convert(APP_TZ).tz_localize(None).normalize()
+        if r["member_id"] not in sent or t > sent[r["member_id"]]:
+            sent[r["member_id"]] = t
+    return sent
+
+
+def load_sent(supabase, gym_id):
+    sent = _cached(("sent", gym_id), lambda: _fetch_sent(supabase, gym_id))
+    return ({}, False) if sent is None else (sent, True)
+
+
+def renewal_queue(roster, sent, remind_days=7, max_lapsed_days=60):
+    if roster is None or roster.empty or "membership_end" not in roster.columns:
+        return []
+    today = pd.Timestamp(today_local())
+    end = pd.to_datetime(roster["membership_end"], errors="coerce").dt.normalize()
+    left = (end - today).dt.days
+    out = []
+    for (_, r), d in zip(roster.iterrows(), left):
+        if pd.isna(d):
+            continue
+        d = int(d)
+        if d > remind_days or d < -max_lapsed_days:
+            continue
+        last = sent.get(r["id"])
+        if last is not None and (today - last).days < 7:
+            continue
+        out.append((r, d, last))
+    out.sort(key=lambda t: t[1])
+    return out
+
+
+def renewal_due_count(supabase, gym_id, roster):
+    s = _biz_ctx()["s"]
+    if not s.get("auto_reminders", True):
+        return 0
+    sent, _ = load_sent(supabase, gym_id)
+    return len(renewal_queue(roster, sent, int(s.get("remind_days", 7))))
+
+
+def _log_reminder(supabase, gym_id, member_id, name):
+    try:
+        supabase.table("reminder_log").insert(
+            {"gym_id": gym_id, "member_id": member_id, "kind": "renewal"}).execute()
+        st.session_state["pay_flash"] = f"Reminder to {name} marked as sent. Next one in 7 days."
+    except Exception:
+        st.session_state["pay_flash"] = "Could not save. Have you run the reminder_log SQL?"
+
+
+def render_renewal_reminders(supabase, gym_id, roster):
+    ctx = _biz_ctx()
+    s = ctx["s"]
+    st.markdown('<div class="section-label">RENEWAL REMINDERS</div>',
+                unsafe_allow_html=True)
+    if not s.get("auto_reminders", True):
+        st.caption("Automatic renewal reminders are switched off in Settings → Preferences.")
+        return
+    sent, ok = load_sent(supabase, gym_id)
+    if not ok:
+        st.warning("Reminder tracking needs the reminder_log table. Run the SQL setup, then refresh.")
+    remind_days = int(s.get("remind_days", 7))
+    queue = renewal_queue(roster, sent, remind_days)
+    if not queue:
+        st.success("No reminders due. Members who have paid are skipped automatically.")
+        return
+    st.caption(f"{len(queue)} member(s) are within {remind_days} days of renewal or lapsed. "
+               "Each gets a gentle reminder from your business, repeated weekly until they pay.")
+    for r, days, last in queue[:10]:
+        name = _text(r["full_name"])
+        with st.container(border=True, key=f"card_rem_{r['id']}"):
+            if days > 0:
+                when, tone = f"Due in {days} day{'s' if days != 1 else ''}", "cyan" if days > 3 else "amber"
+            elif days == 0:
+                when, tone = "Due today", "amber"
+            else:
+                when, tone = f"Lapsed {abs(days)} day{'s' if abs(days) != 1 else ''} ago", "red"
+            extra = chip(f"Last reminded {last:%d %b}", "grey") if last is not None else ""
+            _md(f'<div style="display:flex;align-items:center;gap:12px;">'
+                f'{avatar_html(name, r.get("photo"), 44)}<div>'
+                f'<div style="font-weight:800;color:#F4F7FB;">{_esc(name)}</div>'
+                f'<div class="chip-row">{chip(when, tone)}{extra}</div></div></div>')
+            msg = st.text_area("Message", value=renewal_message(name, days, ctx),
+                               key=f"rm_{r['id']}", height=140)
+            c1, c2, c3 = st.columns(3)
+            digits = whatsapp_digits(r.get("phone"))
+            email = _text(r.get("email"))
+            if digits:
+                c1.link_button("WhatsApp", f"https://wa.me/{digits}?text={quote(msg)}",
+                               use_container_width=True)
+            if email:
+                c2.link_button("Email", f"mailto:{email}?subject="
+                               f"{quote('A note from ' + ctx['biz'])}&body={quote(msg)}",
+                               use_container_width=True)
+            c3.button("Mark as sent", key=f"rms_{r['id']}", on_click=_log_reminder,
+                      args=(supabase, gym_id, r["id"], name), use_container_width=True)
+    if len(queue) > 10:
+        st.caption(f"+{len(queue) - 10} more due.")
+from urllib.parse import quote
+
+TRAINER_PLAYS = {"Free PT session", "Trainer intro", "Goal review"}
+
+PLAY_TEXT = {
+    "Personal call": "Hi {first}, it's {owner} from {biz}. I'd love to give you a quick call to hear how your training is going and see how we can help. When is a good time for you?",
+    "WhatsApp check-in": "Hi {first}! This is {owner} from {biz}. Just checking in to see how you're finding your workouts. Is there anything we can do to make your experience even better?",
+    "Feedback request": "Hi {first}, your opinion matters a lot to us at {biz}. Could you spare a minute to tell us what we're doing well and what we could improve? Reply here and I'll read every word.",
+    "Renewal offer": "Hi {first}! Your membership at {biz} is coming up for renewal and we'd love to keep you with us. Reply and I'll set up a renewal offer that works for you.",
+    "Free PT session": "Hi {first}! {biz} would like to gift you a free personal training session with {tname}{tspec}. It's a great way to fine-tune your plan{goal_part}. Call or message {tphone} to book your slot, or reply here and I'll arrange it.",
+    "Trainer intro": "Hi {first}, I'd like you to meet {tname}{tspec}, one of our trainers at {biz}. {tname} would love to support you{goal_part}. You can reach them on {tphone}, or reply here and I'll introduce you at the gym.",
+    "Goal review": "Hi {first}! It's time for a quick goal review at {biz}{goal_part}. {tname}{tspec} can sit down with you for 15 minutes to check your progress and update your plan. Message {tphone} to book a time.",
+    "Class invite": "Hi {first}! We have a class coming up at {biz} that we think you'll enjoy, and we'd love to see you there. Reply and I'll save you a spot.",
+    "Group challenge": "Hi {first}! {biz} is running a friendly group challenge and you'd be a great fit. It's a fun way to stay motivated alongside other members. Want me to add you?",
+    "Bring-a-friend invite": "Hi {first}! Training is better with a friend. Bring someone along to {biz} as your guest and let us know when you're coming, so we can welcome you both.",
+    "Milestone shout-out": "Hi {first}! Congratulations from all of us at {biz}. Your consistency has really paid off and we're proud of your progress. Keep it up!",
+    "Welcome-back note": "Hi {first}, it's so good to see you back at {biz}! We missed you, and we're here to help you get back into your rhythm. Let me know if you need anything.",
+}
+
+
+def _biz_ctx():
+    p = st.session_state.get("user_profile") or {}
+    return {"biz": _text(p.get("business_name"), "our gym"),
+            "owner": _text(p.get("full_name"), ""),
+            "s": dict(p.get("settings") or {})}
+
+
+def _signoff(ctx):
+    return ctx["s"].get("signoff") or "\n".join(
+        x for x in (ctx["owner"], ctx["biz"]) if x)
+
+
+def play_message(play, member, trainer, ctx):
+    s = ctx["s"]
+    first = (member.get("name") or "").split(" ")[0] or "there"
+    goal = member.get("goal") or ""
+    text = PLAY_TEXT.get(play, "Hi {first}, it's {owner} from {biz}. Just checking in.")
+    return text.format(
+        first=first, biz=ctx["biz"], owner=ctx["owner"] or "the team",
+        tname=trainer["full_name"] if trainer else "one of our trainers",
+        tspec=f" ({trainer['specialty']})" if trainer and trainer.get("specialty") else "",
+        tphone=(trainer.get("phone") if trainer and trainer.get("phone")
+                else s.get("biz_phone") or "our front desk"),
+        goal_part=f" towards your goal of {goal.lower()}" if goal else "",
+    ) + "\n\n" + _signoff(ctx)
+
+
+def renewal_message(name, days, ctx):
+    s = ctx["s"]
+    first = (name or "").split(" ")[0] or "there"
+    if days > 1:
+        when = f"your membership with {ctx['biz']} is due for renewal in {days} days."
+    elif days == 1:
+        when = f"your membership with {ctx['biz']} is due for renewal tomorrow."
+    elif days == 0:
+        when = f"your membership with {ctx['biz']} is due for renewal today."
+    else:
+        n = abs(days)
+        when = (f"your membership with {ctx['biz']} ended {n} day"
+                f"{'s' if n != 1 else ''} ago.")
+    phone = f" You can reach us on {s['biz_phone']}." if s.get("biz_phone") else ""
+    return (f"Hi {first}, I hope you're doing well! Just a gentle note that {when} "
+            f"We'd truly love to keep seeing you at {ctx['biz']}, and whenever it suits you "
+            f"we're happy to help you renew or answer any questions.{phone} "
+            f"No pressure at all, and thank you for being part of our family.\n\n"
+            + _signoff(ctx))
+
+
+def _fetch_trainers(supabase, gym_id):
+    try:
+        return (supabase.table("trainers").select("*").eq("gym_id", gym_id)
+                .order("created_at").execute().data or [])
+    except Exception:
+        return []
+
+
+def load_trainers(supabase, gym_id):
+    return _cached(("trainers", gym_id), lambda: _fetch_trainers(supabase, gym_id))
+
+
+def trainer_card_html(t):
+    name = _text(t.get("full_name"), "Trainer")
+    phone = _text(t.get("phone"))
+    chips = chip(_text(t.get("specialty"), "Trainer"), "cyan")
+    if phone:
+        chips += chip(f"Call {phone}", "grey", href=f"tel:{phone}")
+        digits = whatsapp_digits(phone)
+        if digits:
+            chips += chip("WhatsApp", "lime", href=f"https://wa.me/{digits}")
+    bio = _text(t.get("bio"))
+    bio_html = f'<div class="why" style="padding:6px 0 0;">{_esc(bio)}</div>' if bio else ""
+    return (f'<div class="profile-hero" style="padding:16px 18px;margin:8px 0;">'
+            f'{avatar_html(name, t.get("photo"), 76, "avatar-ring")}'
+            f'<div><div class="profile-name" style="font-size:22px;">{_esc(name)}</div>'
+            f'<div class="chip-row">{chips}</div>{bio_html}</div></div>')
+
+
+def render_trainers_editor(supabase, gym_id):
+    st.caption("Trainers you add here can be introduced to members from the "
+               "Retention Pillars plays.")
+    trainers = load_trainers(supabase, gym_id)
+    for t in trainers:
+        with st.expander(f"{t['full_name']} · {_text(t.get('specialty'), 'Trainer')}"):
+            _md(trainer_card_html(t))
+            with st.form(f"edit_tr_{t['id']}"):
+                n = st.text_input("Full name", value=_text(t.get("full_name")))
+                sp = st.text_input("Specialty", value=_text(t.get("specialty")))
+                ph = st.text_input("Phone number", value=_text(t.get("phone")))
+                bio = st.text_area("Short bio", value=_text(t.get("bio")))
+                pic = st.file_uploader("New photo (optional)",
+                                       type=["jpg", "jpeg", "png", "heic", "heif", "webp"],
+                                       key=f"tr_pic_{t['id']}")
+                ok = st.form_submit_button("Save trainer", use_container_width=True)
+            if ok and n.strip():
+                fields = {"full_name": n.strip(), "specialty": sp.strip() or None,
+                          "phone": ph.strip() or None, "bio": bio.strip() or None}
+                if pic is not None:
+                    try:
+                        fields["photo"] = process_photo(pic.getvalue())
+                    except Exception:
+                        st.warning("The photo could not be read, so it was not changed.")
+                (supabase.table("trainers").update(fields)
+                 .eq("id", t["id"]).eq("gym_id", gym_id).execute())
+                st.session_state["settings_flash"] = "Trainer saved."
+                st.rerun()
+            if st.button("Remove trainer", key=f"tr_rm_{t['id']}"):
+                (supabase.table("trainers").delete()
+                 .eq("id", t["id"]).eq("gym_id", gym_id).execute())
+                st.session_state["settings_flash"] = "Trainer removed."
+                st.rerun()
+    st.markdown("#### Add a trainer")
+    with st.form("add_trainer", clear_on_submit=True):
+        n = st.text_input("Full name")
+        sp = st.text_input("Specialty", placeholder="e.g. Strength and conditioning")
+        ph = st.text_input("Phone number")
+        bio = st.text_area("Short bio (optional)")
+        pic = st.file_uploader("Photo", type=["jpg", "jpeg", "png", "heic", "heif", "webp"],
+                               key="tr_new_pic")
+        ok = st.form_submit_button("Add trainer", use_container_width=True)
+    if ok:
+        if not n.strip():
+            st.error("Please enter the trainer's name.")
+        else:
+            row = {"gym_id": gym_id, "full_name": n.strip(),
+                   "specialty": sp.strip() or None, "phone": ph.strip() or None,
+                   "bio": bio.strip() or None}
+            if pic is not None:
+                try:
+                    row["photo"] = process_photo(pic.getvalue())
+                except Exception:
+                    st.warning("The photo could not be read, so the trainer was added without one.")
+            try:
+                supabase.table("trainers").insert(row).execute()
+            except Exception as error:
+                st.error(f"Could not add the trainer. Have you run the SQL? {error}")
+            else:
+                st.session_state["settings_flash"] = "Trainer added."
+                st.rerun()
+
+
+def _play_panel(a):
+    ctx_play = st.session_state.get("_play_ctx") or {}
+    member = (ctx_play.get("contacts") or {}).get(a["member_id"])
+    if not member:
+        return
+    ctx = _biz_ctx()
+    play = a["action_type"]
+    trainers = ctx_play.get("trainers") or {}
+    trainer = trainers.get(a.get("trainer_id")) if play in TRAINER_PLAYS else None
+    with st.expander("Do this play"):
+        if play in TRAINER_PLAYS:
+            if trainer:
+                _md(trainer_card_html(trainer))
+            elif trainers:
+                st.caption("No trainer was chosen for this play.")
+            else:
+                st.caption("Add trainers in Settings → Trainers to attach a profile.")
+        msg = st.text_area("Message", value=play_message(play, member, trainer, ctx),
+                           key=f"pm_{a['id']}", height=150)
+        c1, c2, c3 = st.columns(3)
+        digits = whatsapp_digits(member.get("phone"))
+        if digits:
+            c1.link_button("WhatsApp", f"https://wa.me/{digits}?text={quote(msg)}",
+                           use_container_width=True)
+        if member.get("email"):
+            c2.link_button("Email", f"mailto:{member['email']}?subject="
+                           f"{quote('A note from ' + ctx['biz'])}&body={quote(msg)}",
+                           use_container_width=True)
+        if member.get("phone"):
+            c3.link_button("Call", f"tel:{member['phone']}", use_container_width=True)
+        if not (digits or member.get("email")):
+            st.caption("This member has no phone or email yet. Add one on their profile.")
+
+
+def _fetch_sent(supabase, gym_id):
+    try:
+        rows = (supabase.table("reminder_log").select("member_id, sent_at")
+                .eq("gym_id", gym_id).eq("kind", "renewal").execute().data or [])
+    except Exception:
+        return None
+    sent = {}
+    for r in rows:
+        t = pd.to_datetime(r.get("sent_at"), errors="coerce", utc=True)
+        if pd.isna(t):
+            continue
+        t = t.tz_convert(APP_TZ).tz_localize(None).normalize()
+        if r["member_id"] not in sent or t > sent[r["member_id"]]:
+            sent[r["member_id"]] = t
+    return sent
+
+
+def load_sent(supabase, gym_id):
+    sent = _cached(("sent", gym_id), lambda: _fetch_sent(supabase, gym_id))
+    return ({}, False) if sent is None else (sent, True)
+
+
+def renewal_queue(roster, sent, remind_days=7, max_lapsed_days=60):
+    if roster is None or roster.empty or "membership_end" not in roster.columns:
+        return []
+    today = pd.Timestamp(today_local())
+    end = pd.to_datetime(roster["membership_end"], errors="coerce").dt.normalize()
+    left = (end - today).dt.days
+    out = []
+    for (_, r), d in zip(roster.iterrows(), left):
+        if pd.isna(d):
+            continue
+        d = int(d)
+        if d > remind_days or d < -max_lapsed_days:
+            continue
+        last = sent.get(r["id"])
+        if last is not None and (today - last).days < 7:
+            continue
+        out.append((r, d, last))
+    out.sort(key=lambda t: t[1])
+    return out
+
+
+def renewal_due_count(supabase, gym_id, roster):
+    s = _biz_ctx()["s"]
+    if not s.get("auto_reminders", True):
+        return 0
+    sent, _ = load_sent(supabase, gym_id)
+    return len(renewal_queue(roster, sent, int(s.get("remind_days", 7))))
+
+
+def _log_reminder(supabase, gym_id, member_id, name):
+    try:
+        supabase.table("reminder_log").insert(
+            {"gym_id": gym_id, "member_id": member_id, "kind": "renewal"}).execute()
+        st.session_state["pay_flash"] = f"Reminder to {name} marked as sent. Next one in 7 days."
+    except Exception:
+        st.session_state["pay_flash"] = "Could not save. Have you run the reminder_log SQL?"
+
+
+def render_renewal_reminders(supabase, gym_id, roster):
+    ctx = _biz_ctx()
+    s = ctx["s"]
+    st.markdown('<div class="section-label">RENEWAL REMINDERS</div>',
+                unsafe_allow_html=True)
+    if not s.get("auto_reminders", True):
+        st.caption("Automatic renewal reminders are switched off in Settings → Preferences.")
+        return
+    sent, ok = load_sent(supabase, gym_id)
+    if not ok:
+        st.warning("Reminder tracking needs the reminder_log table. Run the SQL setup, then refresh.")
+    remind_days = int(s.get("remind_days", 7))
+    queue = renewal_queue(roster, sent, remind_days)
+    if not queue:
+        st.success("No reminders due. Members who have paid are skipped automatically.")
+        return
+    st.caption(f"{len(queue)} member(s) are within {remind_days} days of renewal or lapsed. "
+               "Each gets a gentle reminder from your business, repeated weekly until they pay.")
+    for r, days, last in queue[:10]:
+        name = _text(r["full_name"])
+        with st.container(border=True, key=f"card_rem_{r['id']}"):
+            if days > 0:
+                when, tone = f"Due in {days} day{'s' if days != 1 else ''}", "cyan" if days > 3 else "amber"
+            elif days == 0:
+                when, tone = "Due today", "amber"
+            else:
+                when, tone = f"Lapsed {abs(days)} day{'s' if abs(days) != 1 else ''} ago", "red"
+            extra = chip(f"Last reminded {last:%d %b}", "grey") if last is not None else ""
+            _md(f'<div style="display:flex;align-items:center;gap:12px;">'
+                f'{avatar_html(name, r.get("photo"), 44)}<div>'
+                f'<div style="font-weight:800;color:#F4F7FB;">{_esc(name)}</div>'
+                f'<div class="chip-row">{chip(when, tone)}{extra}</div></div></div>')
+            msg = st.text_area("Message", value=renewal_message(name, days, ctx),
+                               key=f"rm_{r['id']}", height=140)
+            c1, c2, c3 = st.columns(3)
+            digits = whatsapp_digits(r.get("phone"))
+            email = _text(r.get("email"))
+            if digits:
+                c1.link_button("WhatsApp", f"https://wa.me/{digits}?text={quote(msg)}",
+                               use_container_width=True)
+            if email:
+                c2.link_button("Email", f"mailto:{email}?subject="
+                               f"{quote('A note from ' + ctx['biz'])}&body={quote(msg)}",
+                               use_container_width=True)
+            c3.button("Mark as sent", key=f"rms_{r['id']}", on_click=_log_reminder,
+                      args=(supabase, gym_id, r["id"], name), use_container_width=True)
+    if len(queue) > 10:
+        st.caption(f"+{len(queue) - 10} more due.")
 def data_card(rows, cols, key_prefix, tone="cyan", empty="Nothing here yet."):
     if not rows:
         st.caption(empty)
@@ -1777,11 +2382,14 @@ def _has_open_action(supabase, member_id):
             .eq("member_id", member_id).neq("status", "Done").limit(1).execute().data)
     return bool(rows)
 
-def _create_action(supabase, gym_id, member_id, action_type, renewal_days, note=""):
+def _create_action(supabase, gym_id, member_id, action_type, renewal_days,
+                   note="", trainer_id=None):
     due = date.today() + timedelta(days=1 if renewal_days <= 14 else 3)
-    supabase.table("retention_actions").insert({
-        "gym_id": gym_id, "member_id": member_id, "action_type": action_type,
-        "due_date": due.isoformat(), "note": note}).execute()
+    row = {"gym_id": gym_id, "member_id": member_id, "action_type": action_type,
+           "due_date": due.isoformat(), "note": note}
+    if trainer_id:
+        row["trainer_id"] = trainer_id
+    supabase.table("retention_actions").insert(row).execute()
 
 # ------------------------------------------------- member directory
 def render_member_directory(supabase, gym_id):
@@ -2457,6 +3065,8 @@ def _action_card(supabase, a, names, photos, status, prefix):
             chips += outcome_chip(a.get("outcome"))
         _md(f'<div class="chip-row">{chips}</div>')
         _remove_from_board(supabase, a)
+          if status != "Done":
+            _play_panel(a)
         if status != "Done":
             st.button("Message", key=f"follow_{prefix}_{a['id']}", on_click=open_followup,
                       args=(member_id, "Action Centre"), use_container_width=True)
@@ -2545,6 +3155,9 @@ def _list_board(supabase, actions, names, photos):
 def _pick_play(pillar, play):
     st.session_state["play_type"] = (pillar, play)
     st.session_state["play_open"] = True
+def _pick_play(pillar, play):
+    st.session_state["play_type"] = (pillar, play)
+    st.session_state["play_open"] = True
 def _pillars_panel(supabase, gym_id, roster, actions):
     st.markdown('<div class="section-label">RETENTION PILLARS</div>', unsafe_allow_html=True)
     st.caption("Members stay when they feel part of something, know their trainer "
@@ -2554,21 +3167,40 @@ def _pillars_panel(supabase, gym_id, roster, actions):
         own = actions[actions["action_type"].isin(info["plays"])] if not actions.empty else actions
         done_n = int((own["status"] == "Done").sum()) if len(own) else 0
         open_n = len(own) - done_n
-        chips = "".join(chip(p, info["tone"]) for p in info["plays"])
         _md(f'<div class="pillar" style="--tone:{TONES[info["tone"]]}">'
             f'<div class="pillar-ic">{ic(info["icon"], 24)}</div><h4>{_esc(name)}</h4>'
-            f'<p>{_esc(info["blurb"])}</p><div class="chip-row">{chips}</div>'
+            f'<p>{_esc(info["blurb"])}</p>'
             f'<div class="pn">{done_n} done · {open_n} open</div></div>', col)
-    with st.expander("Start a play for a member"):
+        for p in info["plays"]:
+            col.button(p, key=f"pp_{p}", on_click=_pick_play, args=(name, p),
+                       use_container_width=True)
+    with st.expander("Start a play for a member",
+                     expanded=st.session_state.get("play_open", False)):
         names = roster.set_index("id")["full_name"].to_dict()
         ids = list(names)
         c1, c2 = st.columns(2)
         who = c1.selectbox("Member", ids, format_func=lambda i: names[i], key="play_member")
         plays = [(pn, p) for pn, info in PILLARS.items() for p in info["plays"]]
-        play = c2.selectbox("Play", plays, format_func=lambda t: f"{t[0]} · {t[1]}", key="play_type")
+        play = c2.selectbox("Play", plays, format_func=lambda t: f"{t[0]} · {t[1]}",
+                            key="play_type")
+        trainer_id = None
+        if play[1] in TRAINER_PLAYS:
+            trainers = load_trainers(supabase, gym_id)
+            if trainers:
+                tmap = {t["id"]: t for t in trainers}
+                trainer_id = st.selectbox(
+                    "Trainer", list(tmap), key="play_trainer",
+                    format_func=lambda i: f'{tmap[i]["full_name"]} · {_text(tmap[i].get("specialty"), "Trainer")}')
+                _md(trainer_card_html(tmap[trainer_id]))
+            else:
+                st.info("Add your trainers in Settings → Trainers to introduce them to members.")
         if st.button("Add to the board", key="play_add"):
             row = roster[roster["id"] == who].iloc[0]
-            _create_action(supabase, gym_id, who, play[1], int(row["renewal_due_days"]))
+            _create_action(supabase, gym_id, who, play[1],
+                           int(row["renewal_due_days"]), trainer_id=trainer_id)
+            st.session_state.pop("play_open", None)
+            st.session_state["ac_flash"] = (f"{play[1]} added for {names[who]}. "
+                                            "Open its card on the board and tap Do this play.")
             st.rerun()
 
 def render_action_centre(supabase, gym_id, assess_fn):
@@ -2597,6 +3229,14 @@ def render_action_centre(supabase, gym_id, assess_fn):
     names = roster.set_index("id")["full_name"].to_dict()
     photos = roster.set_index("id")["photo"].to_dict() if "photo" in roster.columns else {}
     k = kpis(roster, actions_all)
+    st.session_state["_play_ctx"] = {
+        "contacts": {r["id"]: {"name": _text(r["full_name"]), "phone": _text(r.get("phone")),
+                               "email": _text(r.get("email")),
+                               "goal": _text(r.get("fitness_goal"))}
+                     for _, r in roster.iterrows()},
+        "trainers": {t["id"]: t for t in load_trainers(supabase, gym_id)},
+    }
+    
 
     overdue = 0
     if not actions_all.empty:
@@ -2742,7 +3382,7 @@ def render_payments(supabase, gym_id, assess_fn):
         with col:
             _md(kpi_card(label, len(sub), tone,
                          f"{sub['monthly_fee'].sum():,.0f} / mo"))
-
+    render_renewal_reminders(supabase, gym_id, roster)
     st.markdown('<div class="section-label">WHO TO COLLECT FROM</div>',
                 unsafe_allow_html=True)
     focus = pd.concat([lapsed, renewing]).drop_duplicates(subset="id")
