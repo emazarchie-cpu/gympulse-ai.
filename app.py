@@ -1986,6 +1986,7 @@ MAIN_PAGES = [
 
 MORE_PAGES = [
     "Follow-ups",
+    "Check-in",
     "Member Assessment",
     "Batch Assessment",
     "Model Insights",
@@ -2752,7 +2753,8 @@ elif page == "Archie":
         business_name,
         user_name
     )
-
+elif page == "Check-in":
+    gw.render_checkin(supabase, st.session_state.gym_id)
 elif page == "Settings":
     gw.render_settings(
         supabase,
