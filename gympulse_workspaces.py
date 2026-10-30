@@ -2456,7 +2456,7 @@ def _action_card(supabase, a, names, photos, status, prefix):
         if status == "Done":
             chips += outcome_chip(a.get("outcome"))
         _md(f'<div class="chip-row">{chips}</div>')
-          _remove_from_board(supabase, a)
+        _remove_from_board(supabase, a)
         if status != "Done":
             st.button("Message", key=f"follow_{prefix}_{a['id']}", on_click=open_followup,
                       args=(member_id, "Action Centre"), use_container_width=True)
