@@ -3187,7 +3187,7 @@ def render_archie(supabase, gym_id, assess_fn, business_name, owner_name="the gy
     else:
         context = f"Gym: {business_name}. No scored members yet."
     context += f"\nThe owner's name is {owner_name}. Sign messages with this name."
-        _p = st.session_state.get("user_profile") or {}
+    _p = st.session_state.get("user_profile") or {}
     _lang = (_p.get("settings") or {}).get("language") or _p.get("language") or "English"
 
     context += f"\nReply in {_lang}."
