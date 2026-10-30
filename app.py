@@ -2738,7 +2738,7 @@ elif page == "Member Management":
             phone = st.text_input("Phone number")
             photo_file = st.file_uploader(
                 "Photo (optional)",
-                type=["jpg", "jpeg", "png", "heic", "heif", "webp"]
+                type=["jpg", "jpeg", "png", "heic", "heif", "webp"],
                 key="register_photo"
             )
 
