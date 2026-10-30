@@ -1428,10 +1428,12 @@ if st.session_state.auth_user is None:
                                          "Wait a few minutes, then tap Resend below.")
                             elif "already" in reason:
                                 st.error("This email is already registered. Sign in instead.")
-                            else:
-                                st.error("Registration failed. Please check your details and try again.")
-                 resend_block()
+                            st.error("Registration failed. Please check your details and try again.")
+
+                resend_block()
+
             # ---------------- FORGOT PASSWORD PAGE ----------------
+
             elif st.session_state.auth_mode == "forgot":
 
                 st.button(
