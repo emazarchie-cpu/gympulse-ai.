@@ -1997,7 +1997,11 @@ if "navigate_to" in st.session_state:
 
 def _unread_now():
     gid = st.session_state.get("gym_id")
-    return fu.unread_count(supabase, gid) if gid else None
+    if not gid:
+        return None
+    return gw.cached(("unread", gid),
+                     lambda: fu.unread_count(supabase, gid), ttl=20)
+
 
 
 def _notify_replies(count):
@@ -2488,6 +2492,34 @@ st.markdown(f"""
         width: auto !important; min-width: 0 !important;
     }}
 }}
+</style>
+""", unsafe_allow_html=True)
+st.markdown("""
+<style>
+@media (min-width: 769px) and (max-width: 1100px) {
+    .st-key-top_nav [data-testid="stHorizontalBlock"] {
+        flex-wrap: nowrap !important; gap: 8px !important; align-items: center !important;
+    }
+    .st-key-top_nav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(2) {
+        display: none !important;
+    }
+    .st-key-top_nav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(1) {
+        flex: 1 1 auto !important; width: auto !important; min-width: 0 !important;
+    }
+    .st-key-top_nav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(n+3) {
+        display: flex !important; flex: 0 0 52px !important;
+        width: 52px !important; min-width: 52px !important;
+    }
+    .st-key-pop_main { display: block !important; }
+}
+/* Lighter pages on iPad and phones */
+@media (max-width: 1100px), (hover: none) {
+    .archie-bot, .lp-radar,
+    [data-testid="stChatMessageAvatarAssistant"] { animation: none !important; filter: none !important; }
+    .stButton > button { box-shadow: none !important; transition: none !important; transform: none !important; }
+    [class*="st-key-card_"] { transition: none !important; }
+    * { backdrop-filter: none !important; }
+}
 </style>
 """, unsafe_allow_html=True)
 
