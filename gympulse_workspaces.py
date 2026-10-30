@@ -1290,6 +1290,233 @@ def render_renewal_reminders(supabase, gym_id, roster):
                       args=(supabase, gym_id, r["id"], name), use_container_width=True)
     if len(queue) > 10:
         st.caption(f"+{len(queue) - 10} more due.")
+def _fetch_checkins(supabase, gym_id, days=90):
+    since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    rows, start = [], 0
+    try:
+        while True:
+            page = (supabase.table("checkins").select("id, member_id, checked_in_at")
+                    .eq("gym_id", gym_id).gte("checked_in_at", since)
+                    .order("checked_in_at", desc=True)
+                    .range(start, start + 999).execute().data or [])
+            rows += page
+            if len(page) < 1000 or len(rows) >= 20000:
+                break
+            start += 1000
+    except Exception:
+        return None
+    cols = ["id", "member_id", "at", "day"]
+    if not rows:
+        return pd.DataFrame(columns=cols)
+    df = pd.DataFrame(rows)
+    at = (pd.to_datetime(df["checked_in_at"], errors="coerce", utc=True)
+          .dt.tz_convert(APP_TZ).dt.tz_localize(None))
+    out = pd.DataFrame({"id": df["id"], "member_id": df["member_id"], "at": at})
+    out = out.dropna(subset=["at"])
+    out["day"] = out["at"].dt.normalize()
+    return out
+
+
+def load_checkins(supabase, gym_id):
+    return _cached(("checkins", gym_id), lambda: _fetch_checkins(supabase, gym_id), ttl=30)
+
+
+def checkin_stats(ck):
+    """Per member: days since last visit and visits in the last two 30-day periods."""
+    if ck is None or ck.empty:
+        return pd.DataFrame()
+    today = pd.Timestamp(today_local())
+    d = ck.drop_duplicates(["member_id", "day"]).copy()
+    d["age"] = (today - d["day"]).dt.days.clip(lower=0)
+    return d.groupby("member_id")["age"].agg(
+        days_since_last_visit="min",
+        visits_last_30_days=lambda s: int((s < 30).sum()),
+        visits_previous_30_days=lambda s: int(((s >= 30) & (s < 60)).sum()),
+    ).reset_index()
+
+
+def absence_alerts(ck):
+    """Members whose visit rhythm has changed."""
+    if ck is None or ck.empty:
+        return []
+    today = pd.Timestamp(today_local())
+    d = ck.drop_duplicates(["member_id", "day"]).copy()
+    d["age"] = (today - d["day"]).dt.days
+    d = d[(d["age"] >= 0) & (d["age"] < 56)]
+    out = []
+    for mid, g in d.groupby("member_id"):
+        if len(g) < 4:
+            continue
+        gaps = g["day"].sort_values().diff().dropna().dt.days
+        typical = float(gaps.median())
+        n = max(1, round(typical))
+        last_age = int(g["age"].min())
+        counts = g["day"].dt.weekday.value_counts()
+        usual = set(counts[counts >= 3].index)
+        if last_age > max(typical * 2, typical + 3) and last_age >= 3:
+            out.append({"id": mid, "kind": "pattern", "last": last_age,
+                        "reason": f"Usually visits every {n} day{'s' if n != 1 else ''}, "
+                                  f"but hasn't been in for {last_age} days"})
+        elif today.weekday() in usual and last_age > 0:
+            out.append({"id": mid, "kind": "expected", "last": last_age,
+                        "reason": f"Usually trains on {today:%A}s and isn't in yet today"})
+    out.sort(key=lambda a: (a["kind"] != "pattern", -a["last"]))
+    return out
+
+
+def _do_checkin(supabase, gym_id, member_id, name):
+    try:
+        supabase.table("checkins").insert(
+            {"gym_id": gym_id, "member_id": member_id}).execute()
+        st.session_state["ck_flash"] = f"Welcome, {name.split(' ')[0]}! You're checked in."
+    except Exception as error:
+        st.session_state["ck_flash"] = f"Could not check in: {error}"
+    st.session_state["ck_search"] = ""
+
+
+def _undo_checkin(supabase, gym_id, checkin_id):
+    try:
+        (supabase.table("checkins").delete()
+         .eq("id", checkin_id).eq("gym_id", gym_id).execute())
+        st.session_state["ck_flash"] = "Check-in removed."
+    except Exception as error:
+        st.session_state["ck_flash"] = f"Could not remove: {error}"
+
+
+def _alert_action(supabase, gym_id, member_id, name):
+    try:
+        if _has_open_action(supabase, member_id):
+            st.session_state["ck_flash"] = f"{name} already has an open action."
+        else:
+            _create_action(supabase, gym_id, member_id, "WhatsApp check-in", 1)
+            st.session_state["ck_flash"] = (f"Follow-up added for {name}. "
+                                            "Find it in the Action Centre.")
+    except Exception as error:
+        st.session_state["ck_flash"] = f"Could not add: {error}"
+
+
+def render_checkin(supabase, gym_id):
+    page_header("Front Desk Check-in",
+                "Members tap in at the gym. Attendance updates by itself, and "
+                "alerts appear when someone drops out of their usual pattern.",
+                "At the gym")
+    flash = st.session_state.pop("ck_flash", None)
+    if flash:
+        st.success(flash)
+
+    ck = load_checkins(supabase, gym_id)
+    if ck is None:
+        st.warning("Check-ins need a one-time database update. Run the checkins "
+                   "SQL in Supabase, then refresh this page.")
+        return
+    try:
+        members, _ = fetch_members(supabase, gym_id, archived=False)
+    except Exception as error:
+        st.error("Could not load members.")
+        with st.expander("Technical details"):
+            st.code(str(error))
+        return
+    members = members[~members["suspended"]]
+    if members.empty:
+        st.info("Register members in Member Management first.")
+        return
+
+    names = dict(zip(members["id"], members["full_name"]))
+    photos = dict(zip(members["id"], members["photo"]))
+    today = pd.Timestamp(today_local())
+    has_rows = not ck.empty
+    today_rows = ck[ck["day"] == today] if has_rows else ck
+    today_ids = set(today_rows["member_id"]) if has_rows else set()
+    week_ids = set(ck.loc[(today - ck["day"]).dt.days < 7, "member_id"]) if has_rows else set()
+    month_visits = (len(ck.drop_duplicates(["member_id", "day"])
+                        .query("day > @today - @pd.Timedelta(days=30)"))
+                    if has_rows else 0)
+    kpi_row([
+        ("In today", len(today_ids), "lime", f"{today:%A}"),
+        ("Active this week", len(week_ids), "cyan", "Members who visited"),
+        ("Visits, 30 days", month_visits, "white", "One per member per day"),
+    ])
+
+    tab_in, tab_alert, tab_log = st.tabs(["Check in", "Drop-off alerts", "Today's log"])
+
+    with tab_in:
+        q = st.text_input("Find a member", key="ck_search",
+                          placeholder="Type a name or phone number")
+        needle = q.strip().lower()
+        digits = re.sub(r"\D", "", needle)
+        if not needle:
+            st.caption("Start typing your name or phone number, then tap Check in.")
+        else:
+            hits = []
+            for _, r in members.iterrows():
+                name_ok = needle in _text(r["full_name"]).lower()
+                phone_ok = (len(digits) >= 3
+                            and digits in re.sub(r"\D", "", _text(r["phone"])))
+                if name_ok or phone_ok:
+                    hits.append(r)
+            if not hits:
+                st.info("No member found. Check the spelling, or ask the front desk.")
+            for r in hits[:6]:
+                mid, name = r["id"], _text(r["full_name"])
+                with st.container(border=True, key=f"card_ci_{mid}"):
+                    _md(f'<div style="display:flex;align-items:center;gap:14px;">'
+                        f'{avatar_html(name, r["photo"], 56)}'
+                        f'<div style="font-size:18px;font-weight:800;color:#F4F7FB;">'
+                        f'{_esc(name)}</div></div>')
+                    if mid in today_ids:
+                        st.button("Checked in today ✓", key=f"ci_{mid}",
+                                  disabled=True, use_container_width=True)
+                    else:
+                        st.button("Check in", key=f"ci_{mid}", type="primary",
+                                  on_click=_do_checkin,
+                                  args=(supabase, gym_id, mid, name),
+                                  use_container_width=True)
+        st.caption("Tip: leave this page open on a tablet at the front desk. "
+                   "The search box clears after each check-in.")
+
+    with tab_alert:
+        alerts = [a for a in absence_alerts(ck) if a["id"] in names]
+        if not alerts:
+            st.success("Nobody has dropped out of their pattern. "
+                       "Alerts appear once members have a few weeks of check-ins.")
+        else:
+            st.caption(f"{len(alerts)} member(s) have changed their usual pattern.")
+            if st.button("Add follow-up actions for everyone listed",
+                         key="ck_all", use_container_width=True):
+                for a in alerts[:20]:
+                    _alert_action(supabase, gym_id, a["id"], names[a["id"]])
+                st.rerun()
+            for a in alerts[:20]:
+                mid, name = a["id"], names[a["id"]]
+                tone = "red" if a["kind"] == "pattern" else "amber"
+                label = "Pattern change" if a["kind"] == "pattern" else "Expected today"
+                with st.container(border=True, key=f"card_al_{mid}"):
+                    _md(f'<div style="display:flex;align-items:center;gap:12px;">'
+                        f'{avatar_html(name, photos.get(mid), 46)}<div>'
+                        f'<div style="font-weight:800;color:#F4F7FB;">{_esc(name)}</div>'
+                        f'<div class="chip-row">{chip(label, tone, dot=True)}</div></div></div>')
+                    st.caption(a["reason"])
+                    b1, b2 = st.columns(2)
+                    b1.button("Add follow-up", key=f"alx_{mid}", on_click=_alert_action,
+                              args=(supabase, gym_id, mid, name),
+                              use_container_width=True)
+                    b2.button("Message", key=f"alm_{mid}", on_click=open_followup,
+                              args=(mid, "Check-in"), use_container_width=True)
+
+    with tab_log:
+        if today_rows.empty:
+            st.caption("No check-ins yet today.")
+        else:
+            for _, r in today_rows.sort_values("at", ascending=False).iterrows():
+                nm = names.get(r["member_id"], "Member")
+                c1, c2, c3 = st.columns([3, 1.4, 1.2], vertical_alignment="center")
+                _md(f'<div style="display:flex;align-items:center;gap:10px;">'
+                    f'{avatar_html(nm, photos.get(r["member_id"]), 36)}'
+                    f'<b style="color:#F4F7FB;">{_esc(nm)}</b></div>', c1)
+                _md(f'<div class="money">{r["at"]:%H:%M}</div>', c2)
+                c3.button("Undo", key=f"cu_{r['id']}", on_click=_undo_checkin,
+                          args=(supabase, gym_id, r["id"]), use_container_width=True)
+
 def data_card(rows, cols, key_prefix, tone="cyan", empty="Nothing here yet."):
     if not rows:
         st.caption(empty)
@@ -1887,6 +2114,19 @@ def _load_roster_uncached(supabase, gym_id, assess_fn, with_photos=True):
         supabase.table("member_activity").select("*")
         .eq("gym_id", gym_id).execute().data or []
     )
+        stats = checkin_stats(load_checkins(supabase, gym_id))
+    if not stats.empty and not activity.empty and "member_id" in activity.columns:
+        activity = activity.merge(stats, on="member_id", how="left", suffixes=("", "_ck"))
+        live = activity["days_since_last_visit_ck"].notna()
+        for col in ("days_since_last_visit", "visits_last_30_days",
+                    "visits_previous_30_days"):
+            activity[col] = pd.to_numeric(activity[col], errors="coerce").astype(float)
+            activity.loc[live, col] = activity.loc[live, col + "_ck"]
+        if "updated_at" not in activity.columns:
+            activity["updated_at"] = None
+        activity.loc[live, "updated_at"] = datetime.now(timezone.utc).isoformat()
+        activity = activity.drop(columns=[c for c in activity.columns if c.endswith("_ck")])
+
     return build_roster(members, activity, assess_fn)
 
 def build_roster(members, activity, assess_fn):
@@ -3962,6 +4202,7 @@ def render_dashboard(supabase, gym_id, assess_fn, greeting, user_name, business_
     tiles = [
         ("Member Management", "Member Management", ":material/group:"),
         ("Action Centre", "Action Centre", ":material/task_alt:"),
+                ("Front Desk Check-in", "Check-in", ":material/how_to_reg:"),
         ("Ask Archie", "Archie", ":material/smart_toy:"),
         ("Payments & Renewals", "Payments & Renewals", ":material/payments:"),
         ("Member Assessment", "Member Assessment", ":material/science:"),
