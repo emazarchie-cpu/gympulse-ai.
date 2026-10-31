@@ -2642,14 +2642,14 @@ with profile_col:
             st.caption(safe_business_name)
             st.caption("APPEARANCE")
 
-            st.button(
-                "☀️ Switch to light mode"
-                if st.session_state.get("theme", "dark") == "dark"
-                else "🌙 Switch to dark mode",
-                key="theme_toggle",
-                on_click=toggle_theme,
-                use_container_width=True
-            )
+            _dark = st.session_state.get("theme", "dark") == "dark"
+                st.button(
+                    "Switch to light mode" if _dark else "Switch to dark mode",
+                    icon=":material/light_mode:" if _dark else ":material/dark_mode:",
+                    key="theme_toggle",
+                    on_click=toggle_theme,
+                    use_container_width=True
+                )
             st.divider()
             st.button(
                 "Profile & settings",
