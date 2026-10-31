@@ -526,6 +526,7 @@ def render_settings(supabase, owner_id, gym_id, log_out):
             else:
                 save({"business_name": g_name.strip()}, "Gym name saved.")
         with t_trainers:
+
         render_trainers_editor(supabase, gym_id)
         with t_pref:
            s = dict(profile.get("settings") or {})
