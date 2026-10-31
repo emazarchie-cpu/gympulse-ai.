@@ -6,3 +6,5 @@ supabase
 numpy
 anthropic
 pillow-heif
+qrcode[pil] 
+pillow-heif
