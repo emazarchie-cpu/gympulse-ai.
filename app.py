@@ -2014,14 +2014,28 @@ def _is_mobile():
     return any(w in ua for w in ("iphone", "android", "ipad", "mobile"))
 def show_page(name):
     """Open a page and keep the top-bar radio in sync."""
+    _cur = st.session_state.get("current_page")
+    if _cur and _cur != name:
+        _h = st.session_state.setdefault("nav_hist", [])
+        _h.append(_cur)
+        del _h[:-15]
     st.session_state["current_page"] = name
     
 
 def on_main_nav():
     cur = st.session_state.get("current_page")
     choice = st.session_state.get(f"main_nav_{cur}")
-    if choice:
+    if choice and choice != cur:
+        _h = st.session_state.setdefault("nav_hist", [])
+        _h.append(cur)
+        del _h[:-15]
         st.session_state["current_page"] = choice
+
+
+def go_back():
+    _h = st.session_state.get("nav_hist", [])
+    if _h:
+        st.session_state["current_page"] = _h.pop()
 
 def go_home():
     show_page("Dashboard")
@@ -2680,6 +2694,8 @@ with profile_col:
                         use_container_width=True
                     )
     page = st.session_state["current_page"]
+    if page not in ("Dashboard", "Member Profile") and st.session_state.get("nav_hist"):
+        st.button("← Back", key="global_back", on_click=go_back)
     if page in MAIN_PAGES + MORE_PAGES and st.query_params.get("p") != page:
         st.query_params["p"] = page
 
