@@ -969,7 +969,10 @@ if "supabase_client" not in st.session_state:
     )
 
 supabase = st.session_state.supabase_client
-
+_trainer_token = st.query_params.get("trainer")
+if _trainer_token:
+    gw.render_public_trainer(supabase, _trainer_token)
+    st.stop()
 
 # Initialise login state
 if "auth_user" not in st.session_state:
@@ -1992,8 +1995,6 @@ MAIN_PAGES = [
 MORE_PAGES = [
     "Follow-ups",
     "Check-in",
-    "Member Assessment",
-    "Batch Assessment",
     "Model Insights",
     "About the Model",
     "FAQs",
