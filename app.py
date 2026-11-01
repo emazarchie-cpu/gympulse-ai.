@@ -179,16 +179,74 @@ st.markdown(
         padding: 20px;
     }
 
+        /* ===== Buttons: secondary by default; only primary is filled ===== */
     .stButton > button,
-    .stFormSubmitButton > button {
-        background: var(--lime);
-        color: #10182A;
-        border: none;
+    .stFormSubmitButton > button,
+    .stDownloadButton > button,
+    .stLinkButton > a {
+        background: transparent;
+        color: var(--white);
+        border: 1px solid rgba(255,255,255,0.18);
         border-radius: 10px;
-        font-weight: 800;
-        min-height: 43px;
-        transition: 0.2s ease;
+        font-weight: 600;
+        min-height: 40px;
+        box-shadow: none;
+        transition: background .15s ease, border-color .15s ease;
     }
+    .stButton > button:hover,
+    .stFormSubmitButton > button:hover,
+    .stDownloadButton > button:hover,
+    .stLinkButton > a:hover {
+        background: rgba(255,255,255,0.07);
+        border-color: rgba(255,255,255,0.3);
+        color: var(--white);
+    }
+    .stButton > button p,
+    .stFormSubmitButton > button p,
+    .stDownloadButton > button p,
+    .stLinkButton > a p {
+        color: inherit !important;
+        font-weight: 600 !important;
+        margin: 0 !important;
+    }
+
+    /* Primary */
+    .stButton > button[data-testid^="stBaseButton-primary"],
+    .stFormSubmitButton > button[data-testid^="stBaseButton-primary"],
+    .stDownloadButton > button[data-testid^="stBaseButton-primary"],
+    .stLinkButton > a[data-testid^="stBaseLinkButton-primary"] {
+        background: var(--lime);
+        border-color: var(--lime);
+        color: #10182A;
+    }
+    .stButton > button[data-testid^="stBaseButton-primary"]:hover,
+    .stFormSubmitButton > button[data-testid^="stBaseButton-primary"]:hover,
+    .stDownloadButton > button[data-testid^="stBaseButton-primary"]:hover,
+    .stLinkButton > a[data-testid^="stBaseLinkButton-primary"]:hover {
+        background: #C6F76B;
+        border-color: #C6F76B;
+        color: #10182A;
+    }
+    .stButton > button[data-testid^="stBaseButton-primary"] p,
+    .stFormSubmitButton > button[data-testid^="stBaseButton-primary"] p,
+    .stDownloadButton > button[data-testid^="stBaseButton-primary"] p {
+        color: #10182A !important;
+    }
+
+    /* Tertiary: text only */
+    .stButton > button[data-testid^="stBaseButton-tertiary"],
+    .stFormSubmitButton > button[data-testid^="stBaseButton-tertiary"] {
+        background: transparent;
+        border-color: transparent;
+        color: var(--muted);
+    }
+    .stButton > button[data-testid^="stBaseButton-tertiary"]:hover,
+    .stFormSubmitButton > button[data-testid^="stBaseButton-tertiary"]:hover {
+        background: rgba(255,255,255,0.05);
+        border-color: transparent;
+        color: var(--white);
+    }
+
 
     .stButton > button:hover,
     .stFormSubmitButton > button:hover {
@@ -1249,6 +1307,7 @@ if st.session_state.auth_user is None:
 
                     login_submitted = st.form_submit_button(
                         "Sign in with email",
+                        type="primary",
                         use_container_width=True
                     )
 
@@ -1353,6 +1412,7 @@ if st.session_state.auth_user is None:
 
                     signup_submitted = st.form_submit_button(
                         "Create free account",
+                        type="primary",
                         use_container_width=True
                     )
 
@@ -1466,6 +1526,7 @@ if st.session_state.auth_user is None:
                         reset_email = st.text_input("Email address")
                         send_code = st.form_submit_button(
                             "Send reset code",
+                            type="primary",
                             use_container_width=True
                         )
 
@@ -1501,6 +1562,7 @@ if st.session_state.auth_user is None:
 
                         reset_submitted = st.form_submit_button(
                             "Update password",
+                            type="primary",
                             use_container_width=True
                         )
 
