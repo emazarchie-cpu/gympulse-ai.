@@ -2036,8 +2036,6 @@ MAIN_PAGES = [
 MORE_PAGES = [
     "Follow-ups",
     "Check-in",
-    "Model Insights",
-    "About the Model",
     "FAQs",
 ]
 
@@ -2554,87 +2552,28 @@ def toggle_theme():
         pass
 
 
+def open_settings(section):
+    st.session_state["settings_section"] = section
+    show_page("Settings")
+
+
 _av = profile.get("avatar")
 _av_src = _av if gw.has_photo(_av) else gw._user_avatar(user_name)
 
 st.markdown(f"""
 <style>
 .st-key-top_profile button::before {{
-    content: ""; display: block; width: 34px; height: 34px; border-radius: 50%;
+    content: ""; display: block;
     background: url('{_av_src}') center/cover no-repeat;
-    border: 2px solid #B7F34A; box-sizing: border-box;
 }}
-.st-key-top_msg, .st-key-top_profile {{ display: flex; justify-content: flex-end; }}
-.st-key-top_msg button, .st-key-top_profile button {{
-    background: rgba(255,255,255,0.06) !important;
-    border: 1px solid var(--border) !important;
-    border-radius: 10px !important; min-height: 38px !important;
-    padding: 0 10px !important; box-shadow: none !important;
-}}
-.st-key-top_profile button {{
-    border-radius: 50% !important; width: 42px !important;
-    min-height: 42px !important; padding: 0 !important;
-    justify-content: center !important;
-}}
-.st-key-top_profile button p,
-.st-key-top_profile [data-testid="stIconMaterial"] {{ display: none !important; }}
-.st-key-top_msg [data-testid="stIconMaterial"] {{ font-size: 22px !important; color: var(--white) !important; }}
-.st-key-top_msg button p {{ color: var(--white) !important; font-weight: 800 !important; margin: 0 !important; }}
-.st-key-top_msg button:hover, .st-key-top_profile button:hover {{ border-color: var(--lime) !important; }}
-
-@media (min-width: 769px) {{
-    .st-key-top_nav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(3),
-    .st-key-top_nav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(4),
-    .st-key-top_nav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(5) {{
-        flex: 0 0 52px !important; width: 52px !important; min-width: 52px !important;
-    }}
-}}
-@media (max-width: 768px) {{
-    .st-key-top_nav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(3),
-    .st-key-top_nav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(4),
-    .st-key-top_nav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(5) {{
-        display: flex !important; flex: 0 0 auto !important;
-        width: auto !important; min-width: 0 !important;
-    }}
-}}
-</style>
-""", unsafe_allow_html=True)
-st.markdown("""
-<style>
-@media (min-width: 769px) and (max-width: 1100px) {
-    .st-key-top_nav [data-testid="stHorizontalBlock"] {
-        flex-wrap: nowrap !important; gap: 8px !important; align-items: center !important;
-    }
-    .st-key-top_nav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(2) {
-        display: none !important;
-    }
-    .st-key-top_nav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(1) {
-        flex: 1 1 auto !important; width: auto !important; min-width: 0 !important;
-    }
-    .st-key-top_nav [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(n+3) {
-        display: flex !important; flex: 0 0 52px !important;
-        width: 52px !important; min-width: 52px !important;
-    }
-    .st-key-pop_main { display: block !important; }
-}
-/* Lighter pages on iPad and phones */
-@media (max-width: 1100px), (hover: none) {
-    .archie-bot, .lp-radar,
-    [data-testid="stChatMessageAvatarAssistant"] { animation: none !important; filter: none !important; }
-    .stButton > button { box-shadow: none !important; transition: none !important; transform: none !important; }
-    [class*="st-key-card_"] { transition: none !important; }
-    * { backdrop-filter: none !important; }
-}
 </style>
 """, unsafe_allow_html=True)
 
 with st.container(key="top_nav"):
-    brand_col, nav_col, msg_col, profile_col, menu_col = st.columns(
-        [2.0, 8.0, 0.55, 0.55, 0.55],
-        vertical_alignment="center"
+    brand_col, nav_col, actions_col = st.columns(
+        [2.0, 8.0, 1.6], vertical_alignment="center"
     )
 
-    # BRAND / LOGO
     with brand_col:
         st.markdown(logo_img_tag("nav-brand-logo"), unsafe_allow_html=True)
         st.button("PULSE", on_click=go_home, key="brand_home", use_container_width=True)
@@ -2643,7 +2582,6 @@ with st.container(key="top_nav"):
             unsafe_allow_html=True
         )
 
-    # MAIN NAVIGATION (laptop only)
     with nav_col:
         if not _is_mobile():
             _current = st.session_state.get("current_page")
@@ -2658,85 +2596,72 @@ with st.container(key="top_nav"):
                 on_change=on_main_nav
             )
 
-    # MESSAGES ICON -> Follow-ups
-    with msg_col:
-        with st.container(key="top_msg"):
-            st.button(
-                f":material/forum: {unread_replies}" if unread_replies else ":material/forum:",
-                key="top_msg_btn",
-                on_click=show_page,
-                args=("Follow-ups",),
-                help="Follow-ups"
-            )
-# Define safe display names
-# Define safe display names
-safe_user_name = str(st.session_state.get("user_name") or "User")
-safe_business_name = str(
-    st.session_state.get("business_name") or "Your Business"
-)
+    with actions_col:
+        with st.container(key="top_actions", horizontal=True,
+                          horizontal_alignment="right",
+                          vertical_alignment="center", gap="small"):
 
-# PROFILE ICON -> dropdown
-with profile_col:
-    with st.container(key="top_profile"):
-        with st.popover("Profile"):
-            st.markdown(f"**{safe_user_name}**")
-            st.caption(safe_business_name)
-            st.caption("APPEARANCE")
-
-            _dark = st.session_state.get("theme", "dark") == "dark"
-            st.button(
-                    "Switch to light mode" if _dark else "Switch to dark mode",
-                    icon=":material/light_mode:" if _dark else ":material/dark_mode:",
-                    key="theme_toggle",
-                    on_click=toggle_theme,
-                    use_container_width=True
-                )
-            st.divider()
-            st.button(
-                "Profile & settings",
-                key="open_settings",
-                on_click=show_page,
-                args=("Settings",),
-                use_container_width=True
-            )
-            st.button(
-                    "Log Out",
-                    key="logout_button_main",
-                    on_click=log_out,
-                    use_container_width=True
+            with st.container(key="top_msg"):
+                st.button(
+                    f":material/forum: {unread_replies}" if unread_replies else ":material/forum:",
+                    key="top_msg_btn", on_click=show_page, args=("Follow-ups",),
+                    help="Follow-ups"
                 )
 
-    # HAMBURGER MENU (top right)
-    with menu_col:
-        with st.container(key="top_menu"):
-            with st.popover("☰", use_container_width=False):
-
-                # Main pages: shown on phones only
-                with st.container(key="pop_main"):
-                    for name in MAIN_PAGES:
-                        st.button(
-                            name,
-                            key=f"mob_main_{name}",
-                            on_click=show_page,
-                            args=(name,),
-                            use_container_width=True
-                        )
-                    st.divider()
-
-                # Extra pages (Follow-ups now lives in the message icon)
-                for name in MORE_PAGES:
-                    if name == "Follow-ups":
-                        continue
+            with st.container(key="top_profile"):
+                with st.popover("Profile"):
+                    _who = profile.get("full_name") or user_name
+                    _gym = profile.get("business_name") or business_name
+                    gw._md(
+                        f'<div class="pm-id">{gw.avatar_html(_who, _av, 44)}'
+                        f'<div><div class="pm-name">{gw._esc(_who)}</div>'
+                        f'<div class="pm-gym">{gw._esc(_gym)}</div></div></div>'
+                    )
+                    st.markdown('<div class="pm-label">Appearance</div>', unsafe_allow_html=True)
+                    _dark = st.session_state.get("theme", "dark") == "dark"
                     st.button(
-                        name,
-                        key=f"mob_more_{name}",
-                        on_click=show_page,
-                        args=(name,),
+                        "Switch to light mode" if _dark else "Switch to dark mode",
+                        icon=":material/light_mode:" if _dark else ":material/dark_mode:",
+                        key="theme_toggle", on_click=toggle_theme,
                         use_container_width=True
                     )
+                    st.markdown('<div class="pm-label">Account</div>', unsafe_allow_html=True)
+                    st.button("Profile & settings", icon=":material/person:",
+                              key="pm_item_profile", type="tertiary",
+                              on_click=open_settings, args=("Personal info",),
+                              use_container_width=True)
+                    st.button("Trainers", icon=":material/groups:",
+                              key="pm_item_trainers", type="tertiary",
+                              on_click=open_settings, args=("Trainers",),
+                              use_container_width=True)
+                    st.button("Check-in devices", icon=":material/qr_code_scanner:",
+                              key="pm_item_devices", type="tertiary",
+                              on_click=open_settings, args=("Check-in devices",),
+                              use_container_width=True)
+                    st.button("Preferences", icon=":material/tune:",
+                              key="pm_item_prefs", type="tertiary",
+                              on_click=open_settings, args=("Preferences",),
+                              use_container_width=True)
+                    st.divider()
+                    st.button("Log Out", icon=":material/logout:",
+                              key="logout_button_main", on_click=log_out,
+                              use_container_width=True)
+
+            with st.container(key="top_menu"):
+                with st.popover("☰"):
+                    with st.container(key="pop_main"):
+                        for name in MAIN_PAGES:
+                            st.button(name, key=f"mob_main_{name}", on_click=show_page,
+                                      args=(name,), use_container_width=True)
+                        st.divider()
+                    for name in MORE_PAGES:
+                        if name == "Follow-ups":
+                            continue
+                        st.button(name, key=f"mob_more_{name}", on_click=show_page,
+                                  args=(name,), use_container_width=True)
+
     page = st.session_state["current_page"]
-    if page not in ("Dashboard", "Member Profile") and st.session_state.get("nav_hist"):
-        st.button("← Back", key="global_back", on_click=go_back)
+
     if page in MAIN_PAGES + MORE_PAGES and st.query_params.get("p") != page:
         st.query_params["p"] = page
 
@@ -2755,7 +2680,8 @@ with profile_col:
         except TypeError:
             pass
     
-    
+    if page not in ("Dashboard", "Member Profile") and st.session_state.get("nav_hist"):
+    st.button("Back", icon=":material/arrow_back:", key="global_back", on_click=go_back)
 # =========================================================
 # PERSONALIZED GREETING VARIABLES
 # =========================================================
@@ -3763,141 +3689,8 @@ elif page == "About the Model":
 # =========================================================
 
 elif page == "FAQs":
+    gw.render_faqs()
 
-    gw.page_header(
-        "Frequently Asked Questions",
-        "Quick answers to help you get the most out of GymPulse AI.",
-        "Help"
-    )
-
-    st.markdown(
-        '<div class="section-label">GETTING STARTED</div>',
-        unsafe_allow_html=True
-    )
-
-    with st.expander("How do I add members to my gym?"):
-        st.write(
-            "Open **Member Management**, fill in the member's details, "
-            "and click **Register Member**. Only the full name is "
-            "required. Registered members appear in the table below "
-            "the form."
-        )
-
-    with st.expander("Can I suspend or remove a member?"):
-        st.write(
-            "Yes. In **Member Management**, scroll to **Registered "
-            "Members**, pick a member and choose **Suspend**, "
-            "**Archive** or **Delete permanently**. Suspended and "
-            "archived members are left out of risk scoring and can be "
-            "reactivated or restored at any time."
-        )
-
-    with st.expander("How do I see a member's full details?"):
-        st.write(
-            "Click a member's name in **Member Management**, the "
-            "**Risk Radar** priority list, or the **Action Centre**. "
-            "Their profile shows their photo, contact details, body "
-            "stats and whether their membership is **Active** or "
-            "**Inactive**. A membership is Active until its end date "
-            "passes. Use **Record a renewal** on the Membership tab "
-            "when they renew."
-        )
-
-    with st.expander("Is my gym's data separate from other gyms?"):
-        st.write(
-            "Yes. Each account has its own gym workspace, and the "
-            "Member Management page only loads members registered "
-            "under your gym."
-        )
-
-    with st.expander("How do I log out?"):
-        st.write(
-            "Click **Log Out** at the top right. This ends your "
-            "session and returns you to the login page. Always log "
-            "out on shared computers."
-        )
-
-    st.markdown(
-        '<div class="section-label">RISK ASSESSMENTS</div>',
-        unsafe_allow_html=True
-    )
-
-    with st.expander("What does the cancellation probability mean?"):
-        st.write(
-            "It is the model's estimate of how likely a member is to "
-            "cancel, based on membership type, days since last visit, "
-            "attendance change, days until renewal, and personal-"
-            "training sessions. It is a guide for deciding who to "
-            "check in with, not a guarantee."
-        )
-
-    with st.expander("What do High, Medium, and Low risk mean?"):
-        st.write(
-            "- **High**: estimated probability of 50% or more\n"
-            "- **Medium**: 30% to just under 50%\n"
-            "- **Low**: below 30%\n\n"
-            "These categories are provisional and meant to help you "
-            "prioritise follow-ups."
-        )
-
-    with st.expander("How accurate are the predictions?"):
-        st.write(
-            "The model was trained on **synthetic** (simulated) data, "
-            "so its accuracy on real gym members has not been "
-            "established. Treat results as experimental and combine "
-            "them with your own knowledge of your members."
-        )
-
-    with st.expander("What should I do for a high-risk member?"):
-        st.write(
-            "Check their recent attendance and renewal date, then "
-            "reach out personally. Ask how they are finding their "
-            "training, offer support or a session with a trainer, and "
-            "note the outcome so you can follow up."
-        )
-
-    st.markdown(
-        '<div class="section-label">BATCH ASSESSMENT</div>',
-        unsafe_allow_html=True
-    )
-
-    with st.expander("What columns does my CSV need?"):
-        st.write(
-            "Your file must include these exact column names:\n\n"
-            "- `membership_type` (Monthly, Quarterly, or Annual)\n"
-            "- `days_since_last_visit`\n"
-            "- `visits_previous_30_days`\n"
-            "- `visits_last_30_days`\n"
-            "- `renewal_due_days`\n"
-            "- `pt_sessions_attended`"
-        )
-
-    with st.expander("Why did my CSV upload fail?"):
-        st.write(
-            "The most common causes are a misspelled column name, "
-            "an empty cell, a negative number, or a membership type "
-            "other than Monthly, Quarterly, or Annual. Fix the file "
-            "and upload it again."
-        )
-
-    with st.expander("Are my batch results saved?"):
-        st.write(
-            "No. Batch results exist only for your current session. "
-            "Use **Download Assessment Results CSV** to keep a copy."
-        )
-
-    st.markdown(
-        '<div class="section-label">PRIVACY</div>',
-        unsafe_allow_html=True
-    )
-
-    with st.expander("How should I handle member data?"):
-        st.write(
-            "Only collect information members have agreed to share, "
-            "keep your login private, and log out on shared devices. "
-            "Follow the data-protection rules that apply where you "
-            "operate."
-        )
 # =========================================================
 # 14. FOOTER
 # =========================================================
