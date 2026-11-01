@@ -255,27 +255,6 @@ st.markdown(
         border: none;
     }
 
-    /* Lime buttons: the label must always be dark and easy to read */
-    .stButton > button p,
-    .stFormSubmitButton > button p,
-    .stButton > button:hover p,
-    .stFormSubmitButton > button:hover p {
-        color: #10182A !important;
-        font-weight: 800 !important;
-    }
-
-    .stDownloadButton > button p {
-        color: #0B1020 !important;
-        font-weight: 800 !important;
-    }
-
-    .stDownloadButton > button {
-        background: var(--cyan);
-        color: #0B1020;
-        border: none;
-        border-radius: 10px;
-        font-weight: 800;
-    }
 
     .stProgress > div > div > div > div {
         background: var(--lime);
