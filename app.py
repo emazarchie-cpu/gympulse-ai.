@@ -180,13 +180,13 @@ st.markdown(
     }
 
         /* ===== Buttons: secondary by default; only primary is filled ===== */
-    .stButton > button,
+        .stButton > button,
     .stFormSubmitButton > button,
     .stDownloadButton > button,
     .stLinkButton > a {
-        background: transparent;
+        background: rgba(255,255,255,0.06);
         color: var(--white);
-        border: 1px solid rgba(255,255,255,0.18);
+        border: 1px solid rgba(255,255,255,0.28);
         border-radius: 10px;
         font-weight: 600;
         min-height: 40px;
@@ -197,8 +197,8 @@ st.markdown(
     .stFormSubmitButton > button:hover,
     .stDownloadButton > button:hover,
     .stLinkButton > a:hover {
-        background: rgba(255,255,255,0.07);
-        border-color: rgba(255,255,255,0.3);
+        background: rgba(255,255,255,0.10);
+        border-color: rgba(255,255,255,0.40);
         color: var(--white);
     }
     .stButton > button p,
