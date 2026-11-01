@@ -2680,7 +2680,7 @@ with st.container(key="top_nav"):
         except TypeError:
             pass
     
-    if page not in ("Dashboard", "Member Profile") and st.session_state.get("nav_hist"):
+if page not in ("Dashboard", "Member Profile") and st.session_state.get("nav_hist"):
     st.button("Back", icon=":material/arrow_back:", key="global_back", on_click=go_back)
 # =========================================================
 # PERSONALIZED GREETING VARIABLES
