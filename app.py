@@ -1823,102 +1823,48 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LogisticRegression
 
-
 @st.cache_resource
 def load_model():
-    """Train a demonstration model using synthetic fitness data."""
-
+    """Demonstration model trained on simulated members."""
     rng = np.random.default_rng(42)
+    n = 4000
+    plan = rng.choice(["Monthly", "Quarterly", "Annual"], size=n, p=[0.55, 0.25, 0.20])
+    base = rng.integers(0, 21, n)
+    gap = 30 / np.maximum(base, 1)
+    lapsing = rng.random(n) < 0.22
+    days = np.where(lapsing, rng.integers(7, 60, n),
+                    np.minimum(rng.exponential(gap), 45)).astype(int)
+    recent = np.where(lapsing, np.maximum(0, base - rng.integers(3, 15, n)),
+                      np.clip(base + rng.integers(-3, 4, n), 0, 20))
+    change = recent - base
+    renew = rng.integers(0, 91, n)
+    pt = rng.integers(0, 13, n)
 
-    sample_size = 1000
-
-    membership_type = rng.choice(
-        ["Monthly", "Quarterly", "Annual"],
-        size=sample_size,
-        p=[0.55, 0.25, 0.20]
-    )
-
-    days_since_last_visit = rng.integers(
-        0, 31, size=sample_size
-    )
-
-    visits_previous_30_days = rng.integers(
-        0, 21, size=sample_size
-    )
-
-    visits_last_30_days = rng.integers(
-        0, 21, size=sample_size
-    )
-
-    renewal_due_days = rng.integers(
-        0, 91, size=sample_size
-    )
-
-    pt_sessions_attended = rng.integers(
-        0, 13, size=sample_size
-    )
-
-    attendance_change = (
-        visits_last_30_days
-        - visits_previous_30_days
-    )
+    z = (-2.5 + 0.10 * days - 0.11 * change - 0.12 * pt - 0.04 * renew
+         + np.where(plan == "Monthly", 0.5, 0)
+         + np.where(plan == "Annual", -0.4, 0)
+         + rng.normal(0, 0.6, n))
+    label = (rng.random(n) < 1 / (1 + np.exp(-z))).astype(int)
 
     training_data = pd.DataFrame({
-        "membership_type": membership_type,
-        "days_since_last_visit": days_since_last_visit,
-        "attendance_change": attendance_change,
-        "renewal_due_days": renewal_due_days,
-        "pt_sessions_attended": pt_sessions_attended
+        "membership_type": plan,
+        "days_since_last_visit": days,
+        "attendance_change": change,
+        "renewal_due_days": renew,
+        "pt_sessions_attended": pt,
     })
-
-    # Demonstration labels generated from assumed risk patterns.
-    # These are synthetic labels, not real member outcomes.
-    risk_score = (
-        0.09 * days_since_last_visit
-        - 0.12 * attendance_change
-        - 0.18 * pt_sessions_attended
-        - 0.025 * renewal_due_days
-        + np.where(membership_type == "Monthly", 0.8, 0)
-        + np.where(membership_type == "Annual", -0.5, 0)
-        + rng.normal(0, 1.5, sample_size)
-    )
-
-    cancellation_label = (
-        risk_score > np.median(risk_score)
-    ).astype(int)
-
-    categorical_features = ["membership_type"]
-
-    numeric_features = [
-        "days_since_last_visit",
-        "attendance_change",
-        "renewal_due_days",
-        "pt_sessions_attended"
-    ]
-
-    preprocessing = ColumnTransformer(
-        transformers=[
-            (
-                "membership",
-                OneHotEncoder(handle_unknown="ignore"),
-                categorical_features
-            ),
-            (
-                "numeric",
-                StandardScaler(),
-                numeric_features
-            )
-        ]
-    )
-
+    preprocessing = ColumnTransformer([
+        ("membership", OneHotEncoder(handle_unknown="ignore"), ["membership_type"]),
+        ("numeric", StandardScaler(), ["days_since_last_visit", "attendance_change",
+                                       "renewal_due_days", "pt_sessions_attended"]),
+    ])
     pipeline = Pipeline([
         ("preprocessing", preprocessing),
-        ("classifier", LogisticRegression(max_iter=1000))
+        ("classifier", LogisticRegression(max_iter=1000)),
     ])
-
-    pipeline.fit(training_data, cancellation_label)
-
+    pipeline.fit(training_data, label)
     return pipeline
+
 
 
 model = load_model()
@@ -2668,7 +2614,7 @@ with st.container(key="top_nav"):
     _fragment = getattr(st, "fragment", None)
     if _fragment is not None:
         try:
-            @_fragment(run_every=None if page == "Archie" else 30)
+           @_fragment(run_every=None if page == "Archie" else 20)
             def _watch_inbox():
                 count = _unread_now()
                 if count and count > st.session_state.get("last_unread", 0):
@@ -2676,6 +2622,16 @@ with st.container(key="top_nav"):
                     _notify_replies(count)
                     if st.session_state.get("current_page") == "Follow-ups":
                         st.rerun()
+                gid = st.session_state.get("gym_id")
+                if gid:
+                    sig = gw.checkin_signature(supabase, gid)
+                    prev = st.session_state.get("ck_sig")
+                    st.session_state["ck_sig"] = sig
+                    if prev is not None and sig is not None and sig != prev:
+                        gw.bump_data_version()
+                        if st.session_state.get("current_page") not in ("Check-in", "Archie", "Settings"):
+                            st.rerun()
+
             _watch_inbox()
         except TypeError:
             pass
