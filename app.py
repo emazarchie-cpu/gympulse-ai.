@@ -2614,7 +2614,7 @@ with st.container(key="top_nav"):
     _fragment = getattr(st, "fragment", None)
     if _fragment is not None:
         try:
-           @_fragment(run_every=None if page == "Archie" else 20)
+            @_fragment(run_every=None if page == "Archie" else 20)
             def _watch_inbox():
                 count = _unread_now()
                 if count and count > st.session_state.get("last_unread", 0):
@@ -2631,7 +2631,6 @@ with st.container(key="top_nav"):
                         gw.bump_data_version()
                         if st.session_state.get("current_page") not in ("Check-in", "Archie", "Settings"):
                             st.rerun()
-
             _watch_inbox()
         except TypeError:
             pass
