@@ -127,21 +127,49 @@ def payment_kind(current_end, paid_on, is_first=False):
     return "recovered" if end < paid_on else "renewal"
 
 
+NEW_MEMBER_DAYS = 45      # a first payment within this many days of joining is a joining payment
+
+
+def member_joined_on(supabase, member_id):
+    try:
+        rows = (supabase.table("members").select("created_at").eq("id", member_id)
+                .limit(1).execute().data or [])
+    except Exception:
+        return None
+    if not rows:
+        return None
+    t = pd.to_datetime(rows[0].get("created_at"), errors="coerce", utc=True, format="ISO8601")
+    return None if pd.isna(t) else t.tz_convert(gw.APP_TZ).date()
+
+
+def is_first_payment(supabase, gym_id, member_id):
+    """True when this member has never paid and joined recently: their first
+    payment is a joining payment, not a renewal."""
+    if not payments_ready(supabase, gym_id):
+        return False
+    if _last_payment_time(supabase, gym_id, member_id) is not None:
+        return False
+    joined = member_joined_on(supabase, member_id)
+    return joined is not None and (gw.today_local() - joined).days <= NEW_MEMBER_DAYS
+
+
 def record_payment(supabase, gym_id, member_id, name, amount, plan, start, method="Cash",
-                   current_end=None, act=None, update_fee=False, note=""):
-    """Save a renewal: the payment, the member's new plan dates, and the credit to
-    the play that earned it. Returns a short message for the owner."""
+                   current_end=None, act=None, update_fee=False, note="", first=None, end=None):
+    """Save a payment: the member's plan dates, the payment, and, for a renewal,
+    the credit to the play that earned it. A new member's first payment is a
+    joining payment and is never credited to a retention play."""
     paid_on = gw.today_local()
-    new_end = start + timedelta(days=gw.PLAN_DAYS[plan])
-    kind = payment_kind(current_end, paid_on)
-    play = find_creditable_play(supabase, gym_id, member_id, paid_on)
+    new_end = end or (start + timedelta(days=gw.PLAN_DAYS[plan]))
+    if first is None:
+        first = is_first_payment(supabase, gym_id, member_id)
+    kind = payment_kind(current_end, paid_on, is_first=first)
+    play = None if first else find_creditable_play(supabase, gym_id, member_id, paid_on)
 
     # 1. the member's record is the source of truth for plan dates
-    supabase.table("members").update({
-        "membership_end": new_end.isoformat(),
-        "last_renewed_on": paid_on.isoformat(),
-        "last_payment": float(amount),
-    }).eq("id", member_id).execute()
+    member_update = {"membership_end": new_end.isoformat(), "last_payment": float(amount)}
+    if not first:      # a joining payment is not a renewal, so it doesn't count in the renewal rate
+        member_update["last_renewed_on"] = paid_on.isoformat()
+    supabase.table("members").update(member_update).eq("id", member_id).execute()
     if act:
         changes = {"membership_type": plan,
                    "renewal_due_days": int(min(max((new_end - paid_on).days, 0), 730))}
@@ -169,7 +197,8 @@ def record_payment(supabase, gym_id, member_id, name, amount, plan, start, metho
             saved = False
 
     # 3. a confirmed payment is what closes the play as Retained
-    msg = f"Renewal saved. {name} is active until {new_end:%d %b %Y}."
+    msg = (f"Joining payment saved. {name} is active until {new_end:%d %b %Y}." if first
+           else f"Renewal saved. {name} is active until {new_end:%d %b %Y}.")
     if play:
         if play.get("status") != "Done":
             gw.close_action(supabase, play["id"], "Retained",
@@ -251,14 +280,24 @@ def render_record_payment(supabase, gym_id, roster):
     names = roster.set_index("id")["full_name"].to_dict()
     with st.container(border=True, key="card_pay_record"):
         c1, c2, c3 = st.columns([2, 1, 1])
-        mid = c1.selectbox("Member", list(names), format_func=lambda i: names[i], key="rp_member")
+        ordered = sorted(names, key=lambda i: str(names[i]).lower())
+        mid = c1.selectbox("Member", ordered, index=None, placeholder="Choose a member",
+                           format_func=lambda i: names[i], key="rp_member")
+        if mid is None:
+            st.caption("Pick the member who paid. New members' first payment is recorded as a "
+                       "joining payment; later ones as renewals.")
+            return
         r = roster[roster["id"] == mid].iloc[0]
+        first = is_first_payment(supabase, gym_id, mid)
         plans = list(gw.PLAN_DAYS)
         cur = r.get("membership_type") if r.get("membership_type") in plans else "Monthly"
         plan = c2.selectbox("Plan", plans, index=plans.index(cur), key=f"rp_plan_{mid}")
         method = c3.selectbox("Paid by", PAYMENT_METHODS, key="rp_method")
         state = gw.membership_state(r.get("membership_end"))
-        start_default = state["end"] if state["end"] and state["end"] >= date.today() else date.today()
+        if first:
+            start_default = member_joined_on(supabase, mid) or date.today()
+        else:
+            start_default = state["end"] if state["end"] and state["end"] >= date.today() else date.today()
         d1, d2 = st.columns(2)
         start = d1.date_input("New period starts", value=start_default,
                               key=f"rp_start_{mid}_{start_default}")
@@ -266,16 +305,21 @@ def render_record_payment(supabase, gym_id, roster):
                                  value=float((r.get("monthly_fee") or 0) * gw.PLAN_MONTHS[plan]),
                                  key=f"rp_amt_{mid}_{plan}")
         new_end = start + timedelta(days=gw.PLAN_DAYS[plan])
-        play = find_creditable_play(supabase, gym_id, mid, gw.today_local())
-        hint = (f"Runs until **{new_end:%d %b %Y}**. "
-                + (f"This renewal will be credited to their **{play['action_type']}** play."
-                   if play else "No recent play to credit, so it counts as a renewal only."))
+        play = None if first else find_creditable_play(supabase, gym_id, mid, gw.today_local())
+        if first:
+            hint = (f"Runs until **{new_end:%d %b %Y}**. This is **{names[mid]}'s first payment**, "
+                    "so it's recorded as a joining payment, not a renewal.")
+        else:
+            hint = (f"Runs until **{new_end:%d %b %Y}**. "
+                    + (f"This renewal will be credited to their **{play['action_type']}** play."
+                       if play else "No recent play to credit, so it counts as a renewal only."))
         st.caption(hint)
         if st.button("Save payment", key="rp_save", type="primary"):
             try:
                 st.session_state["pay_flash"] = record_payment(
                     supabase, gym_id, mid, names[mid], amount, plan, start, method,
-                    current_end=r.get("membership_end"), act=True)
+                    current_end=r.get("membership_end"), act=True, first=first)
+                st.session_state.pop("rp_member", None)
             except Exception as error:
                 st.session_state["pay_flash"] = f"Could not save the payment: {error}"
             st.rerun()
@@ -339,7 +383,7 @@ def render_recent_payments(supabase, gym_id, roster):
         credit = ("—" if gw._blank(p["action_id"]) else
                   gw.chip(plays.get(str(p["action_id"]), "A play"), "lime", dot=True))
         kind = PAYMENT_KINDS.get(p["kind"], "Payment")
-        tone = "amber" if p["kind"] == "recovered" else "cyan"
+        tone = {"recovered": "amber", "new": "lime"}.get(p["kind"], "cyan")
         body.append(
             f'<tr><td data-l="Date">{gw._esc(when)}</td>'
             f'<td><b>{gw._esc(who)}</b><span class="sub">{gw._esc(plan)}'

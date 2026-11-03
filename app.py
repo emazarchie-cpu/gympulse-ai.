@@ -2609,6 +2609,13 @@ elif page == "Member Management":
                 value=gw.today_local() + gw.timedelta(days=30),
                 min_value=gw.today_local() - gw.timedelta(days=365),
             )
+            pcol1, pcol2 = st.columns(2)
+            paid_today = pcol1.number_input(
+                "Amount paid today (optional)", min_value=0.0, step=500.0, value=0.0,
+                help="Records their joining payment. Leave at 0 if they haven't paid yet."
+            )
+            paid_method = pcol2.selectbox("Paid by", ["Cash", "Bank transfer", "Card", "POS",
+                                                      "Mobile money", "Other"])
 
             submitted = st.form_submit_button(
                 "Register Member",
@@ -2657,10 +2664,23 @@ elif page == "Member Management":
                 except Exception as error:
                     st.error(f"Could not register member: {error}")
                 else:
+                    new_id = created[0]["id"] if created else None
                     note = gw.save_membership(
-                        supabase, gym_id, created[0]["id"] if created else None,
-                        plan, monthly_fee, membership_end
+                        supabase, gym_id, new_id, plan, monthly_fee, membership_end
                     )
+                    if new_id and paid_today > 0:
+                        import gympulse_revenue as gr
+                        try:
+                            gr.record_payment(
+                                supabase, gym_id, new_id, full_name.strip(), paid_today, plan,
+                                gw.today_local(), paid_method, act=True, first=True,
+                                end=membership_end,
+                            )
+                            note = (note + " " if note else "") + \
+                                f"Joining payment of {paid_today:,.0f} recorded."
+                        except Exception:
+                            note = (note + " " if note else "") + \
+                                "The joining payment could not be saved; record it on Renewals."
                     st.session_state["mm_flash"] = (
                         f"{full_name.strip()} is registered." + (f" {note}" if note else
                         " They're on the Risk Radar now; check-ins will keep them up to date.")
