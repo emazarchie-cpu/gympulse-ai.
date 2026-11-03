@@ -1161,7 +1161,7 @@ if st.session_state.auth_user is None:
 
     # Brand lockup: identical to the top bar (logo, wordmark, tagline),
     # placed in the same left-hand column so it lines up exactly
-        html(f"""
+    html(f"""
     <div class="gp-lockup">
       <img src="{lockup_data_uri(900)}" alt="GymPulse AI">
       <div class="gp-tagline">Smarter insights. Stronger member retention.</div>
