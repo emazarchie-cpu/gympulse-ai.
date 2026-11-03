@@ -986,6 +986,23 @@ def logo_img_tag(css_class):
     if not uri:
         return ""
     return f'<img class="{css_class}" src="{uri}" alt="GymPulse AI logo">'
+@st.cache_resource
+def lockup_data_uri(width=720):
+    """The full GymPulse AI logo (shapes + lettering) as an inline image."""
+    path = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "GymPulse_AI_logo_full.png"
+    )
+    try:
+        img = Image.open(path).convert("RGBA")
+        width = min(width, img.width)
+        height = round(img.height * width / img.width)
+        img = img.convert("RGBa").resize((width, height), Image.LANCZOS).convert("RGBA")
+        buffer = io.BytesIO()
+        img.save(buffer, format="PNG", optimize=True)
+        return "data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode()
+    except Exception:
+        return ""
 
 
 # =========================================================
@@ -1144,19 +1161,13 @@ if st.session_state.auth_user is None:
 
     # Brand lockup: identical to the top bar (logo, wordmark, tagline),
     # placed in the same left-hand column so it lines up exactly
-    login_brand_col, _, _ = st.columns(
-        [3.0, 6.4, 1.1],
-        vertical_alignment="center"
-    )
-
-    with login_brand_col:
         html(f"""
-        <div class="login-brand">
-          {logo_img_tag('nav-brand-logo')}
-          <div class="login-brand-word">GYM<span>PULSE</span> AI</div>
-          <div class="nav-tagline">Smarter insights. Stronger member retention.</div>
-        </div>
-        """)
+    <div class="gp-lockup">
+      <img src="{lockup_data_uri(900)}" alt="GymPulse AI">
+      <div class="gp-tagline">Smarter insights. Stronger member retention.</div>
+    </div>
+    """)
+
 
     # Hero
     html(f"""
@@ -2514,15 +2525,19 @@ st.markdown(f"""
 }}
 </style>
 """, unsafe_allow_html=True)
-
+st.markdown(
+    f"<style>html body .st-key-brand_home button "
+    f"{{ background-image: url('{lockup_data_uri(520)}') !important; }}</style>",
+    unsafe_allow_html=True
+)
 with st.container(key="top_nav"):
     brand_col, nav_col, actions_col = st.columns(
         [2.0, 8.0, 1.6], vertical_alignment="center"
     )
 
     with brand_col:
-        st.markdown(logo_img_tag("nav-brand-logo"), unsafe_allow_html=True)
-        st.button("PULSE", on_click=go_home, key="brand_home", use_container_width=True)
+        st.button("GymPulse AI", on_click=go_home, key="brand_home",
+                  help="Go to Dashboard")
         st.markdown(
             '<div class="nav-tagline">Smarter insights. Stronger member retention.</div>',
             unsafe_allow_html=True
