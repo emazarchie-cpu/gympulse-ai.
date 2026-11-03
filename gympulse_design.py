@@ -329,7 +329,8 @@ html body .st-key-auth_card { border-radius: 22px !important; border: 1px solid 
 
 
 def apply():
-    st.markdown("<style>" + CSS + "</style>", unsafe_allow_html=True)
+    from gympulse_reports import DOWNLOAD_CSS
+    st.markdown("<style>" + CSS + DOWNLOAD_CSS + "</style>", unsafe_allow_html=True)
 
 
 PULSE_SVG = ('<svg class="cc-pulse" viewBox="0 0 1200 46" preserveAspectRatio="none">'
