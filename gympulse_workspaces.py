@@ -1585,7 +1585,8 @@ def story_text(r):
     return f"Why: {st_['why']}. When: {st_['when']}. Next: {nxt}."
 
 
-def members_to_contact(roster, actions, cooldown_days=SUGGEST_COOLDOWN_DAYS, today=None):
+def members_to_contact(roster, actions, cooldown_days=SUGGEST_COOLDOWN_DAYS, today=None,
+                       include_low=False):
     if roster.empty:
         return roster
     blocked = set()
@@ -1599,7 +1600,10 @@ def members_to_contact(roster, actions, cooldown_days=SUGGEST_COOLDOWN_DAYS, tod
         recent = when.isna() | (when >= now - pd.Timedelta(days=cooldown_days))
         blocked |= set(done.loc[recent, "member_id"])
         blocked |= set(done.loc[done["outcome"] == "Cancelled", "member_id"])
-    return roster[(roster["risk_category"] != "Low") & ~roster["id"].isin(blocked)]
+    keep = ~roster["id"].isin(blocked)
+    if not include_low:
+        keep &= roster["risk_category"] != "Low"
+    return roster[keep]
 
 def _go(page, member=None):
     st.session_state["navigate_to"] = page
@@ -3251,6 +3255,8 @@ def _action_card(supabase, a, names, photos, status, prefix):
             _md(f'<div class="why" style="padding:4px 0 2px">'
                 + (f'Goal: {_esc(objective)}' if objective else "")
                 + (f'<br>{_esc(line)}' if line else "") + "</div>")
+        import gympulse_automation as ga  # local import: gympulse_automation imports this module
+        ga.render_assign_control(supabase, a, prefix)
         if status != "Done":
             _play_panel(supabase, a)
             st.button("Message in Follow-ups", key=f"follow_{prefix}_{a['id']}",
@@ -3525,12 +3531,29 @@ def render_action_centre(supabase, gym_id, assess_fn):
 
     _pillars_panel(supabase, gym_id, roster, actions_all)
 
+    import gympulse_automation as ga  # local import: gympulse_automation imports this module
+    made = ga.run_automations(supabase, gym_id, roster, actions_all)
+    if made:
+        st.session_state["ac_flash"] = f"Your automation rules added {_plural(made, 'play')} to the board."
+        st.rerun()
+    ga.render_workload(visible_actions)
+
     st.markdown('<div class="section-label">YOUR BOARD</div>', unsafe_allow_html=True)
     if visible_actions.empty:
         st.info("No actions yet. Add one from the suggestions above.")
         return
-    mode = st.radio("Board view", ["Board", "List"], horizontal=True,
-                    key="ac_view", label_visibility="collapsed")
+    staff = ga.staff_list()
+    v1, v2 = st.columns([1, 1.4])
+    with v1:
+        mode = st.radio("Board view", ["Board", "List"], horizontal=True,
+                        key="ac_view", label_visibility="collapsed")
+    if staff:
+        who = v2.selectbox("Show plays for", ["Everyone"] + staff + ["Unassigned"],
+                           key="ac_staff", label_visibility="collapsed")
+        if who != "Everyone":
+            want = "" if who == "Unassigned" else who
+            visible_actions = visible_actions[[ga.assigned_to(a) == want
+                                               for a in visible_actions.to_dict("records")]]
     if mode == "Board":
         _kanban(supabase, visible_actions, names, photos)
     else:
@@ -3799,6 +3822,10 @@ def render_business_insights(supabase, gym_id, assess_fn):
     if high.empty and not k["open_actions"]:
         st.write("Nothing urgent. Run a goal review with a few Low-risk members.")
 
+    import gympulse_automation as ga  # local import: gympulse_automation imports this module
+    biz = _text((st.session_state.get("user_profile") or {}).get("business_name"), "Your gym")
+    ga.render_report_section(supabase, gym_id, roster, actions, biz)
+
 # ------------------------------------------------------------ Archie
 ARCHIE_PROMPTS = [
     "What should my staff prioritise today?",
@@ -4019,6 +4046,20 @@ def archie_context(roster, actions, business_name, supabase=None, gym_id=None):
                     for c in rows[:6]))
         except Exception:
             pass
+    try:
+        import gympulse_automation as ga
+        staff = ga.staff_list()
+        if staff and not actions.empty:
+            L.append("Team workload (RECORDED, open plays): " + "; ".join(
+                f"{w['who']} {w['open']} open, {w['overdue']} overdue" for w in ga.workload(actions, staff)))
+        cfg = ga.automation_settings()
+        on = [ga.TRIGGERS[r["trigger"]]["label"] + " -> "
+              + ("suggested play" if r["play"] == ga.SUGGESTED else r["play"])
+              for r in cfg["rules"] if r.get("enabled") and r["trigger"] in ga.TRIGGERS]
+        L.append("Automation: " + (("on. Rules: " + "; ".join(on)) if cfg["enabled"] and on else "off")
+                 + ". Automation only creates plays; it never sends messages.")
+    except Exception:
+        pass
     L.append("Retention plays the gym uses: " + ", ".join(ACTION_TYPES))
     return "\n".join(L)
 
@@ -4859,8 +4900,8 @@ def render_settings(supabase, owner_id, gym_id, log_out):
         st.session_state["settings_flash"] = message
         st.rerun()
 
-    SECTIONS = ["Personal info", "Photo", "Gym", "Trainers", "Check-in devices",
-                "Preferences", "Account"]
+    SECTIONS = ["Personal info", "Photo", "Gym", "Trainers", "Team & automation",
+                "Check-in devices", "Preferences", "Account"]
     st.session_state.setdefault("settings_section", "Personal info")
     section = st.segmented_control("Settings section", SECTIONS, key="settings_section",
                                    label_visibility="collapsed") or "Personal info"
@@ -4913,6 +4954,10 @@ def render_settings(supabase, owner_id, gym_id, log_out):
 
     if section == "Trainers":
         render_trainers_editor(supabase, gym_id)
+
+    if section == "Team & automation":
+        import gympulse_automation as ga  # local import: gympulse_automation imports this module
+        ga.render_automation_settings(save, profile)
 
     if section == "Preferences":
         s = dict(profile.get("settings") or {})

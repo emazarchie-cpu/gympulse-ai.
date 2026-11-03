@@ -255,6 +255,12 @@ def render_command_centre(supabase, gym_id, assess_fn, greeting, user_name, busi
                  on_click=gw._go, args=("Check-in",), use_container_width=True)
         return
 
+    import gympulse_automation as ga
+    made = ga.run_automations(supabase, gym_id, roster, actions)
+    if made:
+        st.session_state["cc_flash"] = ("success", f"Your automation rules added "
+                                        f"{_plural(made, 'play')} to the Action Centre for review.")
+        actions = gw.load_actions(supabase, gym_id, include_archived=True)
     live = actions[actions["archived_at"].isna()] if "archived_at" in actions.columns else actions
     k = gw.kpis(roster, live)
     res = outcomes(roster, actions)
@@ -281,6 +287,16 @@ def render_command_centre(supabase, gym_id, assess_fn, greeting, user_name, busi
     flash = st.session_state.pop("cc_flash", None)
     if flash:
         getattr(st, flash[0], st.info)(flash[1])
+    late = res["overdue"] + res["due_today"]
+    if late:
+        if not st.session_state.get("_late_toast"):
+            st.session_state["_late_toast"] = True
+            st.toast(f"{_plural(late, 'follow-up')} need{'s' if late == 1 else ''} attention today")
+        w1, w2 = st.columns([4, 1.2], vertical_alignment="center")
+        w1.warning(f"{_plural(res['overdue'], 'play')} overdue and {res['due_today']} due today. "
+                   "Members waiting on you are the easiest to keep.")
+        w2.button("Open board", key="cc_late", icon=":material/task_alt:", on_click=gw._go,
+                  args=("Action Centre",), use_container_width=True)
     if missing is not None and len(missing):
         m1, m2 = st.columns([4, 1.2], vertical_alignment="center")
         m1.warning(f"{_plural(len(missing), 'member')} {'has' if len(missing) == 1 else 'have'} no plan or fee "
