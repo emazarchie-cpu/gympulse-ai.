@@ -1154,7 +1154,7 @@ def apply_theme(theme):
 # another gym's records even by mistake. Row Level Security in the database
 # (sql/phase1_foundation.sql) is the second, server-side lock.
 GYM_SCOPED_TABLES = {"members", "member_activity", "retention_actions", "checkins",
-                     "classes", "trainers", "messages", "reminder_log"}
+                     "classes", "trainers", "messages", "reminder_log", "payments"}
 
 
 def _current_gym():
@@ -2353,26 +2353,15 @@ def render_member_profile(supabase, gym_id, member_id, assess_fn):
             key=f"renew_fee_{member_id}", disabled=not act)
         if st.button("Save renewal", key="renew_save", type="primary",
                      disabled=not feat["profile_ready"]):
+            import gympulse_revenue as gr  # local import: gympulse_revenue imports this module
             try:
-                (supabase.table("members").update({
-                    "membership_end": new_end.isoformat(),
-                    "last_renewed_on": date.today().isoformat(),
-                    "last_payment": float(amount),
-                }).eq("id", member_id).eq("gym_id", gym_id).execute())
-                if act:
-                    changes = {
-                        "membership_type": plan,
-                        "renewal_due_days": int(min(max((new_end - date.today()).days, 0), 730)),
-                    }
-                    if update_fee and amount > 0:
-                        changes["monthly_fee"] = round(float(amount) / PLAN_MONTHS[plan], 2)
-                    (supabase.table("member_activity").update(changes)
-                     .eq("member_id", member_id).execute())
+                msg = gr.record_payment(supabase, gym_id, member_id, name, amount, plan, start,
+                                        current_end=m["membership_end"], act=act,
+                                        update_fee=update_fee)
             except Exception as error:
                 st.error(f"Could not save the renewal: {error}")
             else:
-                st.session_state["profile_flash"] = (
-                    f"Renewal saved. {name} is Active until {new_end:%d %b %Y}.")
+                st.session_state["profile_flash"] = msg
                 st.rerun()
 
     with tab_photo:
@@ -3612,6 +3601,10 @@ def render_payments(supabase, gym_id, assess_fn):
             _md(kpi_card(label, len(sub), tone,
                          f"{sub['monthly_fee'].sum():,.0f} / mo"))
 
+    import gympulse_revenue as gr  # local import: gympulse_revenue imports this module
+    gr.render_record_payment(supabase, gym_id, roster)
+    gr.render_recent_payments(supabase, gym_id, roster)
+
     render_renewal_reminders(supabase, gym_id, roster)
 
     st.markdown('<div class="section-label">WHO TO COLLECT FROM</div>',
@@ -3650,9 +3643,9 @@ def render_payments(supabase, gym_id, assess_fn):
                         args=(r["id"], "Payments & Renewals"),
                         use_container_width=True)
 
-    st.caption("Renewals are recorded from each member's profile → Membership "
-               "tab → Record a renewal. Update the amount there to keep this "
-               "page accurate.")
+    st.caption("Record renewals above or from a member's profile → Membership tab. "
+               "Each one updates the member's plan and, when it follows a retention play, "
+               "credits that play.")
 
 # ------------------------------------------------------- insights
 def _insights_charts(roster):
@@ -3721,6 +3714,9 @@ def render_business_insights(supabase, gym_id, assess_fn):
     ])
     st.caption("Expected loss = each member's estimate × their monthly fee. "
                "It is a planning figure from a synthetic-data model, not a forecast.")
+
+    import gympulse_revenue as gr  # local import: gympulse_revenue imports this module
+    gr.render_revenue_outcomes(supabase, gym_id, roster)
 
     _insights_charts(roster)
 
@@ -3986,6 +3982,21 @@ def archie_context(roster, actions, business_name, supabase=None, gym_id=None):
              f"(monthly fees {res['retained_rev']:,.0f}); {res['cancelled_n']} cancelled; "
              f"{res['resolved_n']} plays closed; {res['reengaged_n']} members checked in again after a play. "
              f"Save rate: {'not enough data' if res['save_rate'] is None else format(res['save_rate'], '.0%')}.")
+    try:
+        import gympulse_revenue as gr
+        if supabase is not None and gym_id:
+            rev = gr.revenue_summary(supabase, gym_id, roster)
+            if rev["source"] == "payments":
+                L.append(f"PAYMENTS, LAST 30 DAYS (RECORDED): collected {rev['collected']:,.0f} from "
+                         f"{rev['renewals_n']} renewal payments; {rev['credited_n']} renewals credited to a "
+                         f"retention play worth {rev['retained_by_plays']:,.0f}; recovered from lapsed members "
+                         f"{rev['recovered']:,.0f} ({rev['recovered_n']}). Credit means the play was involved, "
+                         "not proof the member would have left without it.")
+            if rev["renewal_rate"] is not None:
+                L.append(f"Renewal rate, last 30 days (RECORDED): {rev['renewal_rate']:.0%} "
+                         f"({rev['renewed']} renewed, {rev['lapsed']} lapsed).")
+    except Exception:
+        pass
     perf = gc.play_performance(actions)
     if perf:
         L.append("Play results, all time (kept / decided, 'No response' excluded): "
