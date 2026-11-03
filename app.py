@@ -346,6 +346,12 @@ st.markdown(
         padding-top: 1rem !important;
     }
 
+    /* Style-only markdown blocks still take a 16px flex gap each, which
+       stacks into a big empty band at the top. Take them out of the flow. */
+    [data-testid="stElementContainer"]:has([data-testid="stMarkdownContainer"] > style:only-child) {
+        display: none !important;
+    }
+
     /* ---------- Top bar container ---------- */
     .st-key-top_nav {
         border-bottom: 1px solid var(--border);
@@ -989,10 +995,11 @@ def logo_img_tag(css_class):
 @st.cache_resource
 def lockup_data_uri(width=720):
     """The full GymPulse AI logo (shapes + lettering) as an inline image."""
-    path = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "GymPulse_AI_logo_full.png"
-    )
+    base = os.path.dirname(os.path.abspath(__file__))
+    path = os.path.join(base, "GymPulse_AI_logo_full.png")
+    if not os.path.exists(path):
+        # Fall back to the full lockup that ships with the repo
+        path = os.path.join(base, "gympulse-email-logo.png")
     try:
         img = Image.open(path).convert("RGBA")
         width = min(width, img.width)
@@ -2521,7 +2528,7 @@ st.markdown(f"""
 <style>
 .st-key-top_profile button::before {{
     content: ""; display: block;
-    background: url('{_av_src}') center/cover no-repeat;
+    background: #10182A url('{_av_src}') center/contain no-repeat;
 }}
 </style>
 """, unsafe_allow_html=True)
