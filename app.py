@@ -2546,6 +2546,9 @@ elif page == "Member Management":
     if not gym_id:
         st.warning("No gym workspace found for your account.")
     else:
+        _mm_flash = st.session_state.pop("mm_flash", None)
+        if _mm_flash:
+            st.success(_mm_flash)
         st.markdown("### Register a New Member")
 
         with st.form("register_member_form"):
@@ -2595,8 +2598,21 @@ elif page == "Member Management":
                     ]
                 )
 
+            st.markdown('<div class="section-label">MEMBERSHIP</div>', unsafe_allow_html=True)
+            st.caption("Plan, fee and end date put the member on the Risk Radar straight away. "
+                       "Their check-ins then update it automatically.")
+            mcol1, mcol2, mcol3 = st.columns(3)
+            plan = mcol1.selectbox("Plan", ["Monthly", "Quarterly", "Annual"])
+            monthly_fee = mcol2.number_input("Monthly fee", min_value=0.0, step=500.0, value=0.0)
+            membership_end = mcol3.date_input(
+                "Membership ends",
+                value=gw.today_local() + gw.timedelta(days=30),
+                min_value=gw.today_local() - gw.timedelta(days=365),
+            )
+
             submitted = st.form_submit_button(
                 "Register Member",
+                type="primary",
                 use_container_width=True
             )
 
@@ -2633,17 +2649,23 @@ elif page == "Member Management":
                         )
 
                 try:
-                    (
+                    created = (
                         supabase.table("members")
                         .insert(member_data)
                         .execute()
-                    )
-
-                    st.success("Member registered successfully!")
-                    st.rerun()
-
+                    ).data or []
                 except Exception as error:
                     st.error(f"Could not register member: {error}")
+                else:
+                    note = gw.save_membership(
+                        supabase, gym_id, created[0]["id"] if created else None,
+                        plan, monthly_fee, membership_end
+                    )
+                    st.session_state["mm_flash"] = (
+                        f"{full_name.strip()} is registered." + (f" {note}" if note else
+                        " They're on the Risk Radar now; check-ins will keep them up to date.")
+                    )
+                    st.rerun()
 
         st.markdown("---")
         st.markdown("### Registered Members")
@@ -2652,7 +2674,7 @@ elif page == "Member Management":
 
 
 # =========================================================
-# 10. INDIVIDUAL MEMBER ASSESSMENT
+# 10. MEMBER PROFILE
 # =========================================================
 
 elif page == "Member Profile":
@@ -2664,603 +2686,9 @@ elif page == "Member Profile":
         assess_members
     )
 
-elif page == "Member Assessment":
-
-    gw.page_header(
-        "Member Assessment",
-        "Enter a hypothetical member's details to explore "
-        "the output of the trained model.",
-        "Try it out"
-    )
-
-    with st.form("member_assessment_form"):
-
-        membership_type = st.selectbox(
-            "Membership type",
-            ["Monthly", "Quarterly", "Annual"]
-        )
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-
-            days_since_last_visit = st.number_input(
-                "Days since last visit",
-                min_value=0,
-                max_value=365,
-                value=7
-            )
-
-            visits_previous_30_days = st.number_input(
-                "Visits in the previous 30 days",
-                min_value=0,
-                max_value=100,
-                value=10
-            )
-
-            renewal_due_days = st.number_input(
-                "Days until renewal",
-                min_value=0,
-                max_value=365,
-                value=14
-            )
-
-        with col2:
-
-            visits_last_30_days = st.number_input(
-                "Visits in the most recent 30 days",
-                min_value=0,
-                max_value=100,
-                value=5
-            )
-
-            pt_sessions_attended = st.number_input(
-                "Personal-training sessions attended",
-                min_value=0,
-                max_value=100,
-                value=2
-            )
-
-        submitted = st.form_submit_button(
-            "Generate Assessment",
-            use_container_width=True
-        )
-
-    if submitted:
-
-        member = pd.DataFrame([{
-            "membership_type": membership_type,
-            "days_since_last_visit": days_since_last_visit,
-            "visits_previous_30_days": visits_previous_30_days,
-            "visits_last_30_days": visits_last_30_days,
-            "renewal_due_days": renewal_due_days,
-            "pt_sessions_attended": pt_sessions_attended
-        }])
-
-        try:
-
-            result = assess_members(member).iloc[0]
-
-            probability = float(
-                result["cancellation_probability"]
-            )
-
-            risk = result["risk_category"]
-
-            st.markdown("---")
-            st.markdown("### Assessment Results")
-
-            col1, col2 = st.columns(2)
-
-            col1.metric(
-                "Estimated Cancellation Probability",
-                f"{probability:.1%}"
-            )
-
-            col2.metric(
-                "Provisional Risk Category",
-                risk
-            )
-
-            st.progress(
-                max(0.0, min(1.0, probability))
-            )
-
-            attendance_change = (
-                visits_last_30_days
-                - visits_previous_30_days
-            )
-
-            st.markdown(
-                '<div class="section-label">ATTENDANCE ANALYSIS</div>',
-                unsafe_allow_html=True
-            )
-
-            a, b, c = st.columns(3)
-
-            a.metric(
-                "Previous 30 Days",
-                int(visits_previous_30_days)
-            )
-
-            b.metric(
-                "Recent 30 Days",
-                int(visits_last_30_days)
-            )
-
-            c.metric(
-                "Attendance Change",
-                f"{attendance_change:+}"
-            )
-
-            if attendance_change < 0:
-
-                st.warning(
-                    "WARNING: MEMBER CHECK-IN RECOMMENDED\n\n"
-                    "Attendance has dropped compared with the previous "
-                    "30 days. Consider contacting the member to understand "
-                    "the change and offer support."
-                )
-
-            elif attendance_change > 0:
-
-                st.success(
-                    "POSITIVE ENGAGEMENT\n\n"
-                    "Attendance has improved compared with the previous "
-                    "30 days. Encourage the member to maintain this progress."
-                )
-
-            else:
-
-                st.info(
-                    "ENGAGEMENT STABLE\n\n"
-                    "Attendance is unchanged compared with the previous "
-                    "30 days. Continue monitoring activity and encourage "
-                    "consistent attendance."
-                )
-
-            if risk == "High":
-
-                st.error(
-                    "PRIORITY FOLLOW-UP\n\n"
-                    "This member requires a priority review. Check their "
-                    "recent attendance and renewal date, then contact "
-                    "them to understand any difficulties they may be "
-                    "experiencing. Record the outcome and schedule a "
-                    "follow-up if needed."
-                )
-
-            elif risk == "Medium":
-
-                st.warning(
-                    "WARNING: MEMBER ENGAGEMENT NEEDS ATTENTION\n\n"
-                    "Review this member's recent attendance and upcoming "
-                    "renewal date. Consider a personal check-in and agree "
-                    "on a practical next step to encourage regular visits."
-                )
-
-            else:
-
-                st.success(
-                    "MAINTAIN MEMBER ENGAGEMENT\n\n"
-                    "Continue monitoring attendance and supporting the "
-                    "member's fitness goals. Encourage consistent visits "
-                    "and review their progress at the next check-in."
-                )
-
-        except Exception as error:
-
-            st.error(f"Assessment failed: {error}")
-# =========================================================
-# 11. BATCH CSV ASSESSMENT
-# =========================================================
-
-elif page == "Batch Assessment":
-
-    # -----------------------------------------------------
-    # PAGE HEADER
-    # -----------------------------------------------------
-
-    st.markdown(
-        """
-        <div class="hero">
-            <div class="hero-eyebrow">
-                GYMPULSE AI · BATCH INTELLIGENCE
-            </div>
-            <div class="hero-title">
-                Batch Assessment
-            </div>
-            <div class="hero-description">
-                Analyse multiple membership records in one workflow.
-                Explore experimental cancellation-risk estimates
-                and identify patterns that may deserve further review.
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    # -----------------------------------------------------
-    # REQUIRED DATA FIELDS
-    # -----------------------------------------------------
-
-    st.markdown(
-        '<div class="section-label">REQUIRED DATA</div>',
-        unsafe_allow_html=True
-    )
-
-    st.markdown(
-        """
-        <p style="color: #9CA3AF; margin-bottom: 20px;">
-            Your CSV file must contain all six fields below.
-            Use the exact column names shown.
-        </p>
-        """,
-        unsafe_allow_html=True
-    )
-
-    required_fields = [
-        (
-            "01",
-            "Membership Type",
-            "membership_type",
-            "The member's membership category."
-        ),
-        (
-            "02",
-            "Days Since Last Visit",
-            "days_since_last_visit",
-            "How many days have passed since the last visit."
-        ),
-        (
-            "03",
-            "Previous 30-Day Visits",
-            "visits_previous_30_days",
-            "Attendance during the preceding 30-day period."
-        ),
-        (
-            "04",
-            "Last 30-Day Visits",
-            "visits_last_30_days",
-            "Recent attendance activity."
-        ),
-        (
-            "05",
-            "Renewal Due Days",
-            "renewal_due_days",
-            "Days remaining until renewal is due."
-        ),
-        (
-            "06",
-            "PT Sessions Attended",
-            "pt_sessions_attended",
-            "Number of personal-training sessions attended."
-        ),
-    ]
-
-    for row_start in range(0, len(required_fields), 3):
-        columns = st.columns(3)
-
-        for column, field in zip(
-            columns,
-            required_fields[row_start:row_start + 3]
-        ):
-            number, title, field_name, description = field
-
-            with column:
-                st.markdown(
-                    f"""
-<div style="
-    background-color: #111827;
-    border: 1px solid #273449;
-    border-radius: 14px;
-    padding: 18px;
-">
-    <div style="color: var(--lime); font-weight: 700;">
-        FIELD {number}
-    </div>
-    <div style="color: #FFFFFF; font-size: 16px;">
-        {title}
-    </div>
-    <div style="color: var(--lime); font-size: 12px;">
-        {field_name}
-    </div>
-    <div style="color: #9CA3AF; font-size: 13px;">
-        {description}
-    </div>
-</div>
-""",
-                    unsafe_allow_html=True
-                )
-# -----------------------------------------------------
-# CSV UPLOAD
-# -----------------------------------------------------
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    st.markdown(
-        '<div class="section-label">UPLOAD MEMBERSHIP DATA</div>',
-        unsafe_allow_html=True
-    )
-
-    st.markdown(
-        """
-<div style="
-    background-color: #111827;
-    border: 1px solid #273449;
-    border-left: 5px solid var(--lime);
-    border-radius: 16px;
-    padding: 24px;
-    margin: 12px 0 18px 0;
-">
-    <div style="
-        color: #FFFFFF;
-        font-size: 20px;
-        font-weight: 600;
-        margin-bottom: 8px;
-    ">
-        Upload your membership records
-    </div>
-    <div style="
-        color: #9CA3AF;
-        font-size: 14px;
-        line-height: 1.6;
-    ">
-        Select a CSV file containing your membership data.
-        You can review the records before running the assessment.
-    </div>
-</div>
-""",
-        unsafe_allow_html=True
-    )
-    uploaded_file = st.file_uploader(
-        "Choose a CSV file",
-        type=["csv"],
-        help="Upload a CSV containing all six required columns."
-    )
-
-    st.caption("Supported format: CSV · Maximum file size: 200 MB")
-
-    if uploaded_file is not None:
-
-        try:
-
-            uploaded_data = pd.read_csv(uploaded_file)
-
-            if uploaded_data.empty:
-                st.error(
-                    "The uploaded CSV contains no records."
-                )
-                st.stop()
-
-            # ---------------------------------------------
-            # VALIDATE REQUIRED COLUMNS
-            # ---------------------------------------------
-
-            required_columns = [
-                "membership_type",
-                "days_since_last_visit",
-                "visits_previous_30_days",
-                "visits_last_30_days",
-                "renewal_due_days",
-                "pt_sessions_attended",
-            ]
-
-            missing_columns = [
-                column
-                for column in required_columns
-                if column not in uploaded_data.columns
-            ]
-
-            if missing_columns:
-
-                st.error(
-                    "Your CSV is missing the following required "
-                    "columns: "
-                    + ", ".join(missing_columns)
-                )
-
-                st.info(
-                    "Check the column names in the Required Data "
-                    "section above and upload the corrected file."
-                )
-
-                st.stop()
-
-            # ---------------------------------------------
-            # FILE SUMMARY
-            # ---------------------------------------------
-
-            st.markdown("<br>", unsafe_allow_html=True)
-
-            st.markdown(
-                '<div class="section-label">FILE OVERVIEW</div>',
-                unsafe_allow_html=True
-            )
-
-            overview_col1, overview_col2, overview_col3 = (
-                st.columns(3)
-            )
-
-            overview_col1.metric(
-                "Total Records",
-                f"{len(uploaded_data):,}"
-            )
-
-            overview_col2.metric(
-                "Required Fields",
-                len(required_columns)
-            )
-
-            overview_col3.metric(
-                "File Status",
-                "Ready"
-            )
-
-            # ---------------------------------------------
-            # DATA PREVIEW
-            # ---------------------------------------------
-
-            with st.expander(
-                "Preview uploaded membership data",
-                expanded=True
-            ):
-
-                st.dataframe(
-                    uploaded_data.head(10),
-                    use_container_width=True,
-                    hide_index=True
-                )
-
-                st.caption(
-                    "Showing the first 10 records. "
-                    "Your original uploaded data is not modified here."
-                )
-
-            # ---------------------------------------------
-            # RUN ASSESSMENT
-            # ---------------------------------------------
-
-            st.markdown("<br>", unsafe_allow_html=True)
-
-            st.markdown(
-                '<div class="section-label">RUN ASSESSMENT</div>',
-                unsafe_allow_html=True
-            )
-
-            st.markdown(
-                """
-                <p style="color: #9CA3AF;">
-                    Run the existing model against the uploaded records
-                    to explore its experimental risk estimates.
-                </p>
-                """,
-                unsafe_allow_html=True
-            )
-
-            if st.button(
-                "Assess All Members",
-                use_container_width=True,
-                type="primary"
-            ):
-
-                with st.spinner(
-                    "Assessing membership records..."
-                ):
-
-                    results = assess_members(uploaded_data)
-
-                total_members = len(results)
-
-                high_risk = int(
-                    (results["risk_category"] == "High").sum()
-                )
-
-                medium_risk = int(
-                    (results["risk_category"] == "Medium").sum()
-                )
-
-                low_risk = int(
-                    (results["risk_category"] == "Low").sum()
-                )
-
-                # -----------------------------------------
-                # RESULTS SUMMARY
-                # -----------------------------------------
-
-                st.markdown("<br>", unsafe_allow_html=True)
-
-                st.markdown(
-                    '<div class="section-label">'
-                    'ASSESSMENT SUMMARY</div>',
-                    unsafe_allow_html=True
-                )
-
-                st.markdown(
-                    """
-                    <p style="color: #9CA3AF;">
-                        Overview of the model outputs for this batch.
-                    </p>
-                    """,
-                    unsafe_allow_html=True
-                )
-
-                col1, col2, col3, col4 = st.columns(4)
-
-                col1.metric(
-                    "Records Assessed",
-                    f"{total_members:,}"
-                )
-
-                col2.metric(
-                    "High Risk",
-                    f"{high_risk:,}"
-                )
-
-                col3.metric(
-                    "Medium Risk",
-                    f"{medium_risk:,}"
-                )
-
-                col4.metric(
-                    "Low Risk",
-                    f"{low_risk:,}"
-                )
-
-                # -----------------------------------------
-                # RESULTS TABLE
-                # -----------------------------------------
-
-                st.markdown("<br>", unsafe_allow_html=True)
-
-                st.markdown(
-                    '<div class="section-label">'
-                    'MEMBER ASSESSMENT RESULTS</div>',
-                    unsafe_allow_html=True
-                )
-
-                st.dataframe(
-                    results,
-                    use_container_width=True,
-                    hide_index=True
-                )
-
-                # -----------------------------------------
-                # DOWNLOAD RESULTS
-                # -----------------------------------------
-
-                csv_output = results.to_csv(
-                    index=False
-                ).encode("utf-8")
-
-                st.download_button(
-                    label="Download Assessment Results CSV",
-                    data=csv_output,
-                    file_name="gympulse_assessment_results.csv",
-                    mime="text/csv",
-                    use_container_width=True,
-                    type="primary"
-                )
-
-                st.caption(
-                    "Results are generated for this session and are "
-                    "not saved to a permanent member database. "
-                    "Risk estimates are experimental and should not "
-                    "be treated as confirmed predictions of cancellation."
-                )
-
-        except Exception as error:
-
-            st.error(
-                "Could not process the uploaded file. "
-                "Check the required columns, values, and file format."
-            )
-
-            with st.expander("Technical details"):
-
-                st.code(str(error))
+# Member Assessment and Batch Assessment were retired in Phase 1: members are
+# scored from their record and check-ins on the Risk Radar instead. The scoring
+# logic they used (prepare_member_data, assess_members) is kept above.
 
 # =========================================================
 # 12. MODEL INSIGHTS

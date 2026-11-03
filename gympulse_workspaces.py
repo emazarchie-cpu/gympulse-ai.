@@ -161,7 +161,7 @@ def apply_live_dates(df):
     stamp = None
     for col in ("updated_at", "created_at"):
         if col in df.columns:
-            s = pd.to_datetime(df[col], errors="coerce", utc=True)
+            s = pd.to_datetime(df[col], errors="coerce", utc=True, format="ISO8601")
             s = s.dt.tz_convert(APP_TZ).dt.tz_localize(None).dt.normalize()
             stamp = s if stamp is None else stamp.fillna(s)
     if stamp is None:
@@ -1149,16 +1149,49 @@ def apply_theme(theme):
         st.markdown("<style>" + LIGHT_CSS + "</style>", unsafe_allow_html=True)
 
 # ------------------------------------------------------------ speed & caching
+# Tables whose rows belong to one gym. Every read, update and delete on them is
+# limited to the signed-in owner's gym here, in one place, so no screen can touch
+# another gym's records even by mistake. Row Level Security in the database
+# (sql/phase1_foundation.sql) is the second, server-side lock.
+GYM_SCOPED_TABLES = {"members", "member_activity", "retention_actions", "checkins",
+                     "classes", "trainers", "messages", "reminder_log"}
+
+
+def _current_gym():
+    try:
+        return st.session_state.get("gym_id")
+    except Exception:
+        return None
+
+
 class _TrackedTable:
-    def __init__(self, table):
+    def __init__(self, table, name=""):
         self._t = table
+        self._name = name
     def __getattr__(self, name):
         attr = getattr(self._t, name)
-        if name in ("insert", "update", "upsert", "delete"):
-            def wrapper(*args, **kwargs):
+        scoped = self._name in GYM_SCOPED_TABLES
+        if name in ("insert", "upsert"):
+            def write(payload, *args, **kwargs):
                 st.session_state["_dv"] = st.session_state.get("_dv", 0) + 1
-                return attr(*args, **kwargs)
-            return wrapper
+                gid = _current_gym() if scoped else None
+                if gid:
+                    rows = payload if isinstance(payload, list) else [payload]
+                    for row in rows:
+                        if isinstance(row, dict):
+                            if row.get("gym_id") not in (None, gid):
+                                raise PermissionError("Refused to write a record for another gym.")
+                            row["gym_id"] = gid
+                return attr(payload, *args, **kwargs)
+            return write
+        if name in ("update", "delete", "select"):
+            def scoped_query(*args, **kwargs):
+                if name != "select":
+                    st.session_state["_dv"] = st.session_state.get("_dv", 0) + 1
+                query = attr(*args, **kwargs)
+                gid = _current_gym() if scoped else None
+                return query.eq("gym_id", gid) if gid else query
+            return scoped_query
         return attr
 
 class TrackedClient:
@@ -1167,7 +1200,7 @@ class TrackedClient:
     def __getattr__(self, name):
         return getattr(self._client, name)
     def table(self, name):
-        return _TrackedTable(self._client.table(name))
+        return _TrackedTable(self._client.table(name), name)
 
 def _clone(value):
     if isinstance(value, pd.DataFrame):
@@ -1410,7 +1443,7 @@ def members_to_contact(roster, actions, cooldown_days=SUGGEST_COOLDOWN_DAYS, tod
         open_mask = actions["status"] != "Done"
         blocked |= set(actions.loc[open_mask, "member_id"])
         done = actions[~open_mask].copy()
-        when = pd.to_datetime(done["completed_at"], errors="coerce", utc=True)
+        when = pd.to_datetime(done["completed_at"], errors="coerce", utc=True, format="ISO8601")
         when = when.dt.tz_localize(None)
         recent = when.isna() | (when >= now - pd.Timedelta(days=cooldown_days))
         blocked |= set(done.loc[recent, "member_id"])
@@ -1693,6 +1726,34 @@ def render_csv_import(supabase, gym_id, use_expander=True):
                 + (f"; {skipped} row(s) skipped." if skipped else "."))
             st.session_state["csv_up_key"] = key + 1
             st.rerun()
+
+def save_membership(supabase, gym_id, member_id, plan, monthly_fee, membership_end, pt_sessions=0):
+    """Give a member the plan details the Risk Radar needs. Attendance starts at
+    zero and is replaced by real check-ins as soon as they arrive.
+    Returns a short note if something could not be saved, else ""."""
+    if not member_id:
+        return "Add their plan in the Risk Radar's data tools to score them."
+    end = pd.Timestamp(membership_end).date() if membership_end is not None else None
+    renew = max(0, (end - today_local()).days) if end else 30
+    try:
+        supabase.table("member_activity").upsert({
+            "member_id": member_id, "gym_id": gym_id,
+            "membership_type": plan, "monthly_fee": float(monthly_fee or 0),
+            "days_since_last_visit": 0, "visits_previous_30_days": 0,
+            "visits_last_30_days": 0, "renewal_due_days": int(renew),
+            "pt_sessions_attended": int(pt_sessions or 0),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }).execute()
+    except Exception:
+        return "Their plan could not be saved; add it in the Risk Radar's data tools."
+    if end:
+        try:
+            supabase.table("members").update({"membership_end": end.isoformat()}) \
+                .eq("id", member_id).execute()
+        except Exception:
+            pass
+    return ""
+
 
 def _set_archived(supabase, member_id, flag):
     supabase.table("members").update({
@@ -3861,7 +3922,8 @@ def _page_checkins(supabase, gym_id, since, cols):
 def _fetch_checkins(supabase, gym_id, days=90):
     since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
     rows = None
-    for cols in ("id, member_id, checked_in_at, class_id", "id, member_id, checked_in_at"):
+    for cols in ("id, member_id, checked_in_at, class_id, source",
+                 "id, member_id, checked_in_at, class_id", "id, member_id, checked_in_at"):
         try:
             rows = _page_checkins(supabase, gym_id, since, cols)
             break
@@ -3870,12 +3932,14 @@ def _fetch_checkins(supabase, gym_id, days=90):
     if rows is None:
         return None
     if not rows:
-        return pd.DataFrame(columns=["id", "member_id", "at", "day", "class_id"])
+        return pd.DataFrame(columns=["id", "member_id", "at", "day", "class_id", "source"])
     df = pd.DataFrame(rows)
-    at = (pd.to_datetime(df["checked_in_at"], errors="coerce", utc=True)
+    at = (pd.to_datetime(df["checked_in_at"], errors="coerce", utc=True, format="ISO8601")
           .dt.tz_convert(APP_TZ).dt.tz_localize(None))
     out = pd.DataFrame({"id": df["id"], "member_id": df["member_id"], "at": at,
-                        "class_id": df["class_id"] if "class_id" in df.columns else None})
+                        "class_id": df["class_id"] if "class_id" in df.columns else None,
+                        "source": (df["source"].fillna("unknown") if "source" in df.columns
+                                   else "unknown")})
     out = out.dropna(subset=["at"])
     out["day"] = out["at"].dt.normalize()
     return out
@@ -3988,21 +4052,192 @@ def class_suggestion(mid, ck, classes):
     return upcoming[0], False
 
 
-def _do_checkin(supabase, gym_id, member_id, name, use_class=False):
+# ------------------------------------------------ attendance events
+# Every way a member can check in (front desk, QR/card scan, kiosk, a device
+# calling the API, a history import) produces the same record in `checkins`:
+#   gym_id, member_id, checked_in_at, source, event_id (+ class_id, location_id)
+# event_id is unique per gym, so the same visit can never be counted twice.
+CHECKIN_SOURCES = {
+    "front_desk": "Front desk", "scan": "QR or card scan", "kiosk": "Kiosk",
+    "device": "Check-in device", "import": "Imported", "unknown": "Earlier check-in",
+}
+DUPLICATE_WINDOW_MINUTES = 10
+
+
+def checkin_event_id(gym_id, member_id, at_iso=None):
+    """A stable id: the same member at the same minute always gives the same id."""
+    import uuid
+    if at_iso is None:
+        return str(uuid.uuid4())
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, f"gympulse:{gym_id}:{member_id}:{str(at_iso)[:16]}"))
+
+
+def _is_duplicate_error(error):
+    text = str(error).lower()
+    return "23505" in text or "duplicate key" in text or "unique" in text
+
+
+def record_checkin(supabase, gym_id, member_id, source="front_desk", at=None,
+                   class_id=None, event_id=None):
+    """Save one attendance event. Returns "saved", "duplicate" or "legacy"
+    (saved without the Phase 1 columns because the SQL has not been run yet)."""
     row = {"gym_id": gym_id, "member_id": member_id}
+    if at is not None:
+        row["checked_in_at"] = at
+    extra = {"source": source, "event_id": event_id or checkin_event_id(gym_id, member_id, at)}
+    attempts = []
+    if class_id:
+        attempts.append({**row, **extra, "class_id": class_id})
+    attempts.append({**row, **extra})
+    if class_id:
+        attempts.append({**row, "class_id": class_id})
+    attempts.append(row)
+    last = None
+    for i, payload in enumerate(attempts):
+        try:
+            supabase.table("checkins").insert(payload).execute()
+            return "saved" if "event_id" in payload else "legacy"
+        except Exception as error:
+            if _is_duplicate_error(error):
+                return "duplicate"
+            last = error
+    raise last
+
+
+def _recently_checked_in(supabase, gym_id, member_id, minutes=DUPLICATE_WINDOW_MINUTES):
+    since = (datetime.now(timezone.utc) - timedelta(minutes=minutes)).isoformat()
+    try:
+        rows = (supabase.table("checkins").select("id").eq("gym_id", gym_id)
+                .eq("member_id", member_id).gte("checked_in_at", since).limit(1)
+                .execute().data or [])
+        return bool(rows)
+    except Exception:
+        return False
+
+
+def _do_checkin(supabase, gym_id, member_id, name, use_class=False, source="front_desk"):
     cid = st.session_state.get("ck_class_sel") if use_class else None
     first = (name or "").split(" ")[0] or "there"
-    try:
-        supabase.table("checkins").insert({**row, **({"class_id": cid} if cid else {})}).execute()
-        st.session_state["ck_flash"] = f"Welcome, {first}! You're checked in."
-    except Exception as error:
+    if _recently_checked_in(supabase, gym_id, member_id):
+        st.session_state["ck_flash"] = f"{first} is already checked in."
+    else:
         try:
-            supabase.table("checkins").insert(row).execute()
-            st.session_state["ck_flash"] = (f"Welcome, {first}! Checked in. "
-                                            "Run the classes SQL to track class attendance.")
-        except Exception:
+            result = record_checkin(supabase, gym_id, member_id, source, class_id=cid)
+            st.session_state["ck_flash"] = (f"{first} is already checked in." if result == "duplicate"
+                                            else f"Welcome, {first}! You're checked in.")
+        except Exception as error:
             st.session_state["ck_flash"] = f"Could not check in: {error}"
+    bump_data_version()
     st.session_state["ck_n"] = st.session_state.get("ck_n", 0) + 1
+
+
+CHECKIN_IMPORT_HELP = (
+    "One row per visit. Columns: **member** (name, email, phone or member code) and "
+    "**date** (for example 2026-10-14). Optional: **time** (18:30). Visits already in "
+    "GymPulse are skipped, so you can import the same file twice safely."
+)
+
+
+def parse_checkin_csv(csv_df, members):
+    """Match each row to a member and a visit time. Returns (rows, issues)."""
+    cols = {c.strip().lower(): c for c in csv_df.columns}
+    member_col = next((cols[c] for c in ("member", "name", "full_name", "member_name",
+                                         "email", "phone", "member_code", "code") if c in cols), None)
+    date_col = next((cols[c] for c in ("date", "visit_date", "checked_in_at", "check_in",
+                                       "datetime", "timestamp") if c in cols), None)
+    time_col = next((cols[c] for c in ("time", "visit_time") if c in cols), None)
+    if member_col is None or date_col is None:
+        return [], [{"Row": "-", "Member": "-", "Problem": "Need a 'member' column and a 'date' column",
+                     "Result": "Nothing imported"}]
+    lookup = {}
+    for _, m in members.iterrows():
+        mid = m["id"]
+        for key in (_text(m.get("full_name")).lower(), _text(m.get("email")).lower(),
+                    member_code(mid).lower(), str(mid).lower()):
+            if key:
+                lookup.setdefault(key, mid)
+        ph = re.sub(r"\D", "", _text(m.get("phone")))
+        if len(ph) >= 7:
+            lookup.setdefault(ph[-10:], mid)
+    rows, issues = [], []
+    now = datetime.now(APP_TZ)
+    for i, rec in csv_df.iterrows():
+        raw = _text(rec.get(member_col)).strip()
+        key = raw.lower()
+        mid = lookup.get(key)
+        if mid is None:
+            digits = re.sub(r"\D", "", raw)
+            mid = lookup.get(digits[-10:]) if len(digits) >= 7 else None
+        if mid is None:
+            issues.append({"Row": i + 2, "Member": raw or "(blank)", "Problem": "No matching member",
+                           "Result": "Skipped"})
+            continue
+        when_text = _text(rec.get(date_col)).strip()
+        if time_col is not None and _text(rec.get(time_col)).strip():
+            when_text += " " + _text(rec.get(time_col)).strip()
+        when = pd.to_datetime(when_text, errors="coerce", dayfirst=False)
+        if pd.isna(when):
+            issues.append({"Row": i + 2, "Member": raw, "Problem": f"Can't read date '{when_text}'",
+                           "Result": "Skipped"})
+            continue
+        if when.tzinfo is None:
+            if when.hour == 0 and when.minute == 0 and time_col is None and len(when_text) <= 10:
+                when = when + pd.Timedelta(hours=12)   # date only: count it at midday
+            when = when.tz_localize(APP_TZ)
+        if when > pd.Timestamp(now) + pd.Timedelta(minutes=5):
+            issues.append({"Row": i + 2, "Member": raw, "Problem": "Date is in the future",
+                           "Result": "Skipped"})
+            continue
+        rows.append({"member_id": mid, "at": when.tz_convert("UTC").isoformat()})
+    return rows, issues
+
+
+def import_checkins(supabase, gym_id, rows, existing):
+    """Insert parsed visits, skipping any already recorded. Returns counts."""
+    seen = set()
+    if existing is not None and not existing.empty:
+        at = pd.to_datetime(existing["at"]).dt.tz_localize(APP_TZ).dt.tz_convert("UTC")
+        seen = set(zip(existing["member_id"], at.dt.strftime("%Y-%m-%dT%H:%M")))
+    saved = skipped = 0
+    for r in rows:
+        key = (r["member_id"], r["at"][:16])
+        if key in seen:
+            skipped += 1
+            continue
+        seen.add(key)
+        if record_checkin(supabase, gym_id, r["member_id"], "import", at=r["at"]) == "duplicate":
+            skipped += 1
+        else:
+            saved += 1
+    bump_data_version()
+    return saved, skipped
+
+
+def render_checkin_import(supabase, gym_id, members, ck):
+    st.markdown(CHECKIN_IMPORT_HELP)
+    up = st.file_uploader("Visit history (CSV)", type=["csv"], key="ck_import_file")
+    st.download_button("Download a template", "member,date,time\nAda Obi,2026-10-01,07:30\n",
+                       file_name="gympulse_checkins_template.csv", key="ck_import_tpl")
+    if up is None:
+        return
+    try:
+        df = pd.read_csv(up, dtype=str).fillna("")
+    except Exception as error:
+        st.error(f"Could not read that file: {error}")
+        return
+    rows, issues = parse_checkin_csv(df, members)
+    st.write(f"**{len(rows)}** visit(s) ready to import"
+             + (f", **{len(issues)}** row(s) need attention." if issues else "."))
+    if issues:
+        st.dataframe(pd.DataFrame(issues)[ISSUE_COLS], hide_index=True, use_container_width=True)
+    if rows and st.button(f"Import {len(rows)} visit(s)", type="primary", key="ck_import_go"):
+        with st.spinner("Importing visits…"):
+            saved, skipped = import_checkins(supabase, gym_id, rows, ck)
+        st.session_state["ck_flash"] = (f"Imported {saved} visit(s)."
+                                        + (f" {skipped} were already recorded." if skipped else "")
+                                        + " The Risk Radar now uses this history.")
+        st.session_state.pop("ck_import_file", None)
+        st.rerun()
 
 
 def _undo_checkin(supabase, gym_id, checkin_id):
@@ -4093,8 +4328,10 @@ def render_checkin(supabase, gym_id):
         ("Visits, 30 days", month_visits, "white", "One per member per day"),
     ])
 
-    tab_in, tab_alert, tab_log, tab_cls = st.tabs(
-        ["Check in", "Drop-off alerts", "Today's log", "Classes"])
+    tab_in, tab_alert, tab_log, tab_cls, tab_imp = st.tabs(
+        ["Check in", "Drop-off alerts", "Today's log", "Classes", "Import history"])
+    with tab_imp:
+        render_checkin_import(supabase, gym_id, members, ck)
 
     with tab_in:
         today_classes = [c for c in classes if c["_start"].date() == now.date()]
@@ -4129,7 +4366,8 @@ def render_checkin(supabase, gym_id):
                     st.session_state["ck_flash"] = f"{_text(hit['full_name'])} is already checked in today."
                     st.session_state["ck_n"] = n + 1
                 else:
-                    _do_checkin(supabase, gym_id, hit["id"], _text(hit["full_name"]), True)
+                    _do_checkin(supabase, gym_id, hit["id"], _text(hit["full_name"]), True,
+                                source="scan")
                 st.rerun()
 
         if not needle:
@@ -4212,7 +4450,9 @@ def render_checkin(supabase, gym_id):
                 _md(f'<div style="display:flex;align-items:center;gap:10px;">'
                     f'{avatar_html(nm, photos.get(r["member_id"]), 36)}'
                     f'<b style="color:#F4F7FB;">{_esc(nm)}</b>{cls_chip}</div>', c1)
-                _md(f'<div class="money">{r["at"]:%H:%M}</div>', c2)
+                src = CHECKIN_SOURCES.get(str(r.get("source") or "unknown"), "Check-in")
+                _md(f'<div class="money">{r["at"]:%H:%M}</div>'
+                    f'<div class="why" style="padding:0">{_esc(src)}</div>', c2)
                 c3.button("Undo", key=f"cu_{r['id']}", on_click=_undo_checkin,
                           args=(supabase, gym_id, r["id"]), use_container_width=True)
 
