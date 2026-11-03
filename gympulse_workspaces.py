@@ -1429,10 +1429,161 @@ def suggest_action(row):
     if row["days_since_last_visit"] >= 14:
         return "Personal call"
     if row["pt_sessions_attended"] == 0:
-        return "Free PT session"
+        return "Trainer intro"
     if row["risk_category"] == "Low":
         return "Goal review"
     return "WhatsApp check-in"
+
+# ------------------------------------------------- retention plays
+# What each play is for, how to deliver it, and when to follow up.
+PLAY_INFO = {
+    "Personal call":        {"objective": "Re-engage a member who is drifting", "channel": "Call", "follow": 2},
+    "WhatsApp check-in":    {"objective": "Re-engage with a light touch", "channel": "WhatsApp", "follow": 3},
+    "Feedback request":     {"objective": "Find out what is pushing them away", "channel": "WhatsApp", "follow": 5},
+    "Renewal offer":        {"objective": "Secure the renewal", "channel": "Call", "follow": 2},
+    "Free PT session":      {"objective": "Restore attendance with personal support", "channel": "WhatsApp", "follow": 4},
+    "Trainer intro":        {"objective": "Build a personal connection", "channel": "In person", "follow": 5},
+    "Goal review":          {"objective": "Reset goals and motivation", "channel": "In person", "follow": 7},
+    "Class invite":         {"objective": "Restore the attendance habit", "channel": "WhatsApp", "follow": 3},
+    "Group challenge":      {"objective": "Build belonging in the community", "channel": "WhatsApp", "follow": 7},
+    "Bring-a-friend invite": {"objective": "Increase engagement and referrals", "channel": "WhatsApp", "follow": 7},
+    "Milestone shout-out":  {"objective": "Reinforce a good habit", "channel": "WhatsApp", "follow": 14},
+    "Welcome-back note":    {"objective": "Make the return stick", "channel": "WhatsApp", "follow": 7},
+}
+CONTACT_METHODS = ["WhatsApp", "Call", "Email", "In person", "SMS"]
+
+# Lifecycle shown to the owner. `status` keeps its three stored values
+# (To do, In progress, Done); the extra stages come from when the member
+# was contacted and when the follow-up is due.
+STAGE_TONE = {"Recommended": "grey", "Started": "cyan", "In progress": "amber",
+              "Contacted": "cyan", "Follow-up due": "red", "Resolved": "lime",
+              "Unsuccessful": "grey"}
+
+
+def _blank(v):
+    return v is None or (isinstance(v, float) and pd.isna(v)) or str(v).strip() in ("", "NaT", "None", "nan")
+
+
+def action_stage(a, today=None):
+    status = a.get("status")
+    if status == "Done":
+        return "Resolved" if a.get("outcome") == "Retained" else "Unsuccessful"
+    if status == "To do":
+        return "Started"
+    if _blank(a.get("contacted_at")):
+        return "In progress"
+    today = today or date.today()
+    try:
+        due = date.fromisoformat(str(a.get("follow_up_on") or a.get("due_date"))[:10])
+    except ValueError:
+        return "Contacted"
+    return "Follow-up due" if due <= today else "Contacted"
+
+
+def stage_chip(stage):
+    return chip(stage, STAGE_TONE.get(stage, "grey"), dot=stage in ("Follow-up due", "Resolved"))
+
+
+def mark_contacted(supabase, action_id, method, follow_days=None, play=None, note=""):
+    """Record that the member was contacted and schedule the follow-up.
+    Returns "full" (all details saved) or "basic" (saved without the Phase 2 columns)."""
+    days = follow_days if follow_days is not None else PLAY_INFO.get(play or "", {}).get("follow", 3)
+    follow_on = (today_local() + timedelta(days=int(days))).isoformat()
+    now = datetime.now(timezone.utc).isoformat()
+    base = {"status": "In progress", "due_date": follow_on}
+    if note:
+        base["note"] = note
+    full = {**base, "contacted_at": now, "contact_method": method, "follow_up_on": follow_on}
+    try:
+        supabase.table("retention_actions").update(full).eq("id", action_id).execute()
+        return "full"
+    except Exception:
+        stamp = f"Contacted by {method.lower()} on {today_local():%d %b}; follow up {follow_on}."
+        base["note"] = (note + " · " if note else "") + stamp
+        supabase.table("retention_actions").update(base).eq("id", action_id).execute()
+        return "basic"
+
+
+def close_action(supabase, action_id, outcome, note=None):
+    row = {"status": "Done", "outcome": outcome,
+           "completed_at": datetime.now(timezone.utc).isoformat()}
+    if note is not None:
+        row["note"] = note
+    supabase.table("retention_actions").update(row).eq("id", action_id).execute()
+
+
+def open_action_for(supabase, member_id):
+    """The member's open play, if any (used by Follow-ups and reminders)."""
+    try:
+        rows = (supabase.table("retention_actions").select("*")
+                .eq("member_id", member_id).neq("status", "Done")
+                .order("created_at", desc=True).limit(1).execute().data or [])
+        rows = [r for r in rows if _blank(r.get("archived_at"))]
+        return rows[0] if rows else None
+    except Exception:
+        return None
+
+
+def _plural(n, word, plural=None):
+    return f"{n} {word if n == 1 else (plural or word + 's')}"
+
+
+def risk_story(r):
+    """Who, why, when and what next for one member, in plain words."""
+    days = int(r.get("days_since_last_visit", 0) or 0)
+    recent = int(r.get("visits_last_30_days", 0) or 0)
+    before = int(r.get("visits_previous_30_days", 0) or 0)
+    renew = int(r.get("renewal_due_days", 0) or 0)
+
+    why = []
+    if before - recent >= 3:
+        why.append(f"visits fell from {before} to {recent} a month")
+    ug = r.get("usual_gap_days")
+    if ug is not None and not pd.isna(ug) and days > max(2 * float(ug), float(ug) + 3):
+        n = max(1, round(float(ug)))
+        why.append(f"usually trains every {_plural(n, 'day')}, now {days} away")
+    elif days >= 10:
+        why.append(f"no check-in for {days} days")
+    if renew == 0:
+        why.append("renews today")
+    elif 0 < renew <= 30:
+        why.append(f"renews in {_plural(renew, 'day')}")
+    elif renew < 0:
+        why.append(f"membership lapsed {_plural(-renew, 'day')} ago")
+    if not why:
+        why.append(str(r.get("drivers") or "early warning signs"))
+
+    if before - recent >= 3:
+        when = "the drop shows over the last 30 days"
+    elif days:
+        when = f"last check-in {_plural(days, 'day')} ago"
+    else:
+        when = "checked in today"
+
+    urgent = r.get("risk_category") == "High" and renew <= 14
+    play = str(r.get("suggested_action") or "Personal call")
+    info = PLAY_INFO.get(play, {})
+    nxt = f"<b>{_esc(play)}</b> {'today' if urgent else 'this week'}"
+    if renew <= 14 and play != "Renewal offer":
+        nxt += ", before the renewal date"
+    if info.get("channel"):
+        nxt += f" · by {info['channel'].lower()}"
+    return {"why": ", ".join(why[:3]), "when": when, "next": nxt, "play": play,
+            "objective": info.get("objective", "")}
+
+
+def story_html(r):
+    st_ = risk_story(r)
+    return (f'<dl class="cc-story"><dt>Why</dt><dd>{_esc(st_["why"])}</dd>'
+            f'<dt>When</dt><dd>{_esc(st_["when"])}</dd>'
+            f'<dt>Next</dt><dd>{st_["next"]}</dd></dl>')
+
+
+def story_text(r):
+    st_ = risk_story(r)
+    nxt = re.sub("<[^>]+>", "", st_["next"])
+    return f"Why: {st_['why']}. When: {st_['when']}. Next: {nxt}."
+
 
 def members_to_contact(roster, actions, cooldown_days=SUGGEST_COOLDOWN_DAYS, today=None):
     if roster.empty:
@@ -2067,9 +2218,10 @@ def render_member_profile(supabase, gym_id, member_id, assess_fn):
                 "membership_end": m["membership_end"],
             }])
             one = apply_live_dates(one)
-            scored = assess_fn(one).iloc[0]
+            scored = assess_fn(one).iloc[0].copy()
             drivers_text = drivers(scored)
             action_text = suggest_action(scored)
+            scored["drivers"], scored["suggested_action"] = drivers_text, action_text
         except Exception:
             scored = None
 
@@ -2137,7 +2289,7 @@ def render_member_profile(supabase, gym_id, member_id, assess_fn):
               <div class="chip-row">{risk_chip(level, prob)}
                 {chip("Suggested: " + action_text, "cyan")}</div>
               {prob_bar(prob, level)}
-              <div class="why" style="padding:8px 0 0;">Why: {_esc(drivers_text)}</div>
+              {story_html(scored)}
             </div>
             """)
             if st.button("Create a follow-up action", key="prof_create"):
@@ -2145,7 +2297,7 @@ def render_member_profile(supabase, gym_id, member_id, assess_fn):
                     st.info(f"{name} already has an open action in the Action Centre.")
                 else:
                     _create_action(supabase, gym_id, member_id, action_text,
-                                   int(scored["renewal_due_days"]))
+                                   int(scored["renewal_due_days"]), note=story_text(scored))
                     st.success("Added to the Action Centre.")
         else:
             st.info("No activity data yet, so there is no risk estimate. "
@@ -2403,7 +2555,7 @@ def _priority_rows(view):
         limit = st.session_state.get("prio_limit", 10)
         for _, r in view.head(limit).iterrows():
             mobile_member_card(
-                r, "prio", why=r["drivers"],
+                r, "prio", why=story_text(r),
                 chips=risk_chip(r["risk_category"]) + chip(r["suggested_action"], "cyan"),
                 bar=prob_bar(r["cancellation_probability"], r["risk_category"]),
                 meta=f'<div class="money">{r["monthly_fee"]:,.0f} / mo</div>',
@@ -2431,7 +2583,7 @@ def _priority_rows(view):
             c[1].button(str(r["full_name"]), key=f"mrow_prio_{r['id']}",
                         on_click=open_profile, args=(r["id"], "Risk Radar"),
                         use_container_width=True)
-            _md(f'<div class="why">{_esc(r["drivers"])}</div>', c[1])
+            _md(story_html(r), c[1])
             _md(risk_chip(r["risk_category"]), c[2])
             _md(prob_bar(r["cancellation_probability"], r["risk_category"]), c[3])
             _md(chip(r["suggested_action"], "cyan"), c[4])
@@ -2553,10 +2705,11 @@ def class_when_long(dt):
 
 
 PLAY_TEXT = {
-    "Personal call": "Hi {first}, it's {owner} from {biz}. I'd love to give you a quick call to hear how your training is going and see how we can help. When is a good time for you?",
-    "WhatsApp check-in": "Hi {first}! This is {owner} from {biz}. Just checking in to see how you're finding your workouts. Is there anything we can do to make your experience even better?",
+    "Personal call": "Hi {first}, it's {owner} from {biz}.{missed} I'd love to give you a quick call to hear how your training{goal_part} is going and see how we can help. When is a good time for you?",
+    "WhatsApp check-in": "Hi {first}! This is {owner} from {biz}.{missed} Just checking in to see how you're finding your workouts{goal_part}. Is there anything we can do to make your experience even better?",
     "Feedback request": "Hi {first}, your opinion matters a lot to us at {biz}. Could you spare a minute to tell us what we're doing well and what we could improve? Reply here and I'll read every word.",
-    "Renewal offer": "Hi {first}, I have something special for you. Your membership at {biz} is due for renewal, and for a short time only you can renew and {offer}. This offer closes on {deadline}, and after that it goes back to the regular price, so I'd really hate for you to miss out. Reply RENEW and I'll lock it in for you today. Thank you for being part of {biz}!",
+    "Renewal offer": "Hi {first}, I have something special for you. Your membership at {biz} {renew_when}, and you can renew and {offer}.{deadline_part} Reply RENEW and I'll lock it in for you. Thank you for being part of {biz}!",
+    "Renewal check-in": "Hi {first}, it's {owner} from {biz}. Your membership {renew_when}, and I'd love to keep helping you{goal_part}. Can I help you renew, or is there anything we could do better for you? Just reply here.",
     "Free PT session": "Hi {first}! {biz} would like to gift you a free personal training session with {tname}{tspec}. It's a great way to fine-tune your plan{goal_part}. Call or message {tphone} to book your slot, or reply here and I'll arrange it.{tprofile}",
     "Trainer intro": "Hi {first}, I'd like you to meet {tname}{tspec}, one of our trainers at {biz}. {tname} would love to support you{goal_part}. You can reach them on {tphone}, or reply here and I'll introduce you at the gym.{tprofile}",
     "Goal review": "Hi {first}! It's time for a quick goal review at {biz}{goal_part}. {tname}{tspec} can sit down with you for 15 minutes to check your progress and update your plan. Message {tphone} to book a time.{tprofile}",
@@ -2566,6 +2719,14 @@ PLAY_TEXT = {
     "Milestone shout-out": "Hi {first}! Congratulations from all of us at {biz}. Your consistency has really paid off and we're proud of your progress. Keep it up!",
     "Welcome-back note": "Hi {first}, it's so good to see you back at {biz}! We missed you, and we're here to help you get back into your rhythm. Let me know if you need anything.",
 }
+
+
+def member_message_ctx(r):
+    """What a message may say about a member: only facts from their record."""
+    get = r.get if hasattr(r, "get") else (lambda k, d=None: d)
+    return {"name": _text(get("full_name")), "phone": _text(get("phone")),
+            "email": _text(get("email")), "goal": _text(get("fitness_goal")),
+            "renew_days": get("renewal_due_days"), "days_away": get("days_since_last_visit")}
 
 
 def _biz_ctx():
@@ -2594,19 +2755,49 @@ def play_message(play, member, trainer, ctx, details=None):
         tspec=f" ({trainer['specialty']})" if trainer and trainer.get("specialty") else "",
         tphone=(trainer.get("phone") if trainer and trainer.get("phone")
                 else s.get("biz_phone") or "our front desk"),
-        goal_part=f" towards your goal of {goal.lower()}" if goal else "",
+        goal_part=_goal_phrase(goal),
         tprofile=(f"\n\nSee {tname}'s full profile and photo here: {link}" if link else ""),
         title=d.get("title") or "our next session",
         when_part=f" on {when}" if when else "",
         where_part=f" ({where})" if where else "",
         reward_line=f"The prize: {reward}. " if reward else "",
         reward=reward or "you both get a thank-you gift from us",
-        offer=d.get("offer") or "enjoy our best renewal rate",
-        deadline=d.get("deadline") or "the end of this week",
+        offer=d.get("offer") or "",
+        deadline_part=(f" This offer is open until {d['deadline']}." if d.get("deadline") else ""),
+        renew_when=_renew_phrase(member.get("renew_days")),
+        missed=(" It's been a little while since we've seen you, and we miss having you around."
+                if _num(member.get("days_away"), 0) >= 10 else ""),
     )
+    if play == "Renewal offer" and not d.get("offer"):
+        play = "Renewal check-in"     # no gym-approved offer: never invent one
     text = PLAY_TEXT.get(
         play, "Hi {first}, it's {owner} from {biz}. Just checking in.").format(**vals)
     return text + "\n\n" + _signoff(ctx)
+
+
+def _goal_phrase(goal):
+    """'Weight loss' -> ' towards your goal of weight loss'; 'Lose weight' -> ' as you work to lose weight'."""
+    g = _text(goal).strip().rstrip(".").lower()
+    if not g:
+        return ""
+    if g.split()[0] in {"lose", "build", "stay", "train", "gain", "get", "improve", "run",
+                        "tone", "increase", "reduce", "keep", "become", "prepare"}:
+        return f" as you work to {g}"
+    return f" towards your goal of {g}"
+
+
+def _renew_phrase(days):
+    d = _num(days, None)
+    if d is None:
+        return "is coming up for renewal"
+    d = int(d)
+    if d < 0:
+        return f"ended {_plural(-d, 'day')} ago"
+    if d == 0:
+        return "is due for renewal today"
+    if d == 1:
+        return "is due for renewal tomorrow"
+    return f"is due for renewal in {d} days"
 
 
 def renewal_message(name, days, ctx):
@@ -2756,6 +2947,41 @@ def _start_play(supabase, aid):
         st.session_state["ac_flash"] = f"Could not update: {error}"
 
 
+def _sent_from_panel(supabase, a):
+    play = a["action_type"]
+    method = PLAY_INFO.get(play, {}).get("channel", "WhatsApp")
+    method = "WhatsApp" if method in ("Call", "In person") else method
+    try:
+        mark_contacted(supabase, a["id"], method, play=play)
+        days = PLAY_INFO.get(play, {}).get("follow", 3)
+        st.session_state["ac_flash"] = f"Marked as contacted. Follow-up due in {_plural(days, 'day')}."
+    except Exception as error:
+        st.session_state["ac_flash"] = f"Could not update: {error}"
+
+
+def pick_trainer(trainers, goal=""):
+    """The trainer whose specialty best matches the member's goal."""
+    if not trainers:
+        return None
+    words = {w for w in re.findall(r"[a-z]+", str(goal or "").lower()) if len(w) > 3}
+    synonyms = {"weight": {"loss", "fat", "hiit", "conditioning", "cardio"},
+                "muscle": {"strength", "bodybuilding", "hypertrophy"},
+                "strength": {"strength", "powerlifting"},
+                "endurance": {"cardio", "running", "conditioning"}}
+    for w in list(words):
+        words |= synonyms.get(w, set())
+    best = max(trainers, key=lambda t: len(words & set(
+        re.findall(r"[a-z]+", _text(t.get("specialty")).lower()))))
+    return best
+
+
+def next_class(classes):
+    now = datetime.now(APP_TZ).replace(tzinfo=None)
+    upcoming = sorted((c for c in classes if c.get("_start") and c["_start"] > now),
+                      key=lambda c: c["_start"])
+    return upcoming[0] if upcoming else None
+
+
 def _message_from_play(aid, member_id):
     st.session_state["fu_prefill"] = st.session_state.get(f"pm_{aid}", "")
     open_followup(member_id, "Action Centre")
@@ -2770,9 +2996,15 @@ def _play_panel(supabase, a):
     play = a["action_type"]
     trainers = ctx_play.get("trainers") or {}
     trainer = trainers.get(a.get("trainer_id")) if play in TRAINER_PLAYS else None
+    if play in TRAINER_PLAYS and trainer is None and trainers:
+        trainer = pick_trainer(list(trainers.values()), member.get("goal"))
     details = a.get("details")
     if not isinstance(details, dict):
         details = {}
+    if play == "Class invite" and not details.get("title"):
+        nxt = next_class(ctx_play.get("classes") or [])
+        if nxt:
+            details = {**details, "title": nxt["name"], "when": class_when_long(nxt["_start"])}
     with st.expander("Do this play"):
         if play in TRAINER_PLAYS:
             if trainer:
@@ -2799,9 +3031,9 @@ def _play_panel(supabase, a):
             c3.link_button("Call", f"tel:{member['phone']}", use_container_width=True)
         if not (digits or member.get("email")):
             st.caption("This member has no phone or email yet. Add one on their profile.")
-        if a.get("status") == "To do":
-            st.button("I've sent it: move to In progress", key=f"ps_{a['id']}",
-                      on_click=_start_play, args=(supabase, a["id"]),
+        if action_stage(a) in ("Started", "In progress"):
+            st.button("I've sent it: mark contacted", key=f"ps_{a['id']}",
+                      on_click=_sent_from_panel, args=(supabase, a),
                       use_container_width=True)
 
 
@@ -2862,6 +3094,10 @@ def _log_reminder(supabase, gym_id, member_id, name):
         supabase.table("reminder_log").insert(
             {"gym_id": gym_id, "member_id": member_id, "kind": "renewal"}).execute()
         st.session_state["pay_flash"] = f"Reminder to {name} marked as sent. Next one in 7 days."
+        row = open_action_for(supabase, member_id)
+        if row and row.get("action_type") in ("Renewal offer", "Personal call", "WhatsApp check-in"):
+            mark_contacted(supabase, row["id"], "WhatsApp", play=row.get("action_type"))
+            st.session_state["pay_flash"] += f" Their {row['action_type']} is marked contacted."
     except Exception:
         st.session_state["pay_flash"] = "Could not save. Have you run the reminder_log SQL?"
 
@@ -2939,48 +3175,108 @@ def _remove_from_board(supabase, a):
         st.rerun()
 
 
+def _contact_line(a):
+    if _blank(a.get("contacted_at")):
+        return ""
+    try:
+        when = pd.Timestamp(a["contacted_at"]).tz_convert(APP_TZ)
+        when_txt = f"{when:%d %b}"
+    except Exception:
+        when_txt = str(a["contacted_at"])[:10]
+    method = _text(a.get("contact_method"), "message")
+    follow = a.get("follow_up_on") or a.get("due_date")
+    tail = f" · follow up {str(follow)[:10]}" if not _blank(follow) else ""
+    return f"Contacted by {method.lower()} on {when_txt}{tail}"
+
+
+def _lifecycle_controls(supabase, a, prefix):
+    """Every step of a play, the same on the board, the list and phones."""
+    aid, play = a["id"], a["action_type"]
+    stage = action_stage(a)
+    info = PLAY_INFO.get(play, {})
+    note = a.get("note")
+    note = note if isinstance(note, str) else ""
+    if stage in ("Resolved", "Unsuccessful"):
+        if note:
+            st.caption(note)
+        return
+    new_note = st.text_area("Note", value=note, key=f"{prefix}_n_{aid}", height=92,
+                            placeholder="Add a note…", label_visibility="collapsed")
+    if stage == "Started":
+        if st.button("Start this play", key=f"{prefix}_s_{aid}", type="primary",
+                     use_container_width=True):
+            (supabase.table("retention_actions")
+             .update({"status": "In progress", "note": new_note}).eq("id", aid).execute())
+            st.rerun()
+    if stage in ("Started", "In progress"):
+        with st.popover("Mark contacted", use_container_width=True):
+            default = info.get("channel", "WhatsApp")
+            method = st.selectbox("How did you reach them?", CONTACT_METHODS,
+                                  index=CONTACT_METHODS.index(default) if default in CONTACT_METHODS else 0,
+                                  key=f"{prefix}_cm_{aid}")
+            days = st.number_input("Follow up in (days)", 1, 60, int(info.get("follow", 3)),
+                                   key=f"{prefix}_fd_{aid}")
+            if st.button("Save contact", key=f"{prefix}_cs_{aid}", type="primary",
+                         use_container_width=True):
+                saved = mark_contacted(supabase, aid, method, days, play, new_note)
+                st.session_state["ac_flash"] = (
+                    f"Contact recorded. Follow-up due in {_plural(int(days), 'day')}."
+                    + ("" if saved == "full" else " Run sql/phase2_retention.sql to keep the "
+                       "contact method and date as their own fields."))
+                st.rerun()
+    else:
+        o1, o2 = st.columns([1.3, 1])
+        outcome = o1.selectbox("Outcome", OUTCOMES, key=f"{prefix}_o_{aid}",
+                               label_visibility="collapsed",
+                               help="Retained: they renewed or came back. Cancelled: they left. "
+                                    "No response: you couldn't reach them.")
+        if o2.button("Record outcome", key=f"{prefix}_d_{aid}", type="primary",
+                     use_container_width=True):
+            close_action(supabase, aid, outcome, new_note)
+            st.rerun()
+        if st.button("Contacted again", key=f"{prefix}_ca_{aid}", type="tertiary",
+                     use_container_width=True):
+            mark_contacted(supabase, aid, _text(a.get("contact_method"), info.get("channel", "WhatsApp")),
+                           info.get("follow", 3), play, new_note)
+            st.rerun()
+
+
 def _action_card(supabase, a, names, photos, status, prefix):
     member_id = a["member_id"]
     who = names.get(member_id, "Archived member")
-    note = a.get("note")
-    note = note if isinstance(note, str) else ""
+    stage = action_stage(a)
     with st.container(border=True, key=f"card_{prefix}_{a['id']}"):
         ca, cb = st.columns([0.34, 1], vertical_alignment="center")
         _md(avatar_html(who, photos.get(member_id), 38, "row-tight"), ca)
         cb.button(str(who), key=f"mrow_{prefix}_{a['id']}", on_click=open_profile,
                   args=(member_id, "Action Centre"), use_container_width=True)
-        chips = chip(a["action_type"], "cyan") + due_chip(a.get("due_date"), status)
+        chips = chip(a["action_type"], "cyan") + stage_chip(stage)
+        if stage in ("Started", "In progress"):
+            chips += due_chip(a.get("due_date"), status)
         if status == "Done":
             chips += outcome_chip(a.get("outcome"))
         _md(f'<div class="chip-row">{chips}</div>')
-        _remove_from_board(supabase, a)
+        objective = PLAY_INFO.get(a["action_type"], {}).get("objective")
+        line = _contact_line(a)
+        if objective or line:
+            _md(f'<div class="why" style="padding:4px 0 2px">'
+                + (f'Goal: {_esc(objective)}' if objective else "")
+                + (f'<br>{_esc(line)}' if line else "") + "</div>")
         if status != "Done":
             _play_panel(supabase, a)
-            st.button("Message", key=f"follow_{prefix}_{a['id']}", on_click=_message_from_play,
-                      args=(a["id"], member_id), use_container_width=True)
-        if status == "Done":
-            if note:
-                st.caption(note)
-            return
-        new_note = st.text_input("Note", value=note, key=f"{prefix}_n_{a['id']}",
-                                 placeholder="Add a note…", label_visibility="collapsed")
-        if status == "To do":
-            if st.button("Start", key=f"{prefix}_s_{a['id']}", use_container_width=True):
-                (supabase.table("retention_actions")
-                 .update({"status": "In progress", "note": new_note})
-                 .eq("id", a["id"]).execute())
-                st.rerun()
-        else:
-            outcome = st.selectbox("Outcome", OUTCOMES, key=f"{prefix}_o_{a['id']}",
-                                   label_visibility="collapsed")
-            if st.button("Mark done", key=f"{prefix}_d_{a['id']}", use_container_width=True):
-                (supabase.table("retention_actions").update({
-                    "status": "Done", "outcome": outcome, "note": new_note,
-                    "completed_at": datetime.now(timezone.utc).isoformat()})
-                 .eq("id", a["id"]).execute())
-                st.rerun()
+            st.button("Message in Follow-ups", key=f"follow_{prefix}_{a['id']}",
+                      on_click=_message_from_play, args=(a["id"], member_id),
+                      use_container_width=True)
+        _lifecycle_controls(supabase, a, prefix)
+        _remove_from_board(supabase, a)
 
 BOARD_TONES = {"To do": "cyan", "In progress": "amber", "Done": "lime"}
+BOARD_COLUMNS = [
+    ("To start", ("Started",), "cyan"),
+    ("In progress", ("In progress",), "amber"),
+    ("Contacted · follow up", ("Contacted", "Follow-up due"), "white"),
+    ("Done", ("Resolved", "Unsuccessful"), "lime"),
+]
 
 def _visible_actions(actions):
     if actions.empty:
@@ -2989,57 +3285,44 @@ def _visible_actions(actions):
         return actions[actions["archived_at"].isna()]
     return actions
 
+def _with_stage(actions):
+    if actions.empty:
+        return actions.assign(stage=pd.Series(dtype=str))
+    return actions.assign(stage=[action_stage(r) for r in actions.to_dict("records")])
+
 def _kanban(supabase, actions, names, photos):
-    cols = st.columns(3)
-    for col, status in zip(cols, STATUSES):
-        sub = actions[actions["status"] == status]
-        if status == "Done" and "completed_at" in sub.columns:
+    actions = _with_stage(actions)
+    cols = st.columns(len(BOARD_COLUMNS))
+    for col, (title, stages, tone) in zip(cols, BOARD_COLUMNS):
+        sub = actions[actions["stage"].isin(stages)]
+        if "Done" in title and "completed_at" in sub.columns:
             sub = sub.sort_values("completed_at", ascending=False, na_position="last")
+        elif "follow" in title:
+            sub = sub.sort_values("due_date", na_position="last")
         with col:
-            _md(f'<div class="kb-head" style="--tone:{TONES[BOARD_TONES[status]]}">'
-                f'<span>{status}</span><b>{len(sub)}</b></div>')
+            due_n = int((sub["stage"] == "Follow-up due").sum())
+            _md(f'<div class="kb-head" style="--tone:{TONES[tone]}">'
+                f'<span>{title}</span><b>{len(sub)}</b></div>'
+                + (f'<div class="kb-empty" style="color:#FF6B6B">{due_n} follow-up(s) due</div>' if due_n else ""))
             if sub.empty:
                 _md('<div class="kb-empty">Nothing here yet</div>')
-            shown = sub.head(10) if status == "Done" else sub
+            shown = sub.head(10) if "Done" in title else sub
             for _, a in shown.iterrows():
-                _action_card(supabase, a, names, photos, status, "kb")
-            if status == "Done" and len(sub) > 10:
+                _action_card(supabase, a, names, photos, a["status"], "kb")
+            if "Done" in title and len(sub) > 10:
                 st.caption(f"+{len(sub) - 10} older ones in the List view.")
 
 def _list_board(supabase, actions, names, photos):
-    tabs = st.tabs([f"{s} ({int((actions['status'] == s).sum())})" for s in STATUSES])
-    for tab, status in zip(tabs, STATUSES):
+    actions = _with_stage(actions)
+    tabs = st.tabs([f"{title} ({int(actions['stage'].isin(stages).sum())})"
+                    for title, stages, _ in BOARD_COLUMNS])
+    for tab, (title, stages, _) in zip(tabs, BOARD_COLUMNS):
         with tab:
-            sub = actions[actions["status"] == status]
+            sub = actions[actions["stage"].isin(stages)]
             if sub.empty:
                 st.caption("Nothing here.")
             for _, a in sub.iterrows():
-                with st.container(border=True, key=f"card_ls_{a['id']}"):
-                    member_id = a["member_id"]
-                    who = names.get(member_id, "Archived member")
-                    _md(f'<div class="chip-row">{avatar_html(who, photos.get(member_id), 30)}'
-                        f'<b style="color:#F4F7FB;align-self:center">{_esc(who)}</b>'
-                        f'{chip(a["action_type"], "cyan")}{due_chip(a.get("due_date"), status)}</div>')
-                    if status == "Done":
-                        _md(f'<div class="chip-row">{outcome_chip(a.get("outcome"))}</div>')
-                    else:
-                        note = a.get("note")
-                        n = st.text_input("Note", note if isinstance(note, str) else "",
-                                          key=f"n_{a['id']}")
-                        x, y = st.columns(2)
-                        if status == "To do" and x.button("Start", key=f"s_{a['id']}"):
-                            (supabase.table("retention_actions")
-                             .update({"status": "In progress", "note": n})
-                             .eq("id", a["id"]).execute())
-                            st.rerun()
-                        out = y.selectbox("Outcome", OUTCOMES, key=f"o_{a['id']}")
-                        if y.button("Mark done", key=f"d_{a['id']}"):
-                            (supabase.table("retention_actions").update({
-                                "status": "Done", "outcome": out, "note": n,
-                                "completed_at": datetime.now(timezone.utc).isoformat()})
-                             .eq("id", a["id"]).execute())
-                            st.rerun()
-                    _delete_action_control(supabase, a["id"])
+                _action_card(supabase, a, names, photos, a["status"], "ls")
 
 
 def _pick_play(pillar, play):
@@ -3177,11 +3460,9 @@ def render_action_centre(supabase, gym_id, assess_fn):
     photos = roster.set_index("id")["photo"].to_dict() if "photo" in roster.columns else {}
     k = kpis(roster, actions_all)
     st.session_state["_play_ctx"] = {
-        "contacts": {r["id"]: {"name": _text(r["full_name"]), "phone": _text(r.get("phone")),
-                               "email": _text(r.get("email")),
-                               "goal": _text(r.get("fitness_goal"))}
-                     for _, r in roster.iterrows()},
+        "contacts": {r["id"]: member_message_ctx(r) for _, r in roster.iterrows()},
         "trainers": {t["id"]: t for t in load_trainers(supabase, gym_id)},
+        "classes": load_classes(supabase, gym_id),
     }
 
     overdue = 0
@@ -3222,13 +3503,14 @@ def render_action_centre(supabase, gym_id, assess_fn):
         if _mobile():
             for _, r in top.iterrows():
                 mobile_member_card(
-                    r, "sug", why=r["drivers"],
+                    r, "sug", why=story_text(r),
                     chips=risk_chip(r["risk_category"], r["cancellation_probability"])
                           + chip(r["suggested_action"], "cyan"),
                     actions=[
                         ("Open profile", "mopen_sug", open_profile, (r["id"], "Action Centre")),
-                        ("Add to Action Centre", "madd_sug", _create_action,
-                         (supabase, gym_id, r["id"], r["suggested_action"], r["renewal_due_days"])),
+                        ("Start play", "madd_sug", _create_action,
+                         (supabase, gym_id, r["id"], r["suggested_action"], r["renewal_due_days"],
+                          story_text(r))),
                     ])
         else:
             with st.container(border=True, key="card_suggested"):
@@ -3238,17 +3520,18 @@ def render_action_centre(supabase, gym_id, assess_fn):
                     c[1].button(str(r["full_name"]), key=f"mrow_sug_{r['id']}",
                                 on_click=open_profile, args=(r["id"], "Action Centre"),
                                 use_container_width=True)
-                    _md(f'<div class="why">{_esc(r["drivers"])}</div>', c[1])
+                    _md(story_html(r), c[1])
                     _md(risk_chip(r["risk_category"], r["cancellation_probability"])
                         + chip(r["suggested_action"], "cyan"), c[2])
-                    if c[3].button("Add", key=f"add_{r['id']}", use_container_width=True):
+                    if c[3].button("Start play", key=f"add_{r['id']}", type="primary",
+                                   use_container_width=True):
                         _create_action(supabase, gym_id, r["id"], r["suggested_action"],
-                                       r["renewal_due_days"])
+                                       r["renewal_due_days"], note=story_text(r))
                         st.rerun()
-        if len(todo) > 1 and st.button("Add all top 5", use_container_width=True):
+        if len(todo) > 1 and st.button("Start plays for all top 5", use_container_width=True):
             for _, r in top.iterrows():
                 _create_action(supabase, gym_id, r["id"], r["suggested_action"],
-                               r["renewal_due_days"])
+                               r["renewal_due_days"], note=story_text(r))
             st.rerun()
 
     _pillars_panel(supabase, gym_id, roster, actions_all)
@@ -3678,7 +3961,19 @@ def archie_context(roster, actions, business_name, supabase=None, gym_id=None):
 
     res = gc.outcomes(roster, actions)
     L.append(f"\nFOLLOW-UPS (recorded): {res['todo']} to do, {res['doing']} in progress, "
-             f"{res['overdue']} overdue, {res['due_today']} due today.")
+             f"{res['overdue']} overdue, {res['due_today']} due today, "
+             f"{res.get('followup_due', 0)} contacted members waiting for their follow-up.")
+    if not actions.empty:
+        live = actions[actions["status"] != "Done"]
+        if "archived_at" in live.columns:
+            live = live[live["archived_at"].isna()]
+        names_ = roster.set_index("id")["full_name"].to_dict()
+        for r in live.head(15).to_dict("records"):
+            info = PLAY_INFO.get(r.get("action_type"), {})
+            line = _contact_line(r)
+            L.append(f"- {names_.get(r['member_id'], 'a member')}: {r.get('action_type')} "
+                     f"({action_stage(r)}; goal: {info.get('objective', 'n/a')})"
+                     + (f"; {line}" if line else ""))
     if not actions.empty and res["overdue"]:
         names = roster.set_index("id")["full_name"].to_dict()
         open_a = actions[actions["status"] != "Done"].copy()
