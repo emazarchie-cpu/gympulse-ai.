@@ -346,6 +346,12 @@ st.markdown(
         padding-top: 1rem !important;
     }
 
+    /* Style-only markdown blocks still take a 16px flex gap each, which
+       stacks into a big empty band at the top. Take them out of the flow. */
+    [data-testid="stElementContainer"]:has([data-testid="stMarkdownContainer"] > style:only-child) {
+        display: none !important;
+    }
+
     /* ---------- Top bar container ---------- */
     .st-key-top_nav {
         border-bottom: 1px solid var(--border);
@@ -2522,7 +2528,7 @@ st.markdown(f"""
 <style>
 .st-key-top_profile button::before {{
     content: ""; display: block;
-    background: url('{_av_src}') center/cover no-repeat;
+    background: #10182A url('{_av_src}') center/contain no-repeat;
 }}
 </style>
 """, unsafe_allow_html=True)
