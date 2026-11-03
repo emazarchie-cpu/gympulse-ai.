@@ -3717,6 +3717,9 @@ def render_business_insights(supabase, gym_id, assess_fn):
     page_header("Business Insights",
                 "What retention is worth, where it leaks, and what's working.",
                 "Numbers that matter")
+    _flash = st.session_state.pop("ins_flash", None)
+    if _flash:
+        st.success(_flash)
     try:
         roster, _ = load_roster(supabase, gym_id, assess_fn)
         actions = load_actions(supabase, gym_id, include_archived=True)
@@ -3739,7 +3742,9 @@ def render_business_insights(supabase, gym_id, assess_fn):
                "It is a planning figure from a synthetic-data model, not a forecast.")
 
     import gympulse_revenue as gr  # local import: gympulse_revenue imports this module
+    import gympulse_pilot as gp  # local import: gympulse_pilot imports this module
     gr.render_revenue_outcomes(supabase, gym_id, roster)
+    gp.render_operations(roster, actions)
 
     _insights_charts(roster)
 
@@ -3825,6 +3830,9 @@ def render_business_insights(supabase, gym_id, assess_fn):
     import gympulse_automation as ga  # local import: gympulse_automation imports this module
     biz = _text((st.session_state.get("user_profile") or {}).get("business_name"), "Your gym")
     ga.render_report_section(supabase, gym_id, roster, actions, biz)
+    gp.render_pilot(supabase, gym_id, roster, actions,
+                    lambda settings, msg: gp.save_profile_settings(supabase, settings, msg))
+    gp.render_export(supabase, gym_id, roster, actions)
 
 # ------------------------------------------------------------ Archie
 ARCHIE_PROMPTS = [
