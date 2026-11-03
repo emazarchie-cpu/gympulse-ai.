@@ -18,7 +18,7 @@ OUTCOME_WINDOW_DAYS = 30
 # ------------------------------------------------------------------ helpers
 def _ts(series):
     """Parse timestamps to naive UTC, tolerating blanks."""
-    out = pd.to_datetime(series, errors="coerce", utc=True)
+    out = pd.to_datetime(series, errors="coerce", utc=True, format="ISO8601")
     return out.dt.tz_localize(None)
 
 
@@ -238,23 +238,32 @@ def _priority_row(supabase, gym_id, r, i, mobile):
 
 def render_command_centre(supabase, gym_id, assess_fn, greeting, user_name, business_name):
     try:
-        roster, _ = gw.load_roster(supabase, gym_id, assess_fn)
+        roster, missing = gw.load_roster(supabase, gym_id, assess_fn)
         actions = gw.load_actions(supabase, gym_id, include_archived=True)
     except Exception:
-        roster, actions = pd.DataFrame(), pd.DataFrame()
+        roster, missing, actions = pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 
     mobile = gw._mobile()
     today = gw.today_local()
-    has_ck = False
+    ck_ids = set()
     try:
         ck = gw.load_checkins(supabase, gym_id)
-        has_ck = ck is not None and not ck.empty
+        if ck is not None and not ck.empty:
+            ck_ids = set(ck["member_id"])
     except Exception:
         pass
-    source = ('<span class="gp-tag live">Live check-ins</span>' if has_ck
-              else '<span class="gp-tag">Typed-in activity</span>')
+    from_ck = int(roster["id"].isin(ck_ids).sum()) if not roster.empty else 0
+    if roster.empty or not from_ck:
+        source = '<span class="gp-tag">Typed-in attendance</span>'
+    elif from_ck == len(roster):
+        source = '<span class="gp-tag live">All from live check-ins</span>'
+    else:
+        source = f'<span class="gp-tag live">{from_ck} of {len(roster)} from check-ins</span>'
 
     if roster.empty:
+        if missing is not None and len(missing):
+            st.info(f"{_plural(len(missing), 'member')} registered without a plan or fee. Add their "
+                    "membership details on the Risk Radar (Data tools) and they'll be scored.")
         gw._md(f"""<div class="cc-hero"><div class="cc-hero-top"><div>
             <div class="cc-eyebrow">Retention command centre · {today:%A %d %B}</div>
             <div class="cc-hello">{gw._esc(greeting)}, {gw._esc(user_name)}</div>
@@ -302,6 +311,12 @@ def render_command_centre(supabase, gym_id, assess_fn, greeting, user_name, busi
     flash = st.session_state.pop("cc_flash", None)
     if flash:
         getattr(st, flash[0], st.info)(flash[1])
+    if missing is not None and len(missing):
+        m1, m2 = st.columns([4, 1.2], vertical_alignment="center")
+        m1.warning(f"{_plural(len(missing), 'member')} {'has' if len(missing) == 1 else 'have'} no plan or fee "
+                   "yet, so GymPulse can't score them. Add their membership details to include them.")
+        m2.button("Add details", key="cc_missing", icon=":material/edit:", on_click=gw._go,
+                  args=("Risk Radar",), use_container_width=True)
 
     # ---- revenue first
     rate = "n/a" if res["save_rate"] is None else f"{res['save_rate']:.0%}"
