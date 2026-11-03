@@ -35,51 +35,14 @@ def _plural(n, word, plural=None):
     return f"{n} {word if n == 1 else (plural or word + 's')}"
 
 
-def risk_story(r):
-    """Who, why, when and what next for one member, in plain words."""
-    days = int(r.get("days_since_last_visit", 0) or 0)
-    recent = int(r.get("visits_last_30_days", 0) or 0)
-    before = int(r.get("visits_previous_30_days", 0) or 0)
-    renew = int(r.get("renewal_due_days", 0) or 0)
-
-    why = []
-    if before - recent >= 3:
-        why.append(f"visits fell from {before} to {recent} a month")
-    ug = r.get("usual_gap_days")
-    if ug is not None and not pd.isna(ug) and days > max(2 * float(ug), float(ug) + 3):
-        n = max(1, round(float(ug)))
-        why.append(f"usually trains every {_plural(n, 'day')}, now {days} away")
-    elif days >= 10:
-        why.append(f"no check-in for {days} days")
-    if renew == 0:
-        why.append("renews today")
-    elif 0 < renew <= 30:
-        why.append(f"renews in {_plural(renew, 'day')}")
-    elif renew < 0:
-        why.append(f"membership lapsed {_plural(-renew, 'day')} ago")
-    if not why:
-        why.append(str(r.get("drivers") or "early warning signs"))
-
-    if before - recent >= 3:
-        when = "the drop shows over the last 30 days"
-    elif days:
-        when = f"last check-in {_plural(days, 'day')} ago"
-    else:
-        when = "checked in today"
-
-    urgent = r.get("risk_category") == "High" and renew <= 14
-    play = str(r.get("suggested_action") or "Personal call")
-    nxt = f"<b>{gw._esc(play)}</b> {'today' if urgent else 'this week'}"
-    if renew <= 14 and play != "Renewal offer":
-        nxt += ", before the renewal date"
-    return {"why": ", ".join(why[:3]), "when": when, "next": nxt, "play": play}
+risk_story = gw.risk_story
 
 
 def outcomes(roster, actions, days=OUTCOME_WINDOW_DAYS):
     """Verified results from recorded actions and real check-ins."""
     res = {"retained_n": 0, "retained_rev": 0.0, "cancelled_n": 0, "reengaged_n": 0,
            "resolved_n": 0, "save_rate": None, "overdue": 0, "due_today": 0,
-           "todo": 0, "doing": 0}
+           "todo": 0, "doing": 0, "contacted_n": 0, "followup_due": 0}
     if actions is None or actions.empty:
         return res
     a = actions.copy()
@@ -98,6 +61,13 @@ def outcomes(roster, actions, days=OUTCOME_WINDOW_DAYS):
     res["overdue"] = int((due < today).sum())
     res["due_today"] = int((due == today).sum())
 
+    if "contacted_at" in a.columns:
+        contacted = a["contacted_at"].notna() & (a["contacted_at"].astype(str).str.len() > 0)
+    else:
+        contacted = pd.Series(False, index=a.index)
+    res["contacted_n"] = int((contacted | (a["status"] == "Done")).sum())
+    res["followup_due"] = int(sum(gw.action_stage(r) == "Follow-up due"
+                                  for r in open_a.to_dict("records")))
     done = a[(a["status"] == "Done") & (a["done_at"] >= now - pd.Timedelta(days=days))]
     res["resolved_n"] = len(done)
     kept = done[done["outcome"] == "Retained"].drop_duplicates("member_id")
@@ -331,7 +301,7 @@ def render_command_centre(supabase, gym_id, assess_fn, greeting, user_name, busi
                   f"Checked in again after a play · save rate {rate}",
                   "#35D6ED", '<span class="gp-tag ok">Check-ins</span>')
            + _kpi("Follow-ups", str(res["todo"] + res["doing"]),
-                  f"{res['overdue']} overdue · {res['due_today']} due today",
+                  f"{res['overdue']} overdue · {res['followup_due']} follow-ups due",
                   "#FFC44D" if res["overdue"] else "#9AA8BD")
            + "</div>")
     st.caption("Estimates come from an experimental model. Verified figures only count recorded "
@@ -392,8 +362,9 @@ def render_command_centre(supabase, gym_id, assess_fn, greeting, user_name, busi
     flagged = int((roster["risk_category"] != "Low").sum())
     started = res["todo"] + res["doing"] + res["resolved_n"]
     steps = [("Detected", flagged, "Members flagged medium or high risk", flagged),
-             ("Acted on", started, "Plays started or finished", started),
-             ("Resolved", res["resolved_n"], "Plays closed with an outcome", res["resolved_n"]),
+             ("Started", started, "Plays started or finished", started),
+             ("Contacted", res["contacted_n"], f"Members reached · {res['followup_due']} follow-ups due",
+              res["contacted_n"]),
              ("Kept", res["retained_n"], f"Members retained · {_money(res['retained_rev'])}/mo", res["retained_n"])]
     top = max(1, flagged, started)
     gw._md('<div class="cc-loop">' + "".join(

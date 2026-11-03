@@ -55,11 +55,21 @@ def whatsapp_ready():
     return bool(_secret("WHATSAPP_TOKEN") and _secret("WHATSAPP_PHONE_ID"))
 
 
-def draft_message(action, name, owner, gym, goal):
-    subject, body = DRAFTS.get(action, DRAFTS["Personal call"])
-    values = {"first": (str(name).split() or ["there"])[0], "owner": owner,
-              "gym": gym, "goal": (goal or "fitness").lower()}
-    return subject.format(**values), body.format(**values)
+def draft_message(action, name, owner, gym, goal, member=None, details=None, trainer=None):
+    """Subject plus the same personalised message the Action Centre uses, so a
+    member never gets two different versions, and never an offer the gym didn't set."""
+    subject, _ = DRAFTS.get(action, DRAFTS["Personal call"])
+    first = (str(name).split() or ["there"])[0]
+    ctx = gw._biz_ctx()
+    if owner:
+        ctx["owner"] = owner
+    if gym:
+        ctx["biz"] = gym
+    who = dict(member or {})
+    who.setdefault("name", name)
+    who.setdefault("goal", goal)
+    body = gw.play_message(action, who, trainer, ctx, details)
+    return subject.format(first=first, owner=owner, gym=gym, goal=(goal or "fitness").lower()), body
 
 
 def archie_rewrite(body, name, owner, gym):
@@ -203,13 +213,15 @@ def _compose(supabase, gym_id, members, owner, gym):
     email, phone = gw._text(m["email"]), gw._text(m["phone"])
     digits = gw.whatsapp_digits(phone)
 
-    open_action = ""
-    try:
-        rows = (supabase.table("retention_actions").select("action_type")
-                .eq("member_id", mid).neq("status", "Done").limit(1).execute().data or [])
-        open_action = rows[0]["action_type"] if rows else ""
-    except Exception:
-        pass
+    open_row = gw.open_action_for(supabase, mid)
+    open_action = open_row["action_type"] if open_row else ""
+    if open_row:
+        stage = gw.action_stage(open_row)
+        gw._md(f'<div class="chip-row">{gw.chip("Open play: " + open_action, "cyan")}'
+               f'{gw.stage_chip(stage)}</div>')
+        line = gw._contact_line(open_row)
+        if line:
+            st.caption(line)
     themes = list(DRAFTS)
     theme = st.selectbox("Message idea", themes,
                          index=themes.index(open_action) if open_action in themes else 0,
@@ -223,7 +235,27 @@ def _compose(supabase, gym_id, members, owner, gym):
 
     gw._md(f'<div class="chip-row">{gw.chip("Drafted by Archie", "lime", dot=True)}'
            f'{gw.chip(theme, "cyan")}</div>')
-    subject_default, body_default = draft_message(theme, name, owner, gym, goal)
+    member_ctx = {"name": name, "goal": goal}
+    try:
+        roster = st.session_state.get("_fu_roster")
+        if roster is not None and not roster.empty and mid in set(roster["id"]):
+            member_ctx = gw.member_message_ctx(roster[roster["id"] == mid].iloc[0])
+    except Exception:
+        pass
+    details = open_row.get("details") if open_row and theme == open_action else None
+    trainer = None
+    if theme in gw.TRAINER_PLAYS:
+        trainers = gw.load_trainers(supabase, gym_id)
+        tmap = {t["id"]: t for t in trainers}
+        trainer = (tmap.get(open_row.get("trainer_id")) if open_row else None) or \
+            gw.pick_trainer(trainers, goal)
+    if theme == "Class invite" and not (isinstance(details, dict) and details.get("title")):
+        nxt = gw.next_class(gw.load_classes(supabase, gym_id))
+        if nxt:
+            details = {"title": nxt["name"], "when": gw.class_when_long(nxt["_start"])}
+    subject_default, body_default = draft_message(
+        theme, name, owner, gym, goal, member_ctx,
+        details if isinstance(details, dict) else None, trainer)
     base = f"{mid}_{channel}_{theme}"
     body_key = f"fu_body_{base}"
     if channel == "Email":
@@ -250,7 +282,7 @@ def _compose(supabase, gym_id, members, owner, gym):
                     st.error(str(error))
                 else:
                     log_message(supabase, gym_id, mid, "whatsapp", "out", body, provider_id=pid)
-                    _after_send(supabase, mid, name)
+                    _after_send(supabase, mid, name, "WhatsApp")
         else:
             url = f"https://wa.me/{digits}?text={urllib.parse.quote(body)}"
             c2.link_button("Open in WhatsApp", url, use_container_width=True)
@@ -258,7 +290,7 @@ def _compose(supabase, gym_id, members, owner, gym):
                        "with the message ready to send. Tap send there, then mark it below.")
             if st.button("I sent it, log it", key="fu_mark"):
                 log_message(supabase, gym_id, mid, "whatsapp", "out", body, status="manual")
-                _after_send(supabase, mid, name)
+                _after_send(supabase, mid, name, "WhatsApp")
     else:
         if not email:
             st.warning(f"{name} has no email address yet. Add one on their profile.")
@@ -272,7 +304,7 @@ def _compose(supabase, gym_id, members, owner, gym):
                     st.error(str(error))
                 else:
                     log_message(supabase, gym_id, mid, "email", "out", body, subject, provider_id=pid)
-                    _after_send(supabase, mid, name)
+                    _after_send(supabase, mid, name, "Email")
         else:
             url = (f"mailto:{email}?subject={urllib.parse.quote(subject or '')}"
                    f"&body={urllib.parse.quote(body)}")
@@ -281,17 +313,23 @@ def _compose(supabase, gym_id, members, owner, gym):
                        "app with the message ready. Send it there, then mark it below.")
             if st.button("I sent it, log it", key="fu_mark"):
                 log_message(supabase, gym_id, mid, "email", "out", body, subject, status="manual")
-                _after_send(supabase, mid, name)
+                _after_send(supabase, mid, name, "Email")
 
 
-def _after_send(supabase, member_id, name):
-    """Move the member's To do action to In progress, then confirm."""
+def _after_send(supabase, member_id, name, channel="WhatsApp"):
+    """One record: a message sent here marks the member's open play as contacted
+    and schedules its follow-up, exactly as the Action Centre does."""
+    row = gw.open_action_for(supabase, member_id)
+    if row is None:
+        st.success(f"Message to {name} logged.")
+        return
     try:
-        (supabase.table("retention_actions").update({"status": "In progress"})
-         .eq("member_id", member_id).eq("status", "To do").execute())
+        gw.mark_contacted(supabase, row["id"], channel, play=row.get("action_type"))
+        days = gw.PLAY_INFO.get(row.get("action_type"), {}).get("follow", 3)
+        st.success(f"Message to {name} logged. Their {row.get('action_type', 'play')} is marked "
+                   f"contacted, with a follow-up due in {gw._plural(days, 'day')}.")
     except Exception:
-        pass
-    st.success(f"Message to {name} logged. Their action is now In progress.")
+        st.success(f"Message to {name} logged.")
 
 
 # ----------------------------------------------------------------- inbox
@@ -371,6 +409,11 @@ def render_followups(supabase, gym_id, assess_fn, owner_name, gym_name):
         with st.expander("Technical details"):
             st.code(str(error))
         return
+    try:
+        st.session_state["_fu_roster"], _ = gw.load_roster(supabase, gym_id, assess_fn,
+                                                           with_photos=False)
+    except Exception:
+        st.session_state["_fu_roster"] = None
     unread = unread_count(supabase, gym_id)
     if unread is None:
         st.warning("Messaging needs a one-time database update. Run "
