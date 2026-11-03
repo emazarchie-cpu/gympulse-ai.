@@ -8,3 +8,5 @@ anthropic
 pillow-heif
 qrcode[pil] 
 pillow-heif
+reportlab
+openpyxl

@@ -1567,7 +1567,8 @@ def risk_story(r):
     if renew <= 14 and play != "Renewal offer":
         nxt += ", before the renewal date"
     if info.get("channel"):
-        nxt += f" · by {info['channel'].lower()}"
+        ch = info["channel"]
+        nxt += f" · by {ch.lower() if ch in ('Call', 'In person') else ch}"
     return {"why": ", ".join(why[:3]), "when": when, "next": nxt, "play": play,
             "objective": info.get("objective", "")}
 
@@ -1820,11 +1821,10 @@ def render_csv_import(supabase, gym_id, use_expander=True):
         template = members[["email", "full_name"]].copy()
         for col in ["membership_type", "monthly_fee"] + list(IMPORT_NUMERIC):
             template[col] = ""
-        st.download_button(
-            "Download a template with my members",
-            template.to_csv(index=False).encode("utf-8"),
-            "gympulse_activity_template.csv", "text/csv",
-        )
+        import gympulse_reports as rp  # local import: gympulse_reports imports this module
+        rp.download_link("Download a template with my members",
+                         template.to_csv(index=False).encode("utf-8"),
+                         "gympulse_activity_template.csv", "text/csv", "act_tpl")
         st.caption("Fill in the blank columns, then upload it below. "
                    "monthly_fee is optional; leave the column out to keep each "
                    "member's current fee.")
@@ -2344,7 +2344,7 @@ def render_member_profile(supabase, gym_id, member_id, assess_fn):
         start_default = (current_end if current_end and current_end >= date.today()
                          else date.today())
         start = r2.date_input("Starts on", value=start_default,
-                              key=f"renew_start_{member_id}_{plan}")
+                              key=f"renew_start_{member_id}_{plan}_{start_default}")
         amount = r3.number_input(
             "Amount paid", min_value=0.0, step=500.0,
             value=float((fee or 0.0) * PLAN_MONTHS[plan]),
@@ -4571,8 +4571,9 @@ def import_checkins(supabase, gym_id, rows, existing):
 def render_checkin_import(supabase, gym_id, members, ck):
     st.markdown(CHECKIN_IMPORT_HELP)
     up = st.file_uploader("Visit history (CSV)", type=["csv"], key="ck_import_file")
-    st.download_button("Download a template", "member,date,time\nAda Obi,2026-10-01,07:30\n",
-                       file_name="gympulse_checkins_template.csv", key="ck_import_tpl")
+    import gympulse_reports as rp  # local import: gympulse_reports imports this module
+    rp.download_link("Download a template", "member,date,time\nAda Obi,2026-10-01,07:30\n",
+                     "gympulse_checkins_template.csv", "text/csv", "ck_import_tpl")
     if up is None:
         return
     try:

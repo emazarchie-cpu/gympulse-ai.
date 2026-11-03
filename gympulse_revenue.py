@@ -35,6 +35,8 @@ def _fetch_payments_uncached(supabase, gym_id, days=400):
     if df.empty:
         return pd.DataFrame(columns=["id", "member_id", "amount", "paid_on", "kind",
                                      "action_id", "plan", "covers_until", "method", "note"])
+    if "created_at" in df.columns:
+        df = df.sort_values(["paid_on", "created_at"], ascending=False).reset_index(drop=True)
     df["amount"] = pd.to_numeric(df["amount"], errors="coerce").fillna(0.0)
     df["paid_on"] = pd.to_datetime(df["paid_on"], errors="coerce").dt.date
     for col in ("action_id", "kind", "plan", "method", "note", "covers_until"):
@@ -72,6 +74,16 @@ def find_creditable_play(supabase, gym_id, member_id, paid_on):
     credited = _credited_action_ids(supabase, gym_id)
     history = payments_ready(supabase, gym_id)
     start = pd.Timestamp(paid_on) - pd.Timedelta(days=ATTRIBUTION_WINDOW_DAYS)
+    # A play can only earn the renewal it led to: it must have been worked after
+    # this member's previous payment. A second payment straight after the first
+    # therefore gets no credit, even if another play happens to be open.
+    previous = _last_payment_time(supabase, gym_id, member_id)
+    if previous is not None:
+        start = max(start, previous)
+    # Prefer plays where the member was actually reached, most recent first
+    rows = sorted(rows, key=lambda r: (not gw._blank(r.get("contacted_at")),
+                                       str(r.get("contacted_at") or r.get("created_at") or "")),
+                  reverse=True)
     for r in rows:
         if str(r.get("id")) in credited or r.get("outcome") == "Cancelled":
             continue
@@ -85,6 +97,22 @@ def find_creditable_play(supabase, gym_id, member_id, paid_on):
         if start <= when <= pd.Timestamp(paid_on) + pd.Timedelta(days=1):
             return r
     return None
+
+
+def _last_payment_time(supabase, gym_id, member_id):
+    """When this member last paid (naive UTC), from the payment history, or None."""
+    try:
+        rows = (supabase.table("payments").select("created_at, paid_on").eq("member_id", member_id)
+                .order("created_at", desc=True).limit(1).execute().data or [])
+    except Exception:
+        return None
+    if not rows:
+        return None
+    t = pd.to_datetime(rows[0].get("created_at"), errors="coerce", utc=True, format="ISO8601")
+    if pd.isna(t):
+        t = pd.to_datetime(rows[0].get("paid_on"), errors="coerce")
+        return None if pd.isna(t) else t
+    return t.tz_localize(None)
 
 
 def payment_kind(current_end, paid_on, is_first=False):
@@ -232,7 +260,8 @@ def render_record_payment(supabase, gym_id, roster):
         state = gw.membership_state(r.get("membership_end"))
         start_default = state["end"] if state["end"] and state["end"] >= date.today() else date.today()
         d1, d2 = st.columns(2)
-        start = d1.date_input("New period starts", value=start_default, key=f"rp_start_{mid}")
+        start = d1.date_input("New period starts", value=start_default,
+                              key=f"rp_start_{mid}_{start_default}")
         amount = d2.number_input("Amount paid", min_value=0.0, step=500.0,
                                  value=float((r.get("monthly_fee") or 0) * gw.PLAN_MONTHS[plan]),
                                  key=f"rp_amt_{mid}_{plan}")
@@ -252,25 +281,96 @@ def render_record_payment(supabase, gym_id, roster):
             st.rerun()
 
 
+PAYMENTS_TABLE_CSS = """
+.gp-table-wrap { border: 1px solid rgba(255,255,255,0.09); border-radius: 16px; overflow: hidden;
+    background: #10172A; }
+.gp-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.gp-table th { text-align: left; font-size: 11px; letter-spacing: .8px; text-transform: uppercase;
+    color: #93A1B8; font-weight: 700; padding: 11px 14px; background: rgba(255,255,255,0.03);
+    border-bottom: 1px solid rgba(255,255,255,0.08); white-space: nowrap; }
+.gp-table td { padding: 11px 14px; color: #E6ECF5; border-bottom: 1px solid rgba(255,255,255,0.06);
+    vertical-align: middle; }
+.gp-table tr:last-child td { border-bottom: 0; }
+.gp-table td.num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; color: #F4F7FB; }
+.gp-table th.num { text-align: right; }
+.gp-table .sub { display: block; font-size: 11.5px; color: #93A1B8; margin-top: 2px; }
+.gp-table-foot { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+    padding: 10px 14px; font-size: 12.5px; color: #93A1B8; border-top: 1px solid rgba(255,255,255,0.08); }
+.gp-table-foot b { color: #F4F7FB; }
+@media (max-width: 700px) {
+    .gp-table thead { display: none; }
+    .gp-table, .gp-table tbody, .gp-table tr, .gp-table td { display: block; width: 100%; box-sizing: border-box; }
+    .gp-table tr { padding: 10px 14px; border-bottom: 1px solid rgba(255,255,255,0.07); }
+    .gp-table td { border: 0; padding: 2px 0; }
+    .gp-table td.num { text-align: left; font-size: 16px; }
+    .gp-table td[data-l]::before { content: attr(data-l) ": "; color: #93A1B8; font-size: 12px; }
+}
+"""
+
+
 def render_recent_payments(supabase, gym_id, roster):
-    pay = load_payments(supabase, gym_id)
     st.markdown('<div class="section-label">RECENT PAYMENTS</div>', unsafe_allow_html=True)
+    pay = load_payments(supabase, gym_id)
     if pay is None:
-        st.caption("Run sql/phase3_revenue.sql in Supabase to keep a full payment history "
-                   "and credit renewals to the plays that earned them.")
+        st.info("Run sql/phase3_revenue.sql in Supabase to keep a full payment history "
+                "and credit renewals to the plays that earned them.")
         return
     if pay.empty:
         st.caption("No payments recorded yet. Record one above, or from a member's profile.")
         return
     names = roster.set_index("id")["full_name"].to_dict() if not roster.empty else {}
-    rows = []
-    for _, p in pay.head(15).iterrows():
-        rows.append({"Date": f"{p['paid_on']:%d %b %Y}" if pd.notna(p["paid_on"]) else "—",
-                     "Member": names.get(p["member_id"], "Former member"),
-                     "Amount": f"{p['amount']:,.0f}",
-                     "Type": PAYMENT_KINDS.get(p["kind"], "Payment"),
-                     "Credited to a play": "—" if gw._blank(p["action_id"]) else "Yes"})
-    st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+    plays = {}
+    ids = [str(x) for x in pay["action_id"].dropna().tolist() if not gw._blank(x)]
+    if ids:
+        try:
+            rows = (supabase.table("retention_actions").select("id, action_type")
+                    .in_("id", ids[:200]).execute().data or [])
+            plays = {str(r["id"]): r["action_type"] for r in rows}
+        except Exception:
+            plays = {}
+    show = st.session_state.get("pay_rows", 10)
+    body = []
+    for _, p in pay.head(show).iterrows():
+        when = f"{p['paid_on']:%d %b %Y}" if pd.notna(p["paid_on"]) else "—"
+        who = names.get(p["member_id"], "Former member")
+        plan = gw._text(p.get("plan"))
+        until_d = pd.to_datetime(p.get("covers_until"), errors="coerce")
+        until = "" if pd.isna(until_d) else f"{until_d:%d %b %Y}"
+        credit = ("—" if gw._blank(p["action_id"]) else
+                  gw.chip(plays.get(str(p["action_id"]), "A play"), "lime", dot=True))
+        kind = PAYMENT_KINDS.get(p["kind"], "Payment")
+        tone = "amber" if p["kind"] == "recovered" else "cyan"
+        body.append(
+            f'<tr><td data-l="Date">{gw._esc(when)}</td>'
+            f'<td><b>{gw._esc(who)}</b><span class="sub">{gw._esc(plan)}'
+            f'{" · until " + gw._esc(until) if until else ""}</span></td>'
+            f'<td class="num">{p["amount"]:,.0f}</td>'
+            f'<td>{gw.chip(kind, tone)}</td>'
+            f'<td data-l="Paid by">{gw._esc(gw._text(p.get("method"), "—"))}</td>'
+            f'<td data-l="Credited to">{credit}</td></tr>')
+    since = gw.today_local() - timedelta(days=30)
+    month = pay[pay["paid_on"] >= since]
+    gw._md("<style>" + PAYMENTS_TABLE_CSS + "</style>"
+           '<div class="gp-table-wrap"><table class="gp-table"><thead><tr>'
+           '<th>Date</th><th>Member</th><th class="num">Amount</th><th>Type</th><th>Paid by</th>'
+           '<th>Credited to</th></tr></thead><tbody>' + "".join(body) + "</tbody></table>"
+           f'<div class="gp-table-foot"><span>Last 30 days: <b>{month["amount"].sum():,.0f}</b> '
+           f'from <b>{len(month)}</b> payment(s)</span><span>Showing {min(show, len(pay))} of '
+           f'{len(pay)}</span></div></div>')
+    c1, c2 = st.columns([1, 1])
+    if len(pay) > show:
+        c1.button("Show more payments", key="pay_more", type="tertiary",
+                  on_click=gw._bump, args=("pay_rows", 10, 20))
+    try:
+        import gympulse_pilot as gp
+        import gympulse_reports as rp
+        tables = [t for t in gp.export_tables(supabase, gym_id, roster, None) if t[0] == "Payments"]
+        if tables:
+            with c2:
+                rp.download_link("Payment history (Excel)", rp.build_xlsx(tables, "Payment history"),
+                                 f"GymPulse-payments-{gw.today_local():%Y-%m-%d}.xlsx", rp.XLSX, "pay_xlsx")
+    except Exception:
+        pass
 
 
 def render_revenue_outcomes(supabase, gym_id, roster):

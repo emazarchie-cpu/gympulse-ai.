@@ -290,67 +290,132 @@ def render_automation_settings(save, profile):
 
 
 # ------------------------------------------------------------------ weekly report
-def weekly_report(supabase, gym_id, roster, actions, business_name, days=7):
-    """A plain-text retention report for the last `days`, from recorded data."""
+def weekly_report_data(supabase, gym_id, roster, actions, days=7):
+    """Everything the weekly report says, from recorded data and labelled estimates."""
     import gympulse_command as gc
     import gympulse_revenue as gr
     today = gw.today_local()
     since = pd.Timestamp(today - timedelta(days=days)).tz_localize(gw.APP_TZ).tz_convert("UTC")
     a = actions.copy() if actions is not None else pd.DataFrame()
+
     def _in_window(col):
         if a.empty or col not in a.columns:
             return pd.Series(False, index=a.index)
         return pd.to_datetime(a[col], errors="coerce", utc=True, format="ISO8601") >= since
-    started = int(_in_window("created_at").sum())
-    contacted = int(_in_window("contacted_at").sum())
+
     closed = a[_in_window("completed_at")] if not a.empty else a
-    kept = int((closed["outcome"] == "Retained").sum()) if len(closed) else 0
-    lost = int((closed["outcome"] == "Cancelled").sum()) if len(closed) else 0
-    res = gc.outcomes(roster, actions)
-    rev = gr.revenue_summary(supabase, gym_id, roster, days=days)
-    high = int((roster["risk_category"] == "High").sum()) if not roster.empty else 0
+    out = closed["outcome"].fillna("") if len(closed) and "outcome" in closed.columns else pd.Series(dtype=str)
+    need = gw.members_to_contact(roster, actions) if not roster.empty else roster
+    staff = staff_list()
+    return {
+        "start": today - timedelta(days=days), "end": today,
+        "members": len(roster),
+        "high": int((roster["risk_category"] == "High").sum()) if not roster.empty else 0,
+        "at_risk_rev": float(roster["revenue_at_risk"].sum()) if not roster.empty else 0.0,
+        "started": int(_in_window("created_at").sum()),
+        "contacted": int(_in_window("contacted_at").sum()),
+        "closed": len(closed), "kept": int((out == "Retained").sum()), "lost": int((out == "Cancelled").sum()),
+        "res": gc.outcomes(roster, actions),
+        "rev": gr.revenue_summary(supabase, gym_id, roster, days=days),
+        "need": [(r["full_name"], gw.risk_story(r)) for _, r in need.head(8).iterrows()],
+        "team": workload(actions, staff) if staff and actions is not None and not actions.empty else [],
+    }
+
+
+def _plain(html):
+    import re
+    return re.sub("<[^>]+>", "", html)
+
+
+def weekly_report(supabase, gym_id, roster, actions, business_name, days=7):
+    """The weekly report as plain text (email body and on-screen preview)."""
+    d = weekly_report_data(supabase, gym_id, roster, actions, days)
+    rev, res = d["rev"], d["res"]
     lines = [f"# {business_name} · Weekly retention report",
-             f"{(today - timedelta(days=days)):%d %b} to {today:%d %b %Y}", "",
+             f"{d['start']:%d %b} to {d['end']:%d %b %Y}", "",
              "## Members",
-             f"- Members tracked: {len(roster)}",
-             f"- High risk now: {high} (estimate)",
-             f"- Revenue at risk: {roster['revenue_at_risk'].sum():,.0f} a month (estimate)" if not roster.empty else "",
+             f"- Members tracked: {d['members']}",
+             f"- High risk now: {d['high']} (estimate)",
+             f"- Revenue at risk: {d['at_risk_rev']:,.0f} a month (estimate)",
              "", "## Retention work this week (recorded)",
-             f"- Plays started: {started}",
-             f"- Members contacted: {contacted}",
-             f"- Plays closed: {len(closed)} · kept {kept} · cancelled {lost}",
+             f"- Plays started: {d['started']}",
+             f"- Members contacted: {d['contacted']}",
+             f"- Plays closed: {d['closed']} · kept {d['kept']} · cancelled {d['lost']}",
              f"- Overdue follow-ups now: {res['overdue']}",
              "", "## Revenue this week (recorded)"]
     if rev["source"] == "payments":
         lines += [f"- Collected: {rev['collected']:,.0f} from {rev['renewals_n']} renewal payment(s)",
                   f"- Credited to plays: {rev['retained_by_plays']:,.0f} ({rev['credited_n']} renewal(s))",
                   f"- Recovered from lapsed members: {rev['recovered']:,.0f}"]
-    else:
-        lines.append("- Payment history isn't switched on yet (sql/phase3_revenue.sql).")
     if rev["renewal_rate"] is not None:
         lines.append(f"- Renewal rate: {rev['renewal_rate']:.0%} ({rev['renewed']} renewed, {rev['lapsed']} lapsed)")
-    need = gw.members_to_contact(roster, actions) if not roster.empty else roster
-    if len(need):
+    if d["need"]:
         lines += ["", "## Who needs you next week"]
-        for _, r in need.head(5).iterrows():
-            lines.append(f"- {r['full_name']}: {gw.story_text(r)}")
-    staff = staff_list()
-    if staff and actions is not None and not actions.empty:
+        for name, story in d["need"][:5]:
+            lines.append(f"- {name}: {story['why']}. Next: {_plain(story['next'])}.")
+    if d["team"]:
         lines += ["", "## Team"]
-        for w in workload(actions, staff):
-            lines.append(f"- {w['who']}: {w['open']} open, {w['overdue']} overdue")
+        lines += [f"- {w['who']}: {w['open']} open, {w['overdue']} overdue" for w in d["team"]]
     lines += ["", "Estimates come from an experimental model. Recorded figures come from check-ins, "
               "plays and payments in GymPulse AI."]
-    return "\n".join(l for l in lines if l is not None)
+    return "\n".join(lines)
+
+
+def weekly_report_pdf(supabase, gym_id, roster, actions, business_name, days=7):
+    import gympulse_reports as rp
+    d = weekly_report_data(supabase, gym_id, roster, actions, days)
+    rev, res = d["rev"], d["res"]
+    rate = "n/a" if rev["renewal_rate"] is None else f"{rev['renewal_rate']:.0%}"
+    blocks = [
+        ("h", "At a glance"),
+        ("kpis", [("Members tracked", f"{d['members']}", "Active members"),
+                  ("High risk", f"{d['high']}", "Estimate"),
+                  ("Revenue at risk", f"{d['at_risk_rev']:,.0f}", "Per month · estimate"),
+                  ("Renewal rate", rate, f"{rev['renewed']} renewed · {rev['lapsed']} lapsed")]),
+        ("h", "Retention work this week"),
+        ("kpis", [("Plays started", f"{d['started']}", "Recorded"),
+                  ("Members contacted", f"{d['contacted']}", "Recorded"),
+                  ("Plays closed", f"{d['closed']}", f"Kept {d['kept']} · cancelled {d['lost']}"),
+                  ("Overdue now", f"{res['overdue']}", f"{res['due_today']} due today")]),
+    ]
+    if rev["source"] == "payments":
+        blocks += [("h", "Revenue this week"),
+                   ("kpis", [("Collected", f"{rev['collected']:,.0f}", f"{rev['renewals_n']} renewal payment(s)"),
+                             ("Credited to plays", f"{rev['retained_by_plays']:,.0f}",
+                              f"{rev['credited_n']} renewal(s)"),
+                             ("Recovered", f"{rev['recovered']:,.0f}", f"{rev['recovered_n']} lapsed member(s)")])]
+        if rev["by_play"]:
+            blocks.append(("table", ["Play", "Revenue credited"],
+                           [[k, f"{v:,.0f}"] for k, v in sorted(rev["by_play"].items(), key=lambda kv: -kv[1])],
+                           [3, 1]))
+    blocks.append(("h", "Who needs you next week"))
+    blocks.append(("table", ["Member", "Why", "Next step"],
+                   [[n, s["why"], _plain(s["next"])] for n, s in d["need"]], [1.3, 3, 1.7]))
+    if d["team"]:
+        blocks.append(("h", "Team workload"))
+        blocks.append(("table", ["Staff", "Open plays", "Overdue", "Follow-ups due"],
+                       [[w["who"], w["open"], w["overdue"], w["follow_up_due"]] for w in d["team"]]))
+    blocks.append(("note", "Recorded figures come from check-ins, retention plays and payments in GymPulse AI. "
+                           "Risk levels and revenue at risk are estimates from an experimental model. Revenue "
+                           "credited to a play shows the play was involved in the renewal, not proof the member "
+                           "would otherwise have left."))
+    return rp.build_pdf("Weekly retention report",
+                        f"{d['start']:%d %b} to {d['end']:%d %b %Y}", blocks, business_name)
 
 
 def render_report_section(supabase, gym_id, roster, actions, business_name):
+    import gympulse_reports as rp
     st.markdown('<div class="section-label">WEEKLY REPORT</div>', unsafe_allow_html=True)
     report = weekly_report(supabase, gym_id, roster, actions, business_name)
     c1, c2 = st.columns(2)
-    c1.download_button("Download this week's report", report,
-                       file_name=f"gympulse-weekly-{gw.today_local():%Y-%m-%d}.md",
-                       mime="text/markdown", use_container_width=True, key="rep_dl")
+    with c1:
+        try:
+            pdf = weekly_report_pdf(supabase, gym_id, roster, actions, business_name)
+            rp.download_link("Download weekly report (PDF)", pdf,
+                             f"GymPulse-weekly-report-{gw.today_local():%Y-%m-%d}.pdf", rp.PDF,
+                             "weekly_pdf", primary=True)
+        except Exception as error:
+            st.error(f"Could not build the PDF: {error}")
     owner_email = (st.session_state.get("auth_user") or {}).get("email", "")
     try:
         import gympulse_followups as fu

@@ -217,32 +217,87 @@ def save_profile_settings(supabase, settings, message):
 
 
 # ------------------------------------------------------------------ export
-def render_export(supabase, gym_id, roster, actions):
+def _local_dt(series):
+    t = pd.to_datetime(series, errors="coerce", utc=True, format="ISO8601")
+    return t.dt.tz_convert(gw.APP_TZ).dt.tz_localize(None)
+
+
+def export_tables(supabase, gym_id, roster, actions):
+    """Clean, owner-friendly tables for export: (sheet, DataFrame, formats)."""
     import gympulse_revenue as gr
-    st.markdown('<div class="section-label">EXPORT YOUR DATA</div>', unsafe_allow_html=True)
-    c1, c2, c3 = st.columns(3)
+    names = roster.set_index("id")["full_name"].to_dict() if not roster.empty else {}
+    out = []
     if not roster.empty:
-        cols = [c for c in ["full_name", "email", "phone", "membership_type", "monthly_fee",
-                            "membership_end", "days_since_last_visit", "visits_last_30_days",
-                            "visits_previous_30_days", "risk_category", "cancellation_probability",
-                            "suggested_action"] if c in roster.columns]
-        c1.download_button("Members and risk (CSV)", roster[cols].to_csv(index=False),
-                           file_name="gympulse-members.csv", mime="text/csv",
-                           use_container_width=True, key="exp_members")
+        m = pd.DataFrame({
+            "Member": roster["full_name"],
+            "Phone": roster.get("phone"), "Email": roster.get("email"),
+            "Plan": roster.get("membership_type"),
+            "Monthly fee": pd.to_numeric(roster.get("monthly_fee"), errors="coerce"),
+            "Membership ends": pd.to_datetime(roster.get("membership_end"), errors="coerce"),
+            "Days since last visit": roster.get("days_since_last_visit"),
+            "Visits, last 30 days": roster.get("visits_last_30_days"),
+            "Visits, previous 30 days": roster.get("visits_previous_30_days"),
+            "Risk level (estimate)": roster.get("risk_category"),
+            "Cancellation estimate": pd.to_numeric(roster.get("cancellation_probability"), errors="coerce"),
+            "Why": [gw.risk_story(r)["why"] for _, r in roster.iterrows()],
+            "Suggested play": roster.get("suggested_action"),
+        })
+        out.append(("Members and risk", m, {"Monthly fee": "money", "Membership ends": "date",
+                                            "Cancellation estimate": "pct"}))
     if actions is not None and not actions.empty:
-        names = roster.set_index("id")["full_name"].to_dict() if not roster.empty else {}
-        a = actions.assign(member=actions["member_id"].map(names))
-        cols = [c for c in ["member", "action_type", "status", "outcome", "created_at", "contacted_at",
-                            "contact_method", "due_date", "completed_at", "assigned_to", "note"]
-                if c in a.columns]
-        c2.download_button("Retention plays (CSV)", a[cols].to_csv(index=False),
-                           file_name="gympulse-plays.csv", mime="text/csv",
-                           use_container_width=True, key="exp_plays")
+        a = actions
+        col = lambda c: a[c] if c in a.columns else None
+        import gympulse_automation as ga
+        p = pd.DataFrame({
+            "Member": a["member_id"].map(names).fillna("Former member"),
+            "Play": col("action_type"),
+            "Stage": [gw.action_stage(r) for r in a.to_dict("records")],
+            "Outcome": col("outcome"),
+            "Started": _local_dt(col("created_at")) if "created_at" in a.columns else None,
+            "Contacted": _local_dt(col("contacted_at")) if "contacted_at" in a.columns else None,
+            "Contact method": col("contact_method"),
+            "Follow-up due": pd.to_datetime(col("due_date"), errors="coerce") if "due_date" in a.columns else None,
+            "Closed": _local_dt(col("completed_at")) if "completed_at" in a.columns else None,
+            "Assigned to": [ga.assigned_to(r) for r in a.to_dict("records")],
+            "Note": col("note"),
+        })
+        out.append(("Retention plays", p, {"Started": "date", "Contacted": "date",
+                                           "Follow-up due": "date", "Closed": "date"}))
     pay = gr.load_payments(supabase, gym_id)
     if pay is not None and not pay.empty:
-        names = roster.set_index("id")["full_name"].to_dict() if not roster.empty else {}
-        p = pay.assign(member=pay["member_id"].map(names))
-        c3.download_button("Payments (CSV)", p.drop(columns=["gym_id"], errors="ignore").to_csv(index=False),
-                           file_name="gympulse-payments.csv", mime="text/csv",
-                           use_container_width=True, key="exp_pay")
+        q = pd.DataFrame({
+            "Date": pd.to_datetime(pay["paid_on"], errors="coerce"),
+            "Member": pay["member_id"].map(names).fillna("Former member"),
+            "Amount": pay["amount"],
+            "Type": pay["kind"].map(gr.PAYMENT_KINDS).fillna("Payment"),
+            "Plan": pay.get("plan"), "Paid by": pay.get("method"),
+            "Covers until": pd.to_datetime(pay.get("covers_until"), errors="coerce"),
+            "Credited to a play": ["No" if gw._blank(v) else "Yes" for v in pay["action_id"]],
+            "Note": pay.get("note"),
+        })
+        out.append(("Payments", q, {"Date": "date", "Amount": "money", "Covers until": "date"}))
+    return out
+
+
+def render_export(supabase, gym_id, roster, actions):
+    import gympulse_reports as rp
+    st.markdown('<div class="section-label">EXPORT YOUR DATA</div>', unsafe_allow_html=True)
+    try:
+        tables = export_tables(supabase, gym_id, roster, actions)
+    except Exception as error:
+        st.error(f"Could not prepare the export: {error}")
+        return
+    if not tables:
+        st.caption("Nothing to export yet.")
+        return
+    stamp = f"{gw.today_local():%Y-%m-%d}"
+    cols = st.columns(len(tables) + 1)
+    for col, (name, df, fmt) in zip(cols, tables):
+        with col:
+            rp.download_link(f"{name} (Excel)", rp.build_xlsx([(name, df, fmt)], name),
+                             f"GymPulse-{name.replace(' ', '-').lower()}-{stamp}.xlsx", rp.XLSX,
+                             f"exp_{name[:4]}")
+    with cols[-1]:
+        rp.download_link("Everything (Excel)", rp.build_xlsx(tables, "Full export"),
+                         f"GymPulse-full-export-{stamp}.xlsx", rp.XLSX, "exp_all", primary=True)
     st.caption("Exports contain your members' personal details. Store them securely.")
