@@ -287,6 +287,8 @@ def render_command_centre(supabase, gym_id, assess_fn, greeting, user_name, busi
     flash = st.session_state.pop("cc_flash", None)
     if flash:
         getattr(st, flash[0], st.info)(flash[1])
+    import gympulse_pilot as gp
+    gp.render_checklist(supabase, gym_id, roster, missing, actions)
     late = res["overdue"] + res["due_today"]
     if late:
         if not st.session_state.get("_late_toast"):
