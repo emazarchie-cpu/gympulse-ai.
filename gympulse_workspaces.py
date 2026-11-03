@@ -1373,7 +1373,9 @@ def drivers(row):
     if change <= -3:
         out.append("attendance dropping")
     if row["renewal_due_days"] <= 14:
-        out.append(f"renews in {int(row['renewal_due_days'])} days")
+        d = int(row["renewal_due_days"])
+        out.append("renews today" if d == 0 else f"lapsed {-d} days ago" if d < 0
+                   else f"renews in {d} day{'s' if d != 1 else ''}")
     if row["pt_sessions_attended"] == 0:
         out.append("no PT sessions")
     if row["membership_type"] == "Monthly":
@@ -3459,10 +3461,12 @@ def render_business_insights(supabase, gym_id, assess_fn):
 
 # ------------------------------------------------------------ Archie
 ARCHIE_PROMPTS = [
-    "Who should I call first today?",
-    "Write a WhatsApp message for my most at-risk member",
-    "Why is revenue at risk this month?",
-    "Give me a 3-step plan for this week",
+    "What should my staff prioritise today?",
+    "Which renewals are at risk this month?",
+    "Which retention plays are working?",
+    "How much revenue did we retain this month?",
+    "Why are members becoming inactive?",
+    "Write a WhatsApp message for my top priority member",
 ]
 
 ARCHIE_BOT_SVG = """
@@ -3490,7 +3494,7 @@ def _archie_hero(thinking=False):
       <div class="archie-orb {state}">{ARCHIE_BOT_SVG}</div>
       <div class="archie-meta">
         <div class="archie-name">Archie</div>
-        <div class="archie-role">Your retention assistant. Ask about members, revenue and follow-ups.</div>
+        <div class="archie-role">Your retention analyst. Ask who needs you, why members are drifting, which plays work and what revenue you kept. Every answer shows the figures behind it.</div>
         <div class="archie-status"><span class="dot"></span>{status}
           <span class="archie-wave"><i></i><i></i><i></i><i></i><i></i></span></div>
       </div>
@@ -3559,54 +3563,117 @@ def _stream(slot, text):
     slot.markdown(text)
 
 
-def archie_context(roster, actions, business_name):
-    """Build a concise business context for Archie."""
-    lines = [
-        f"Gym business: {business_name}",
-        f"Total scored members: {len(roster)}",
-    ]
-    if "monthly_fee" in roster.columns:
-        lines.append(f"Total monthly fees: {roster['monthly_fee'].sum():,.0f}")
-    if "revenue_at_risk" in roster.columns:
-        lines.append(f"Expected monthly revenue at risk: {roster['revenue_at_risk'].sum():,.0f}")
+def archie_context(roster, actions, business_name, supabase=None, gym_id=None):
+    """Everything Archie may use, labelled as RECORDED or ESTIMATE."""
+    import gympulse_command as gc  # local import: gympulse_command imports this module
 
-    if "risk_category" in roster.columns:
-        risk_counts = roster["risk_category"].fillna("Unknown").value_counts()
-        lines.append("Member risk summary:")
-        for category, count in risk_counts.items():
-            lines.append(f"- {category} risk: {count} members")
+    today = today_local()
+    L = [f"Gym business: {business_name}",
+         f"Today: {today:%A %d %B %Y}",
+         "Data period: attendance from front-desk check-ins over the last 90 days "
+         "(typed-in activity where a member has no check-ins); outcomes over the last 30 days.",
+         "Money is per month, in the gym's own currency, with no symbol."]
+    if roster.empty:
+        L.append("No scored members yet.")
+        return "\n".join(L)
 
-    needed = {"full_name", "risk_category", "cancellation_probability"}
-    if needed.issubset(roster.columns) and not roster.empty:
-        lines.append("Top at-risk members:")
-        for _, r in roster.head(5).iterrows():
-            lines.append(
-                f"- {r['full_name']}: {r['risk_category']} risk, "
-                f"{r['cancellation_probability']:.0%}, "
-                f"{int(r.get('days_since_last_visit', 0))} days since last visit, "
-                f"renews in {int(r.get('renewal_due_days', 0))} days, "
-                f"suggested: {r.get('suggested_action', 'check in')}"
-            )
+    n = len(roster)
+    L.append(f"\nMEMBERS (recorded): {n} active members tracked, "
+             f"total monthly fees {roster['monthly_fee'].sum():,.0f}.")
+    counts = roster["risk_category"].value_counts()
+    L.append("Risk levels (ESTIMATE from an experimental model): "
+             + ", ".join(f"{k} {int(counts.get(k, 0))}" for k in ("High", "Medium", "Low")))
+    L.append(f"Expected monthly revenue at risk (ESTIMATE): {roster['revenue_at_risk'].sum():,.0f}. "
+             f"Fees held by high-risk members: "
+             f"{roster.loc[roster['risk_category'] == 'High', 'monthly_fee'].sum():,.0f}.")
 
-    if not actions.empty:
-        lines.append(f"Recorded retention actions: {len(actions)}")
-        for column in ("status", "action_type"):
-            if column in actions.columns:
-                counts = actions[column].fillna("Unknown").value_counts()
-                lines.append(f"Actions by {column}:")
-                for label, count in counts.items():
-                    lines.append(f"- {label}: {count}")
-                break
+    declining = roster[roster["attendance_change"] <= -3]
+    away = roster[roster["days_since_last_visit"] >= 14]
+    lapsed = roster[roster["renewal_due_days"] < 0]
+    L.append(f"Attendance (recorded): {len(declining)} members visiting at least 3 times less than the "
+             f"previous 30 days; {len(away)} not seen for 14+ days; {len(lapsed)} memberships already lapsed.")
 
-    return "\n".join(lines)
+    watch = gc.renewal_watch(roster)
+    if len(watch):
+        L.append(f"\nRENEWAL WATCH (renewing within 30 days and attending less or at risk): "
+                 f"{len(watch)} members, fees {watch['monthly_fee'].sum():,.0f}/month")
+        for _, r in watch.head(10).iterrows():
+            L.append(f"- {r['full_name']}: renews in {int(r['renewal_due_days'])} days, "
+                     f"{r['membership_type']} plan, fee {r['monthly_fee']:,.0f}, "
+                     f"visits {int(r['visits_previous_30_days'])} -> {int(r['visits_last_30_days'])}, "
+                     f"{r['risk_category']} risk")
+
+    need = members_to_contact(roster, actions)
+    if len(need):
+        ranked = need.assign(_v=need["cancellation_probability"] * need["monthly_fee"]) \
+                     .sort_values("_v", ascending=False)
+        L.append(f"\nPRIORITY QUEUE ({len(need)} medium/high-risk members with no open play):")
+        for _, r in ranked.head(12).iterrows():
+            story = gc.risk_story(r)
+            nxt = re.sub("<[^>]+>", "", story["next"])
+            L.append(f"- {r['full_name']}: {r['risk_category']} risk ({r['cancellation_probability']:.0%} estimate), "
+                     f"fee {r['monthly_fee']:,.0f}, goal {_text(r.get('fitness_goal'), 'not set')}. "
+                     f"Why: {story['why']}. When: {story['when']}. Suggested next: {nxt}.")
+
+    res = gc.outcomes(roster, actions)
+    L.append(f"\nFOLLOW-UPS (recorded): {res['todo']} to do, {res['doing']} in progress, "
+             f"{res['overdue']} overdue, {res['due_today']} due today.")
+    if not actions.empty and res["overdue"]:
+        names = roster.set_index("id")["full_name"].to_dict()
+        open_a = actions[actions["status"] != "Done"].copy()
+        open_a["_due"] = pd.to_datetime(open_a["due_date"], errors="coerce").dt.date
+        for _, a in open_a[open_a["_due"] < date.today()].head(8).iterrows():
+            L.append(f"- Overdue: {a['action_type']} for {names.get(a['member_id'], 'a member')}, "
+                     f"due {a['_due']}, status {a['status']}")
+
+    L.append(f"\nOUTCOMES, LAST 30 DAYS (RECORDED, verified): {res['retained_n']} members retained after a play "
+             f"(monthly fees {res['retained_rev']:,.0f}); {res['cancelled_n']} cancelled; "
+             f"{res['resolved_n']} plays closed; {res['reengaged_n']} members checked in again after a play. "
+             f"Save rate: {'not enough data' if res['save_rate'] is None else format(res['save_rate'], '.0%')}.")
+    perf = gc.play_performance(actions)
+    if perf:
+        L.append("Play results, all time (kept / decided, 'No response' excluded): "
+                 + "; ".join(f"{p['play']} {p['kept']}/{p['decided']}" for p in perf[:8]))
+
+    if supabase is not None and gym_id:
+        try:
+            trainers = load_trainers(supabase, gym_id)
+            if trainers:
+                L.append("\nTrainers: " + ", ".join(
+                    f"{_text(t.get('name'))} ({_text(t.get('specialty'), 'general')})" for t in trainers[:8]))
+        except Exception:
+            pass
+        try:
+            cls = load_classes(supabase, gym_id)
+            if cls is not None and len(cls):
+                rows = cls.to_dict("records") if hasattr(cls, "to_dict") else list(cls)
+                L.append("Upcoming classes: " + "; ".join(
+                    f"{_text(c.get('name'))} {str(c.get('starts_at', ''))[:16].replace('T', ' ')}"
+                    for c in rows[:6]))
+        except Exception:
+            pass
+    L.append("Retention plays the gym uses: " + ", ".join(ACTION_TYPES))
+    return "\n".join(L)
 
 
 ARCHIE_SYSTEM = (
-    "You are Archie, a warm, upbeat retention assistant for a gym owner. "
-    "Use only the gym data provided below. Be concise and practical. "
-    "When asked for a WhatsApp or email message, write it ready to send, "
-    "friendly and excited, and sign it with the owner's name. "
-    "If the data does not contain the answer, say so instead of guessing."
+    "You are Archie, the retention analyst inside GymPulse AI. You help a gym owner keep members "
+    "and protect membership revenue. Be warm, direct and practical.\n"
+    "Rules:\n"
+    "1. Use only the GYM DATA below. If the answer is not in it, say what is missing and how to get it "
+    "(for example: record outcomes in the Action Centre, check members in at the front desk).\n"
+    "2. Always give the figures behind an answer and the data period they cover.\n"
+    "3. Keep RECORDED facts (check-ins, renewals, outcomes) separate from ESTIMATES (risk scores, "
+    "revenue at risk). Call estimates estimates. Never present an estimate as a result.\n"
+    "4. Never invent members, numbers, results, discounts, prices or deadlines. Only mention an offer "
+    "if the owner gives you its terms.\n"
+    "5. When recommending, name who, why, and the next step (which play, which channel, when), "
+    "ordered by urgency and monthly fee.\n"
+    "6. A message sent is not a member saved. Only count members as retained when the data records it.\n"
+    "7. When asked for a WhatsApp or email message, write it ready to send: short, friendly, personal "
+    "(use their goal or habits), with no invented offer, signed with the owner's name.\n"
+    "Format: short paragraphs or bullets, member names in bold, no tables unless asked. "
+    "End data answers with one short line in italics starting 'Based on'."
 )
 
 
@@ -3629,7 +3696,7 @@ def archie_reply(messages, context):
                    for m in messages[-12:]]
         response = client.messages.create(
             model=ARCHIE_MODEL,
-            max_tokens=700,
+            max_tokens=900,
             system=ARCHIE_SYSTEM + "\n\nGYM DATA:\n" + context,
             messages=history,
         )
@@ -3702,11 +3769,11 @@ def render_archie(supabase, gym_id, assess_fn, business_name, owner_name="the gy
     _md(_archie_hero(False), hero)
     try:
         roster, _ = load_roster(supabase, gym_id, assess_fn, with_photos=False)
-        actions = load_actions(supabase, gym_id)
+        actions = load_actions(supabase, gym_id, include_archived=True)
     except Exception:
         roster, actions = pd.DataFrame(), pd.DataFrame()
     if len(roster):
-        context = archie_context(roster, actions, business_name)
+        context = archie_context(roster, actions, business_name, supabase, gym_id)
     else:
         context = f"Gym: {business_name}. No scored members yet."
     context += f"\nThe owner's name is {owner_name}. Sign messages with this name."
@@ -3717,12 +3784,28 @@ def render_archie(supabase, gym_id, assess_fn, business_name, owner_name="the gy
     if "archie_msgs" not in st.session_state:
         st.session_state.archie_msgs = []
 
+    if len(roster) and not st.session_state.archie_msgs:
+        import gympulse_command as gc  # local import: gympulse_command imports this module
+        try:
+            res = gc.outcomes(roster, actions)
+            need = members_to_contact(roster, actions)
+            bullets = "".join(f"<li>{b}</li>" for b in gc.daily_brief(
+                roster, actions, res, gc.renewal_watch(roster), need))
+            _md(f"""<div class="cc-brief" style="margin-top:8px"><div class="cc-brief-head">
+                <div class="cc-brief-orb"></div><div><div class="cc-brief-title">Today's brief</div>
+                <div class="cc-brief-sub">Ready before you ask · from your records, check-ins and outcomes</div>
+                </div></div><ul>{bullets}</ul></div>""")
+        except Exception:
+            pass
+
     st.markdown('<div class="section-label">TRY ASKING</div>', unsafe_allow_html=True)
-    cols = st.columns(len(ARCHIE_PROMPTS))
     picked = None
-    for col, p in zip(cols, ARCHIE_PROMPTS):
-        if col.button(p, key=f"ap_{p}", use_container_width=True):
-            picked = p
+    per_row = 2 if _mobile() else 3
+    for i in range(0, len(ARCHIE_PROMPTS), per_row):
+        cols = st.columns(per_row)
+        for col, p in zip(cols, ARCHIE_PROMPTS[i:i + per_row]):
+            if col.button(p, key=f"ap_{p}", use_container_width=True):
+                picked = p
     if not st.session_state.archie_msgs:
         hour = datetime.now(APP_TZ).hour
         hello = ("Good morning" if hour < 12
@@ -3737,7 +3820,7 @@ def render_archie(supabase, gym_id, assess_fn, business_name, owner_name="the gy
             if m["role"] == "assistant":
                 _mention_buttons(m["content"], roster, f"h{i}", supabase, gym_id)
     typed = st.chat_input("Ask Archie...")
-    question = typed or picked
+    question = typed or picked or st.session_state.pop("archie_pending", None)
     if question:
         st.session_state.archie_msgs.append({"role": "user", "content": question})
         with _chat_message("user"):
@@ -3757,8 +3840,8 @@ def render_archie(supabase, gym_id, assess_fn, business_name, owner_name="the gy
         st.session_state.archie_msgs = []
         st.rerun()
     st.caption("Archie can be wrong. Check details before contacting members. "
-               "Only your top at-risk members' names and scores are shared with "
-               "the AI service.")
+               "To answer, member names, attendance, renewal and follow-up details from "
+               "your workspace are shared with the AI service. Phone numbers and emails are not.")
 
 # ------------------------------------------------------ front desk check-in
 def _page_checkins(supabase, gym_id, since, cols):
