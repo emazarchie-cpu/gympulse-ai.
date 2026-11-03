@@ -1,5 +1,7 @@
 import gympulse_workspaces as gw
 import gympulse_followups as fu
+import gympulse_design as gd
+import gympulse_command as gc
 import os
 import textwrap
 
@@ -1154,6 +1156,9 @@ under applicable law, including the Nigeria Data Protection Act.
     )
 
 
+# Design system v2 sits on top of every earlier style layer
+gd.apply()
+
 # Show login and registration until authenticated
 if st.session_state.auth_user is None:
     # -------------------------
@@ -1166,80 +1171,13 @@ if st.session_state.auth_user is None:
         "GymPulse_AI_logo_mark.png"
     )
 
-    # Brand lockup: identical to the top bar (logo, wordmark, tagline),
-    # placed in the same left-hand column so it lines up exactly
-    html(f"""
-    <div class="gp-lockup">
-      <img src="{lockup_data_uri(900)}" alt="GymPulse AI">
-      <div class="gp-tagline">Smarter insights. Stronger member retention.</div>
+    # Landing: navigation, hero and live product preview
+    html(gd.landing_top(lockup_data_uri(900), icon))
+    html("""
+    <div class="lx-auth-head" id="get-started">
+      <div class="lx-kicker">Your workspace</div>
+      <div class="lx-h2" style="font-size:30px;margin-bottom:4px;">Sign in or start free</div>
     </div>
-    """)
-
-
-    # Hero
-    html(f"""
-    <div class="lp-hero">
-      <div>
-        <div class="lp-pill"><span class="lp-dot"></span>
-          Member retention intelligence for gyms</div>
-        <div class="lp-title">Know who is leaving<br>
-          <span class="lp-grad">before they do.</span></div>
-        <div class="lp-sub">GymPulse AI reads attendance and renewal
-          patterns and flags the members who are drifting away, so you can
-          reach out while it still matters. Add members by hand or drop in
-          a spreadsheet.</div>
-        <div class="lp-chips">
-          <div class="lp-chip">{icon('check', 14)} Free to start</div>
-          <div class="lp-chip">{icon('check', 14)} Runs in your browser</div>
-          <div class="lp-chip">{icon('check', 14)} Works with a simple CSV</div>
-          <div class="lp-chip">{icon('check', 14)} Archie AI assistant</div>
-        </div>
-      </div>
-      <div class="lp-radar">
-        <div class="lp-radar-head">
-          <div class="lp-radar-title">Risk Radar</div>
-          <div class="lp-live"><span class="lp-dot"></span>LIVE PREVIEW</div>
-        </div>
-        <svg class="lp-pulse-line" viewBox="0 0 400 54" preserveAspectRatio="none">
-          <path d="M0 30 H110 L130 30 L145 6 L165 50 L182 18 L195 30 H400"
-                fill="none" stroke="#B7F34A" stroke-width="2.5"
-                stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        <div class="lp-row">
-          <div class="lp-avatar" style="background:#FF8A5B;">AO</div>
-          <div class="lp-row-main">
-            <div class="lp-row-name">Member A</div>
-            <div class="lp-row-sub">18 days away · renews in 6 days</div>
-          </div>
-          <div class="lp-risk lp-high">HIGH · 72%</div>
-        </div>
-        <div class="lp-row">
-          <div class="lp-avatar" style="background:#FFC44D;">KB</div>
-          <div class="lp-row-main">
-            <div class="lp-row-name">Member B</div>
-            <div class="lp-row-sub">Visits down 4 this month</div>
-          </div>
-          <div class="lp-risk lp-med">MEDIUM · 41%</div>
-        </div>
-        <div class="lp-row">
-          <div class="lp-avatar" style="background:#B7F34A;">CE</div>
-          <div class="lp-row-main">
-            <div class="lp-row-name">Member C</div>
-            <div class="lp-row-sub">Steady visits · 6 PT sessions</div>
-          </div>
-          <div class="lp-risk lp-low">LOW · 14%</div>
-        </div>
-        <div class="lp-tiny">ILLUSTRATIVE EXAMPLE · NOT REAL MEMBER DATA</div>
-      </div>
-    </div>
-    <div class="lp-stats">
-      <div class="lp-stat"><b>5</b><span>signals analysed</span></div>
-      <div class="lp-stat"><b>3</b><span>clear risk levels</span></div>
-      <div class="lp-stat"><b>CSV</b><span>or manual entry</span></div>
-      <div class="lp-stat"><b>Seconds</b><span>to a full assessment</span></div>
-    </div>
-    <div class="section-label" style="text-align:center;margin-top:34px;">
-      SIGN IN TO YOUR WORKSPACE</div>
     """)
 
     # -------------------------
@@ -1619,145 +1557,7 @@ if st.session_state.auth_user is None:
                     show_privacy()
 
     # LANDING PAGE SECTIONS
-
-    # The quiet exit
-    html(f"""
-    <div class="lp-kicker">The problem</div>
-    <div class="lp-h2">Members rarely say goodbye.<br>They just fade.</div>
-    <div class="lp-lead">By the time a cancellation lands, the warning signs
-      have been there for weeks.</div>
-    <div class="lp-split">
-      <div>
-        <div class="lp-ic">{icon('down')}</div>
-        <h3>Attendance slips first. Cancellation follows.</h3>
-        <p>A drop from regular visits to almost none is easy to miss in a
-          busy gym. GymPulse AI watches that pattern together with renewal
-          timing and personal-training activity, then tells you where to
-          look first.</p>
-      </div>
-      <div>
-        <div class="lp-bars">
-          <div class="lp-bar-col"><div class="lp-bar-fill" style="height:92%"></div><div class="lp-bar-lbl">W1</div></div>
-          <div class="lp-bar-col"><div class="lp-bar-fill" style="height:84%"></div><div class="lp-bar-lbl">W2</div></div>
-          <div class="lp-bar-col"><div class="lp-bar-fill" style="height:70%"></div><div class="lp-bar-lbl">W3</div></div>
-          <div class="lp-bar-col"><div class="lp-bar-fill warn" style="height:46%"></div><div class="lp-bar-lbl">W4</div></div>
-          <div class="lp-bar-col"><div class="lp-bar-fill warn" style="height:28%"></div><div class="lp-bar-lbl">W5</div></div>
-          <div class="lp-bar-col"><div class="lp-bar-fill warn" style="height:14%"></div><div class="lp-bar-lbl">W6</div></div>
-        </div>
-        <div class="lp-bar-cap">Illustrative weekly visits for one member</div>
-      </div>
-    </div>
-    """)
-
-    # How it works
-    html(f"""
-    <div class="lp-kicker">How it works</div>
-    <div class="lp-h2">From spreadsheet to action<br>in three moves</div>
-    <div class="lp-lead">Bring the information you already have. No hardware,
-      no installs.</div>
-    <div class="lp-steps">
-      <div class="lp-stepcard"><div class="lp-num">01</div>
-        <div class="lp-ic">{icon('upload')}</div>
-        <h4>Bring your data</h4>
-        <p>Register members one at a time or upload a CSV with membership
-          type, visits, renewal timing and PT sessions.</p></div>
-      <div class="lp-stepcard"><div class="lp-num">02</div>
-        <div class="lp-ic">{icon('gauge')}</div>
-        <h4>Get risk estimates</h4>
-        <p>Each member gets a cancellation probability and a High, Medium
-          or Low level you can read at a glance.</p></div>
-      <div class="lp-stepcard"><div class="lp-num">03</div>
-        <div class="lp-ic">{icon('chat')}</div>
-        <h4>Reach out early</h4>
-        <p>Start with the members who need you most, check in personally and
-          download the results for your team.</p></div>
-    </div>
-    """)
-
-    # Meet Archie
-    html(f"""
-    <div class="lp-kicker">Meet Archie</div>
-    <div class="lp-h2">Your AI retention assistant</div>
-    <div class="lp-lead">Archie reads your live member data, tells you who needs
-      you first, and writes excited, ready-to-send messages for WhatsApp and email.</div>
-    <div class="lp-archie">
-      <div class="lp-archie-bot">{gw.ARCHIE_BOT_SVG}</div>
-      <div class="lp-chat">
-        <div class="lp-msg me">Who should I call first today?</div>
-        <div class="lp-msg ai">Great news, I found three members who would love to hear
-          from you. Ada has not visited in 18 days and renews this week, so she is first.</div>
-        <div class="lp-msg ai">Here is a message ready to send: "Hi Ada! We have missed you
-          at the gym and we are so excited to help you reach your goal. Can we chat this week?"</div>
-        <div class="lp-send">WHATSAPP · EMAIL · SEND IN ONE CLICK</div>
-      </div>
-    </div>
-    """)
-
-    # Bento features
-    html(f"""
-    <div class="lp-kicker">Features</div>
-    <div class="lp-h2">Built for one job:<br>keeping your members</div>
-    <div class="lp-lead">Focused tools, no clutter.</div>
-    <div class="lp-bento-grid">
-      <div class="lp-bento b-4">
-        <div class="lp-ic">{icon('upload')}</div>
-        <h4>Batch CSV assessment</h4>
-        <p>Upload your whole membership list, preview the records, and
-          download an estimate for every member in a single file.</p>
-        <div class="lp-mini">
-          <span class="lp-risk lp-high">HIGH</span>
-          <span class="lp-risk lp-med">MEDIUM</span>
-          <span class="lp-risk lp-low">LOW</span>
-        </div>
-      </div>
-      <div class="lp-bento b-2">
-        <div class="lp-ic">{icon('user')}</div>
-        <h4>Individual assessment</h4>
-        <p>One member, instant estimate, plus suggested next steps.</p>
-      </div>
-      <div class="lp-bento b-2">
-        <div class="lp-ic">{icon('users')}</div>
-        <h4>Member management</h4>
-        <p>A private register with goals, contact details and body metrics.</p>
-      </div>
-      <div class="lp-bento b-2">
-        <div class="lp-ic">{icon('sliders')}</div>
-        <h4>What-if explorer</h4>
-        <p>See how the estimate shifts as time since the last visit grows.</p>
-      </div>
-      <div class="lp-bento b-2">
-        <div class="lp-ic">{icon('target')}</div>
-        <h4>Priority follow-up</h4>
-        <p>Plain-language guidance on who to contact first.</p>
-      </div>
-    </div>
-    """)
-
-    # Transparency
-    html(f"""
-    <div class="lp-kicker">Transparency</div>
-    <div class="lp-note">
-      <div class="lp-ic">{icon('shield')}</div>
-      <div>
-        <h4>Experimental estimates, clearly labelled</h4>
-        <p>GymPulse AI is an early-stage project and its model is trained on
-          synthetic data. Treat results as a guide for deciding who to check
-          in with, not a guarantee. Your own knowledge of your members always
-          comes first.</p>
-      </div>
-    </div>
-    """)
-
-    # Closing call to action
-    html(f"""
-    <div class="lp-cta">
-      <div class="lp-cta-title">Keep more members.<br>
-        <span class="lp-grad">Start with GymPulse AI.</span></div>
-      <p>Create your free account at the top of this page
-        <span class="lp-arrow">{icon('arrow', 16)}</span></p>
-    </div>
-    <div class="footer">© GymPulse AI · Smarter insights. Stronger member retention.</div>
-    """)
+    html(gd.landing_sections(icon, gw.ARCHIE_BOT_SVG))
     st.stop()
 
 # =========================================================
@@ -1995,13 +1795,19 @@ MAIN_PAGES = [
     "Business Insights",
     "Archie",
     "Member Management",
+    "Check-in",
 ]
 
 MORE_PAGES = [
     "Follow-ups",
-    "Check-in",
     "FAQs",
 ]
+
+NAV_SHORT = {
+    "Payments & Renewals": "Renewals",
+    "Business Insights": "Insights",
+    "Member Management": "Members",
+}
 
 if "current_page" not in st.session_state:
     _saved = st.query_params.get("p", "")
@@ -2087,7 +1893,7 @@ st.session_state["last_unread"] = unread_replies
 def nav_label(name):
     if name == "Follow-ups" and unread_replies:
         return f"{name} ({unread_replies})"
-    return name
+    return NAV_SHORT.get(name, name)
 
 
 st.markdown("""
@@ -2539,7 +2345,7 @@ st.markdown(
 )
 with st.container(key="top_nav"):
     brand_col, nav_col, actions_col = st.columns(
-        [2.0, 8.0, 1.6], vertical_alignment="center"
+        [1.5, 8.6, 1.6], vertical_alignment="center"
     )
 
     with brand_col:
@@ -2683,7 +2489,7 @@ safe_business_name = html_escape(str(business_name))
 # 7. DASHBOARD
 # =========================================================
 if page == "Dashboard":
-    gw.render_dashboard(
+    gc.render_command_centre(
         supabase,
         st.session_state.get("gym_id"),
         assess_members,
