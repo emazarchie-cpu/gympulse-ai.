@@ -2355,8 +2355,11 @@ def render_member_profile(supabase, gym_id, member_id, assess_fn):
         update_fee = st.checkbox(
             "Also update the monthly fee from this payment", value=bool(act),
             key=f"renew_fee_{member_id}", disabled=not act)
+        import gympulse_revenue as gr  # local import: gympulse_revenue imports this module
+        guard_ok = gr.renewal_guard(supabase, gym_id, member_id, name, m["membership_end"],
+                                    plan, "prof")
         if st.button("Save renewal", key="renew_save", type="primary",
-                     disabled=not feat["profile_ready"]):
+                     disabled=not feat["profile_ready"] or not guard_ok):
             import gympulse_revenue as gr  # local import: gympulse_revenue imports this module
             try:
                 msg = gr.record_payment(supabase, gym_id, member_id, name, amount, plan, start,

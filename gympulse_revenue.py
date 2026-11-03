@@ -270,6 +270,32 @@ def revenue_summary(supabase, gym_id, roster, days=30):
 
 
 # ------------------------------------------------------------------ views
+RECENT_PAYMENT_DAYS = 7
+
+
+def renewal_guard(supabase, gym_id, member_id, name, current_end, plan, key):
+    """Stop accidental repeat renewals. Returns True when it's fine to save:
+    either nothing looks like a duplicate, or the owner confirmed it's a separate payment."""
+    reasons = []
+    pay = load_payments(supabase, gym_id)
+    if pay is not None and not pay.empty:
+        mine = pay[pay["member_id"] == member_id]
+        if len(mine):
+            last = mine.iloc[0]
+            if pd.notna(last["paid_on"]) and (gw.today_local() - last["paid_on"]).days <= RECENT_PAYMENT_DAYS:
+                until = pd.to_datetime(last.get("covers_until"), errors="coerce")
+                reasons.append(f"{name} already paid {last['amount']:,.0f} on {last['paid_on']:%d %b}"
+                               + ("" if pd.isna(until) else f", covering until {until:%d %b %Y}") + ".")
+    state = gw.membership_state(current_end)
+    if state["days"] is not None and state["days"] > gw.PLAN_DAYS.get(plan, 30):
+        reasons.append(f"Their membership is already paid until {state['end']:%d %b %Y}, "
+                       f"more than one {plan.lower()} period ahead.")
+    if not reasons:
+        return True
+    st.warning(" ".join(reasons) + " Saving again adds another period on top.")
+    return st.checkbox("Yes, this is a separate new payment", key=f"guard_{key}_{member_id}")
+
+
 def render_record_payment(supabase, gym_id, roster):
     """Quick 'record a renewal' form for the Payments page."""
     st.markdown('<div class="section-label">RECORD A RENEWAL OR PAYMENT</div>',
@@ -281,8 +307,9 @@ def render_record_payment(supabase, gym_id, roster):
     with st.container(border=True, key="card_pay_record"):
         c1, c2, c3 = st.columns([2, 1, 1])
         ordered = sorted(names, key=lambda i: str(names[i]).lower())
+        form_n = st.session_state.get("rp_n", 0)
         mid = c1.selectbox("Member", ordered, index=None, placeholder="Choose a member",
-                           format_func=lambda i: names[i], key="rp_member")
+                           format_func=lambda i: names[i], key=f"rp_member_{form_n}")
         if mid is None:
             st.caption("Pick the member who paid. New members' first payment is recorded as a "
                        "joining payment; later ones as renewals.")
@@ -314,12 +341,13 @@ def render_record_payment(supabase, gym_id, roster):
                     + (f"This renewal will be credited to their **{play['action_type']}** play."
                        if play else "No recent play to credit, so it counts as a renewal only."))
         st.caption(hint)
-        if st.button("Save payment", key="rp_save", type="primary"):
+        ok = renewal_guard(supabase, gym_id, mid, names[mid], r.get("membership_end"), plan, "rp")
+        if st.button("Save payment", key="rp_save", type="primary", disabled=not ok):
             try:
                 st.session_state["pay_flash"] = record_payment(
                     supabase, gym_id, mid, names[mid], amount, plan, start, method,
                     current_end=r.get("membership_end"), act=True, first=first)
-                st.session_state.pop("rp_member", None)
+                st.session_state["rp_n"] = form_n + 1      # fresh, empty form after saving
             except Exception as error:
                 st.session_state["pay_flash"] = f"Could not save the payment: {error}"
             st.rerun()
@@ -348,6 +376,9 @@ PAYMENTS_TABLE_CSS = """
     .gp-table td { border: 0; padding: 2px 0; }
     .gp-table td.num { text-align: left; font-size: 16px; }
     .gp-table td[data-l]::before { content: attr(data-l) ": "; color: #93A1B8; font-size: 12px; }
+    .gp-table td.num, .gp-table td.kind { display: inline-block; width: auto; margin: 4px 10px 2px 0;
+        vertical-align: middle; }
+    .gp-table td.none { display: none; }
 }
 """
 
@@ -389,9 +420,9 @@ def render_recent_payments(supabase, gym_id, roster):
             f'<td><b>{gw._esc(who)}</b><span class="sub">{gw._esc(plan)}'
             f'{" · until " + gw._esc(until) if until else ""}</span></td>'
             f'<td class="num">{p["amount"]:,.0f}</td>'
-            f'<td>{gw.chip(kind, tone)}</td>'
+            f'<td class="kind">{gw.chip(kind, tone)}</td>'
             f'<td data-l="Paid by">{gw._esc(gw._text(p.get("method"), "—"))}</td>'
-            f'<td data-l="Credited to">{credit}</td></tr>')
+            f'<td data-l="Credited to" class="{"none" if credit == "—" else ""}">{credit}</td></tr>')
     since = gw.today_local() - timedelta(days=30)
     month = pay[pay["paid_on"] >= since]
     gw._md("<style>" + PAYMENTS_TABLE_CSS + "</style>"
