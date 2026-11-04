@@ -568,14 +568,38 @@ def palette(theme):
             "line": "#E5E9F0", "box": "#F4F7FB", "scheme": "light"}
 
 
+def small_logo(data, max_px=600):
+    """A logo shrunk to at most max_px wide (PNG, transparency kept). A full-size
+    phone photo used as a logo can take hundreds of MB to process, enough to
+    restart a small server."""
+    if not data:
+        return data
+    try:
+        from PIL import Image
+        im = Image.open(io.BytesIO(data))
+        if max(im.size) <= max_px and len(data) < 400_000:
+            return data
+        im.draft("RGB", (max_px, max_px))          # JPEGs decode straight at a smaller size
+        im.thumbnail((max_px, max_px))
+        if im.mode not in ("RGB", "RGBA", "LA", "L"):
+            im = im.convert("RGBA")
+        out = io.BytesIO()
+        im.save(out, "PNG", optimize=True)
+        return out.getvalue()
+    except Exception:
+        return None if len(data) > 5_000_000 else data
+
+
 def logo_is_dark(data):
     """True when a logo is mostly dark ink, so it needs a light header to be seen."""
     if not data:
         return False
     try:
         from PIL import Image
-        im = Image.open(io.BytesIO(data)).convert("RGBA")
+        im = Image.open(io.BytesIO(data))
+        im.draft("RGB", (240, 240))
         im.thumbnail((120, 120))
+        im = im.convert("RGBA")
         px = [(r, g, b_) for r, g, b_, a in im.getdata() if a > 60]
         if not px:
             return False
@@ -592,7 +616,7 @@ def logo_tone(url):
         return "light"
     cache = st.session_state.setdefault("_logo_tone", {})
     if url not in cache:
-        cache[url] = "dark" if logo_is_dark(_fetch_image(url)) else "light"
+        cache[url] = "dark" if logo_is_dark(small_logo(_fetch_image(url), 240)) else "light"
     return cache[url]
 
 
@@ -1039,6 +1063,10 @@ def render_brand_settings(supabase, gym_id, save):
                         buf = io.BytesIO(); im.save(buf, "JPEG", quality=86); data, ctype = buf.getvalue(), "image/jpeg"
                     except Exception:
                         pass
+                else:                                    # logos are stored small (max 800px, PNG)
+                    small = small_logo(data, 800)
+                    if small and small is not data:
+                        data, ctype = small, "image/png"
                 url = upload_asset(supabase, gym_id, f"brand/{name}.{'jpg' if ctype == 'image/jpeg' else 'png'}",
                                    data, ctype)
                 if url:

@@ -84,7 +84,7 @@ def _pdf_brand():
     if cache and cache.get("sig") == sig:
         return cache
     try:
-        logo = gcamp._fetch_image(b.get("logo_url")) if b.get("logo_url") else None
+        logo = gcamp.small_logo(gcamp._fetch_image(b.get("logo_url"))) if b.get("logo_url") else None
         out = {"gym": b["gym"], "dark": b["dark"] or NAVY, "accent": b["color"] or LIME, "logo": logo, "sig": sig}
     except Exception:
         out = {"gym": _gym_name(), "dark": NAVY, "accent": LIME, "logo": None, "sig": sig}
