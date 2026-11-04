@@ -67,8 +67,20 @@ def service_client():
 
 
 # ------------------------------------------------------------------ data
-def all_gyms(sc):
-    """Every gym with its owner's profile, email and WhatsApp number."""
+def all_gyms(sc, fresh=False):
+    """Every gym with its owner's profile, email and WhatsApp number (kept for 2 minutes)."""
+    hit = None if fresh else st.session_state.get("_adm_gyms")
+    if hit and (datetime.now(timezone.utc) - hit[0]).seconds < 120:
+        return hit[1]
+    out = _all_gyms(sc)
+    try:
+        st.session_state["_adm_gyms"] = (datetime.now(timezone.utc), out)
+    except Exception:
+        pass
+    return out
+
+
+def _all_gyms(sc):
     gyms = sc.table("gyms").select("id, owner_id, business_name, created_at").execute().data or []
     owners = [g["owner_id"] for g in gyms if g.get("owner_id")]
     profiles = {}
@@ -130,6 +142,26 @@ def as_gym(entry):
                 st.session_state.pop(k, None)
             else:
                 st.session_state[k] = v
+
+
+def report_data(sc, entry, start, end):
+    """One gym's report numbers, kept for 10 minutes so reopening it is instant."""
+    key = (entry["gym"]["id"], str(start), str(end))
+    store = st.session_state.setdefault("_adm_reports", {})
+    hit = store.get(key)
+    if hit and (datetime.now(timezone.utc) - hit[0]).seconds < 600:
+        return hit[1]
+    import gympulse_grow as gg
+    with as_gym(entry):
+        d = gg.monthly_data(sc, entry["gym"]["id"], None, start, end)
+    store[key] = (datetime.now(timezone.utc), d)
+    return d
+
+
+def report_pdf(entry, d):
+    import gympulse_grow as gg
+    with as_gym(entry):
+        return gg.monthly_pdf(d)
 
 
 def gym_report(sc, entry, start, end):
@@ -214,7 +246,7 @@ def send_all(sc, start, end, sent_by="auto", only=None, log=print):
     done = sent_log(sc, period) or {}
     flags = gym_flags(sc) or {}
     sent = skipped = failed = 0
-    for entry in all_gyms(sc):
+    for entry in all_gyms(sc, fresh=True):
         gid = entry["gym"]["id"]
         if only and gid not in only:
             continue
@@ -292,7 +324,7 @@ def render_reports(sc):
     gw.kpi_row([("Gyms", str(len(gyms)), "cyan", "on GymPulse AI"),
                 ("Emailed", f"{emailed}/{len(gyms)}", "lime", start.strftime("%B report")),
                 ("WhatsApp sent", str(sum((g["gym"]["id"], "whatsapp") in log for g in gyms)), "amber", "by you"),
-                ("Automatic", "1st of month", "grey", "Render Cron Job")])
+                ("Automatic", "1st of month", "grey", "8am Lagos, GitHub Actions")])
     if emailed < len(gyms) and st.button(f"Email all {len(gyms) - emailed} unsent reports", type="primary",
                                          icon=":material/mail:"):
         with st.spinner("Sending…"):
@@ -309,10 +341,16 @@ def render_reports(sc):
         chips = (gw.chip("emailed", "lime") if (gid, "email") in log else gw.chip("not emailed", "grey"))
         chips += gw.chip("reports paused", "amber") if (flags.get(gid) or {}).get("reports_paused") else ""
         chips += gw.chip("WhatsApp sent", "cyan") if (gid, "whatsapp") in log else ""
-        with st.expander(f"{entry['name']} · {entry['owner'] or 'owner'} · {entry['email'] or 'no email'}"):
+        with st.expander(f"{entry['name']} · {entry['owner'] or 'owner'} · {entry['email'] or 'no email'}",
+                         expanded=st.session_state.get("adm_rep_open") == gid):
             gw._md(f'<div class="chip-row">{chips}</div>')
+            # Reports are built only for the gym you open, and kept for this session:
+            # building every gym's report on every click used too much memory.
+            if not st.toggle("Show this gym's report", key=f"adm_show_{gid}_{period}"):
+                continue
+            st.session_state["adm_rep_open"] = gid
             try:
-                d, pdf = gym_report(sc, entry, start, end)
+                d = report_data(sc, entry, start, end)
             except Exception as error:
                 st.error(f"Could not build this report: {error}")
                 continue
@@ -321,13 +359,20 @@ def render_reports(sc):
                         ("Collected", _money(d["collected"]), "amber", ""),
                         ("New members", str(d["joined"]), "grey", "")])
             c1, c2, c3 = st.columns(3)
+            pdf_key = f"_adm_pdf_{gid}_{period}"
             with c1:
-                rp.download_link("Download PDF", pdf, f"{gg.safe_name(entry['name'])}-{period}-retention-report.pdf",
-                                 rp.PDF, f"adm_pdf_{gid}")
+                if st.session_state.get(pdf_key):
+                    rp.download_link("Download PDF", st.session_state[pdf_key],
+                                     f"{gg.safe_name(entry['name'])}-{period}-retention-report.pdf", rp.PDF, f"adm_pdf_{gid}")
+                elif st.button("Prepare PDF", key=f"adm_mk_{gid}", use_container_width=True):
+                    for k in [k for k in st.session_state.keys() if str(k).startswith("_adm_pdf_")]:
+                        del st.session_state[k]            # keep only one PDF in memory
+                    st.session_state[pdf_key] = report_pdf(entry, d)
+                    st.rerun()
             if c2.button("Email report", key=f"adm_em_{gid}", type="primary", icon=":material/mail:",
                          use_container_width=True, disabled=not entry["email"]):
                 try:
-                    send_report_email(entry, d, pdf)
+                    send_report_email(entry, d, report_pdf(entry, d))
                     log_sent(sc, gid, period, "email", (st.session_state.get("auth_user") or {}).get("email", "admin"))
                     st.session_state["adm_flash"] = f"Report emailed to {entry['email']}."
                 except Exception as error:
@@ -461,6 +506,7 @@ def gym_backup(sc, entry):
 def delete_gym(sc, entry, delete_login=True):
     """Permanently remove a gym, all its data, its images and (optionally) the owner's login."""
     gid, owner = entry["gym"]["id"], entry["gym"].get("owner_id")
+    st.session_state.pop("_adm_gyms", None)
     done, problems = [], []
     for table in GYM_TABLES:
         try:
@@ -500,6 +546,7 @@ def delete_gym(sc, entry, delete_login=True):
 
 
 def set_suspended(sc, entry, suspend):
+    st.session_state.pop("_adm_gyms", None)
     sc.auth.admin.update_user_by_id(entry["gym"]["owner_id"], {"ban_duration": BAN_FOREVER if suspend else "none"})
 
 
