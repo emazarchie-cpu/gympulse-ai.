@@ -1242,6 +1242,9 @@ if st.session_state.auth_user is None:
                     '<div class="auth-title">Welcome back, sign in</div>',
                     unsafe_allow_html=True
                 )
+                _login_flash = st.session_state.pop("login_flash", None)
+                if _login_flash:
+                    st.info(_login_flash)
 
                 if st.session_state.get("password_updated", False):
                     st.success("Password updated. Sign in with your new password.")
@@ -1590,6 +1593,21 @@ business_name = profile.get("business_name", "My Gym")
 
 owner_id = st.session_state.auth_user["id"]
 
+# Keep the Supabase login alive: get_session() renews an expired access token
+# (they last about an hour), so queries keep running as this owner.
+_session = None
+try:
+    _session = supabase.auth.get_session()
+except Exception:
+    _session = None
+_session_lost = False
+
+
+def _auth_error(error):
+    text = str(error).lower()
+    return any(k in text for k in ("42501", "row-level security", "jwt", "pgrst301", "pgrst303", "invalid token"))
+
+
 try:
     # Retrieve the gym belonging to the authenticated owner
     gym_rows = gw.cached(
@@ -1606,9 +1624,33 @@ try:
         skip_empty=True
     )
 
+    # An empty answer can mean the login has lapsed, not that there's no gym:
+    # renew the session and ask again before creating anything.
+    if not gym_rows:
+        try:
+            supabase.auth.refresh_session()
+        except Exception:
+            pass
+        try:
+            gym_rows = (supabase.table("gyms").select("*").eq("owner_id", owner_id)
+                        .limit(1).execute().data or [])
+        except Exception as error:
+            if _auth_error(error):
+                _session_lost = True
+            gym_rows = []
+    if not gym_rows and _session is None and not _session_lost:
+        try:
+            _session_lost = supabase.auth.get_session() is None and bool(
+                st.session_state.get("_had_gym"))
+        except Exception:
+            pass
+    if _session_lost:
+        raise PermissionError("session expired")
+
     # Create a workspace if this owner does not have one
     if gym_rows:
         gym = gym_rows[0]
+        st.session_state["_had_gym"] = True
 
     else:
         new_gym = (
@@ -1633,6 +1675,13 @@ try:
 
 except Exception as error:
     st.session_state.gym_id = None
+
+    if isinstance(error, PermissionError) or _auth_error(error):
+        # The login lapsed: sign in again instead of showing a database error.
+        for _k in list(st.session_state.keys()):
+            del st.session_state[_k]
+        st.session_state["login_flash"] = "Your session expired. Please sign in again."
+        st.rerun()
 
     st.error(
         "We couldn't load your gym workspace. "
