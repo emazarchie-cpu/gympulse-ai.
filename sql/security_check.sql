@@ -57,12 +57,18 @@ tables as (
 funcs as (
     select
         case when p.proname in ('gp_owns_gym', 'email_unsubscribe', 'book_demo', 'demo_taken_slots',
-                                'cancel_demo', 'public_trainer') then 'OK' else 'CHECK' end as result,
+                                'cancel_demo', 'public_trainer', 'device_checkin', 'handle_new_user',
+                                'rls_auto_enable') then 'OK' else 'CHECK' end as result,
         'function' as kind,
         p.proname as name,
         case when p.proname in ('gp_owns_gym', 'email_unsubscribe', 'book_demo', 'demo_taken_slots',
-                                'cancel_demo', 'public_trainer')
-             then 'Known GymPulse function that runs with extra rights on purpose.'
+                                'cancel_demo', 'public_trainer', 'device_checkin', 'handle_new_user',
+                                'rls_auto_enable')
+             then case p.proname
+                      when 'device_checkin' then 'Check-in kiosk: needs the gym''s secret device key. Correct.'
+                      when 'handle_new_user' then 'Creates a profile when someone signs up. Correct.'
+                      when 'rls_auto_enable' then 'Supabase helper that switches security on for new tables. Correct.'
+                      else 'Known GymPulse function that runs with extra rights on purpose.' end
              else 'Runs with extra rights (security definer). Make sure it only returns what it should.' end
     from pg_proc p
     where p.pronamespace = 'public'::regnamespace and p.prosecdef
