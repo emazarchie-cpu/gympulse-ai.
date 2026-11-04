@@ -55,7 +55,15 @@ def service_client():
     if not (url and key):
         return None
     from supabase import create_client
-    return create_client(url, key)
+    try:                                   # reuse one client per admin session
+        cached = st.session_state.get("_svc_client")
+        if cached and cached[0] == url:
+            return cached[1]
+        client = create_client(url, key)
+        st.session_state["_svc_client"] = (url, client)
+        return client
+    except Exception:
+        return create_client(url, key)
 
 
 # ------------------------------------------------------------------ data
@@ -72,13 +80,16 @@ def all_gyms(sc):
         p = profiles.get(g.get("owner_id")) or {"id": g.get("owner_id"), "business_name": g.get("business_name")}
         s = dict(p.get("settings") or {})
         brand = dict(s.get("email_brand") or {})
-        email = ""
+        email, user = "", None
         try:
-            u = sc.auth.admin.get_user_by_id(g["owner_id"])
-            email = getattr(getattr(u, "user", None), "email", "") or ""
+            user = getattr(sc.auth.admin.get_user_by_id(g["owner_id"]), "user", None)
+            email = getattr(user, "email", "") or ""
         except Exception:
             pass
         out.append({"gym": g, "profile": p, "email": email,
+                    "signed_up": getattr(user, "created_at", None) or g.get("created_at"),
+                    "last_login": getattr(user, "last_sign_in_at", None),
+                    "banned_until": getattr(user, "banned_until", None),
                     "phone": gw._text(s.get("biz_phone") or brand.get("whatsapp")),
                     "name": gw._text(p.get("business_name") or g.get("business_name"), "Gym"),
                     "owner": gw._text(p.get("full_name"))})
@@ -201,10 +212,15 @@ def send_all(sc, start, end, sent_by="auto", only=None, log=print):
     """Email every gym its report for the month, skipping any already sent. Returns (sent, skipped, failed)."""
     period = f"{start:%Y-%m}"
     done = sent_log(sc, period) or {}
+    flags = gym_flags(sc) or {}
     sent = skipped = failed = 0
     for entry in all_gyms(sc):
         gid = entry["gym"]["id"]
         if only and gid not in only:
+            continue
+        if flags.get(gid, {}).get("reports_paused"):
+            skipped += 1
+            log(f"paused {entry['name']}")
             continue
         if (gid, "email") in done:
             skipped += 1
@@ -228,12 +244,28 @@ def render_admin():
         return
     import gympulse_grow as gg
     import gympulse_reports as rp
-    gw.page_header("Admin", "Monthly reports for every gym on GymPulse AI.", "Founder")
+    gw.page_header("Admin", "Every gym on GymPulse AI: accounts, activity and monthly reports.", "Founder")
     sc = service_client()
     if sc is None:
         st.warning("Add SUPABASE_SERVICE_ROLE_KEY on Render (Supabase → Project Settings → API → service_role) "
                    "so this page can read every gym. Keep it secret: it bypasses row-level security.")
         return
+    flash = st.session_state.pop("adm_flash", None)
+    if flash:
+        (st.error if flash.startswith("Could not") else st.success)(flash)
+    section = st.segmented_control("Admin section", ["Gyms", "Monthly reports", "Admin log"], key="adm_section",
+                                   default="Gyms", label_visibility="collapsed") or "Gyms"
+    if section == "Gyms":
+        render_gyms(sc)
+    elif section == "Admin log":
+        render_log(sc)
+    else:
+        render_reports(sc)
+
+
+def render_reports(sc):
+    import gympulse_grow as gg
+    import gympulse_reports as rp
     today = gw.today_local()
     months = []
     y, m = today.year, today.month
@@ -255,14 +287,12 @@ def render_admin():
     except Exception as error:
         st.error(f"Could not load gyms: {error}")
         return
+    flags = gym_flags(sc) or {}
     emailed = sum((g["gym"]["id"], "email") in log for g in gyms)
     gw.kpi_row([("Gyms", str(len(gyms)), "cyan", "on GymPulse AI"),
                 ("Emailed", f"{emailed}/{len(gyms)}", "lime", start.strftime("%B report")),
                 ("WhatsApp sent", str(sum((g["gym"]["id"], "whatsapp") in log for g in gyms)), "amber", "by you"),
                 ("Automatic", "1st of month", "grey", "Render Cron Job")])
-    flash = st.session_state.pop("adm_flash", None)
-    if flash:
-        st.success(flash)
     if emailed < len(gyms) and st.button(f"Email all {len(gyms) - emailed} unsent reports", type="primary",
                                          icon=":material/mail:"):
         with st.spinner("Sending…"):
@@ -277,6 +307,7 @@ def render_admin():
     for entry in gyms:
         gid = entry["gym"]["id"]
         chips = (gw.chip("emailed", "lime") if (gid, "email") in log else gw.chip("not emailed", "grey"))
+        chips += gw.chip("reports paused", "amber") if (flags.get(gid) or {}).get("reports_paused") else ""
         chips += gw.chip("WhatsApp sent", "cyan") if (gid, "whatsapp") in log else ""
         with st.expander(f"{entry['name']} · {entry['owner'] or 'owner'} · {entry['email'] or 'no email'}"):
             gw._md(f'<div class="chip-row">{chips}</div>')
@@ -310,3 +341,321 @@ def render_admin():
                     st.rerun()
             else:
                 c3.caption("No WhatsApp number in this gym's settings.")
+
+
+# ================================================================== gym management
+# Child tables first, so nothing is left behind and no foreign key blocks the delete.
+GYM_TABLES = ["challenge_entries", "challenges", "referrals", "progress_logs", "member_freezes", "exit_reasons",
+              "onboarding_steps", "payment_requests", "payments", "messages", "reminder_log", "checkins",
+              "retention_actions", "member_activity", "classes", "trainers", "members", "companies",
+              "platform_reports", "platform_gym_flags"]
+BAN_FOREVER = "876000h"     # 100 years: Supabase's way to block a login
+
+
+def _actor():
+    return (st.session_state.get("auth_user") or {}).get("email", "admin")
+
+
+def audit(sc, action, entry, detail=None):
+    try:
+        sc.table("admin_audit").insert({"actor": _actor(), "action": action, "gym_id": entry["gym"]["id"],
+                                        "gym_name": entry["name"], "owner_email": entry["email"] or None,
+                                        "detail": detail or {}}).execute()
+    except Exception:
+        pass
+
+
+def gym_flags(sc):
+    """{gym_id: {"reports_paused": bool, "note": str}} or None before sql/phase7_admin_tools.sql."""
+    try:
+        return {r["gym_id"]: r for r in sc.table("platform_gym_flags").select("*").execute().data or []}
+    except Exception:
+        return None
+
+
+def set_flag(sc, gym_id, **fields):
+    sc.table("platform_gym_flags").upsert({"gym_id": gym_id, **fields,
+                                          "updated_at": datetime.now(timezone.utc).isoformat()},
+                                         on_conflict="gym_id").execute()
+
+
+def _count(sc, table, gym_id, since=None, col="checked_in_at"):
+    try:
+        q = sc.table(table).select("id", count="exact").eq("gym_id", gym_id)
+        if since:
+            q = q.gte(col, since)
+        res = q.limit(1).execute()
+        if res.count is not None:
+            return res.count
+        q = sc.table(table).select("id").eq("gym_id", gym_id)      # clients without counts
+        return len((q.gte(col, since) if since else q).execute().data or [])
+    except Exception:
+        return None
+
+
+def _last(sc, table, gym_id, col):
+    try:
+        rows = sc.table(table).select(col).eq("gym_id", gym_id).order(col, desc=True).limit(1).execute().data or []
+        return rows[0][col] if rows else None
+    except Exception:
+        return None
+
+
+def gym_stats(sc, gym_id):
+    key = ("adm_stats", gym_id)
+    hit = st.session_state.get("_adm_stats", {}).get(key)
+    if hit and (datetime.now(timezone.utc) - hit[0]).seconds < 120:
+        return hit[1]
+    since = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+    out = {"members": _count(sc, "members", gym_id), "checkins_30d": _count(sc, "checkins", gym_id, since),
+           "plays": _count(sc, "retention_actions", gym_id), "payments": _count(sc, "payments", gym_id),
+           "last_checkin": _last(sc, "checkins", gym_id, "checked_in_at")}
+    st.session_state.setdefault("_adm_stats", {})[key] = (datetime.now(timezone.utc), out)
+    return out
+
+
+def _when(value):
+    if not value:
+        return "never"
+    try:
+        t = pd.to_datetime(value, utc=True).tz_convert(gw.APP_TZ)
+        days = (pd.Timestamp.now(tz=gw.APP_TZ) - t).days
+        return f"{t:%d %b %Y}" + (" (today)" if days == 0 else f" ({days}d ago)" if days < 60 else "")
+    except Exception:
+        return str(value)[:10]
+
+
+def _is_banned(entry):
+    b = entry.get("banned_until")
+    if not b:
+        return False
+    try:
+        return pd.to_datetime(b, utc=True) > pd.Timestamp.now(tz="UTC")
+    except Exception:
+        return False
+
+
+def is_protected(entry):
+    """Admin accounts can't be suspended or deleted from here (so you can't lock yourself out)."""
+    return (entry.get("email") or "").lower() in admin_emails()
+
+
+def gym_backup(sc, entry):
+    """An Excel file with the gym's members, check-ins, plays and payments, made before a delete."""
+    import gympulse_reports as rp
+    gid = entry["gym"]["id"]
+    sheets = []
+    for table, title in (("members", "Members"), ("member_activity", "Plans"), ("payments", "Payments"),
+                         ("retention_actions", "Plays"), ("checkins", "Check-ins"), ("trainers", "Trainers")):
+        try:
+            rows = sc.table(table).select("*").eq("gym_id", gid).limit(20000).execute().data or []
+        except Exception:
+            rows = []
+        df = pd.DataFrame(rows)
+        if "photo" in df.columns:
+            df = df.drop(columns=["photo"])
+        sheets.append((title, df if len(df) else pd.DataFrame({"Note": ["No rows"]}), {}))
+    return rp.build_xlsx(sheets, f"{entry['name']} backup", gym=entry["name"])
+
+
+def delete_gym(sc, entry, delete_login=True):
+    """Permanently remove a gym, all its data, its images and (optionally) the owner's login."""
+    gid, owner = entry["gym"]["id"], entry["gym"].get("owner_id")
+    done, problems = [], []
+    for table in GYM_TABLES:
+        try:
+            sc.table(table).delete().eq("gym_id", gid).execute()
+            done.append(table)
+        except Exception as error:
+            msg = str(error)
+            if "does not exist" not in msg and "PGRST205" not in msg and "42P01" not in msg:
+                problems.append(f"{table}: {msg[:80]}")
+    try:                                    # logos, photos and banners in storage
+        store = sc.storage.from_("email-assets")
+        paths = []
+        for folder in ("", "brand", "banners", "trainers"):
+            prefix = f"{gid}/{folder}".rstrip("/")
+            for f in store.list(prefix) or []:
+                if f.get("id"):
+                    paths.append(f"{prefix}/{f['name']}")
+        if paths:
+            store.remove(paths)
+    except Exception:
+        pass
+    try:
+        sc.table("gyms").delete().eq("id", gid).execute()
+    except Exception as error:
+        problems.append(f"gyms: {str(error)[:120]}")
+        return False, problems
+    if delete_login and owner:
+        try:
+            sc.table("profiles").delete().eq("id", owner).execute()
+        except Exception as error:
+            problems.append(f"profiles: {str(error)[:80]}")
+        try:
+            sc.auth.admin.delete_user(owner)
+        except Exception as error:
+            problems.append(f"login: {str(error)[:80]}")
+    return True, problems
+
+
+def set_suspended(sc, entry, suspend):
+    sc.auth.admin.update_user_by_id(entry["gym"]["owner_id"], {"ban_duration": BAN_FOREVER if suspend else "none"})
+
+
+# ------------------------------------------------------------------ gyms tab
+def render_gyms(sc):
+    import gympulse_reports as rp
+    try:
+        gyms = all_gyms(sc)
+    except Exception as error:
+        st.error(f"Could not load gyms: {error}")
+        return
+    flags = gym_flags(sc)
+    if flags is None:
+        st.info("Run sql/phase7_admin_tools.sql in Supabase to switch on pausing reports and the admin log.")
+        flags = {}
+    stats = {g["gym"]["id"]: gym_stats(sc, g["gym"]["id"]) for g in gyms}
+    total_members = sum(s["members"] or 0 for s in stats.values())
+    active = sum(1 for s in stats.values() if (s["checkins_30d"] or 0) > 0)
+    week = pd.Timestamp.now(tz="UTC") - pd.Timedelta(days=7)
+    new_week = sum(1 for g in gyms if g.get("signed_up") and pd.to_datetime(g["signed_up"], utc=True) >= week)
+    gw.kpi_row([("Gyms", str(len(gyms)), "cyan", f"{new_week} joined this week"),
+                ("Active gyms", str(active), "lime", "check-ins in the last 30 days"),
+                ("Members", f"{total_members:,}", "amber", "across all gyms"),
+                ("Suspended", str(sum(_is_banned(g) for g in gyms)), "grey", "login blocked")])
+
+    c1, c2 = st.columns([3, 1])
+    q = c1.text_input("Search", placeholder="Gym, owner or email", key="adm_q", label_visibility="collapsed")
+    order = c2.selectbox("Sort", ["Newest", "Most members", "Least active", "Name"], key="adm_sort",
+                         label_visibility="collapsed")
+    view = [g for g in gyms if not q or q.lower() in f"{g['name']} {g['owner']} {g['email']}".lower()]
+    if order == "Newest":
+        view.sort(key=lambda g: str(g.get("signed_up") or ""), reverse=True)
+    elif order == "Most members":
+        view.sort(key=lambda g: -(stats[g["gym"]["id"]]["members"] or 0))
+    elif order == "Least active":
+        view.sort(key=lambda g: stats[g["gym"]["id"]]["checkins_30d"] or 0)
+
+    table = pd.DataFrame([{"Gym": g["name"], "Owner": g["owner"], "Email": g["email"],
+                           "Signed up": _when(g.get("signed_up")), "Last login": _when(g.get("last_login")),
+                           "Members": stats[g["gym"]["id"]]["members"],
+                           "Check-ins (30d)": stats[g["gym"]["id"]]["checkins_30d"],
+                           "Status": "Suspended" if _is_banned(g) else "Active",
+                           "Reports": "Paused" if flags.get(g["gym"]["id"], {}).get("reports_paused") else "On"}
+                          for g in view])
+    try:
+        rp.download_link("Export gyms (Excel)", rp.build_xlsx([("Gyms", table, {})], "GymPulse AI gyms",
+                                                              gym="GymPulse AI"), "gympulse-gyms.xlsx", rp.XLSX
+                         if hasattr(rp, "XLSX") else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                         "adm_export")
+    except Exception:
+        pass
+
+    for g in view:
+        gid = g["gym"]["id"]
+        s = stats[gid]
+        f = flags.get(gid, {})
+        banned = _is_banned(g)
+        chips = (gw.chip("suspended", "red", dot=True) if banned else gw.chip("active", "lime", dot=True))
+        chips += gw.chip("reports paused", "amber") if f.get("reports_paused") else ""
+        chips += gw.chip("admin", "cyan") if is_protected(g) else ""
+        with st.expander(f"{g['name']} · {g['owner'] or 'no name'} · {g['email'] or 'no email'}",
+                         expanded=st.session_state.get("adm_open") == gid):
+            gw._md(f'<div class="chip-row">{chips}</div>')
+            gw.kpi_row([("Members", str(s["members"] if s["members"] is not None else "–"), "cyan", ""),
+                        ("Check-ins (30d)", str(s["checkins_30d"] if s["checkins_30d"] is not None else "–"), "lime",
+                         f"last {_when(s['last_checkin'])}"),
+                        ("Plays", str(s["plays"] if s["plays"] is not None else "–"), "amber", ""),
+                        ("Payments", str(s["payments"] if s["payments"] is not None else "–"), "grey", "")])
+            st.caption(f"Signed up {_when(g.get('signed_up'))} · last login {_when(g.get('last_login'))}"
+                       + (f" · WhatsApp {g['phone']}" if g["phone"] else ""))
+            note = st.text_input("Private note (only admins see this)", f.get("note") or "", key=f"adm_note_{gid}",
+                                 placeholder="e.g. pilot gym, paid until March, test account")
+            c1, c2, c3 = st.columns(3)
+            if note != (f.get("note") or "") and c1.button("Save note", key=f"adm_ns_{gid}", use_container_width=True):
+                try:
+                    set_flag(sc, gid, note=note.strip() or None)
+                    audit(sc, "note", g, {"note": note.strip()})
+                    st.session_state["adm_flash"] = f"Note saved for {g['name']}."
+                    st.session_state["adm_open"] = gid
+                except Exception as error:
+                    st.session_state["adm_flash"] = f"Could not save the note: {error}"
+                st.session_state["adm_open"] = gid
+                st.rerun()
+            paused = bool(f.get("reports_paused"))
+            if c2.button("Resume monthly reports" if paused else "Pause monthly reports", key=f"adm_rp_{gid}",
+                         use_container_width=True):
+                try:
+                    set_flag(sc, gid, reports_paused=not paused)
+                    audit(sc, "reports_resumed" if paused else "reports_paused", g)
+                    st.session_state["adm_flash"] = (f"Monthly reports {'resumed' if paused else 'paused'} "
+                                                     f"for {g['name']}.")
+                except Exception as error:
+                    st.session_state["adm_flash"] = f"Could not change reports: {error}"
+                st.session_state["adm_open"] = gid
+                st.rerun()
+            if g.get("email") and c3.button("Send password reset", key=f"adm_pw_{gid}", use_container_width=True):
+                try:
+                    sc.auth.reset_password_for_email(g["email"])
+                    audit(sc, "password_reset", g)
+                    st.session_state["adm_flash"] = f"Password reset email sent to {g['email']}."
+                except Exception as error:
+                    st.session_state["adm_flash"] = f"Could not send the reset: {error}"
+                st.session_state["adm_open"] = gid
+                st.rerun()
+
+            if is_protected(g):
+                st.caption("This is an admin account, so it can't be suspended or deleted here.")
+                continue
+            st.markdown("**Access**")
+            if st.button("Restore access" if banned else "Suspend access", key=f"adm_ban_{gid}",
+                         type="secondary", use_container_width=True,
+                         help="Suspending blocks the owner from logging in. Their data stays, and you can restore it."):
+                try:
+                    set_suspended(sc, g, not banned)
+                    audit(sc, "restored" if banned else "suspended", g)
+                    st.session_state["adm_flash"] = f"{g['name']} {'can log in again' if banned else 'is suspended'}."
+                except Exception as error:
+                    st.session_state["adm_flash"] = f"Could not change access: {error}"
+                st.session_state["adm_open"] = gid
+                st.rerun()
+
+            if st.toggle("Delete this gym…", key=f"adm_dt_{gid}"):
+                st.warning(f"This permanently deletes **{g['name']}**: {s['members'] or 0} members, their check-ins, "
+                           "plays, payments, messages, trainers, images and reports. It can't be undone.")
+                try:
+                    rp.download_link("Download a backup first (Excel)", gym_backup(sc, g),
+                                     f"{gw._text(g['name']).replace(' ', '-')}-backup.xlsx",
+                                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                     f"adm_bk_{gid}")
+                except Exception as error:
+                    st.caption(f"Backup unavailable: {error}")
+                also = st.checkbox("Also delete the owner's login, so they can't sign in again with it",
+                                   value=True, key=f"adm_dl_{gid}")
+                typed = st.text_input(f'Type "{g["name"]}" to confirm', key=f"adm_dc_{gid}")
+                if st.button("Delete permanently", key=f"adm_del_{gid}", type="primary",
+                             disabled=typed.strip() != g["name"].strip(), use_container_width=True):
+                    with st.spinner("Deleting…"):
+                        ok, problems = delete_gym(sc, g, also)
+                    audit(sc, "deleted", g, {"login_deleted": bool(also), "problems": problems})
+                    st.session_state.pop("_adm_stats", None)
+                    st.session_state["adm_flash"] = (
+                        (f"{g['name']} was deleted." if ok else f"Could not delete {g['name']}.")
+                        + (" Notes: " + "; ".join(problems) if problems else ""))
+                    st.session_state["adm_open"] = gid
+                    st.rerun()
+
+
+def render_log(sc):
+    try:
+        rows = sc.table("admin_audit").select("*").order("at", desc=True).limit(200).execute().data or []
+    except Exception:
+        st.info("Run sql/phase7_admin_tools.sql in Supabase to keep a log of admin actions.")
+        return
+    if not rows:
+        st.caption("No admin actions yet.")
+        return
+    st.dataframe(pd.DataFrame([{"When": _when(r.get("at") or r.get("created_at")), "Admin": r.get("actor"), "Action": r.get("action"),
+                                "Gym": r.get("gym_name"), "Owner": r.get("owner_email")} for r in rows]),
+                 hide_index=True, use_container_width=True)

@@ -26,3 +26,17 @@ Sign in with an email listed in `GYMPULSE_ADMINS` and open **☰ → Admin**. Pi
 - **WhatsApp the owner**: opens WhatsApp with the report message ready, written as from Emmanuel at GymPulse AI. Tap **I sent it on WhatsApp** afterwards to log it.
 
 **Email all unsent reports** sends to every gym that hasn't had that month's email yet.
+
+## Managing gyms (Admin → Gyms)
+
+Run `sql/phase7_admin_tools.sql` once in Supabase. It adds per-gym admin settings and the admin log.
+
+- **Overview:** total gyms (and how many joined this week), active gyms (check-ins in the last 30 days), total members and suspended accounts. Search by gym, owner or email, sort by newest, most members, least active or name, and export the list to Excel.
+- **For each gym:** members, check-ins in the last 30 days and the last check-in, plays, payments, sign-up date, last login and WhatsApp number.
+- **Private note:** only admins see it, for example "pilot gym" or "test account".
+- **Pause monthly reports:** the gym is skipped by the automatic run and by Email all unsent. Resume any time.
+- **Send password reset:** emails the owner a reset code.
+- **Suspend access:** blocks the owner from logging in. All their data stays, and **Restore access** undoes it.
+- **Delete this gym:** first download a backup (Excel with members, plans, payments, plays, check-ins and trainers), then type the gym's name to confirm. This permanently removes the gym, all its data and images, and, if ticked, the owner's login. It can't be undone.
+- Admin accounts (emails in `GYMPULSE_ADMINS`) can't be suspended or deleted from here, so you can't lock yourself out.
+- **Admin log:** every note, pause, reset, suspension and deletion, with who did it and when.
