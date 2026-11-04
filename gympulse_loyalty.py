@@ -350,11 +350,14 @@ def render_loyalty(supabase, gym_id, owner_id):
         nxt = r["next"]
         pct = 100 if nxt is None else min(100, round(r["balance"] / max(int(nxt["points"]), 1) * 100))
         hint = "can get any gift" if nxt is None else f"{r['to_next']:,} more points for {nxt['name']}"
+        c1, c2 = st.columns([6, 1], vertical_alignment="center")
         gw._md(f'<div style="display:flex;align-items:center;gap:12px;margin:6px 0"><div style="width:34px">{medal}</div>'
                f'<div style="flex:1"><b>{gw._esc(r["name"])}</b> · {r["balance"]:,} points '
                f'<span style="opacity:.7">({r["visits"]} visits, {r["weeks"]} busy weeks, {r["renewals"]} paid on '
                f'time) · {gw._esc(hint)}</span>'
-               f'<div class="pbar" style="margin-top:4px"><span style="width:{pct}%;--tone:#B7F34A"></span></div></div></div>')
+               f'<div class="pbar" style="margin-top:4px"><span style="width:{pct}%;--tone:#B7F34A"></span></div></div></div>', c1)
+        c2.button("Profile", key=f"loy_prof_{r['member_id']}", icon=":material/person:", use_container_width=True,
+                  on_click=gw.open_profile, args=(r["member_id"], "Grow"))
     if reds:
         with st.expander("Gifts already given"):
             names = dict(zip(table["member_id"], table["name"]))
@@ -411,10 +414,13 @@ def render_auto(supabase, gym_id, owner_id):
         st.dataframe(pd.DataFrame([{"Message": label[k], "Member": m.get("full_name"),
                                     "Email": m.get("email") or "–", "Subject": subj}
                                    for k, m, ref, subj, body, b in due]), hide_index=True, use_container_width=True)
-        with st.expander("See what the email looks like"):
-            k, m, ref, subj, body, b = due[0]
+        if st.toggle("Show me the email before it goes", key="auto_preview"):
+            i = st.selectbox("Whose email?", range(len(due)), key="auto_preview_pick",
+                             format_func=lambda j: f"{label[due[j][0]]} · {due[j][1].get('full_name')}")
+            k, m, ref, subj, body, b = due[i]
             import gympulse_campaigns as gcamp
             import streamlit.components.v1 as components
+            st.markdown(f"**Subject:** {subj}")
             components.html(gcamp.render_message(gcamp.brand(), subj, body, "#", b), height=640, scrolling=True)
         st.button(f"Send these {len(with_email)} now instead of waiting", type="primary", key="auto_now",
                   icon=":material/mail:",

@@ -1613,6 +1613,7 @@ def render_month_banner(supabase, gym_id, assess_fn, owner_id):
 
 def _open_report():
     st.session_state["grow_section"] = "Monthly report"
+    st.session_state["_grow_last"] = "Monthly report"
     st.session_state["current_page"] = "Grow"
 
 
@@ -1625,9 +1626,13 @@ def render_grow(supabase, gym_id, assess_fn, owner_id):
     err = st.session_state.pop("grow_error", None)
     if err:
         st.error(err)
-    st.session_state.setdefault("grow_section", SECTIONS[0])
+    # Streamlit forgets a tab choice while you're on another page, so keep a copy
+    # and come back to the same tab (e.g. Loyalty after opening a profile).
+    if "grow_section" not in st.session_state:
+        st.session_state["grow_section"] = st.session_state.get("_grow_last", SECTIONS[0])
     section = st.segmented_control("Grow section", SECTIONS, key="grow_section",
                                    label_visibility="collapsed") or SECTIONS[0]
+    st.session_state["_grow_last"] = section
     if section == "Collect renewals":
         render_collect(supabase, gym_id, owner_id)
     elif section == "Automatic messages":
