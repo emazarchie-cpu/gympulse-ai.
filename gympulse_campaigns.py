@@ -370,18 +370,19 @@ def render_email(fields, b, ctx, banner_url, unsub_url=""):
                     f'<a href="{ge.esc(unsub_url)}" style="color:{P['muted']}">Unsubscribe</a>')
     pre = ge.esc(fill(fields.get("preheader", ""), ctx))
     return f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="color-scheme" content="{P['scheme']} only"><title>{ge.esc(fill(fields["subject"], ctx))}</title></head>
-<body style="margin:0;padding:0;background:{P['page']}">
+<meta name="color-scheme" content="{P['scheme']} only"><meta name="supported-color-schemes" content="{P['scheme']} only">
+<style>:root{{color-scheme:{P['scheme']} only}}</style><title>{ge.esc(fill(fields["subject"], ctx))}</title></head>
+<body bgcolor="{P['page']}" style="margin:0;padding:0;background-color:{P['page']}">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0">{pre}</div>
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:{P['page']}"><tr><td align="center" style="padding:20px 10px">
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;background:{P['card']};border-radius:14px;overflow:hidden;border:1px solid {P['line']}">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="{P['page']}" style="background-color:{P['page']}"><tr><td align="center" bgcolor="{P['page']}" style="padding:20px 10px;background-color:{P['page']}">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="{P['card']}" style="max-width:600px;background-color:{P['card']};border-radius:14px;overflow:hidden;border:1px solid {P['line']}">
 <tr><td style="padding:0;line-height:0">{hero}</td></tr>
-<tr><td style="padding:30px 30px 8px;font-family:Arial,Helvetica,sans-serif">
+<tr><td bgcolor="{P['card']}" style="padding:30px 30px 8px;background-color:{P['card']};font-family:Arial,Helvetica,sans-serif">
 <p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:{P['text']}">Hello {ge.esc(ctx["first"])},</p>
 {paras}{offer_html}{btn}
 <p style="margin:0 0 6px;font-size:16px;line-height:1.6;color:{P['text']}">{sign}</p>
 </td></tr>
-<tr><td style="padding:18px 30px 26px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.6;color:{P['muted']};border-top:1px solid {P['line']}">
+<tr><td bgcolor="{P['card']}" style="padding:18px 30px 26px;background-color:{P['card']};font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.6;color:{P['muted']};border-top:1px solid {P['line']}">
 {'<br>'.join(foot)}</td></tr>
 </table>
 <div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#8A94A6;padding:12px">Sent with GymPulse AI</div>
@@ -482,7 +483,7 @@ def editor(prefix, template_name, b, ctx_preview):
     f["theme"] = st.radio("Email background", themes, horizontal=True,
                           index=themes.index(b.get("email_theme", "light")),
                           format_func=lambda v: "White" if v == "light" else "Black",
-                          key=f"{prefix}_th_{template_name}")
+                          key=f"{prefix}_th_{template_name}_{b.get('email_theme', 'light')}")
     f["preheader"] = t["preheader"]
     f["signoff"] = "{owner}\n{gym}"
     return f
@@ -511,7 +512,8 @@ def render_single(supabase, gym_id, member, play, details=None):
         preview(fields, b, ctx, png)
     frm, reply = sender_for(b)
     st.caption(f"From **{frm}**" + (f" · replies go to **{reply}**" if reply else
-                                     " · add your company email in Settings → Email & branding so replies reach you"))
+                                     " · add your company email in Settings → Email & branding so replies reach you")
+               + f" · {'Black' if fields['theme'] == 'dark' else 'White'} background")
     if not member.get("email"):
         st.warning("This member has no email address yet. Add one on their profile.")
         return False
@@ -603,7 +605,8 @@ def render_campaigns(supabase, gym_id, roster):
     with st.expander(f"Preview (as {ctx['first']} sees it)", expanded=True):
         preview(fields, b, ctx, png)
     frm, reply = sender_for(b)
-    st.caption(f"From **{frm}**" + (f" · replies go to **{reply}**" if reply else ""))
+    st.caption(f"From **{frm}**" + (f" · replies go to **{reply}**" if reply else "")
+               + f" · {'Black' if fields['theme'] == 'dark' else 'White'} background")
     if not ready():
         st.info("Email sending isn't switched on yet (RESEND_API_KEY on Render).")
         return
@@ -680,6 +683,10 @@ def render_brand_settings(supabase, gym_id, save):
                            format_func=lambda v: "White" if v == "light" else "Black",
                            help="The default for every email. You can change it on any single email or campaign.",
                            key="eb_theme")
+    if email_theme != b["email_theme"] and st.session_state.get("eb_theme_tried") != email_theme:
+        st.session_state["eb_theme_tried"] = email_theme
+        save({"settings": {**s, "email_brand": {**cur, "email_theme": email_theme}}},
+             "Email background saved: " + ("Black." if email_theme == "dark" else "White."))
     u1, u2 = st.columns(2)
     logo_file = u1.file_uploader("Logo (PNG with transparent background is best)", type=["png", "jpg", "jpeg", "webp"],
                                  key="eb_logo")
