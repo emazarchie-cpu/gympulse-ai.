@@ -1881,10 +1881,14 @@ NAV_SHORT = {
 }
 
 if "current_page" not in st.session_state:
-    _saved = st.query_params.get("p", "")
-    st.session_state["current_page"] = (
-        _saved if _saved in MAIN_PAGES + MORE_PAGES else "Dashboard"
-    )
+    # Every sign-in starts on the Dashboard, not on the page saved in the
+    # address bar from the last visit.
+    st.session_state["current_page"] = "Dashboard"
+    try:
+        if st.query_params.get("p"):
+            del st.query_params["p"]
+    except Exception:
+        pass
 
 def _is_mobile():
     try:
