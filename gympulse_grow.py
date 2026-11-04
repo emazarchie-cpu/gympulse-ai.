@@ -1525,30 +1525,6 @@ def monthly_data(supabase, gym_id, assess_fn, start, end):
     return d
 
 
-def monthly_text(d):
-    biz, owner = _biz()
-    month = d["start"].strftime("%B %Y")
-    money = _money(d["credited"])
-    lines = [f"📊 *{biz} · {month} retention report*", ""]
-    if d["kept_n"]:
-        lines.append(f"✅ GymPulse AI helped you keep *{d['kept_n']} member{'s' if d['kept_n'] != 1 else ''}*, "
-                     f"worth *{money}*{' a month' if d.get('credited_is_fee') else ''}.")
-    else:
-        lines.append("No plays were closed as kept this month. Work your Action Centre to start saving members.")
-    lines += [f"💰 Collected: {_money(d['collected'])}" + (f" (incl. {_money(d['recovered'])} won back)" if d["recovered"] else ""),
-              f"🆕 New members: {d['joined']}",
-              f"⏳ Memberships that ended: {d['lapsed']}",
-              f"🏋️ Visits: {d['visits']} from {d['active']} active members"]
-    if d["lost_n"]:
-        lines.append(f"❌ Members lost after a play: {d['lost_n']}")
-    if d["top_staff"]:
-        lines.append(f"🏆 Top of the team: {d['top_staff']}")
-    if d["top_reason"]:
-        lines.append(f"🔎 Main reason members left: {d['top_reason']}")
-    lines += ["", "Open GymPulse AI to see this week's priorities: https://usegympulseai.com"]
-    return "\n".join(lines)
-
-
 def monthly_letter(d):
     """The monthly report as a short, professional letter for email."""
     biz, owner = _biz()
@@ -1571,14 +1547,6 @@ def monthly_letter(d):
     return "\n".join(lines)
 
 
-def email_monthly(to, d):
-    import gympulse_campaigns as gcamp
-    biz, _ = _biz()
-    gcamp.email_letter(to, f"{biz}: {d['start']:%B %Y} retention report", monthly_letter(d),
-                       attachments=[(f"{safe_name(biz)}-{d['start']:%Y-%m}-retention-report.pdf", monthly_pdf(d))],
-                       button=("Open GymPulse AI", "https://usegympulseai.com"))
-
-
 def monthly_pdf(d):
     import gympulse_reports as rp
     blocks = [("kpis", [("Members kept", str(d["kept_n"]), "after a play"),
@@ -1597,8 +1565,8 @@ def monthly_pdf(d):
 
 
 def render_monthly(supabase, gym_id, assess_fn, owner_id):
-    st.caption("Your month in one message: members kept, money kept, new joins, visits and your top performer. "
-               "It's ready on the 1st of every month, and you can see the month so far too.")
+    st.caption("Your month at a glance: members kept, money kept, new joins and visits. GymPulse AI emails "
+               "you this report, with the PDF, on the 1st of every month.")
     today = _today()
     which = st.radio("Period", ["Last month", "This month so far"], horizontal=True, key="grow_mr_period")
     start, end = month_bounds(today) if which == "Last month" else (today.replace(day=1), today)
@@ -1607,63 +1575,34 @@ def render_monthly(supabase, gym_id, assess_fn, owner_id):
                 ("Money kept", _money(d["credited"]), "cyan", "credited payments" if not d.get("credited_is_fee") else "monthly fees"),
                 ("Collected", _money(d["collected"]), "amber", "all payments"),
                 ("New members", str(d["joined"]), "grey", "")])
-    text = monthly_text(d)
-    st.text_area("WhatsApp message", text, height=300, key=f"grow_mr_text_{which}")
-    s = _settings()
-    c1, c2, c3 = st.columns(3)
-    c1.link_button("Send to my WhatsApp", wa_url(s.get("biz_phone", ""), text), icon=":material/chat:",
-                   use_container_width=True)
-    with c2:
-        import gympulse_reports as rp
-        try:
-            rp.download_link("Download PDF", monthly_pdf(d), f"{safe_name(_biz()[0])}-{start:%Y-%m}-retention-report.pdf", rp.PDF,
-                             f"grow_mr_pdf_{which}", primary=True)
-        except Exception as error:
-            st.error(f"Could not build the PDF: {error}")
-    owner_email = (st.session_state.get("auth_user") or {}).get("email", "")
-    import gympulse_campaigns as gcamp
-    if owner_email and gcamp.ready():
-        if c3.button(f"Email to {owner_email}", key="grow_mr_email", type="primary", icon=":material/mail:",
-                     use_container_width=True):
-            try:
-                email_monthly(owner_email, d)
-                st.success("Report emailed with the PDF attached.")
-            except Exception as error:
-                st.error(f"Could not send: {error}")
-    if not s.get("biz_phone"):
-        st.caption("Add your business WhatsApp number in Settings → Gym so this opens your own chat.")
+    gw.kpi_row([("Visits", str(d["visits"]), "cyan", "one per member per day"),
+                ("Active members", str(d["active"]), "lime", "trained at least once"),
+                ("Memberships ended", str(d["lapsed"]), "amber", ""),
+                ("Top of the team", d["top_staff"] or "–", "grey", d["top_reason"] and f"Main reason left: {d['top_reason']}" or "")])
+    import gympulse_reports as rp
+    try:
+        rp.download_link("Download the report (PDF)", monthly_pdf(d),
+                         f"{safe_name(_biz()[0])}-{start:%Y-%m}-retention-report.pdf", rp.PDF,
+                         f"grow_mr_pdf_{which}", primary=True)
+    except Exception as error:
+        st.error(f"Could not build the PDF: {error}")
 
 
 def render_month_banner(supabase, gym_id, assess_fn, owner_id):
-    """On the dashboard in the first week of a month: last month's result, emailed once automatically."""
+    """On the dashboard in the first week of a month: last month's result. GymPulse AI emails it to the owner."""
     today = _today()
     if today.day > 7:
         return
     start, end = month_bounds(today)
-    key = f"{start:%Y-%m}"
     try:
         d = monthly_data(supabase, gym_id, assess_fn, start, end)
     except Exception:
         return
-    s = _settings()
-    if s.get("monthly_report_sent") != key:
-        owner_email = (st.session_state.get("auth_user") or {}).get("email", "")
-        import gympulse_campaigns as gcamp
-        if owner_email and gcamp.ready() and not st.session_state.get(f"_mr_try_{key}"):
-            st.session_state[f"_mr_try_{key}"] = True
-            try:
-                email_monthly(owner_email, d)
-                profile = st.session_state.get("user_profile") or {}
-                ns = {**dict(profile.get("settings") or {}), "monthly_report_sent": key}
-                supabase.table("profiles").update({"settings": ns}).eq("id", owner_id).execute()
-                profile["settings"] = ns
-            except Exception:
-                pass
     msg = (f"<b>Your {start:%B} report is ready.</b> GymPulse AI helped you keep {d['kept_n']} "
            f"member{'s' if d['kept_n'] != 1 else ''}, worth {_money(d['credited'])}." if d["kept_n"]
            else f"<b>Your {start:%B} report is ready.</b> {_money(d['collected'])} collected, {d['joined']} new members.")
     c1, c2 = st.columns([4, 1])
-    gw._md(f'<div class="cc-brief">📊 {msg}</div>', c1)
+    gw._md(f'<div class="cc-brief">{msg}</div>', c1)
     c2.button("Open report", key="grow_mr_open", use_container_width=True, on_click=_open_report)
 
 
