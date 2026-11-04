@@ -42,3 +42,21 @@ Every PDF has the gym's logo and brand colour in the header and a small GymPulse
 - Members pay the gym directly. GymPulse never handles the money, and payments are marked as paid by the gym.
 - WhatsApp buttons open the chat with the message ready to send (`wa.me` links). They work without the WhatsApp Business API.
 - Ramadan and Eid dates are estimates, because they depend on the moon sighting.
+
+## Loyalty points and automatic messages
+
+Run `sql/phase9_loyalty.sql` once in Supabase.
+
+**Loyalty (Grow → Loyalty)**
+- Members earn points only from recorded activity: **points per visit** (one per day), a **strong-week bonus** for training N times in a week, and an **on-time renewal bonus** for a renewal paid before the plan ended. Points count from the date you choose.
+- You set the rewards (for example 200 = free smoothie, 500 = free PT session, 1,000 = one week free).
+- **Ready for a reward** lists members with enough points. Email or WhatsApp them, then tap **Mark reward as claimed** to take the points off.
+- A leaderboard shows each member's points and how far they are from their next reward.
+
+**Automatic messages (Grow → Automatic messages)**
+- **Renewal reminder**, N days before a plan ends (default 3).
+- **We missed you**, after N days without a check-in (default 7, active members only).
+- **Reward ready**, when a member has enough points (needs loyalty on).
+- All three start switched off. They go out every morning at 08:30 Lagos time from `.github/workflows/auto-messages.yml`, which uses the same repository secrets as Monthly reports. You can also tap **Send today's … now**.
+- Each member gets each message at most once per occasion, and at most one automatic email a day (renewal first, then we missed you, then reward). Unsubscribed members are skipped. Members with no email are listed with a WhatsApp button. There's a daily cap (default 80), because Resend's free plan allows 100 emails a day.
+- Renewal emails use the same invitation as Collect renewals: no bank details, and a Paystack button if you've added a link.

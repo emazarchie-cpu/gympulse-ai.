@@ -393,7 +393,7 @@ def render_reports(sc):
 
 # ================================================================== gym management
 # Child tables first, so nothing is left behind and no foreign key blocks the delete.
-GYM_TABLES = ["challenge_entries", "challenges", "referrals", "progress_logs", "member_freezes", "exit_reasons",
+GYM_TABLES = ["loyalty_redemptions", "auto_messages", "challenge_entries", "challenges", "referrals", "progress_logs", "member_freezes", "exit_reasons",
               "onboarding_steps", "payment_requests", "payments", "messages", "reminder_log", "checkins",
               "retention_actions", "member_activity", "classes", "trainers", "members", "companies",
               "platform_reports", "platform_gym_flags"]
