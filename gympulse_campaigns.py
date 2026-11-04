@@ -370,6 +370,30 @@ def host_trainer_photo(supabase, gym_id, fields):
         fields["trainer_card"] = {**card, "photo_url": trainer_photo_url(supabase, gym_id, t)}
 
 
+# The Gmail app on iPhone flips the colours of every email in dark mode, which
+# turns a black email light. On black emails, text and coloured blocks sit in
+# two blend layers that only Gmail sees (the "u + .body" selector). In dark
+# mode they flip those colours back; in light mode they change nothing.
+# Backgrounds outside them use background-image, which Gmail does not flip.
+GMAIL_DARK_CSS = (
+    "u + .body .gp-s{background:#000;mix-blend-mode:screen}"
+    "u + .body .gp-d{background:#000;mix-blend-mode:difference}"
+    "u + .body .gp-card,u + .body .gp-tbox{background-image:linear-gradient(#000000,#000000)!important}")
+
+
+def gx(html, P):
+    """Keep this block's colours in Gmail's dark mode (black emails only)."""
+    if P.get("scheme") != "dark" or not html:
+        return html
+    return f'<div class="gp-s"><div class="gp-d">{html}</div></div>'
+
+
+def bgx(color, P):
+    """Inline background that Gmail's dark mode leaves alone on black emails."""
+    base = f"background-color:{color};"
+    return base + (f"background-image:linear-gradient({color},{color});" if P.get("scheme") == "dark" else "")
+
+
 def trainer_card_email(card, P, acc):
     """A trainer profile block that works in email apps (tables, inline styles)."""
     if not card:
@@ -380,9 +404,9 @@ def trainer_card_email(card, P, acc):
         pic = (f'<img src="{ge.esc(card["photo_url"])}" width="84" height="84" alt="{name}" '
                f'style="display:block;width:84px;height:84px;border-radius:42px;border:3px solid {acc};object-fit:cover">')
     else:
-        pic = (f'<table role="presentation" cellspacing="0" cellpadding="0"><tr><td width="84" height="84" align="center" '
-               f'bgcolor="{acc}" style="width:84px;height:84px;border-radius:42px;background-color:{acc};'
-               f'font-family:Arial,Helvetica,sans-serif;font-size:28px;font-weight:700;color:#0A0F1E">{ge.esc(initials)}</td></tr></table>')
+        pic = gx(f'<table role="presentation" cellspacing="0" cellpadding="0"><tr><td width="84" height="84" align="center" '
+                 f'bgcolor="{acc}" style="width:84px;height:84px;border-radius:42px;background-color:{acc};'
+                 f'font-family:Arial,Helvetica,sans-serif;font-size:28px;font-weight:700;color:#0A0F1E">{ge.esc(initials)}</td></tr></table>', P)
     spec = (f'<div style="display:inline-block;margin-top:6px;padding:3px 10px;border-radius:999px;'
             f'background-color:{acc};color:#0A0F1E;font-size:12px;font-weight:700">{ge.esc(card["specialty"])}</div>'
             if card.get("specialty") else "")
@@ -400,13 +424,14 @@ def trainer_card_email(card, P, acc):
         f'<a href="{ge.esc(u)}" style="color:{P["text"]};font-weight:700;text-decoration:underline">{ge.esc(t)}</a>'
         for u, t in links)
     link_html = f'<p style="margin:12px 0 0;font-size:13px;line-height:1.9">{link_html}</p>' if link_html else ""
-    return (f'<table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="{P["box"]}" '
-            f'style="margin:4px 0 22px;background-color:{P["box"]};border-radius:14px;border:1px solid {P["line"]}"><tr>'
+    text = (f'<div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:{P["muted"]}">Your coach</div>'
+            f'<div style="font-size:19px;font-weight:700;color:{P["text"]};margin-top:2px">{name}</div>'
+            f'{spec}{bio}{link_html}')
+    return (f'<table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="{P["box"]}" class="gp-tbox" '
+            f'style="margin:4px 0 22px;{bgx(P["box"], P)}border-radius:14px;border:1px solid {P["line"]}"><tr>'
             f'<td width="104" valign="top" style="padding:18px 0 18px 18px">{pic}</td>'
             f'<td valign="top" style="padding:18px 18px 18px 16px;font-family:Arial,Helvetica,sans-serif">'
-            f'<div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:{P["muted"]}">Your coach</div>'
-            f'<div style="font-size:19px;font-weight:700;color:{P["text"]};margin-top:2px">{name}</div>'
-            f'{spec}{bio}{link_html}</td></tr></table>')
+            f'{gx(text, P)}</td></tr></table>')
 
 
 # ------------------------------------------------------------------ rendering
@@ -470,11 +495,11 @@ def render_email(fields, b, ctx, banner_url, unsub_url=""):
                 f'style="display:block;width:100%;max-width:600px;height:auto;border:0">')
     else:
         hl = ge.esc(fill(fields["headline"], ctx)).replace("\n", "<br>")
-        hero = (f'<div style="background:{dark};padding:34px 28px;text-align:right;font-family:Arial Black,Arial,Helvetica,sans-serif">'
+        hero = gx(f'<div style="background:{dark};padding:34px 28px;text-align:right;font-family:Arial Black,Arial,Helvetica,sans-serif">'
                 f'<div style="color:#fff;font-size:15px;font-weight:700;margin-bottom:14px">{ge.esc(b["gym"])}</div>'
                 f'<div style="color:#fff;font-size:44px;line-height:1.0;font-weight:900">{hl}</div>'
                 f'<div style="color:{acc};font-size:16px;margin-top:10px;font-family:Arial,Helvetica,sans-serif">'
-                f'{ge.esc(fill(fields.get("kicker", ""), ctx))}</div></div>')
+                f'{ge.esc(fill(fields.get("kicker", ""), ctx))}</div></div>', P)
     foot = []
     if b["address"]:
         foot.append(ge.esc(b["address"]))
@@ -488,21 +513,21 @@ def render_email(fields, b, ctx, banner_url, unsub_url=""):
     pre = ge.esc(fill(fields.get("preheader", ""), ctx))
     return f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="{P['scheme']} only"><meta name="supported-color-schemes" content="{P['scheme']} only">
-<style>:root{{color-scheme:{P['scheme']} only}}</style><title>{ge.esc(fill(fields["subject"], ctx))}</title></head>
-<body bgcolor="{P['page']}" style="margin:0;padding:0;background-color:{P['page']}">
+<style>:root{{color-scheme:{P['scheme']} only}}{GMAIL_DARK_CSS if P['scheme'] == 'dark' else ''}</style><title>{ge.esc(fill(fields["subject"], ctx))}</title></head>
+<body class="body" bgcolor="{P['page']}" style="margin:0;padding:0;{bgx(P['page'], P)}">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0">{pre}</div>
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="{P['page']}" style="background-color:{P['page']}"><tr><td align="center" bgcolor="{P['page']}" style="padding:20px 10px;background-color:{P['page']}">
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="{P['card']}" style="max-width:600px;background-color:{P['card']};border-radius:14px;overflow:hidden;border:1px solid {P['line']}">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="{P['page']}" style="{bgx(P['page'], P)}"><tr><td align="center" bgcolor="{P['page']}" style="padding:20px 10px;{bgx(P['page'], P)}">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="{P['card']}" class="gp-card" style="max-width:600px;{bgx(P['card'], P)}border-radius:14px;overflow:hidden;border:1px solid {P['line']}">
 <tr><td style="padding:0;line-height:0">{hero}</td></tr>
-<tr><td bgcolor="{P['card']}" style="padding:30px 30px 8px;background-color:{P['card']};font-family:Arial,Helvetica,sans-serif">
-<p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:{P['text']}">Hello {ge.esc(ctx["first"])},</p>
-{paras}{trainer_card_email(fields.get("trainer_card") if fields.get("show_card", True) else None, P, acc)}{offer_html}{btn}
-<p style="margin:0 0 6px;font-size:16px;line-height:1.6;color:{P['text']}">{sign}</p>
+<tr><td bgcolor="{P['card']}" class="gp-card" style="padding:30px 30px 8px;{bgx(P['card'], P)}font-family:Arial,Helvetica,sans-serif">
+{gx(f'<p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:{P["text"]}">Hello {ge.esc(ctx["first"])},</p>' + paras, P)}
+{trainer_card_email(fields.get("trainer_card") if fields.get("show_card", True) else None, P, acc)}{gx(offer_html, P)}{gx(btn, P)}
+{gx(f'<p style="margin:0 0 22px;font-size:16px;line-height:1.6;color:{P["text"]}">{sign}</p>', P)}
 </td></tr>
-<tr><td bgcolor="{P['card']}" style="padding:18px 30px 26px;background-color:{P['card']};font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.6;color:{P['muted']};border-top:1px solid {P['line']}">
-{'<br>'.join(foot)}</td></tr>
+<tr><td bgcolor="{P['card']}" class="gp-card" style="padding:0 30px 26px;{bgx(P['card'], P)}font-family:Arial,Helvetica,sans-serif">
+{gx(f'<div style="padding-top:18px;border-top:1px solid {P["line"]};font-size:12px;line-height:1.6;color:{P["muted"]}">' + '<br>'.join(foot) + '</div>', P)}</td></tr>
 </table>
-<div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#8A94A6;padding:12px">Sent with GymPulse AI</div>
+{gx('<div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#8A94A6;padding:12px">Sent with GymPulse AI</div>', P)}
 </td></tr></table></body></html>"""
 
 
