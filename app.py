@@ -2,6 +2,7 @@ import gympulse_workspaces as gw
 import gympulse_followups as fu
 import gympulse_design as gd
 import gympulse_command as gc
+import gympulse_grow as gg
 import os
 import textwrap
 
@@ -1808,6 +1809,7 @@ MAIN_PAGES = [
     "Action Centre",
     "Payments & Renewals",
     "Business Insights",
+    "Grow",
     "Archie",
     "Member Management",
     "Check-in",
@@ -2503,7 +2505,19 @@ safe_business_name = html_escape(str(business_name))
 # =========================================================
 # 7. DASHBOARD
 # =========================================================
+if st.session_state.get("gym_id") and st.session_state.get("_freeze_day") != str(gw.today_local()):
+    st.session_state["_freeze_day"] = str(gw.today_local())
+    try:
+        gg.process_freezes(supabase, st.session_state["gym_id"])
+    except Exception:
+        pass
+
 if page == "Dashboard":
+    try:
+        gg.render_month_banner(supabase, st.session_state.get("gym_id"), assess_members, owner_id)
+    except Exception:
+        pass
+    st.markdown('<div style="height:6px"></div>', unsafe_allow_html=True)
     gc.render_command_centre(
         supabase,
         st.session_state.get("gym_id"),
@@ -2524,6 +2538,8 @@ elif page == "Business Insights":
     gw.render_business_insights(supabase, st.session_state.gym_id, assess_members)
 elif page == "Payments & Renewals":
     gw.render_payments(supabase, st.session_state.gym_id, assess_members)
+elif page == "Grow":
+    gg.render_grow(supabase, st.session_state.gym_id, assess_members, owner_id)
 elif page == "Follow-ups":
     fu.render_followups(
         supabase,
