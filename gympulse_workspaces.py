@@ -1134,19 +1134,11 @@ def apply_ui_styles():
     st.markdown("<style>" + DESIGN_CSS + "</style>", unsafe_allow_html=True)
 
 
-LIGHT_CSS = """
-html { filter: invert(1) hue-rotate(180deg); background: #fff; }
-img, video, .archie-bot, [style*="background-image"],
-.st-key-top_profile button::before,
-[class*="st-key-mention_"] button::before {
-    filter: invert(1) hue-rotate(180deg);
-}
-"""
-
-
 def apply_theme(theme):
+    """Light mode uses its own palette (gympulse_design.LIGHT_CSS), not an inverted dark theme."""
     if theme == "light":
-        st.markdown("<style>" + LIGHT_CSS + "</style>", unsafe_allow_html=True)
+        import gympulse_design as gd
+        gd.apply_light()
 
 # ------------------------------------------------------------ speed & caching
 # Tables whose rows belong to one gym. Every read, update and delete on them is

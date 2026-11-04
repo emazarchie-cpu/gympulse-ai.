@@ -43,8 +43,8 @@ TEMPLATES = {
         "body": ["It's been a while since we saw you at {gym}, and we've missed having you around.",
                  "Breaks happen to everyone: work gets busy, plans change, motivation dips. "
                  "What matters is the next step, and it can be a small one.",
-                 "<b>Whenever you're ready, we're ready for you.</b> Your coaches and your goals{goal_part} "
-                 "are waiting, and we'll help you ease back in at your own pace."],
+                 "<b>Whenever you're ready, we're ready for you.</b> Your coaches are ready to help you{goal_part}, "
+                 "and we'll ease you back in at your own pace."],
         "button": "I'm ready to restart", "link": "whatsapp"},
     "WhatsApp check-in": {
         "subject": "We miss you, {first}",
@@ -162,6 +162,7 @@ def brand(profile=None):
         "domain_status": gw._text(b.get("domain_status")),
         "sender_email": gw._text(b.get("sender_email")),
         "owner": gw._text(p.get("full_name"), ""),
+        "email_theme": "dark" if b.get("email_theme") == "dark" else "light",
     }
 
 
@@ -324,14 +325,21 @@ def button_url(kind, b, custom=""):
 
 
 def render_email(fields, b, ctx, banner_url, unsub_url=""):
-    """The full branded email for one member."""
+    """The full branded email for one member, on a white or a black background."""
     acc, dark = b["color"], b["dark"]
-    paras = "".join(f'<p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:#1F2937">{fill(p, ctx)}</p>'
+    theme = fields.get("theme") or b.get("email_theme") or "light"
+    if theme == "dark":
+        P = {"page": "#05070D", "card": "#0E1320", "text": "#E8EDF5", "muted": "#9AA6B8",
+             "line": "#1F2737", "box": "#161D2C", "scheme": "dark"}
+    else:
+        P = {"page": "#EEF1F6", "card": "#FFFFFF", "text": "#1F2937", "muted": "#5B6678",
+             "line": "#E5E9F0", "box": "#F4F7FB", "scheme": "light"}
+    paras = "".join(f'<p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:{P['text']}">{fill(p, ctx)}</p>'
                     for p in fields["body"] if str(p).strip())
     offer = fill(fields.get("offer", ""), ctx)
-    offer_html = (f'<div style="margin:6px 0 20px;padding:14px 16px;border-radius:12px;background:#F4F7FB;'
-                  f'border-left:4px solid {acc};font-size:15px;color:#111827"><b>{ge.esc(offer)}</b>'
-                  + (f'<br><span style="color:#5B6678;font-size:13px">{ge.esc(fill(fields.get("terms", ""), ctx))}</span>'
+    offer_html = (f'<div style="margin:6px 0 20px;padding:14px 16px;border-radius:12px;background:{P['box']};'
+                  f'border-left:4px solid {acc};font-size:15px;color:{P['text']}"><b>{ge.esc(offer)}</b>'
+                  + (f'<br><span style="color:{P['muted']};font-size:13px">{ge.esc(fill(fields.get("terms", ""), ctx))}</span>'
                      if fields.get("terms") else "") + "</div>") if offer else ""
     btn_url = button_url(fields.get("link", "whatsapp"), b, fields.get("custom_link", ""))
     btn = (f'<table role="presentation" cellspacing="0" cellpadding="0" style="margin:4px 0 22px"><tr>'
@@ -359,21 +367,21 @@ def render_email(fields, b, ctx, banner_url, unsub_url=""):
         foot.append(contact)
     if unsub_url:
         foot.append(f'You\'re receiving this because you\'re a member of {ge.esc(b["gym"])}. '
-                    f'<a href="{ge.esc(unsub_url)}" style="color:#5B6678">Unsubscribe</a>')
+                    f'<a href="{ge.esc(unsub_url)}" style="color:{P['muted']}">Unsubscribe</a>')
     pre = ge.esc(fill(fields.get("preheader", ""), ctx))
     return f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="color-scheme" content="light only"><title>{ge.esc(fill(fields["subject"], ctx))}</title></head>
-<body style="margin:0;padding:0;background:#EEF1F6">
+<meta name="color-scheme" content="{P['scheme']} only"><title>{ge.esc(fill(fields["subject"], ctx))}</title></head>
+<body style="margin:0;padding:0;background:{P['page']}">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0">{pre}</div>
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#EEF1F6"><tr><td align="center" style="padding:20px 10px">
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;background:#FFFFFF;border-radius:14px;overflow:hidden">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:{P['page']}"><tr><td align="center" style="padding:20px 10px">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;background:{P['card']};border-radius:14px;overflow:hidden;border:1px solid {P['line']}">
 <tr><td style="padding:0;line-height:0">{hero}</td></tr>
 <tr><td style="padding:30px 30px 8px;font-family:Arial,Helvetica,sans-serif">
-<p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:#1F2937">Hello {ge.esc(ctx["first"])},</p>
+<p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:{P['text']}">Hello {ge.esc(ctx["first"])},</p>
 {paras}{offer_html}{btn}
-<p style="margin:0 0 6px;font-size:16px;line-height:1.6;color:#1F2937">{sign}</p>
+<p style="margin:0 0 6px;font-size:16px;line-height:1.6;color:{P['text']}">{sign}</p>
 </td></tr>
-<tr><td style="padding:18px 30px 26px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.6;color:#5B6678;border-top:1px solid #E5E9F0">
+<tr><td style="padding:18px 30px 26px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.6;color:{P['muted']};border-top:1px solid {P['line']}">
 {'<br>'.join(foot)}</td></tr>
 </table>
 <div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#8A94A6;padding:12px">Sent with GymPulse AI</div>
@@ -470,6 +478,11 @@ def editor(prefix, template_name, b, ctx_preview):
     f["link"] = c4.selectbox("Button opens", kinds, index=kinds.index(t["link"]), format_func=LINK_KINDS.get,
                              key=f"{prefix}_lk_{template_name}")
     f["custom_link"] = st.text_input("Link", "", key=f"{prefix}_cl_{template_name}") if f["link"] == "custom" else ""
+    themes = ["light", "dark"]
+    f["theme"] = st.radio("Email background", themes, horizontal=True,
+                          index=themes.index(b.get("email_theme", "light")),
+                          format_func=lambda v: "White" if v == "light" else "Black",
+                          key=f"{prefix}_th_{template_name}")
     f["preheader"] = t["preheader"]
     f["signoff"] = "{owner}\n{gym}"
     return f
@@ -662,6 +675,11 @@ def render_brand_settings(supabase, gym_id, save):
     c6, c7 = st.columns(2)
     whatsapp = c6.text_input("WhatsApp number for buttons", b["whatsapp"], placeholder="e.g. 0803 000 0000")
     address = c7.text_input("Address for the email footer", b["address"], placeholder="e.g. 12 Admiralty Way, Lekki, Lagos")
+    email_theme = st.radio("Email background", ["light", "dark"], horizontal=True,
+                           index=0 if b["email_theme"] == "light" else 1,
+                           format_func=lambda v: "White" if v == "light" else "Black",
+                           help="The default for every email. You can change it on any single email or campaign.",
+                           key="eb_theme")
     u1, u2 = st.columns(2)
     logo_file = u1.file_uploader("Logo (PNG with transparent background is best)", type=["png", "jpg", "jpeg", "webp"],
                                  key="eb_logo")
@@ -671,7 +689,7 @@ def render_brand_settings(supabase, gym_id, save):
     if st.button("Save email branding", type="primary", key="eb_save"):
         new = {**cur, "sender_name": sender_name.strip(), "company_email": company_email.strip(),
                "color": color, "dark": dark, "website": website.strip(), "whatsapp": whatsapp.strip(),
-               "address": address.strip()}
+               "address": address.strip(), "email_theme": email_theme}
         problems = []
         for f, key, name in ((logo_file, "logo_url", "logo"), (photo_file, "photo_url", "photo")):
             if f is not None:
@@ -695,7 +713,7 @@ def render_brand_settings(supabase, gym_id, save):
                                          "in Supabase to switch on image hosting." if problems else ""))
     st.markdown("**Preview**")
     ctx = member_ctx({"name": "Ada Obi", "goal": "Weight loss", "renew_days": 6}, b)
-    t = dict(TEMPLATES["Win-back"])
+    t = dict(TEMPLATES["Win-back"]); t["theme"] = email_theme
     png = make_banner(t["headline"], t["kicker"], "", b["color"], b["dark"], _fetch_image(b["photo_url"]),
                       _fetch_image(b["logo_url"]), b["gym"])
     preview(t, b, ctx, png)
