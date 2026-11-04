@@ -1,0 +1,50 @@
+# Emails every gym its monthly retention report, free, on GitHub Actions.
+# Runs at 07:00 UTC (08:00 Lagos) on the 1st of every month.
+# Needs three repository secrets (Settings -> Secrets and variables -> Actions):
+#   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, RESEND_API_KEY
+# Run it by hand from the Actions tab: choose "Monthly reports" -> Run workflow.
+name: Monthly reports
+
+on:
+  schedule:
+    - cron: "0 7 1 * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run: list what would be sent, send nothing"
+        type: boolean
+        default: true
+      month:
+        description: "Month to send, YYYY-MM (leave empty for last month)"
+        required: false
+        default: ""
+
+concurrency:
+  group: monthly-reports
+  cancel-in-progress: false
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install
+        run: pip install -r requirements.txt
+      - name: Send reports
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          REPORTS_FROM: ${{ vars.REPORTS_FROM }}
+        run: |
+          ARGS=""
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if [ "${{ inputs.dry_run }}" = "true" ]; then ARGS="$ARGS --dry-run"; fi
+            if [ -n "${{ inputs.month }}" ]; then ARGS="$ARGS --month ${{ inputs.month }}"; fi
+          fi
+          python scripts/send_monthly_reports.py $ARGS
