@@ -260,12 +260,15 @@ def send_all(sc, start, end, sent_by="auto", only=None, log=print):
         try:
             d, pdf = gym_report(sc, entry, start, end)
             send_report_email(entry, d, pdf)
+            del pdf
             log_sent(sc, gid, period, "email", sent_by)
             sent += 1
             log(f"sent   {entry['name']} -> {entry['email']}")
         except Exception as error:
             failed += 1
             log(f"failed {entry['name']}: {error}")
+    import gc
+    gc.collect()
     return sent, skipped, failed
 
 
