@@ -27,6 +27,9 @@ Run `sql/phase5_growth.sql` in Supabase (SQL Editor → New query → paste → 
 - Every message has **Send email** as the main button. The email goes out as a letter with the gym's logo, brand colour, footer and chosen background (White or Black, set in Settings → Email & branding). Emoji are left out of emails.
 - **WhatsApp** is the second button. Renewal requests, payment reminders and first-week rescues are marked *important*, with a suggestion to also send them on WhatsApp so the member sees them the same day.
 - Emailing a renewal request moves the member to *Waiting for payment* automatically.
+- **Payment emails never contain bank details.** In an inbox they look like scams. Instead, the email opens with the member's real progress (visits since joining and in the last 30 days, and their goal), says their spot is still there, invites them to renew at the front desk ("it takes two minutes"), and asks them to reply with the day they're coming. Two buttons: *Tell us when you're coming* (opens the gym's WhatsApp or email) and *Pay securely with Paystack*, which appears only if the gym added a Paystack link.
+- An optional **perk for renewing in person**, set by the gym in Collect renewals → Your payment details, is added to both versions. GymPulse never invents offers.
+- The WhatsApp version sends the same invitation and puts the payment options (Paystack link, then bank transfer with a reference) at the end, as an option.
 - Members who unsubscribed, or who have no email address, can only be reached on WhatsApp.
 - HR reports, the monthly report and the weekly report are emailed with their PDF attached.
 

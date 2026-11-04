@@ -201,25 +201,151 @@ def plan_price(row):
     return plan, float(row.get("monthly_fee") or 0) * gw.PLAN_MONTHS[plan]
 
 
-def renewal_text(name, amount, plan, end, pay, ref):
+def member_story(m, checkins):
+    """What the member has already put in: real visits only."""
+    mine = checkins[checkins["member_id"] == m["id"]] if len(checkins) else checkins
+    days = mine.drop_duplicates("day") if len(mine) else mine
+    since = pd.Timestamp(_today() - timedelta(days=30))
+    return {"total": int(len(days)),
+            "recent": int((days["at"] >= since).sum()) if len(days) else 0,
+            "last": days["at"].max().date() if len(days) else None,
+            "joined": m.get("joined") if m.get("joined") and not pd.isna(m.get("joined")) else None,
+            "goal": gw._text(m.get("fitness_goal"))}
+
+
+def _progress_line(story, biz):
+    if story["total"] >= 3 and story["joined"]:
+        line = f"You've trained at {biz} {story['total']} times since {story['joined']:%B}"
+        line += f", {story['recent']} of them in the last 30 days." if story["recent"] else "."
+        return line
+    if story["last"]:
+        return f"Your last session with us was on {story['last']:%A %d %B}."
+    return ""
+
+
+def renewal_email(name, amount, plan, end, pay, story, reminder=False):
+    """(subject, body) for an email that invites the member in instead of chasing money.
+    No bank details in email: members get those by replying, or on WhatsApp."""
     biz, owner = _biz()
     first = _first(name)
-    if end is None:
-        when = "is due for renewal"
+    days = (end - _today()).days if end else None
+    lapsed = days is not None and days < 0
+    if reminder:
+        subject = f"{first}, we'd love to see you back this week"
+    elif lapsed:
+        subject = f"Your spot at {biz} is still here, {first}"
     else:
-        days = (end - _today()).days
-        when = (f"ends today" if days == 0 else f"ends in {days} day{'s' if days != 1 else ''} ({end:%d %b})"
-                if days > 0 else f"ended on {end:%d %b}")
-    lines = [f"Hi {first}! 👋 Your {plan.lower()} membership at {biz} {when}.",
-             f"To renew, it's {_money(amount)}."]
-    if pay.get("bank_account"):
-        lines.append(f"\nPay by bank transfer:\n{pay.get('bank_name', '')}\n{pay['bank_account']}\n"
-                     f"{pay.get('bank_holder', '')}\nReference: {ref}")
+        subject = f"{first}, keep your momentum going at {biz}"
+    para = [f"Hi {first},"]
+    prog = _progress_line(story, biz)
+    goal = gw._goal_phrase(story.get("goal"))
+    if prog:
+        para.append(prog + (f" Every session is a step{goal}, so let's keep it going." if goal else
+                            " That consistency is what gets results, so let's keep it going."))
+    if days is None:
+        para.append(f"Your {plan.lower()} membership is due for renewal ({_money(amount)}).")
+    elif lapsed:
+        para.append(f"Your {plan.lower()} membership ended on {end:%d %B}, but your spot is still here and "
+                    f"so is everything you've built. Renewal is {_money(amount)}.")
+    elif days == 0:
+        para.append(f"Your {plan.lower()} membership renews today. Renewal is {_money(amount)}.")
+    else:
+        para.append(f"Your {plan.lower()} membership renews on {end:%A %d %B}. Renewal is {_money(amount)}.")
+    perk = gw._text(pay.get("perk"))
+    para.append("The easiest way to renew is at the front desk on your next visit. It takes two minutes, "
+                "and you can go straight into your session." + (f" Renew in person this week and you'll get {perk}." if perk else ""))
+    para.append("Reply to this email with the day you're coming in, and we'll have everything ready for you.")
     if pay.get("paystack_link"):
-        lines.append(f"\nOr pay online with card or transfer: {pay['paystack_link']}")
-    lines.append("\nOnce you've paid, reply with a screenshot of the payment and I'll confirm it straight away. "
-                 f"Thank you for training with us! 💪\n{owner}".rstrip())
-    return "\n".join(lines)
+        para.append("If you'd rather renew now, you can pay securely online with Paystack using the button below.")
+    para.append(f"See you soon,\n{owner}\n{biz}".replace("\n\n", "\n"))
+    return subject, "\n\n".join(para)
+
+
+def renewal_buttons(pay):
+    import gympulse_campaigns as gcamp
+    b = gcamp.brand()
+    come = gcamp.button_url("whatsapp", b) or (f"mailto:{b['company_email']}" if b.get("company_email") else "")
+    out = []
+    if come:
+        out.append(("Tell us when you're coming", come))
+    if pay.get("paystack_link"):
+        out.append(("Pay securely with Paystack", pay["paystack_link"]))
+    return out
+
+
+def renewal_text(name, amount, plan, end, pay, ref, story=None, reminder=False):
+    """The WhatsApp version: same invitation, with payment options at the end."""
+    biz, owner = _biz()
+    first = _first(name)
+    story = story or {"total": 0, "recent": 0, "last": None, "joined": None, "goal": ""}
+    days = (end - _today()).days if end else None
+    when = ("is due for renewal" if days is None else "renews today" if days == 0 else
+            f"renews on {end:%a %d %b}" if days > 0 else f"ended on {end:%d %b}, but your spot is still here")
+    prog = _progress_line(story, biz)
+    lines = [f"Hi {first}! 👋 " + ("Just checking in. " if reminder else "") + (prog + " 💪" if prog else "").strip(),
+             f"\nYour {plan.lower()} membership {when}. Renewal is {_money(amount)}."]
+    perk = gw._text(pay.get("perk"))
+    lines.append("\nCome in this week and renew at the front desk, it only takes two minutes"
+                 + (f", and you'll get {perk}." if perk else ".") + " Which day works for you?")
+    extra = []
+    if pay.get("paystack_link"):
+        extra.append(f"Pay online: {pay['paystack_link']}")
+    if pay.get("bank_account"):
+        extra.append(f"Or transfer: {pay.get('bank_name', '')} · {pay['bank_account']} · {pay.get('bank_holder', '')}"
+                     f" (reference {ref})")
+    if extra:
+        lines.append("\nPrefer to pay now?\n" + "\n".join(extra) + "\nJust send the receipt here and I'll confirm it.")
+    lines.append(f"\n{owner}")
+    return "\n".join(l for l in lines if l.strip())
+
+
+def _renewal_email_cb(supabase, gym_id, m, subj_key, body_key, buttons, on_done, args):
+    import gympulse_campaigns as gcamp
+    ok, msg = gcamp.email_member(supabase, gym_id, m, st.session_state.get(subj_key) or "",
+                                 st.session_state.get(body_key) or "", buttons)
+    st.session_state["grow_flash" if ok else "grow_error"] = msg
+    if ok and on_done:
+        on_done(*args)
+        st.session_state["grow_flash"] = msg
+
+
+def renewal_composer(supabase, gym_id, m, amount, plan, ref, pay, story, key, reminder=False, request=True):
+    """Email (recommended) and WhatsApp versions of one renewal message."""
+    m = dict(m)
+    import zlib
+    key = f"{key}_{zlib.crc32(repr(sorted(pay.items())).encode()) % 100000}"   # redraft when payment details change
+    subject, body = renewal_email(m["full_name"], amount, plan, m.get("end"), pay, story, reminder)
+    buttons = renewal_buttons(pay)
+    t_email, t_wa = st.tabs(["Email (recommended)", "WhatsApp"])
+    log = (supabase, gym_id, m["id"], amount, plan, ref)
+    with t_email:
+        has_email = "@" in gw._text(m.get("email"))
+        st.text_input("Subject", subject, key=f"{key}_subj")
+        st.text_area("Email", body, height=300, key=f"{key}_body", label_visibility="collapsed")
+        st.caption("No bank details in emails: they look like scams in an inbox. The email invites the member in "
+                   "to renew at the front desk" + (", with a secure Paystack button." if pay.get("paystack_link") else
+                                                   ". Add a Paystack link above for a secure online option."))
+        with st.expander("Preview the email"):
+            import gympulse_campaigns as gcamp
+            import streamlit.components.v1 as components
+            components.html(gcamp.render_message(gcamp.brand(), st.session_state.get(f"{key}_subj") or subject,
+                                                 st.session_state.get(f"{key}_body") or body, "#", buttons),
+                            height=760, scrolling=True)
+        st.button("Send email", key=f"{key}_send", type="primary", icon=":material/mail:", disabled=not has_email,
+                  use_container_width=True, on_click=_renewal_email_cb,
+                  args=(supabase, gym_id, m, f"{key}_subj", f"{key}_body", buttons,
+                        _log_request if request else None, log + ("Email",) if request else ()))
+        if not has_email:
+            st.caption("No email address on file. Use WhatsApp, or add their email on their profile.")
+    with t_wa:
+        text = st.text_area("WhatsApp", renewal_text(m["full_name"], amount, plan, m.get("end"), pay, ref, story, reminder),
+                            height=260, key=f"{key}_wa", label_visibility="collapsed")
+        c1, c2 = st.columns(2)
+        c1.link_button("Open in WhatsApp", wa_url(m.get("phone"), text), icon=":material/chat:", use_container_width=True)
+        if request:
+            c2.button("I sent it on WhatsApp", key=f"{key}_wasent", use_container_width=True,
+                      on_click=_log_request, args=log + ("WhatsApp",))
+        st.caption("WhatsApp from your gym's number is where bank details belong, at the end, as an option.")
 
 
 def _mark_paid(supabase, gym_id, row, amount, plan, method, req_id=None):
@@ -245,11 +371,11 @@ def _mark_paid(supabase, gym_id, row, amount, plan, method, req_id=None):
     st.session_state["grow_flash"] = msg
 
 
-def _log_request(supabase, gym_id, mid, amount, plan, ref):
+def _log_request(supabase, gym_id, mid, amount, plan, ref, channel="WhatsApp"):
     try:
         supabase.table("payment_requests").insert({
             "gym_id": gym_id, "member_id": mid, "amount": float(amount), "plan": plan,
-            "reference": ref, "channel": "WhatsApp", "status": "pending"}).execute()
+            "reference": ref, "channel": channel, "status": "pending"}).execute()
         gw.bump_data_version()
         st.session_state["grow_flash"] = "Marked as requested. It's now in Waiting for payment."
     except Exception:
@@ -262,7 +388,8 @@ def render_collect(supabase, gym_id, owner_id):
     with st.expander("Your payment details" + ("" if pay.get("bank_account") or pay.get("paystack_link")
                                               else " · set these up first"),
                      expanded=not (pay.get("bank_account") or pay.get("paystack_link"))):
-        st.caption("These go into every renewal message. Members pay you directly. GymPulse never touches the money.")
+        st.caption("Members pay you directly. GymPulse never touches the money. Bank details only go into "
+                   "WhatsApp messages; emails invite members in and offer your Paystack link.")
         c1, c2, c3 = st.columns(3)
         bank = c1.text_input("Bank", pay.get("bank_name", ""), placeholder="e.g. GTBank")
         acct = c2.text_input("Account number", pay.get("bank_account", ""), placeholder="0123456789")
@@ -270,9 +397,13 @@ def render_collect(supabase, gym_id, owner_id):
         link = st.text_input("Paystack payment page (optional)", pay.get("paystack_link", ""),
                              placeholder="e.g. https://paystack.com/pay/your-gym",
                              help="Create a payment page in your Paystack dashboard (Payments → Payment pages) and paste its link.")
+        perk = st.text_input("Perk for renewing in person (optional)", pay.get("perk", ""),
+                             placeholder="e.g. a free smoothie, or a free body-composition scan",
+                             help="Only shown if you type one. GymPulse never invents offers.")
         if st.button("Save payment details", type="primary", key="grow_pay_save"):
             _save_settings(supabase, owner_id, {"collect": {"bank_name": bank.strip(), "bank_account": acct.strip(),
-                                                           "bank_holder": holder.strip(), "paystack_link": link.strip()}},
+                                                           "bank_holder": holder.strip(), "paystack_link": link.strip(),
+                                                           "perk": perk.strip()}},
                            "Payment details saved.")
             st.rerun()
 
@@ -283,6 +414,7 @@ def render_collect(supabase, gym_id, owner_id):
     reqs = _rows(supabase, "payment_requests", gym_id)
     pending = [r for r in (reqs or []) if r.get("status") == "pending"]
     pending_ids = {r["member_id"] for r in pending}
+    ck = _checkins(supabase, gym_id, 400)
     today = _today()
     df = df[df["end"].notna()].copy()
     df["days_left"] = [(e - today).days for e in df["end"]]
@@ -315,21 +447,18 @@ def render_collect(supabase, gym_id, owner_id):
                     _update(supabase, "payment_requests", r["id"], {"status": "cancelled"})
                     st.rerun()
                 if age >= 3:
-                    k = f"grow_rem_{r['id']}"
-                    st.session_state.setdefault(k, renewal_text(m["full_name"], r["amount"], r.get("plan") or "Monthly",
-                                                                m["end"], pay, r["reference"]))
-                    with st.expander("Send a reminder"):
-                        st.text_area("Message", key=k, height=200, label_visibility="collapsed")
-                        send_row(k, m, f"grow_remb_{r['id']}", f"Reminder: your {_biz()[0]} renewal",
-                                 button=("Pay online", pay.get("paystack_link")), important=True,
-                                 supabase=supabase, gym_id=gym_id)
+                    with st.expander("Send a friendly follow-up"):
+                        renewal_composer(supabase, gym_id, m, float(r["amount"]), r.get("plan") or "Monthly",
+                                         r["reference"], pay, member_story(m, ck), f"grow_rem_{r['id']}",
+                                         reminder=True, request=False)
 
     st.markdown('<div class="section-label">ASK FOR PAYMENT</div>', unsafe_allow_html=True)
     if due.empty:
         st.success("Nobody is due in the next 14 days. 🎉")
         return
     if not (pay.get("bank_account") or pay.get("paystack_link")):
-        st.warning("Add your bank details or Paystack link above so the messages tell members how to pay.")
+        st.info("Tip: add your Paystack link above for a secure pay-online button, and your bank details "
+                "for WhatsApp messages.")
     for _, m in due.iterrows():
         if m["id"] in pending_ids:
             continue
@@ -344,18 +473,11 @@ def render_collect(supabase, gym_id, owner_id):
             amt = c1.number_input("Amount (₦)", min_value=0.0, value=float(amount), step=1000.0, key=f"grow_amt_{m['id']}")
             plans = list(gw.PLAN_MONTHS)
             plan = c2.selectbox("Plan", plans, index=plans.index(plan), key=f"grow_plan_{m['id']}")
-            k = f"grow_msg_{m['id']}_{amt:.0f}_{plan}"
-            _message_box(renewal_text(m["full_name"], amt, plan, m["end"], pay, ref), k, 220)
-            send_row(k, m, f"grow_rqe_{m['id']}", f"Your {_biz()[0]} membership renewal",
-                     button=("Pay online", pay.get("paystack_link")), important=True,
-                     on_done=_log_request, args=(supabase, gym_id, m["id"], amt, plan, ref),
-                     supabase=supabase, gym_id=gym_id)
-            c1, c2 = st.columns(2)
-            c1.button("I sent it on WhatsApp", key=f"grow_req_{m['id']}", use_container_width=True,
-                      on_click=_log_request, args=(supabase, gym_id, m["id"], amt, plan, ref))
-            c2.button("Mark as paid", key=f"grow_pd_{m['id']}", use_container_width=True,
+            renewal_composer(supabase, gym_id, m, amt, plan, ref, pay, member_story(m, ck),
+                             f"grow_rn_{m['id']}_{amt:.0f}_{plan}")
+            st.button("Already paid? Mark as paid", key=f"grow_pd_{m['id']}", use_container_width=True,
                       on_click=_mark_paid, args=(supabase, gym_id, m, amt, plan, "Bank transfer"))
-            st.caption("Emailing it moves them to Waiting for payment automatically.")
+            st.caption("Sending it moves them to Waiting for payment, where you mark it paid when they renew.")
 
 
 # ================================================================== 2. First 90 days

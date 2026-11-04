@@ -596,6 +596,14 @@ def logo_tone(url):
     return cache[url]
 
 
+def _buttons(button):
+    """One (label, url) or a list of them; empty urls are dropped."""
+    if not button:
+        return []
+    items = [button] if isinstance(button[0], str) else list(button)
+    return [(l, u) for l, u in items if u]
+
+
 def render_message(b, subject, body, unsub_url="", button=None, preheader="", theme=None):
     """A branded letter from the gym: logo header in the gym's colours, the message,
     an optional button, and the gym's footer. White or black background."""
@@ -620,12 +628,21 @@ def render_message(b, subject, body, unsub_url="", button=None, preheader="", th
               f'<tr><td height="4" bgcolor="{acc}" style="height:4px;line-height:4px;font-size:0;'
               f'background-color:{acc};background-image:linear-gradient({acc},{acc})">&nbsp;</td></tr></table>')
     btn = ""
-    if button and button[1]:
-        btn = (f'<table role="presentation" cellspacing="0" cellpadding="0" style="margin:4px 0 22px"><tr>'
-               f'<td bgcolor="{acc}" style="border-radius:12px;background-color:{acc}"><a href="{ge.esc(button[1])}" '
-               f'style="display:inline-block;padding:14px 24px;font-family:Arial,Helvetica,sans-serif;font-size:15px;'
-               f'font-weight:700;color:#0A0F1E;text-decoration:none;border-radius:12px">{ge.esc(button[0])}</a>'
-               f'</td></tr></table>')
+    for i, (label, url) in enumerate(_buttons(button)):
+        if i == 0:      # main action: filled in the brand colour
+            btn += (f'<table role="presentation" cellspacing="0" cellpadding="0" style="margin:4px 0 12px"><tr>'
+                    f'<td bgcolor="{acc}" style="border-radius:12px;background-color:{acc}"><a href="{ge.esc(url)}" '
+                    f'style="display:inline-block;padding:14px 24px;font-family:Arial,Helvetica,sans-serif;font-size:15px;'
+                    f'font-weight:700;color:#0A0F1E;text-decoration:none;border-radius:12px">{ge.esc(label)}</a>'
+                    f'</td></tr></table>')
+        else:           # second option: outlined
+            btn += (f'<table role="presentation" cellspacing="0" cellpadding="0" style="margin:0 0 12px"><tr>'
+                    f'<td style="border-radius:12px;border:2px solid {acc}"><a href="{ge.esc(url)}" '
+                    f'style="display:inline-block;padding:12px 22px;font-family:Arial,Helvetica,sans-serif;font-size:15px;'
+                    f'font-weight:700;color:{P["text"]};text-decoration:none;border-radius:12px">{ge.esc(label)}</a>'
+                    f'</td></tr></table>')
+    if btn:
+        btn += '<div style="height:10px;line-height:10px;font-size:0">&nbsp;</div>'
     foot = []
     if b.get("address"):
         foot.append(ge.esc(b["address"]))
@@ -672,7 +689,7 @@ def email_member(supabase, gym_id, member, subject, body, button=None):
     clean = no_emoji(subject)
     try:
         pid = send(to, clean, render_message(b, clean, body, unsub, button), no_emoji(body)
-                   + (f"\n\n{button[0]}: {button[1]}" if button and button[1] else "")
+                   + "".join(f"\n\n{l}: {u}" for l, u in _buttons(button))
                    + (f"\n\nUnsubscribe: {unsub}" if unsub else ""), b, unsub)
     except Exception as error:
         return False, str(error)
