@@ -18,7 +18,8 @@
 | Name | Value |
 |---|---|
 | `DEMO_MEET_LINK` | your Meet link, for example `https://meet.google.com/abc-defg-hij` |
-| `DEMO_OWNER_EMAIL` | where bookings are sent (default `gympulseai22@gmail.com`) |
+| `DEMO_OWNER_EMAIL` | where bookings are sent (default `emmanuel@usegympulseai.com`) |
+| `DEMO_EMAIL_FROM` | optional, default `Emmanuel from GymPulse AI <emmanuel@usegympulseai.com>` |
 | `DEMO_DAYS` | optional, default `Mon,Tue,Wed,Thu,Fri` |
 | `DEMO_HOURS` | optional, first and last start time, default `10:00-16:30` |
 | `RESEND_API_KEY`, `EMAIL_FROM` | email sending, from resend.com (also used by Follow-ups) |

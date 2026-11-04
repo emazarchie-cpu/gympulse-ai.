@@ -9,7 +9,8 @@ visitors never read the table. Every demo uses one Google Meet link
 
 Settings (Render environment variables or Streamlit secrets):
   DEMO_MEET_LINK      your permanent Google Meet link, e.g. https://meet.google.com/abc-defg-hij
-  DEMO_OWNER_EMAIL    where new bookings are sent (default gympulseai22@gmail.com)
+  DEMO_OWNER_EMAIL    where new bookings are sent (default emmanuel@usegympulseai.com)
+  DEMO_EMAIL_FROM     sender of demo emails (default "Emmanuel from GymPulse AI <emmanuel@usegympulseai.com>")
   DEMO_DAYS           working days, default Mon,Tue,Wed,Thu,Fri
   DEMO_HOURS          first and last start time, default 10:00-16:30
   DEMO_SLOT_MINUTES   length of a demo, default 30
@@ -49,7 +50,8 @@ def config():
     except Exception:
         first, last = time(10, 0), time(16, 30)
     return {"meet": _setting("DEMO_MEET_LINK"),
-            "owner": _setting("DEMO_OWNER_EMAIL", "gympulseai22@gmail.com"),
+            "owner": _setting("DEMO_OWNER_EMAIL", "emmanuel@usegympulseai.com"),
+            "sender": _setting("DEMO_EMAIL_FROM", "Emmanuel from GymPulse AI <emmanuel@usegympulseai.com>"),
             "days": [DAY_NAMES.index(d) for d in days if d in DAY_NAMES] or [0, 1, 2, 3, 4],
             "first": first, "last": last,
             "slot": max(15, min(90, int(_setting("DEMO_SLOT_MINUTES", "30") or 30)))}
@@ -143,7 +145,8 @@ def google_calendar_url(b, cfg):
 # ------------------------------------------------------------------ email
 def _send(to, subject, html, text, ics=None):
     import requests
-    key, sender = _setting("RESEND_API_KEY"), _setting("EMAIL_FROM")
+    # Demo emails come from Emmanuel; EMAIL_FROM stays the sender for gyms' member emails
+    key, sender = _setting("RESEND_API_KEY"), config()["sender"] or _setting("EMAIL_FROM")
     if not (key and sender):
         return False
     payload = {"from": sender, "to": [to], "subject": subject, "html": html, "text": text}
@@ -276,7 +279,7 @@ def render_booking(supabase):
             day = st.selectbox("Date", days, format_func=lambda d: f"{d:%A %d %B}", key="dm_day")
             slots = free_slots(supabase, cfg, day)
             if slots is None:
-                st.warning("Online booking is being set up. Email gympulseai22@gmail.com and we'll "
+                st.warning("Online booking is being set up. Email emmanuel@usegympulseai.com and we'll "
                            "book your demo straight away.")
                 return
             if not slots:
@@ -321,7 +324,7 @@ def _book(supabase, cfg, name, email, phone, gym, members, notes, start):
         elif "bad_email" in msg:
             st.error("Please check your email address.")
         else:
-            st.error("We couldn't book that right now. Please try again, or email gympulseai22@gmail.com.")
+            st.error("We couldn't book that right now. Please try again, or email emmanuel@usegympulseai.com.")
         return
     row = rows[0] if rows else {}
     token = row.get("cancel_token") or str(uuid.uuid4())
