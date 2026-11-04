@@ -125,8 +125,36 @@ TONES = {
     "lime": "#B7F34A", "red": "#FF6B6B", "amber": "#FFC44D",
     "cyan": "#35D6ED", "white": "#F4F7FB", "grey": "#9AA8BD",
 }
-PLAN_DAYS = {"Monthly": 30, "Quarterly": 90, "Annual": 365}
-PLAN_MONTHS = {"Monthly": 1, "Quarterly": 3, "Annual": 12}
+# Membership plans, shortest first. "Annual" is the old name for Yearly and is
+# still read from existing records.
+PLAN_DAYS = {"Daily": 1, "Weekly": 7, "2 weeks": 14, "Monthly": 30, "2 months": 60,
+             "Quarterly": 90, "6 months": 180, "Yearly": 365, "Annual": 365}
+PLAN_MONTHS = {p: (round(d / 30, 4) if d < 30 else {30: 1, 60: 2, 90: 3, 180: 6, 365: 12}[d])
+               for p, d in PLAN_DAYS.items()}
+PLANS = ["Daily", "Weekly", "2 weeks", "Monthly", "2 months", "Quarterly", "6 months", "Yearly"]
+PLAN_PHRASE = {"Daily": "daily", "Weekly": "weekly", "2 weeks": "two-week", "Monthly": "monthly",
+               "2 months": "two-month", "Quarterly": "quarterly", "6 months": "six-month",
+               "Yearly": "yearly", "Annual": "yearly"}
+
+
+def plan_name(value):
+    """A plan from the list above ('Annual' reads as Yearly; anything unknown as Monthly)."""
+    v = str(value or "").strip()
+    if v == "Annual":
+        return "Yearly"
+    return v if v in PLAN_DAYS else "Monthly"
+
+
+def plan_phrase(value):
+    """'Weekly' -> 'weekly', '2 weeks' -> 'two-week' (for 'your two-week membership')."""
+    return PLAN_PHRASE.get(plan_name(value), "monthly")
+
+
+def model_plan(value):
+    """The risk model was trained on Monthly, Quarterly and Annual plans: short plans
+    score like Monthly, 6 months like Quarterly, and Yearly like Annual."""
+    days = PLAN_DAYS.get(plan_name(value), 30)
+    return "Monthly" if days <= 60 else "Quarterly" if days <= 180 else "Annual"
 PHOTO_SIZE = 192
 GOALS = ["Weight loss", "Muscle gain", "General fitness", "Strength",
          "Endurance", "Sports performance"]
@@ -1403,8 +1431,8 @@ def drivers(row):
                    else f"renews in {d} day{'s' if d != 1 else ''}")
     if row["pt_sessions_attended"] == 0:
         out.append("no PT sessions")
-    if row["membership_type"] == "Monthly":
-        out.append("monthly plan (easy to leave)")
+    if PLAN_DAYS.get(plan_name(row["membership_type"]), 30) <= 30:
+        out.append(f"{plan_phrase(row['membership_type'])} plan (easy to leave)")
     ug = row.get("usual_gap_days") if hasattr(row, "get") else None
     if ug is not None and not pd.isna(ug):
         days = int(row["days_since_last_visit"])
@@ -1644,7 +1672,7 @@ def _activity_editor(supabase, gym_id, roster, missing, use_expander=True):
         st.info("Register members in Member Management first.")
         return
 
-    plans = ["Monthly", "Quarterly", "Annual"]
+    plans = PLANS
 
     with _section("Add or update member activity", use_expander,
                   expanded=roster.empty):
@@ -1661,11 +1689,12 @@ def _activity_editor(supabase, gym_id, roster, missing, use_expander=True):
             c1, c2 = st.columns(2)
             mtype = c1.selectbox(
                 "Membership type", plans,
-                index=plans.index(val("membership_type", "Monthly"))
+                index=plans.index(plan_name(val("membership_type", "Monthly")))
             )
             fee = c2.number_input(
                 "Monthly fee", min_value=0.0, step=500.0,
-                value=float(val("monthly_fee", 0.0))
+                value=float(val("monthly_fee", 0.0)),
+                help="What the plan works out to per month (a 2-week plan at 15,000 is about 32,000 a month)."
             )
             d = c1.number_input(
                 "Days since last visit", 0, 365,
@@ -1710,7 +1739,12 @@ IMPORT_NUMERIC = {
     "renewal_due_days": (0, 730),
     "pt_sessions_attended": (0, 500),
 }
-IMPORT_PLANS = {"monthly": "Monthly", "quarterly": "Quarterly", "annual": "Annual"}
+IMPORT_PLANS = {"daily": "Daily", "day": "Daily", "weekly": "Weekly", "week": "Weekly",
+                "2 weeks": "2 weeks", "two weeks": "2 weeks", "biweekly": "2 weeks", "fortnightly": "2 weeks",
+                "monthly": "Monthly", "month": "Monthly", "2 months": "2 months", "two months": "2 months",
+                "bimonthly": "2 months", "quarterly": "Quarterly", "3 months": "Quarterly",
+                "6 months": "6 months", "six months": "6 months", "half-yearly": "6 months", "biannual": "6 months",
+                "yearly": "Yearly", "annual": "Yearly", "12 months": "Yearly", "1 year": "Yearly"}
 ISSUE_COLS = ["Row", "Member", "Problem", "Result"]
 
 def parse_activity_csv(csv_df, members):
@@ -1760,7 +1794,7 @@ def parse_activity_csv(csv_df, members):
             continue
         plan = IMPORT_PLANS.get(str(r["membership_type"]).strip().lower())
         if not plan:
-            skip("membership_type must be Monthly, Quarterly or Annual")
+            skip("membership_type must be one of: " + ", ".join(PLANS))
             continue
 
         row = {"member_id": ids[0], "membership_type": plan}
@@ -2325,10 +2359,8 @@ def render_member_profile(supabase, gym_id, member_id, assess_fn):
         """)
 
         st.markdown("#### Record a renewal")
-        plans = list(PLAN_DAYS)
-        current_plan = _text(act.get("membership_type")) if act else "Monthly"
-        if current_plan not in plans:
-            current_plan = "Monthly"
+        plans = PLANS
+        current_plan = plan_name(act.get("membership_type")) if act else "Monthly"
         r1, r2, r3 = st.columns(3)
         plan = r1.selectbox("Plan", plans, index=plans.index(current_plan),
                             key=f"renew_plan_{member_id}")
@@ -2649,10 +2681,9 @@ def render_risk_radar(supabase, gym_id, assess_fn):
     st.markdown('<div class="section-label">FILTER</div>', unsafe_allow_html=True)
     f1, f2, f3 = st.columns([2, 2, 3])
     levels = f1.multiselect("Risk level", ["High", "Medium", "Low"], ["High", "Medium", "Low"])
-    plans = f2.multiselect("Membership", ["Monthly", "Quarterly", "Annual"],
-                           ["Monthly", "Quarterly", "Annual"])
+    plans = f2.multiselect("Membership", PLANS, PLANS)
     search = f3.text_input("Search member", placeholder="Type a name")
-    view = roster[roster["risk_category"].isin(levels) & roster["membership_type"].isin(plans)]
+    view = roster[roster["risk_category"].isin(levels) & roster["membership_type"].map(plan_name).isin(plans)]
     if search:
         view = view[view["full_name"].str.contains(search, case=False, na=False)]
     if view.empty:

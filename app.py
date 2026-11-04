@@ -1829,7 +1829,9 @@ def assess_members(data):
     if data.empty:
         raise ValueError("The uploaded dataset contains no members.")
 
-    features = prepare_member_data(data)
+    # Score every plan on the three plan types the model was trained on
+    features = prepare_member_data(
+        data.assign(membership_type=data["membership_type"].map(gw.model_plan)))
 
     probabilities = model.predict_proba(features)[:, 1]
 
@@ -2684,15 +2686,17 @@ elif page == "Member Management":
                 )
 
             st.markdown('<div class="section-label">MEMBERSHIP</div>', unsafe_allow_html=True)
-            st.caption("Plan, fee and end date put the member on the Risk Radar straight away. "
+            st.caption("Plan, price and end date put the member on the Risk Radar straight away. "
                        "Their check-ins then update it automatically.")
             mcol1, mcol2, mcol3 = st.columns(3)
-            plan = mcol1.selectbox("Plan", ["Monthly", "Quarterly", "Annual"])
-            monthly_fee = mcol2.number_input("Monthly fee", min_value=0.0, step=500.0, value=0.0)
+            plan = mcol1.selectbox("Plan", gw.PLANS, index=gw.PLANS.index("Monthly"))
+            plan_price = mcol2.number_input("Price of this plan", min_value=0.0, step=500.0, value=0.0,
+                                            help="What the member pays for the plan, e.g. 5,000 for a week.")
             membership_end = mcol3.date_input(
                 "Membership ends",
-                value=gw.today_local() + gw.timedelta(days=30),
+                value=None,
                 min_value=gw.today_local() - gw.timedelta(days=365),
+                help="Leave empty to count the plan from today.",
             )
             pcol1, pcol2 = st.columns(2)
             paid_today = pcol1.number_input(
@@ -2709,6 +2713,9 @@ elif page == "Member Management":
             )
 
         if submitted:
+            if membership_end is None:
+                membership_end = gw.today_local() + gw.timedelta(days=gw.PLAN_DAYS[plan])
+            monthly_fee = round(float(plan_price) / gw.PLAN_MONTHS[plan], 2)
 
             if not full_name.strip():
                 st.error("Please enter the member's full name.")

@@ -202,7 +202,7 @@ def reference_for(member_id, name):
 
 
 def plan_price(row):
-    plan = row.get("membership_type") if row.get("membership_type") in gw.PLAN_MONTHS else "Monthly"
+    plan = gw.plan_name(row.get("membership_type"))
     return plan, float(row.get("monthly_fee") or 0) * gw.PLAN_MONTHS[plan]
 
 
@@ -248,14 +248,14 @@ def renewal_email(name, amount, plan, end, pay, story, reminder=False):
         para.append(prog + (f" Every session is a step{goal}, so let's keep it going." if goal else
                             " That consistency is what gets results, so let's keep it going."))
     if days is None:
-        para.append(f"Your {plan.lower()} membership is due for renewal ({_money(amount)}).")
+        para.append(f"Your {gw.plan_phrase(plan)} membership is due for renewal ({_money(amount)}).")
     elif lapsed:
-        para.append(f"Your {plan.lower()} membership ended on {end:%d %B}, but your spot is still here and "
+        para.append(f"Your {gw.plan_phrase(plan)} membership ended on {end:%d %B}, but your spot is still here and "
                     f"so is everything you've built. Renewal is {_money(amount)}.")
     elif days == 0:
-        para.append(f"Your {plan.lower()} membership renews today. Renewal is {_money(amount)}.")
+        para.append(f"Your {gw.plan_phrase(plan)} membership renews today. Renewal is {_money(amount)}.")
     else:
-        para.append(f"Your {plan.lower()} membership renews on {end:%A %d %B}. Renewal is {_money(amount)}.")
+        para.append(f"Your {gw.plan_phrase(plan)} membership renews on {end:%A %d %B}. Renewal is {_money(amount)}.")
     perk = gw._text(pay.get("perk"))
     para.append("The easiest way to renew is at the front desk on your next visit. It takes two minutes, "
                 "and you can go straight into your session." + (f" Renew in person this week and you'll get {perk}." if perk else ""))
@@ -288,7 +288,7 @@ def renewal_text(name, amount, plan, end, pay, ref, story=None, reminder=False):
             f"renews on {end:%a %d %b}" if days > 0 else f"ended on {end:%d %b}, but your spot is still here")
     prog = _progress_line(story, biz)
     lines = [f"Hi {first}! 👋 " + ("Just checking in. " if reminder else "") + (prog + " 💪" if prog else "").strip(),
-             f"\nYour {plan.lower()} membership {when}. Renewal is {_money(amount)}."]
+             f"\nYour {gw.plan_phrase(plan)} membership {when}. Renewal is {_money(amount)}."]
     perk = gw._text(pay.get("perk"))
     lines.append("\nCome in this week and renew at the front desk, it only takes two minutes"
                  + (f", and you'll get {perk}." if perk else ".") + " Which day works for you?")
@@ -476,7 +476,7 @@ def render_collect(supabase, gym_id, owner_id):
             gw._md(gw.chip(plan, "grey") + gw.chip(label, tone) + gw.chip(f"Ref {ref}", "lime"))
             c1, c2 = st.columns(2)
             amt = c1.number_input("Amount (₦)", min_value=0.0, value=float(amount), step=1000.0, key=f"grow_amt_{m['id']}")
-            plans = list(gw.PLAN_MONTHS)
+            plans = gw.PLANS
             plan = c2.selectbox("Plan", plans, index=plans.index(plan), key=f"grow_plan_{m['id']}")
             renewal_composer(supabase, gym_id, m, amt, plan, ref, pay, member_story(m, ck),
                              f"grow_rn_{m['id']}_{amt:.0f}_{plan}")
