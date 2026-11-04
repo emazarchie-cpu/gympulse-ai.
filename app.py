@@ -1819,6 +1819,9 @@ MORE_PAGES = [
     "Follow-ups",
     "FAQs",
 ]
+import gympulse_admin as gadm
+if gadm.is_admin():
+    MORE_PAGES.append("Admin")
 
 NAV_SHORT = {
     "Payments & Renewals": "Renewals",
@@ -2540,6 +2543,8 @@ elif page == "Payments & Renewals":
     gw.render_payments(supabase, st.session_state.gym_id, assess_members)
 elif page == "Grow":
     gg.render_grow(supabase, st.session_state.gym_id, assess_members, owner_id)
+elif page == "Admin":
+    gadm.render_admin()
 elif page == "Follow-ups":
     fu.render_followups(
         supabase,

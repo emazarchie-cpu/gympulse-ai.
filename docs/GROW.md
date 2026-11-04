@@ -20,7 +20,7 @@ Run `sql/phase5_growth.sql` in Supabase (SQL Editor → New query → paste → 
 | **Corporate** | Company plans with seats, a monthly fee and an HR contact. Link staff to the company and see the team's attendance over the last 30 days. Download a PDF report for HR or send a summary on WhatsApp. |
 | **Team** | A leaderboard of who worked which plays, members kept, save rate, and money kept. Money only counts renewal payments credited to that person's plays. |
 | **Season planner** | The Nigerian year: New Year rush, Valentine's, Ramadan and Eid (estimated dates), Easter, rainy season, summer travel, back to routine, pre-December and Detty December. Each has what to do and a ready message, and is flagged 14 days ahead. Also shows the gym's own monthly visits. |
-| **Monthly report** | Last month (or this month so far) in one WhatsApp-ready message and a PDF: members kept, money kept, collected, new members, visits, top staff member and top exit reason. In the first week of each month it appears on the Dashboard, and if email sending is set up it's emailed to the owner once. |
+| **Monthly report** | View only: last month or this month so far, with members kept, money kept, collected, new members, visits, top staff member and top exit reason, plus a PDF download. Gyms don't send it themselves. GymPulse AI emails it to every gym owner on the 1st of each month (see `docs/ADMIN.md`). In the first week of each month it also appears on the Dashboard. |
 
 ## Email first, WhatsApp for what's urgent
 
@@ -31,7 +31,7 @@ Run `sql/phase5_growth.sql` in Supabase (SQL Editor → New query → paste → 
 - An optional **perk for renewing in person**, set by the gym in Collect renewals → Your payment details, is added to both versions. GymPulse never invents offers.
 - The WhatsApp version sends the same invitation and puts the payment options (Paystack link, then bank transfer with a reference) at the end, as an option.
 - Members who unsubscribed, or who have no email address, can only be reached on WhatsApp.
-- HR reports, the monthly report and the weekly report are emailed with their PDF attached.
+- HR reports and the weekly report are emailed with their PDF attached. The monthly report comes from GymPulse AI itself.
 
 ## PDFs
 
