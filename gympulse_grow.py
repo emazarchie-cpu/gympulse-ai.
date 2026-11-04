@@ -562,8 +562,8 @@ def _step_done(supabase, gym_id, mid, step):
 
 
 def render_onboarding(supabase, gym_id):
-    st.caption("New members are the most likely to quit. Each person gets six touches in their first 90 days. "
-               "Alerts flag anyone who hasn't come in during their first week.")
+    st.caption("New members quit the most. This gives each new member 6 friendly messages in their first 3 months, "
+               "and warns you if someone hasn't come in during their first week.")
     done_rows = _rows(supabase, "onboarding_steps", gym_id)
     if _need_sql(done_rows):
         return
@@ -660,8 +660,8 @@ def create_freeze(supabase, gym_id, m, start, end, reason, extend=True):
 
 
 def render_freeze(supabase, gym_id):
-    st.caption("A paused member comes back. A cancelled one rarely does. Freeze a membership for travel, "
-               "December, Ramadan, exams or injury, and their end date moves forward by the same number of days.")
+    st.caption("Someone travelling or busy? Pause their membership instead of losing them. They don't lose the days "
+               "they paid for: their end date moves forward by the days they were away.")
     rows = _rows(supabase, "member_freezes", gym_id, order="starts_on")
     if _need_sql(rows):
         return
@@ -776,8 +776,8 @@ def _reply_reason(supabase, gym_id, member_id):
 
 
 def render_exit(supabase, gym_id):
-    st.caption("Ask lapsed members one question on WhatsApp, record their answer, and see what's really "
-               "driving people away.")
+    st.caption("Ask members who stopped coming why they left, write down their answer, and see the most common "
+               "reasons so you know what to fix.")
     rows = _rows(supabase, "exit_reasons", gym_id)
     if _need_sql(rows):
         return
@@ -870,8 +870,8 @@ def shoutout(name, goal, summary):
 
 
 def render_progress(supabase, gym_id):
-    st.caption("Members who can see their results stay. Log a weigh-in, measurement or personal best in "
-               "10 seconds, and GymPulse drafts a shout-out when the numbers show real progress.")
+    st.caption("Members stay when they see results. Write down their weight or best lift, and when they improve, "
+               "GymPulse writes them a \"well done\" message for you.")
     logs = _rows(supabase, "progress_logs", gym_id, order="logged_on", desc=False)
     if _need_sql(logs):
         return
@@ -960,8 +960,8 @@ REF_STAGES = ["invited", "visited", "joined", "rewarded"]
 
 
 def render_referrals(supabase, gym_id, owner_id):
-    st.caption("Members bring friends, friends join, and the member gets a real reward. Track every invite "
-               "from first message to reward.")
+    st.caption("Ask members to bring a friend. When the friend joins, the member gets a gift you choose. "
+               "Keep track of every friend from invite to joining.")
     rows = _rows(supabase, "referrals", gym_id)
     if _need_sql(rows):
         return
@@ -1069,8 +1069,8 @@ def leaderboard(challenge, entries, checkins):
 
 
 def render_challenges(supabase, gym_id):
-    st.caption("Run a visits challenge. Members join, every real check-in counts (one per day), and the "
-               "leaderboard updates by itself.")
+    st.caption("Start a challenge, like \"come 12 times this month\". Every visit counts (one per day) and the "
+               "ranking updates by itself.")
     chals = _rows(supabase, "challenges", gym_id, order="starts_on")
     entries = _rows(supabase, "challenge_entries", gym_id)
     if _need_sql(chals) or _need_sql(entries):
@@ -1201,8 +1201,8 @@ def company_pdf(rep):
 
 
 def render_corporate(supabase, gym_id):
-    st.caption("Sell team memberships to companies, then send HR a monthly attendance report. "
-               "Companies renew when they can see their staff using it.")
+    st.caption("Sell gym memberships to companies for their staff. Then send the company a monthly report "
+               "showing which staff came to the gym.")
     comps = _rows(supabase, "companies", gym_id, order="name", desc=False)
     if _need_sql(comps):
         return
@@ -1333,8 +1333,8 @@ def team_board(actions, payments, days=30):
 
 
 def render_team(supabase, gym_id, assess_fn):
-    st.caption("Who worked the plays and how much money they kept in the last 30 days. Money only counts "
-               "renewal payments credited to that person's plays.")
+    st.caption("See which of your staff kept the most members (and money) in the last 30 days by following up "
+               "with members.")
     import gympulse_revenue as gr
     actions = gw.load_actions(supabase, gym_id, include_archived=True)
     pays = gr.load_payments(supabase, gym_id)
@@ -1441,8 +1441,8 @@ def upcoming(today=None, horizon=120):
 
 
 def render_seasons(supabase, gym_id):
-    st.caption("The moments in the Nigerian year that move gym attendance, with a plan and a ready message "
-               "for each. Ramadan and Eid dates are estimates, so confirm them closer to the time.")
+    st.caption("Busy and quiet times of the year in Nigeria (like January, Ramadan and December), what to do for each, "
+               "and a ready message. Ramadan and Eid dates are guesses, so check them nearer the time.")
     biz, _ = _biz()
     today = _today()
     events = upcoming(today)
@@ -1570,8 +1570,8 @@ def monthly_pdf(d):
 
 
 def render_monthly(supabase, gym_id, assess_fn, owner_id):
-    st.caption("Your month at a glance: members kept, money kept, new joins and visits. GymPulse AI emails "
-               "you this report, with the PDF, on the 1st of every month.")
+    st.caption("How your gym did this month: members kept, money made, new members and visits. GymPulse AI "
+               "also emails you this report on the 1st of every month.")
     today = _today()
     which = st.radio("Period", ["Last month", "This month so far"], horizontal=True, key="grow_mr_period")
     start, end = month_bounds(today) if which == "Last month" else (today.replace(day=1), today)
