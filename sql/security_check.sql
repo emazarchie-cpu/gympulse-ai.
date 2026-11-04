@@ -75,7 +75,10 @@ storage as (
                 else 'Private bucket.' end
     from storage.buckets b
 )
-select * from tables
-union all select * from funcs
-union all select * from storage
+select result, kind, name, what_it_means
+from (
+    select * from tables
+    union all select * from funcs
+    union all select * from storage
+) as everything
 order by case result when 'PROBLEM' then 0 when 'CHECK' then 1 else 2 end, kind, name;
