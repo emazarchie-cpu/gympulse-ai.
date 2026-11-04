@@ -248,9 +248,11 @@ def _compose(supabase, gym_id, members, owner, gym):
             ctx_member["id"], ctx_member["email"] = mid, email
         extra = {}
         trainers = gw.load_trainers(supabase, gym_id)
-        t = gw.pick_trainer(trainers, goal)
+        tmap = {x["id"]: x for x in trainers}
+        t = (tmap.get(open_row.get("trainer_id")) if open_row else None) or gw.pick_trainer(trainers, goal)
         if t:
             extra["trainer"] = gw._text(t.get("full_name"))
+            extra["trainer_id"] = t["id"]
         nxt = gw.next_class(gw.load_classes(supabase, gym_id))
         if nxt:
             extra.update(class_name=nxt["name"], class_when=gw.class_when_long(nxt["_start"]))
