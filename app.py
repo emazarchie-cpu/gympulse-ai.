@@ -1037,6 +1037,13 @@ if _trainer_token:
     gw.render_public_trainer(supabase, _trainer_token)
     st.stop()
 
+# Public "Book a demo" page and its cancel link (no sign-in needed)
+if st.query_params.get("demo") or st.query_params.get("demo_cancel"):
+    import gympulse_booking as gb
+    gd.apply()
+    gb.render_router(supabase)
+    st.stop()
+
 # Initialise login state
 if "auth_user" not in st.session_state:
     st.session_state.auth_user = None

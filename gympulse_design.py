@@ -354,13 +354,6 @@ PULSE_SVG = ('<svg class="cc-pulse" viewBox="0 0 1200 46" preserveAspectRatio="n
              '</linearGradient></defs></svg>')
 
 
-# Where "Book a demo" goes. Swap for a Calendly or WhatsApp link when you have one,
-# for example "https://calendly.com/yourname/demo" or "https://wa.me/234XXXXXXXXXX".
-BOOK_DEMO_URL = ("mailto:gympulseai22@gmail.com?subject=Book%20a%20GymPulse%20AI%20demo"
-                 "&body=Hi%2C%20I%27d%20like%20a%2015-minute%20demo%20of%20GymPulse%20AI.%0A%0A"
-                 "Gym%20name%3A%20%0AMembers%3A%20%0ABest%20time%20to%20call%3A%20")
-
-
 def landing_top(lockup_uri, icon):
     """Navigation, hero and live product preview."""
     return f"""
@@ -418,7 +411,7 @@ def landing_top(lockup_uri, icon):
       <div class="lx-demo-note">Plays muted. Tap the video for sound.</div>
       <div class="lx-demo-cta">
         <a class="lx-btn lx-btn-primary" href="#get-started">Start free</a>
-        <a class="lx-btn" href="{BOOK_DEMO_URL}" target="_blank" rel="noopener">Book a 15-minute demo</a>
+        <a class="lx-btn" href="?demo=book" target="_self">Book a 15-minute demo</a>
       </div>
     </div>
     <div class="lx-strip">
@@ -516,7 +509,7 @@ def landing_sections(icon, bot_svg):
       <p>Create your free workspace above. It takes about a minute.</p>
       <div class="lx-demo-cta">
         <a class="lx-btn lx-btn-primary" href="#get-started">Start free</a>
-        <a class="lx-btn" href="{BOOK_DEMO_URL}" target="_blank" rel="noopener">Book a 15-minute demo</a>
+        <a class="lx-btn" href="?demo=book" target="_self">Book a 15-minute demo</a>
       </div>
     </div>
     <div class="lx-foot"><span>© GymPulse AI</span><span>Smarter insights. Stronger member retention.</span></div>
