@@ -143,26 +143,40 @@ def google_calendar_url(b, cfg):
 
 
 # ------------------------------------------------------------------ email
+def _log(msg):
+    """Shows up in Render → Logs, so email problems are never silent."""
+    print(f"[GymPulse demo email] {msg}", flush=True)
+
+
 def _send(to, subject, html, text, ics=None):
     import requests
     # Demo emails come from Emmanuel; EMAIL_FROM stays the sender for gyms' member emails
     key, sender = _setting("RESEND_API_KEY"), config()["sender"] or _setting("EMAIL_FROM")
-    if not (key and sender):
+    if not key:
+        _log("not sent: RESEND_API_KEY is not set on this service")
         return False
     payload = {"from": sender, "to": [to], "subject": subject, "html": html, "text": text}
     reply = _setting("EMAIL_REPLY_TO") or config()["owner"]
     if reply:
         payload["reply_to"] = reply
+    attempts = []
     if ics:
-        payload["attachments"] = [{"filename": "gympulse-demo.ics",
-                                   "content": base64.b64encode(ics.encode()).decode(),
-                                   "content_type": "text/calendar; method=REQUEST"}]
-    try:
-        r = requests.post("https://api.resend.com/emails", json=payload, timeout=20,
-                          headers={"Authorization": f"Bearer {key}"})
-        return r.status_code < 300
-    except Exception:
-        return False
+        attempts.append({**payload, "attachments": [{
+            "filename": "gympulse-demo.ics",
+            "content": base64.b64encode(ics.encode()).decode()}]})
+    attempts.append(payload)          # if the attachment is refused, send without it
+    for body in attempts:
+        try:
+            r = requests.post("https://api.resend.com/emails", json=body, timeout=20,
+                              headers={"Authorization": f"Bearer {key}"})
+        except Exception as error:
+            _log(f"not sent to {to}: could not reach Resend ({error})")
+            continue
+        if r.status_code < 300:
+            _log(f"sent to {to}: {subject}")
+            return True
+        _log(f"Resend refused email to {to} ({r.status_code}): {r.text[:300]}")
+    return False
 
 
 def _email_html(title, rows, cta=None, footer=""):
