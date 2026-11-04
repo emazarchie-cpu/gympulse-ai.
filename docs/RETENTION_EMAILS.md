@@ -6,6 +6,7 @@ Gyms send designed emails to their members, with their own logo, photo, colours 
 
 1. **Settings → Email & branding**
    - Sender name (for example "Emmanuel from GymPulse AI"), company email (replies go here), brand colour, banner background, WhatsApp number, website and footer address.
+   - **Email background:** White or Black. This is the default for every email, and you can change it for any single email or campaign before sending.
    - Upload your **logo** and a **gym photo**. The photo goes on the left of every banner.
 2. **Send to one member:** Follow-ups → Compose → choose the member → Send via **Email** → leave **Designed email** on.
    - The design follows the play you pick. Every part is editable: headline, tagline, offer, message, button and link.

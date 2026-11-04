@@ -514,3 +514,170 @@ def landing_sections(icon, bot_svg):
     </div>
     <div class="lx-foot"><span>© GymPulse AI</span><span>Smarter insights. Stronger member retention.</span></div>
     """
+
+
+# =====================================================================
+# Light mode: a real light palette (not an inverted dark theme).
+# Applied after every other style layer when the owner picks light mode.
+# =====================================================================
+LIGHT_CSS = """
+:root, html body {
+    --gp-bg: #F4F6FA; --gp-s1: #FFFFFF; --gp-s2: #F1F4F8; --gp-s3: #E9EEF5;
+    --gp-line: rgba(15,23,42,0.09); --gp-line-2: rgba(15,23,42,0.16);
+    --gp-text: #0F172A; --gp-muted: #5B6678; --gp-dim: #7A8699;
+    --gp-lime: #4D7C0F; --gp-cyan: #0E7490;
+    --background: #F4F6FA; --surface: #FFFFFF; --surface-light: #F1F4F8; --white: #0F172A;
+    --muted: #5B6678; --border: rgba(15,23,42,0.09);
+    --surface-1: #FFFFFF; --surface-2: #F1F4F8; --line: rgba(15,23,42,0.09);
+    --line-strong: rgba(15,23,42,0.22); --text: #0F172A; --text-muted: #5B6678; --accent: #4D7C0F;
+    color-scheme: light;
+}
+html body .stApp {
+    background:
+      radial-gradient(1000px 480px at 10% -10%, rgba(183,243,74,0.16), transparent 60%),
+      radial-gradient(900px 460px at 95% 0%, rgba(53,214,237,0.12), transparent 60%),
+      #F4F6FA !important;
+    color: #0F172A !important;
+}
+/* every piece of text: dark ink first, then the exceptions below */
+html body .stApp.stApp.stApp :is(p, span, label, li, h1, h2, h3, h4, h5, h6, b, strong, td, th, dd, dt,
+    small, em, div, a:not(.gp-dl):not(.lx-btn)) { color: #0F172A; }
+html body .stApp.stApp.stApp :is(input, textarea) {
+    color: #0F172A !important; -webkit-text-fill-color: #0F172A !important; caret-color: #0F172A; }
+html body .stApp.stApp.stApp :is(input, textarea)::placeholder { color: #94A0B2 !important;
+    -webkit-text-fill-color: #94A0B2 !important; }
+
+/* secondary text */
+html body .stApp.stApp.stApp :is(.pg-sub, .pg-date, .kpi-hint, .kpi-label, .why, .why *, .cc-sub, .cc-kpi-hint,
+    .cc-kpi-label, .cc-step-l, .cc-step-n, .cc-brief-sub, .cc-brief-foot, .cc-story dt, .cc-empty, .section-label,
+    .bk-sub, .bk-small, .lx-sub, .lx-demo-note, .pm-gym, .pm-label, .chat-who, .archie-role, .sb-sub,
+    .gp-table th, .gp-table .sub, .gp-table-foot, .kb-empty, .bp-sub, .pn, .pillar p, .money,
+    [data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] *,
+    [data-testid="stWidgetLabel"] small, .cc-play-rate) { color: #5B6678 !important; }
+html body .stApp.stApp.stApp :is(.cc-sub b, .cc-story dd, .cc-brief li, .cc-brief li *) { color: #1E293B !important; }
+/* accent text, deeper so it reads on white */
+html body .stApp.stApp.stApp :is(.pg-eyebrow, .cc-eyebrow, .lx-kicker, .cc-story dd b, .archie-status,
+    .kicker) { color: #4D7C0F !important; }
+html body .stApp.stApp.stApp a:not(.gp-dl):not(.lx-btn):not([data-testid^="stBaseLinkButton"]) { color: #0E7490; }
+
+/* surfaces */
+html body .stApp.stApp :is(.kpi, .cc-kpi, .cc-loop, .panel, .pillar, .board-progress, .kb-head, .gp-table-wrap,
+    .status-big, .profile-hero, .lx-card, .lx-strip, .bk-done) {
+    background: #FFFFFF !important; border: 1px solid rgba(15,23,42,0.08) !important;
+    box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 8px 24px -16px rgba(15,23,42,0.18) !important; }
+html body .stApp.stApp .kpi::after { display: none; }
+html body .stApp.stApp :is(.cc-hero, .archie-hero) {
+    background: radial-gradient(600px 220px at 85% 0%, rgba(53,214,237,0.18), transparent 70%),
+                radial-gradient(500px 240px at 0% 100%, rgba(183,243,74,0.22), transparent 70%), #FFFFFF !important;
+    border: 1px solid rgba(15,23,42,0.08) !important; box-shadow: 0 10px 30px -18px rgba(15,23,42,0.25) !important; }
+html body .stApp.stApp .cc-brief {
+    background: radial-gradient(380px 160px at 100% 0%, rgba(53,214,237,0.14), transparent 70%),
+                linear-gradient(180deg, rgba(183,243,74,0.14), rgba(183,243,74,0.04)), #FFFFFF !important;
+    border: 1px solid rgba(77,124,15,0.25) !important; }
+html body .stApp.stApp .cc-step + .cc-step { border-left-color: rgba(15,23,42,0.08) !important; }
+html body .stApp.stApp :is(.cc-step-bar, .cc-play-bar, .pbar) { background: #E9EEF5 !important; }
+html body .stApp.stApp .gp-table th { background: #F6F8FB !important; }
+html body .stApp.stApp .gp-table td { border-bottom-color: rgba(15,23,42,0.06) !important; }
+html body .stApp.stApp [data-testid="stVerticalBlock"]:is([class*="st-key-card_"], [class*="st-key-cc_"], .st-key-auth_card) {
+    background: #FFFFFF !important; border: 1px solid rgba(15,23,42,0.08) !important;
+    box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 10px 28px -18px rgba(15,23,42,0.2) !important; }
+html body .stApp.stApp [data-testid="stExpander"] details { background: #FFFFFF !important;
+    border-color: rgba(15,23,42,0.1) !important; }
+html body .stApp.stApp [data-testid="stExpander"] summary:hover { background: #F6F8FB !important; }
+html body .stApp.stApp [data-testid="stChatMessage"] { background: #FFFFFF !important;
+    border: 1px solid rgba(15,23,42,0.08) !important; }
+html body .stApp.stApp [data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]) {
+    background: #F3F9E6 !important; border-color: rgba(77,124,15,0.25) !important; }
+html body .stApp.stApp [data-testid="stChatInput"] { background: #FFFFFF !important; border-color: rgba(15,23,42,0.16) !important; }
+html body .stApp.stApp [data-testid="stChatInput"] textarea { background: transparent !important; }
+html body .stApp.stApp.stApp [data-testid="stChatInput"],
+html body .stApp.stApp.stApp [data-testid="stChatInput"] > div,
+html body .stApp.stApp.stApp [data-testid="stChatInput"] [data-baseweb] { background: #FFFFFF !important; }
+html body .stApp.stApp.stApp [data-testid="stChatInput"] div:not(:has(button)) { background-color: transparent !important; }
+
+/* inputs, selects, uploads */
+html body .stApp.stApp :is([data-testid="stTextInputRootElement"], [data-testid="stTextAreaRootElement"],
+    [data-testid="stNumberInputContainer"], [data-testid="stDateInputField"], [data-baseweb="select"] > div,
+    [data-baseweb="input"], [data-baseweb="textarea"]) {
+    background: #FFFFFF !important; border: 1px solid #D5DCE6 !important; }
+html body .stApp.stApp [data-testid="stNumberInputContainer"] button { background: #F1F4F8 !important; }
+html body .stApp.stApp :is([data-testid="stSelectbox"], [data-testid="stMultiSelect"], [data-testid="stDateInput"],
+    [data-testid="stTimeInput"]) [role="group"] { background: #FFFFFF !important; border: 1px solid #D5DCE6 !important; }
+html body .stApp.stApp [data-testid="stRadioOption"]:not([data-selected="true"]) > div > div:first-child:not([data-testid]) {
+    background: #FFFFFF !important; border: 1px solid #B8C2D0 !important; }
+html body .stApp.stApp [data-testid="stBottom"] > div { background: #F4F6FA !important; }
+html, html body { background: #F4F6FA !important; }
+html body .stApp.stApp [data-testid="stFileUploaderDropzone"] { background: #FFFFFF !important;
+    border: 1px dashed #C7D0DC !important; }
+html body [data-baseweb="popover"] :is(ul, [role="listbox"], [data-baseweb="menu"]) {
+    background: #FFFFFF !important; border: 1px solid #E3E8EF !important; }
+html body [data-baseweb="popover"] :is(li, [role="option"]) , html body [data-baseweb="popover"] :is(li, [role="option"]) * {
+    color: #0F172A !important; }
+html body [data-baseweb="popover"] [role="option"]:hover, html body [data-baseweb="popover"] [aria-selected="true"] {
+    background: #F1F6E8 !important; }
+html body [data-testid="stPopoverBody"] { background: #FFFFFF !important; border: 1px solid #E3E8EF !important;
+    box-shadow: 0 20px 50px -20px rgba(15,23,42,0.35) !important; }
+html body [data-testid="stPopoverBody"] * { color: #0F172A; }
+html body [data-testid="stPopoverBody"][data-testid="stPopoverBody"][data-testid="stPopoverBody"] .stButton button,
+html body [data-testid="stPopoverBody"][data-testid="stPopoverBody"][data-testid="stPopoverBody"] .stButton button :is(p, span, div) { color: #1F2937 !important; }
+html body [data-testid="stPopoverBody"][data-testid="stPopoverBody"][data-testid="stPopoverBody"] .stButton button[data-testid^="stBaseButton-secondary"] {
+    background-color: #F4F6FA !important; border: 1px solid #E3E8EF !important; }
+html body [data-testid="stPopoverBody"][data-testid="stPopoverBody"][data-testid="stPopoverBody"] .stButton button:hover { background-color: #EEF4E2 !important; }
+html body [data-testid="stPopoverBody"][data-testid="stPopoverBody"][data-testid="stPopoverBody"] .stButton button:hover :is(p, span, div) { color: #3F6212 !important; }
+html body [data-testid="stPopoverBody"][data-testid="stPopoverBody"][data-testid="stPopoverBody"] .st-key-logout_button_main .stButton button :is(p, span, div) { color: #B42318 !important; }
+html body [data-testid="stPopoverBody"][data-testid="stPopoverBody"][data-testid="stPopoverBody"] hr { border-color: #E3E8EF !important; }
+html body .stApp.stApp [data-baseweb="tab-list"] { border-bottom-color: rgba(15,23,42,0.1) !important; }
+html body .stApp.stApp [data-testid="stAlert"] > div { background: #FFFFFF !important;
+    border: 1px solid rgba(15,23,42,0.1) !important; }
+html body [data-testid="stToast"] { background: #FFFFFF !important; color: #0F172A !important; }
+
+/* buttons */
+html body .stApp.stApp :is(button[kind="secondary"], button[kind="secondaryFormSubmit"],
+    [data-testid="stBaseLinkButton-secondary"], [data-testid="stPopover"] > div > button,
+    button[data-variant="segmented_control"]) {
+    background-color: #FFFFFF !important; border: 1px solid #D5DCE6 !important; color: #0F172A !important;
+    box-shadow: 0 1px 2px rgba(15,23,42,0.05) !important; }
+html body .stApp.stApp.stApp.stApp :is(button[kind="secondary"], button[kind="secondaryFormSubmit"],
+    [data-testid="stBaseLinkButton-secondary"], button[data-variant="segmented_control"]) :is(p, span, div) {
+    color: #0F172A !important; }
+html body .stApp.stApp button[data-variant="segmented_control"][aria-checked="true"] {
+    background-color: #EEF7DC !important; border-color: rgba(77,124,15,0.45) !important; }
+html body .stApp.stApp.stApp.stApp button[data-variant="segmented_control"][aria-checked="true"] * { color: #3F6212 !important; }
+html body .stApp.stApp.stApp .st-key-brand_home button { background-color: transparent !important;
+    border: 0 !important; box-shadow: none !important; }
+html body .stApp.stApp :is(button[kind="secondary"], [data-testid="stBaseLinkButton-secondary"]):hover {
+    border-color: #8DB33A !important; background: #F7FBEF !important; }
+html body .stApp.stApp :is(button[kind="primary"], button[kind="primaryFormSubmit"]) * { color: #0A0F1E !important; }
+html body .stApp.stApp button[kind="tertiary"] * { color: #0E7490 !important; }
+html body .stApp.stApp .gp-dl { background: #FFFFFF !important; border-color: #D5DCE6 !important; color: #0F172A !important; }
+html body .stApp.stApp .gp-dl-primary { background: linear-gradient(100deg, #B7F34A, #35D6ED) !important; border: 0 !important; color: #0A0F1E !important; }
+
+/* top bar */
+html body .stApp.stApp .st-key-top_nav { background: rgba(255,255,255,0.75) !important;
+    border-bottom: 1px solid rgba(15,23,42,0.08) !important; }
+html body .stApp.stApp.stApp .st-key-top_nav div[role="radiogroup"] label p { color: #334155 !important; }
+html body .stApp.stApp .st-key-top_nav [data-testid="stRadioOption"][data-selected="true"] {
+    background: #EEF7DC !important; box-shadow: inset 0 0 0 1px rgba(77,124,15,0.35) !important; }
+html body .stApp.stApp.stApp .st-key-top_nav [data-testid="stRadioOption"][data-selected="true"] p { color: #3F6212 !important; }
+html body .stApp.stApp :is(.st-key-top_msg, .st-key-top_menu) button { background: #FFFFFF !important;
+    border: 1px solid #D5DCE6 !important; }
+
+/* chips: same tones, readable on white */
+html body .stApp.stApp.stApp .chip { background: #F1F4F8 !important; color: #334155 !important; }
+html body .stApp.stApp.stApp .chip-lime { background: #EEF7DC !important; color: #3F6212 !important; }
+html body .stApp.stApp.stApp .chip-cyan { background: #E3F6FA !important; color: #0E7490 !important; }
+html body .stApp.stApp.stApp .chip-amber { background: #FEF3DC !important; color: #B45309 !important; }
+html body .stApp.stApp.stApp .chip-red { background: #FDE8E8 !important; color: #B91C1C !important; }
+html body .stApp.stApp.stApp .gp-tag { border-color: rgba(15,23,42,0.16) !important; color: #475569 !important; }
+html body .stApp.stApp.stApp .gp-tag.ok { color: #3F6212 !important; background: #EEF7DC !important; border-color: rgba(77,124,15,0.3) !important; }
+html body .stApp.stApp.stApp .gp-tag.est { color: #B45309 !important; background: #FEF3DC !important; border-color: rgba(180,83,9,0.3) !important; }
+
+/* misc */
+html body .stApp.stApp hr, html body .stApp.stApp [data-testid="stDivider"] { border-color: rgba(15,23,42,0.1) !important; }
+html body .stApp.stApp .cc-pulse { opacity: .55; }
+html body ::selection { background: rgba(183,243,74,0.45); color: #0F172A; }
+"""
+
+
+def apply_light():
+    st.markdown("<style>" + LIGHT_CSS + "</style>", unsafe_allow_html=True)

@@ -995,10 +995,11 @@ def logo_img_tag(css_class):
         return ""
     return f'<img class="{css_class}" src="{uri}" alt="GymPulse AI logo">'
 @st.cache_resource
-def lockup_data_uri(width=720):
-    """The full GymPulse AI logo (shapes + lettering) as an inline image."""
+def lockup_data_uri(width=720, dark_text=False):
+    """The full GymPulse AI logo (shapes + lettering) as an inline image.
+    dark_text=True gives the light-mode version with navy lettering."""
     base = os.path.dirname(os.path.abspath(__file__))
-    path = os.path.join(base, "GymPulse_AI_logo_full.png")
+    path = os.path.join(base, "gympulse-logo-dark.png" if dark_text else "GymPulse_AI_logo_full.png")
     if not os.path.exists(path):
         # Fall back to the full lockup that ships with the repo
         path = os.path.join(base, "gympulse-email-logo.png")
@@ -2354,7 +2355,7 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 st.markdown(
     f"<style>html body .st-key-brand_home button "
-    f"{{ background-image: url('{lockup_data_uri(520)}') !important; }}</style>",
+    f"{{ background-image: url('{lockup_data_uri(520, st.session_state.get('theme') == 'light')}') !important; }}</style>",
     unsafe_allow_html=True
 )
 with st.container(key="top_nav"):
@@ -2939,3 +2940,6 @@ elif page == "FAQs":
 # =========================================================
 # 14. FOOTER
 # =========================================================
+
+# Light mode goes last so it sits on top of every page's own styles
+gw.apply_theme(st.session_state.get("theme", "dark"))
