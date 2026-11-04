@@ -267,6 +267,8 @@ def send_all(sc, start, end, sent_by="auto", only=None, log=print):
         except Exception as error:
             failed += 1
             log(f"failed {entry['name']}: {error}")
+            import gympulse_monitoring as gmon
+            gmon.capture(error, "monthly report")
     import gc
     gc.collect()
     return sent, skipped, failed

@@ -13,6 +13,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 logging.getLogger("streamlit").setLevel(logging.ERROR)
+import gympulse_monitoring as gmon   # noqa: E402
+gmon.init("scheduled job")
 
 import gympulse_admin as gadm        # noqa: E402
 import gympulse_loyalty as gl        # noqa: E402

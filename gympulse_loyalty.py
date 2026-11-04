@@ -260,6 +260,8 @@ def send_due(supabase, gym_id, profile=None, dry_run=False, log=print):
             else:
                 failed += 1
                 log(f"  failed {kind:8} -> {m.get('full_name')}: {msg}")
+                import gympulse_monitoring as gmon
+                gmon.capture(RuntimeError(f"automatic {kind} email failed: {msg}"), "automatic messages")
     return sent, skipped, failed
 
 
