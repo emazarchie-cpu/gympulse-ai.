@@ -25,7 +25,8 @@ import streamlit as st
 
 import gympulse_workspaces as gw
 
-SQL_HINT = "Run sql/phase9_loyalty.sql in Supabase to switch this on."
+SQL_HINT = ("This needs a one-time setup: open Supabase, go to SQL Editor, paste in the file "
+            "sql/phase9_loyalty.sql and press Run.")
 
 LOYALTY_DEFAULTS = {
     "enabled": False,
@@ -268,33 +269,36 @@ def _redeem(supabase, gym_id, mid, reward):
         supabase.table("loyalty_redemptions").insert({"gym_id": gym_id, "member_id": mid, "reward": reward["name"],
                                                       "points": int(reward["points"])}).execute()
         gw.bump_data_version()
-        st.session_state["grow_flash"] = f"{reward['name']} claimed: {int(reward['points']):,} points used."
+        st.session_state["grow_flash"] = f"Done. {reward['name']} given, {int(reward['points']):,} points taken off."
     except Exception as error:
         st.session_state["grow_error"] = f"Could not save: {error}. {SQL_HINT}"
 
 
 def render_loyalty(supabase, gym_id, owner_id):
     import gympulse_grow as gg
-    st.caption("Members earn points for every day they train, every strong week, and every on-time renewal. "
-               "You choose the rewards. Points come from real check-ins and payments only.")
+    st.caption("Members get points each time they come to the gym and when they renew on time. "
+               "When they have enough points, they get a gift you choose, like a free smoothie or a free session.")
     cfg = loyalty_cfg()
-    with st.expander("Points and rewards" + ("" if cfg["enabled"] else " · switch loyalty on"),
+    with st.expander("Points and gifts" + ("" if cfg["enabled"] else " · turn it on here"),
                      expanded=not cfg["enabled"]):
-        on = st.toggle("Loyalty points on", value=cfg["enabled"], key="loy_on")
+        on = st.toggle("Turn on loyalty points", value=cfg["enabled"], key="loy_on")
         c1, c2, c3, c4 = st.columns(4)
-        per_visit = c1.number_input("Points per visit", 0, 1000, int(cfg["per_visit"]), help="One visit per day counts.")
-        week_visits = c2.number_input("Visits for a strong week", 1, 7, int(cfg["week_visits"]))
-        week_bonus = c3.number_input("Strong-week bonus", 0, 1000, int(cfg["week_bonus"]))
-        renewal_bonus = c4.number_input("On-time renewal bonus", 0, 5000, int(cfg["renewal_bonus"]),
-                                        help="Renewal paid before the plan ended.")
-        start = st.date_input("Count points from", date.fromisoformat(str(cfg.get("start") or gw.today_local())),
-                              max_value=gw.today_local(), help="Earlier visits and renewals don't count.")
-        st.markdown("**Rewards**")
+        per_visit = c1.number_input("Points for each visit", 0, 1000, int(cfg["per_visit"]),
+                                    help="Coming twice in one day still counts as one visit.")
+        week_visits = c2.number_input("Visits in a week for extra points", 1, 7, int(cfg["week_visits"]),
+                                      help="For example 3: a member who comes 3 or more times in a week gets extra points.")
+        week_bonus = c3.number_input("Extra points for a busy week", 0, 1000, int(cfg["week_bonus"]))
+        renewal_bonus = c4.number_input("Points for renewing on time", 0, 5000, int(cfg["renewal_bonus"]),
+                                        help="When a member pays before their membership runs out.")
+        start = st.date_input("Start counting from", date.fromisoformat(str(cfg.get("start") or gw.today_local())),
+                              max_value=gw.today_local(),
+                              help="Visits before this date don't earn points. Pick an earlier date to include past visits.")
+        st.markdown("**Gifts members can get** (name and how many points it costs)")
         rewards = st.data_editor(pd.DataFrame(cfg["rewards"] or LOYALTY_DEFAULTS["rewards"]), num_rows="dynamic",
                                  use_container_width=True, key="loy_rewards",
-                                 column_config={"name": st.column_config.TextColumn("Reward"),
+                                 column_config={"name": st.column_config.TextColumn("Gift"),
                                                 "points": st.column_config.NumberColumn("Points", min_value=1, step=50)})
-        if st.button("Save loyalty settings", type="primary", key="loy_save"):
+        if st.button("Save", type="primary", key="loy_save"):
             rw = [{"name": str(r["name"]).strip(), "points": int(r["points"])} for _, r in rewards.iterrows()
                   if str(r.get("name") or "").strip() and pd.notna(r.get("points")) and int(r["points"]) > 0]
             gg._save_settings(supabase, owner_id, {"loyalty": {
@@ -303,7 +307,7 @@ def render_loyalty(supabase, gym_id, owner_id):
                 "renewal_bonus": int(renewal_bonus), "rewards": rw}}, "Loyalty settings saved.")
             st.rerun()
     if not cfg["enabled"]:
-        st.info("Switch loyalty points on above to start counting.")
+        st.info("Turn on loyalty points above to start.")
         return
     cfg, table, reds = compute_points(supabase, gym_id)
     if reds is None:
@@ -313,20 +317,20 @@ def render_loyalty(supabase, gym_id, owner_id):
         st.info("Add members first.")
         return
     month_start = pd.Timestamp(gw.today_local().replace(day=1))
-    gw.kpi_row([("Members earning", str(int((table["earned"] > 0).sum())), "cyan", f"since {cfg['start']}"),
-                ("Points earned", f"{int(table['earned'].sum()):,}", "lime", "all members"),
-                ("Ready for a reward", str(int(table["ready"].notna().sum())), "amber", "tell them"),
-                ("Rewards claimed", str(len(reds)), "grey",
+    gw.kpi_row([("Members with points", str(int((table["earned"] > 0).sum())), "cyan", f"since {cfg['start']}"),
+                ("Total points", f"{int(table['earned'].sum()):,}", "lime", "all members together"),
+                ("Can get a gift now", str(int(table["ready"].notna().sum())), "amber", "let them know"),
+                ("Gifts given", str(len(reds)), "grey",
                  f"{sum(1 for r in reds if pd.Timestamp(str(r['created_at'])[:10]) >= month_start)} this month")])
 
     ready = table[table["ready"].notna()]
     if len(ready):
-        st.markdown('<div class="section-label">READY FOR A REWARD</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-label">CAN GET A GIFT NOW</div>', unsafe_allow_html=True)
         members = {r["id"]: dict(r) for _, r in gg._members(supabase, gym_id).iterrows()}
         for _, r in ready.iterrows():
             with st.expander(f"{r['name']} · {r['balance']:,} points · {r['ready']['name']}"):
                 options = [x for x in cfg["rewards"] if r["balance"] >= int(x["points"])]
-                pick = st.selectbox("Reward", range(len(options)), index=len(options) - 1,
+                pick = st.selectbox("Gift", range(len(options)), index=len(options) - 1,
                                     format_func=lambda i: f"{options[i]['name']} ({int(options[i]['points']):,} points)",
                                     key=f"loy_pick_{r['member_id']}")
                 subject, body = reward_letter(r, options[pick], cfg)
@@ -335,26 +339,27 @@ def render_loyalty(supabase, gym_id, owner_id):
                 st.text_area("Message", key=k, height=200, label_visibility="collapsed")
                 m = members.get(r["member_id"], {"id": r["member_id"], "full_name": r["name"]})
                 gg.send_row(k, m, f"loy_send_{r['member_id']}", subject, supabase=supabase, gym_id=gym_id)
-                st.button("Mark reward as claimed", key=f"loy_claim_{r['member_id']}", type="primary",
+                st.button("They've collected it", key=f"loy_claim_{r['member_id']}", type="primary",
+                          help="Takes the points for this gift off their total.",
                           on_click=_redeem, args=(supabase, gym_id, r["member_id"], options[pick]))
 
-    st.markdown('<div class="section-label">LEADERBOARD</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">TOP MEMBERS</div>', unsafe_allow_html=True)
     top = table.head(20)
     for i, (_, r) in enumerate(top.iterrows()):
         medal = ["🥇", "🥈", "🥉"][i] if i < 3 and r["balance"] > 0 else f"{i + 1}."
         nxt = r["next"]
         pct = 100 if nxt is None else min(100, round(r["balance"] / max(int(nxt["points"]), 1) * 100))
-        hint = "every reward unlocked" if nxt is None else f"{r['to_next']:,} to {nxt['name']}"
+        hint = "can get any gift" if nxt is None else f"{r['to_next']:,} more points for {nxt['name']}"
         gw._md(f'<div style="display:flex;align-items:center;gap:12px;margin:6px 0"><div style="width:34px">{medal}</div>'
                f'<div style="flex:1"><b>{gw._esc(r["name"])}</b> · {r["balance"]:,} points '
-               f'<span style="opacity:.7">({r["visits"]} visits, {r["weeks"]} strong weeks, {r["renewals"]} on-time '
-               f'renewals) · {gw._esc(hint)}</span>'
+               f'<span style="opacity:.7">({r["visits"]} visits, {r["weeks"]} busy weeks, {r["renewals"]} paid on '
+               f'time) · {gw._esc(hint)}</span>'
                f'<div class="pbar" style="margin-top:4px"><span style="width:{pct}%;--tone:#B7F34A"></span></div></div></div>')
     if reds:
-        with st.expander("Claimed rewards"):
+        with st.expander("Gifts already given"):
             names = dict(zip(table["member_id"], table["name"]))
             st.dataframe(pd.DataFrame([{"When": str(r["created_at"])[:10], "Member": names.get(r["member_id"], "Member"),
-                                        "Reward": r["reward"], "Points": r["points"]} for r in reds]),
+                                        "Gift": r["reward"], "Points used": r["points"]} for r in reds]),
                          hide_index=True, use_container_width=True)
 
 
@@ -370,60 +375,61 @@ def _send_now(supabase, gym_id):
 
 def render_auto(supabase, gym_id, owner_id):
     import gympulse_grow as gg
-    st.caption("Branded emails that go out by themselves every morning at 8:30 (Lagos time), each at most once per "
-               "member per occasion. Members who unsubscribed or have no email are skipped.")
+    st.caption("Turn these on and GymPulse emails your members for you every morning at 8:30, with your logo. "
+               "You don't have to press send. Nobody gets the same email twice.")
     auto = auto_cfg()
     with st.form("auto_form"):
         c1, c2 = st.columns([1, 2])
-        r_on = c1.toggle("Renewal reminder", value=auto["renewal"]["on"])
-        r_days = c2.number_input("Days before the plan ends", 1, 14, int(auto["renewal"]["days"]))
+        r_on = c1.toggle("Remind them to renew", value=auto["renewal"]["on"])
+        r_days = c2.number_input("How many days before their membership ends", 1, 14, int(auto["renewal"]["days"]))
         c3, c4 = st.columns([1, 2])
-        m_on = c3.toggle("We missed you", value=auto["missed"]["on"])
-        m_days = c4.number_input("Days without a check-in", 3, 30, int(auto["missed"]["days"]),
-                                 help="Active members only. Sent once per absence.")
-        rw_on = st.toggle("Reward ready (needs loyalty points on)", value=auto["reward"]["on"])
-        cap = st.number_input("Most emails per day", 10, 500, int(auto["daily_cap"]),
-                              help="Resend's free plan allows 100 emails a day across all gyms.")
-        if st.form_submit_button("Save automatic messages", type="primary"):
+        m_on = c3.toggle("\"We missed you\" when they stop coming", value=auto["missed"]["on"])
+        m_days = c4.number_input("After how many days of not coming", 3, 30, int(auto["missed"]["days"]),
+                                 help="Only for members whose membership is still running.")
+        rw_on = st.toggle("Tell them when they've earned a gift (loyalty must be on)", value=auto["reward"]["on"])
+        cap = st.number_input("Most emails in one day", 10, 500, int(auto["daily_cap"]),
+                              help="A limit so you don't send too many at once. The free email plan allows 100 a day.")
+        if st.form_submit_button("Save", type="primary"):
             gg._save_settings(supabase, owner_id, {"auto_messages": {
                 "renewal": {"on": bool(r_on), "days": int(r_days)}, "missed": {"on": bool(m_on), "days": int(m_days)},
                 "reward": {"on": bool(rw_on)}, "daily_cap": int(cap)}}, "Automatic messages saved.")
             st.rerun()
     if not (auto["renewal"]["on"] or auto["missed"]["on"] or auto["reward"]["on"]):
-        st.info("Switch on at least one message above. Nothing is sent until you do.")
+        st.info("Turn on at least one message above. Nothing is sent until you do.")
         return
     due = due_messages(supabase, gym_id)
     if due is None:
         st.info(SQL_HINT)
         return
-    label = {"renewal": "Renewal reminder", "missed": "We missed you", "reward": "Reward ready"}
+    label = {"renewal": "Renew reminder", "missed": "We missed you", "reward": "Gift earned"}
     with_email = [d for d in due if "@" in gw._text(d[1].get("email"))]
-    gw.kpi_row([("Due today", str(len(due)), "cyan", "across all switched-on messages"),
-                ("Will be emailed", str(len(with_email)), "lime", "have an email address"),
-                ("No email", str(len(due) - len(with_email)), "amber", "use WhatsApp for these"),
-                ("Next run", "8:30 tomorrow" if not due else "8:30 daily", "grey", "automatic")])
+    gw.kpi_row([("To send today", str(len(due)), "cyan", "members who need a message"),
+                ("Have an email", str(len(with_email)), "lime", "will get it by email"),
+                ("No email", str(len(due) - len(with_email)), "amber", "send these on WhatsApp"),
+                ("Sends itself at", "8:30 am", "grey", "every morning")])
     if due:
         st.dataframe(pd.DataFrame([{"Message": label[k], "Member": m.get("full_name"),
                                     "Email": m.get("email") or "–", "Subject": subj}
                                    for k, m, ref, subj, body, b in due]), hide_index=True, use_container_width=True)
-        with st.expander("Preview one"):
+        with st.expander("See what the email looks like"):
             k, m, ref, subj, body, b = due[0]
             import gympulse_campaigns as gcamp
             import streamlit.components.v1 as components
             components.html(gcamp.render_message(gcamp.brand(), subj, body, "#", b), height=640, scrolling=True)
-        st.button(f"Send today's {len(with_email)} now", type="primary", key="auto_now", icon=":material/mail:",
+        st.button(f"Send these {len(with_email)} now instead of waiting", type="primary", key="auto_now",
+                  icon=":material/mail:",
                   disabled=not with_email, on_click=_send_now, args=(supabase, gym_id))
         no_email = [d for d in due if "@" not in gw._text(d[1].get("email"))]
         if no_email:
-            with st.expander(f"{len(no_email)} without an email: send on WhatsApp"):
+            with st.expander(f"{len(no_email)} have no email: send on WhatsApp"):
                 for k, m, ref, subj, body, b in no_email:
                     st.link_button(f"{label[k]} · {m.get('full_name')}", gg.wa_url(m.get("phone"), body),
                                    use_container_width=True)
     else:
-        st.success("Nothing due today. Messages will go out automatically when they are.")
+        st.success("No one needs a message today. GymPulse will send them by itself when someone does.")
     _, rows = _sent_refs(supabase, gym_id, 30)
     if rows:
-        with st.expander(f"Sent in the last 30 days ({len(rows)})"):
+        with st.expander(f"Already sent in the last 30 days ({len(rows)})"):
             names = {r["id"]: r["full_name"] for _, r in gg._members(supabase, gym_id).iterrows()}
             st.dataframe(pd.DataFrame([{"When": str(r["sent_at"])[:16].replace("T", " "),
                                         "Message": label.get(r["kind"], r["kind"]),
