@@ -41,6 +41,20 @@ def _setting(name, default=""):
         return default
 
 
+def meet_url(raw):
+    """Just the meet.google.com link, even if the whole calendar invite text was pasted."""
+    import re
+    raw = raw or ""
+    m = re.search(r"https?://meet\.google\.com/[a-z0-9-]+", raw, re.I)
+    if m:
+        return m.group(0)
+    m = re.search(r"\bmeet\.google\.com/[a-z0-9-]+", raw, re.I)
+    if m:
+        return "https://" + m.group(0)
+    m = re.search(r"https?://\S+", raw)
+    return m.group(0).rstrip(".,)") if m else ""
+
+
 def config():
     days = [d.strip()[:3].title() for d in _setting("DEMO_DAYS", "Mon,Tue,Wed,Thu,Fri").split(",") if d.strip()]
     hours = _setting("DEMO_HOURS", "10:00-16:30").split("-")
@@ -49,7 +63,7 @@ def config():
         last = time.fromisoformat(hours[1].strip())
     except Exception:
         first, last = time(10, 0), time(16, 30)
-    return {"meet": _setting("DEMO_MEET_LINK"),
+    return {"meet": meet_url(_setting("DEMO_MEET_LINK")),
             "owner": _setting("DEMO_OWNER_EMAIL", "emmanuel@usegympulseai.com"),
             "sender": _setting("DEMO_EMAIL_FROM", "Emmanuel from GymPulse AI <emmanuel@usegympulseai.com>"),
             "days": [DAY_NAMES.index(d) for d in days if d in DAY_NAMES] or [0, 1, 2, 3, 4],
@@ -179,27 +193,12 @@ def _send(to, subject, html, text, ics=None):
     return False
 
 
-def _email_html(title, rows, cta=None, footer=""):
-    logo = f"{gw.APP_URL}/app/static/gympulse-email-logo.png"
-    body = "".join(f'<tr><td style="padding:6px 0;color:#5B6678;width:140px;vertical-align:top">{gw._esc(k)}</td>'
-                   f'<td style="padding:6px 0;color:#111827;font-weight:600">{v}</td></tr>' for k, v in rows)
-    button = ""
-    if cta:
-        button = "".join(
-            f'<a href="{gw._esc(url)}" style="display:inline-block;margin:6px 8px 0 0;padding:12px 20px;border-radius:10px;'
-            f'background:{"linear-gradient(100deg,#B7F34A,#35D6ED)" if i == 0 else "#F1F4F8"};color:#0A0F1E;'
-            f'font-weight:700;text-decoration:none;font-size:14px">{gw._esc(label)}</a>'
-            for i, (label, url) in enumerate(cta))
-    return f"""<div style="background:#F5F7FA;padding:24px 0;font-family:Arial,Helvetica,sans-serif">
-<table role="presentation" width="100%" style="max-width:560px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden">
-<tr><td style="background:#0B1020;padding:20px 24px"><img src="{logo}" alt="GymPulse AI" height="40" style="display:block"></td></tr>
-<tr><td style="height:4px;background:linear-gradient(90deg,#B7F34A,#35D6ED)"></td></tr>
-<tr><td style="padding:24px">
-<h1 style="margin:0 0 12px;font-size:21px;color:#111827">{gw._esc(title)}</h1>
-<table role="presentation" style="font-size:14px;border-collapse:collapse">{body}</table>
-<div style="margin-top:18px">{button}</div>
-<p style="margin:20px 0 0;font-size:12px;color:#5B6678">{footer}</p>
-</td></tr></table></div>"""
+def _email_html(title, rows, cta=None, footer="", intro="", preheader=""):
+    import gympulse_email as ge
+    buttons = "".join(ge.button(label, url, primary=(i == 0)) for i, (label, url) in enumerate(cta or []))
+    body = (f"<p style=\"margin:0 0 6px\">{intro}</p>" if intro else "") + ge.details(rows) + \
+        (f'<div style="margin-top:8px">{buttons}</div>' if buttons else "")
+    return ge.layout(title, body, preheader=preheader, footer_html=footer)
 
 
 def send_confirmations(b, cfg):
@@ -215,7 +214,9 @@ def send_confirmations(b, cfg):
          ("Join", join), ("Gym", gw._esc(b["gym"]))],
         [("Join Google Meet", meet)] * bool(meet) + [("Add to Google Calendar", cal)],
         f"Can't make it? <a href=\"{gw._esc(b['cancel_url'])}\" style=\"color:#5B6678\">Cancel this booking</a>. "
-        "Reply to this email to pick another time.")
+        "Reply to this email to pick another time.",
+        intro="Thanks for booking. Here are your details. The calendar invite is attached.",
+        preheader=f"{when} on Google Meet")
     client_text = (f"Your GymPulse AI demo is booked.\n\nWhen: {when}\nLength: 15 minutes\n"
                    f"Join: {meet or 'Google Meet link to follow by email'}\nAdd to Google Calendar: {cal}\n\n"
                    f"Cancel: {b['cancel_url']}\n")
