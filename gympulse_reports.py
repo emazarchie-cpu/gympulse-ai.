@@ -56,6 +56,51 @@ def _gym_name():
 
 
 # ------------------------------------------------------------------ PDF
+LOGO_DARK = os.path.join(HERE, "gympulse-logo-dark.png")   # navy lettering, for white backgrounds
+_PDF_MAP = {"₦": "NGN ", "→": " to ", "←": "", "✓": "", "✔": "", "•": "-", "…": "...",
+            "“": '"', "”": '"', "‘": "'", "’": "'"}
+
+
+def clean(text):
+    """Professional PDF text: no emoji or symbols the fonts can't print; naira as NGN."""
+    import re
+    t = str(text if text is not None else "")
+    for k, v in _PDF_MAP.items():
+        t = t.replace(k, v)
+    t = t.encode("cp1252", "ignore").decode("cp1252")
+    t = re.sub(r"\*\*?([^*\n]+)\*\*?", r"\1", t)
+    return re.sub(r"[ \t]{2,}", " ", t).replace("NGN  ", "NGN ").strip()
+
+
+def _pdf_brand():
+    """The gym's colours and logo for document headers (cached for the session)."""
+    try:
+        import gympulse_campaigns as gcamp
+        b = gcamp.brand()
+    except Exception:
+        b = None
+    sig = (b or {}).get("logo_url"), (b or {}).get("color"), (b or {}).get("dark"), (b or {}).get("gym")
+    cache = st.session_state.get("_pdf_brand")
+    if cache and cache.get("sig") == sig:
+        return cache
+    try:
+        logo = gcamp._fetch_image(b.get("logo_url")) if b.get("logo_url") else None
+        out = {"gym": b["gym"], "dark": b["dark"] or NAVY, "accent": b["color"] or LIME, "logo": logo, "sig": sig}
+    except Exception:
+        out = {"gym": _gym_name(), "dark": NAVY, "accent": LIME, "logo": None, "sig": sig}
+    st.session_state["_pdf_brand"] = out
+    return out
+
+
+def _lum(hex_colour):
+    try:
+        h = hex_colour.lstrip("#")
+        r, g, b = (int(h[i:i + 2], 16) / 255 for i in (0, 2, 4))
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b
+    except Exception:
+        return 0
+
+
 def build_pdf(title, subtitle, blocks, gym=None):
     """blocks: list of ("h", text) | ("p", text) | ("kpis", [(label, value, hint)])
     | ("table", columns, rows) | ("note", text) | ("space", points)."""
@@ -67,38 +112,71 @@ def build_pdf(title, subtitle, blocks, gym=None):
     from reportlab.platypus import (Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle,
                                     KeepTogether)
 
-    gym = gym or _gym_name()
+    from reportlab.lib.utils import ImageReader
+
+    brand = _pdf_brand()
+    gym = clean(gym or brand["gym"] or _gym_name())
+    title, subtitle = clean(title), clean(subtitle)
+    head = brand["dark"] if _lum(brand["dark"]) < 0.45 else NAVY
+    light_head = False
+    if brand.get("logo"):
+        try:
+            import gympulse_campaigns as gcamp
+            light_head = gcamp.logo_is_dark(brand["logo"])
+        except Exception:
+            light_head = False
+    band_fill = "#FFFFFF" if light_head else head
+    band_text = INK if light_head else "#FFFFFF"
+    band_sub = MUTED if light_head else "#C9D3E3"
+    accent = brand["accent"] or LIME
     W, H = A4
     band = 30 * mm
     buf = io.BytesIO()
     made = datetime.now(gw.APP_TZ)
+    gym_logo = None
+    if brand.get("logo"):
+        try:
+            gym_logo = ImageReader(io.BytesIO(brand["logo"]))
+        except Exception:
+            gym_logo = None
 
     def frame(canvas, doc):
         canvas.saveState()
-        canvas.setFillColor(colors.HexColor(NAVY))
+        canvas.setFillColor(colors.HexColor(band_fill))
         canvas.rect(0, H - band, W, band, stroke=0, fill=1)
-        canvas.setFillColor(colors.HexColor(LIME))
-        canvas.rect(0, H - band - 1.6 * mm, W * 0.62, 1.6 * mm, stroke=0, fill=1)
-        canvas.setFillColor(colors.HexColor(CYAN))
-        canvas.rect(W * 0.62, H - band - 1.6 * mm, W * 0.38, 1.6 * mm, stroke=0, fill=1)
-        if os.path.exists(LOGO):
-            lh = 16 * mm
-            canvas.drawImage(LOGO, 14 * mm, H - band + (band - lh) / 2, width=lh * 560 / 200,
-                             height=lh, mask="auto", preserveAspectRatio=True)
-        canvas.setFillColor(colors.white)
-        canvas.setFont("Helvetica-Bold", 13)
-        canvas.drawRightString(W - 14 * mm, H - 12.5 * mm, gym)
-        canvas.setFillColor(colors.HexColor("#C9D3E3"))
-        canvas.setFont("Helvetica", 9)
-        canvas.drawRightString(W - 14 * mm, H - 18.5 * mm, title)
+        canvas.setFillColor(colors.HexColor(accent))
+        canvas.rect(0, H - band - 1.6 * mm, W, 1.6 * mm, stroke=0, fill=1)
+        x0 = 14 * mm
+        if gym_logo is not None:                      # the gym's own logo, scaled to fit the band
+            iw, ih = gym_logo.getSize()
+            lh = 15 * mm
+            lw = min(lh * iw / max(ih, 1), 70 * mm)
+            lh = lw * ih / max(iw, 1)
+            canvas.drawImage(gym_logo, x0, H - band + (band - lh) / 2, width=lw, height=lh, mask="auto")
+        else:                                          # no logo yet: the gym's name as a wordmark
+            canvas.setFillColor(colors.HexColor(band_text))
+            canvas.setFont("Helvetica-Bold", 17)
+            canvas.drawString(x0, H - band / 2 - 2, gym)
+        canvas.setFillColor(colors.HexColor(band_text))
+        canvas.setFont("Helvetica-Bold", 11.5)
+        canvas.drawRightString(W - 14 * mm, H - 12.5 * mm, title)
+        canvas.setFillColor(colors.HexColor(band_sub))
+        canvas.setFont("Helvetica", 8.5)
+        canvas.drawRightString(W - 14 * mm, H - 18.5 * mm, gym if gym_logo is not None else "")
         canvas.drawRightString(W - 14 * mm, H - 23.5 * mm, made.strftime("Generated %d %b %Y, %H:%M"))
         canvas.setStrokeColor(colors.HexColor(LINE))
         canvas.setLineWidth(0.6)
-        canvas.line(14 * mm, 14 * mm, W - 14 * mm, 14 * mm)
+        canvas.line(14 * mm, 15 * mm, W - 14 * mm, 15 * mm)
+        fx = 14 * mm
+        if os.path.exists(LOGO_DARK):                  # small GymPulse AI mark in the footer
+            fh = 4.2 * mm
+            canvas.drawImage(LOGO_DARK, fx, 8 * mm, width=fh * 560 / 200, height=fh, mask="auto",
+                             preserveAspectRatio=True)
+            fx += fh * 560 / 200 + 3 * mm
         canvas.setFillColor(colors.HexColor(MUTED))
         canvas.setFont("Helvetica", 7.5)
-        canvas.drawString(14 * mm, 9.5 * mm, f"{gym} · Prepared with GymPulse AI · Confidential: contains member data")
-        canvas.drawRightString(W - 14 * mm, 9.5 * mm, f"Page {doc.page}")
+        canvas.drawString(fx, 9.3 * mm, f"Prepared for {gym} with GymPulse AI  |  Confidential: contains member data")
+        canvas.drawRightString(W - 14 * mm, 9.3 * mm, f"Page {doc.page}")
         canvas.restoreState()
 
     doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=14 * mm, rightMargin=14 * mm,
@@ -126,12 +204,12 @@ def build_pdf(title, subtitle, blocks, gym=None):
     for b in blocks:
         kind = b[0]
         if kind == "h":
-            story.append(Paragraph(gw._esc(b[1]), st_h))
+            story.append(Paragraph(gw._esc(clean(b[1])), st_h))
         elif kind == "p":
-            story.append(Paragraph(b[1], st_p))
+            story.append(Paragraph(clean(b[1]), st_p))
         elif kind == "note":
             story.append(Spacer(1, 4))
-            story.append(Paragraph(gw._esc(b[1]), st_note))
+            story.append(Paragraph(gw._esc(clean(b[1])), st_note))
         elif kind == "space":
             story.append(Spacer(1, b[1]))
         elif kind == "kpis":
@@ -139,9 +217,9 @@ def build_pdf(title, subtitle, blocks, gym=None):
             n = max(1, min(4, len(items)))
             cells, row = [], []
             for label, value, hint in items:
-                row.append([Paragraph(gw._esc(label.upper()), st_lab),
-                            Paragraph(gw._esc(value), st_val),
-                            Paragraph(gw._esc(hint), st_lab)])
+                row.append([Paragraph(gw._esc(clean(label).upper()), st_lab),
+                            Paragraph(gw._esc(clean(value)), st_val),
+                            Paragraph(gw._esc(clean(hint)), st_lab)])
                 if len(row) == n:
                     cells.append(row)
                     row = []
@@ -154,7 +232,7 @@ def build_pdf(title, subtitle, blocks, gym=None):
                 ("INNERGRID", (0, 0), (-1, -1), 0.6, colors.white),
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
                 ("TOPPADDING", (0, 0), (-1, -1), 8), ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
-                ("LINEABOVE", (0, 0), (-1, 0), 2, colors.HexColor(LIME)),
+                ("LINEABOVE", (0, 0), (-1, 0), 2, colors.HexColor(accent)),
             ]))
             story.append(t)
         elif kind == "table":
@@ -163,13 +241,13 @@ def build_pdf(title, subtitle, blocks, gym=None):
             if not rows:
                 story.append(Paragraph("Nothing to show yet.", st_note))
                 continue
-            data = [[Paragraph(gw._esc(c), st_head) for c in cols]]
-            data += [[Paragraph(gw._esc(str(v)), st_cell) for v in r] for r in rows]
+            data = [[Paragraph(gw._esc(clean(c)), st_head) for c in cols]]
+            data += [[Paragraph(gw._esc(clean(v)), st_cell) for v in r] for r in rows]
             if widths:
                 total = sum(widths)
                 widths = [usable * w / total for w in widths]
             t = Table(data, colWidths=widths or [usable / len(cols)] * len(cols), repeatRows=1)
-            style = [("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(NAVY)),
+            style = [("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(head)),
                      ("VALIGN", (0, 0), (-1, -1), "TOP"),
                      ("TOPPADDING", (0, 0), (-1, -1), 5), ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
                      ("LINEBELOW", (0, 0), (-1, -1), 0.4, colors.HexColor(LINE))]

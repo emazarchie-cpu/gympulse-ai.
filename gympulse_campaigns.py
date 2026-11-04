@@ -546,6 +546,152 @@ def plain_text(fields, ctx, unsub_url=""):
             + (f"\n\nUnsubscribe: {unsub_url}" if unsub_url else ""))
 
 
+# ------------------------------------------------------------------ simple branded message
+EMOJI_RE = re.compile("[\U0001F000-\U0001FAFF\U00002600-\U000027BF\U0001F900-\U0001F9FF"
+                      "\U00002190-\U000021FF\U00002B00-\U00002BFF\uFE0F\u200D]+")
+
+
+def no_emoji(text):
+    """Emails read as professional letters: emoji stay in WhatsApp only."""
+    t = EMOJI_RE.sub("", str(text or ""))
+    t = re.sub(r"\*\*?([^*\n]+)\*\*?", r"\1", t)     # WhatsApp *bold* and markdown **bold**
+    t = re.sub(r"(?m)^#{1,6}\s*", "", t)
+    t = re.sub(r"[ \t]+([,.!?])", r"\1", t)
+    return re.sub(r"[ \t]{2,}", " ", t).strip()
+
+
+def palette(theme):
+    if theme == "dark":
+        return {"page": "#05070D", "card": "#0E1320", "text": "#E8EDF5", "muted": "#9AA6B8",
+                "line": "#1F2737", "box": "#161D2C", "scheme": "dark"}
+    return {"page": "#EEF1F6", "card": "#FFFFFF", "text": "#1F2937", "muted": "#5B6678",
+            "line": "#E5E9F0", "box": "#F4F7FB", "scheme": "light"}
+
+
+def logo_is_dark(data):
+    """True when a logo is mostly dark ink, so it needs a light header to be seen."""
+    if not data:
+        return False
+    try:
+        from PIL import Image
+        im = Image.open(io.BytesIO(data)).convert("RGBA")
+        im.thumbnail((120, 120))
+        px = [(r, g, b_) for r, g, b_, a in im.getdata() if a > 60]
+        if not px:
+            return False
+        lum = sum(0.2126 * r + 0.7152 * g + 0.0722 * b_ for r, g, b_ in px) / len(px) / 255
+        opaque = len(px) / (im.width * im.height)
+        return lum < 0.42 and opaque < 0.97      # dark ink on a transparent background
+    except Exception:
+        return False
+
+
+def logo_tone(url):
+    """'dark' or 'light' for the gym's logo, cached for the session."""
+    if not url:
+        return "light"
+    cache = st.session_state.setdefault("_logo_tone", {})
+    if url not in cache:
+        cache[url] = "dark" if logo_is_dark(_fetch_image(url)) else "light"
+    return cache[url]
+
+
+def render_message(b, subject, body, unsub_url="", button=None, preheader="", theme=None):
+    """A branded letter from the gym: logo header in the gym's colours, the message,
+    an optional button, and the gym's footer. White or black background."""
+    P = palette(theme or b.get("email_theme") or "light")
+    acc, dark = b["color"], b["dark"]
+    text = no_emoji(body)
+    paras = "".join(
+        f'<p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:{P["text"]}">'
+        f'{ge.esc(p.strip()).replace(chr(10), "<br>")}</p>'
+        for p in re.split(r"\n\s*\n", text) if p.strip())
+    if b.get("logo_url") and logo_tone(b["logo_url"]) == "dark":
+        dark = "#FFFFFF"              # dark logo: white header so it stays visible
+    if b.get("logo_url"):
+        brand_html = (f'<img src="{ge.esc(b["logo_url"])}" alt="{ge.esc(b["gym"])}" height="44" '
+                      f'style="display:block;height:44px;max-width:220px;width:auto;border:0">')
+    else:
+        brand_html = (f'<div style="font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:20px;'
+                      f'font-weight:900;color:#FFFFFF;letter-spacing:.5px">{ge.esc(b["gym"])}</div>')
+    header = (f'<table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="{dark}" '
+              f'style="background-color:{dark};background-image:linear-gradient({dark},{dark})"><tr>'
+              f'<td style="padding:22px 28px">{brand_html}</td></tr>'
+              f'<tr><td height="4" bgcolor="{acc}" style="height:4px;line-height:4px;font-size:0;'
+              f'background-color:{acc};background-image:linear-gradient({acc},{acc})">&nbsp;</td></tr></table>')
+    btn = ""
+    if button and button[1]:
+        btn = (f'<table role="presentation" cellspacing="0" cellpadding="0" style="margin:4px 0 22px"><tr>'
+               f'<td bgcolor="{acc}" style="border-radius:12px;background-color:{acc}"><a href="{ge.esc(button[1])}" '
+               f'style="display:inline-block;padding:14px 24px;font-family:Arial,Helvetica,sans-serif;font-size:15px;'
+               f'font-weight:700;color:#0A0F1E;text-decoration:none;border-radius:12px">{ge.esc(button[0])}</a>'
+               f'</td></tr></table>')
+    foot = []
+    if b.get("address"):
+        foot.append(ge.esc(b["address"]))
+    contact = " · ".join(x for x in [ge.esc(b.get("company_email")), ge.esc(b.get("whatsapp")),
+                                      ge.esc(b.get("website"))] if x)
+    if contact:
+        foot.append(contact)
+    if unsub_url:
+        foot.append(f'You\'re receiving this because you\'re a member of {ge.esc(b["gym"])}. '
+                    f'<a href="{ge.esc(unsub_url)}" style="color:{P["muted"]}">Unsubscribe</a>')
+    foot_html = gx(f'<div style="padding-top:18px;border-top:1px solid {P["line"]};font-size:12px;line-height:1.6;'
+                   f'color:{P["muted"]}">' + "<br>".join(foot) + "</div>", P) if foot else ""
+    pre = ge.esc(no_emoji(preheader or text.split("\n")[0])[:140])
+    return f"""<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="{P['scheme']} only"><meta name="supported-color-schemes" content="{P['scheme']} only">
+<style>:root{{color-scheme:{P['scheme']} only}}{GMAIL_DARK_CSS if P['scheme'] == 'dark' else ''}</style><title>{ge.esc(no_emoji(subject))}</title></head>
+<body class="body" bgcolor="{P['page']}" style="margin:0;padding:0;{bgx(P['page'], P)}">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0">{pre}</div>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="{P['page']}" style="{bgx(P['page'], P)}"><tr><td align="center" bgcolor="{P['page']}" style="padding:20px 10px;{bgx(P['page'], P)}">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="{P['card']}" class="gp-card" style="max-width:600px;{bgx(P['card'], P)}border-radius:14px;overflow:hidden;border:1px solid {P['line']}">
+<tr><td style="padding:0">{header}</td></tr>
+<tr><td bgcolor="{P['card']}" class="gp-card" style="padding:30px 30px 8px;{bgx(P['card'], P)}font-family:Arial,Helvetica,sans-serif">
+{gx(paras, P)}{gx(btn, P)}
+</td></tr>
+<tr><td bgcolor="{P['card']}" class="gp-card" style="padding:0 30px 26px;{bgx(P['card'], P)}font-family:Arial,Helvetica,sans-serif">{foot_html}</td></tr>
+</table>
+{gx('<div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#8A94A6;padding:12px">Sent with GymPulse AI</div>', P)}
+</td></tr></table></body></html>"""
+
+
+def email_member(supabase, gym_id, member, subject, body, button=None):
+    """Send one branded letter to a member. Returns (sent, message for the owner)."""
+    to = gw._text(member.get("email"))
+    name = gw._text(member.get("full_name") or member.get("name"), "this member")
+    if "@" not in to:
+        return False, f"{name} has no email address. Add one on their profile, or use WhatsApp."
+    if not ready():
+        return False, "Email sending isn't switched on yet (RESEND_API_KEY on Render)."
+    opted, token = member_flags(supabase, gym_id, [member["id"]]).get(member["id"], (False, None))
+    if opted:
+        return False, f"{name} unsubscribed from emails, so GymPulse won't email them. Use WhatsApp instead."
+    b = brand()
+    unsub = unsub_link(token)
+    clean = no_emoji(subject)
+    try:
+        pid = send(to, clean, render_message(b, clean, body, unsub, button), no_emoji(body)
+                   + (f"\n\n{button[0]}: {button[1]}" if button and button[1] else "")
+                   + (f"\n\nUnsubscribe: {unsub}" if unsub else ""), b, unsub)
+    except Exception as error:
+        return False, str(error)
+    try:
+        import gympulse_followups as fu
+        fu.log_message(supabase, gym_id, member["id"], "email", "out", no_emoji(body), clean, provider_id=pid)
+    except Exception:
+        pass
+    return True, f"Email sent to {name} ({to})."
+
+
+def email_letter(to, subject, body, attachments=None, button=None):
+    """A branded letter to someone who isn't a member (the owner, a company's HR)."""
+    b = brand()
+    clean = no_emoji(subject)
+    return send(to, clean, render_message(b, clean, body, "", button), no_emoji(body), b,
+                attachments=attachments)
+
+
 # ------------------------------------------------------------------ sending
 def _resend_key():
     import gympulse_followups as fu
@@ -556,7 +702,7 @@ def ready():
     return bool(_resend_key())
 
 
-def send(to, subject, html, text, b, unsub_url=""):
+def send(to, subject, html, text, b, unsub_url="", attachments=None):
     import requests
     key = _resend_key()
     if not key:
@@ -567,6 +713,9 @@ def send(to, subject, html, text, b, unsub_url=""):
         payload["reply_to"] = reply
     if unsub_url:
         payload["headers"] = {"List-Unsubscribe": f"<{unsub_url}>"}
+    if attachments:      # [(filename, bytes)]
+        payload["attachments"] = [{"filename": n, "content": base64.b64encode(d).decode()}
+                                  for n, d in attachments]
     r = requests.post("https://api.resend.com/emails", json=payload, timeout=20,
                       headers={"Authorization": f"Bearer {key}"})
     if r.status_code >= 300:

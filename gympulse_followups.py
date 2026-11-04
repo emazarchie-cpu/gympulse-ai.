@@ -9,7 +9,7 @@ import streamlit as st
 
 import gympulse_workspaces as gw
 
-CHANNELS = ["WhatsApp", "Email"]
+CHANNELS = ["Email", "WhatsApp"]
 
 # Excited, friendly drafts per play: (email subject, message)
 DRAFTS = {
@@ -233,7 +233,7 @@ def _compose(supabase, gym_id, members, owner, gym):
                          key=f"fu_theme_{mid}",
                          help="Archie drafts an excited message for the idea you pick.")
     options = [c for c in CHANNELS]
-    default_channel = "WhatsApp" if digits else "Email"
+    default_channel = "Email" if email else "WhatsApp"
     if st.session_state.get("fu_channel") not in options:
         st.session_state["fu_channel"] = default_channel
     channel = st.radio("Send via", options, horizontal=True, key="fu_channel")
@@ -322,16 +322,17 @@ def _compose(supabase, gym_id, members, owner, gym):
         if not email:
             st.warning(f"{name} has no email address yet. Add one on their profile.")
             return
-        if email_ready():
-            if c2.button("Send email", key="fu_send", use_container_width=True):
-                try:
-                    pid = send_email(email, subject or "", body)
-                except Exception as error:
-                    log_message(supabase, gym_id, mid, "email", "out", body, subject, status="failed")
-                    st.error(str(error))
-                else:
-                    log_message(supabase, gym_id, mid, "email", "out", body, subject, provider_id=pid)
+        import gympulse_campaigns as gcamp
+        if gcamp.ready():
+            if c2.button("Send email", key="fu_send", type="primary", use_container_width=True):
+                ok, msg = gcamp.email_member(supabase, gym_id, {"id": mid, "email": email, "full_name": name},
+                                             subject or f"A message from {gym}", body)
+                if ok:
                     _after_send(supabase, mid, name, "Email")
+                else:
+                    log_message(supabase, gym_id, mid, "email", "out", body, subject, status="failed")
+                    st.error(msg)
+            st.caption("Sent as a letter with your logo, colours and email background. Emoji are left out of emails.")
         else:
             url = (f"mailto:{email}?subject={urllib.parse.quote(subject or '')}"
                    f"&body={urllib.parse.quote(body)}")

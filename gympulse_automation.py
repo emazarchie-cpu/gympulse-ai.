@@ -412,24 +412,23 @@ def render_report_section(supabase, gym_id, roster, actions, business_name):
         try:
             pdf = weekly_report_pdf(supabase, gym_id, roster, actions, business_name)
             rp.download_link("Download weekly report (PDF)", pdf,
-                             f"GymPulse-weekly-report-{gw.today_local():%Y-%m-%d}.pdf", rp.PDF,
+                             f"weekly-retention-report-{gw.today_local():%Y-%m-%d}.pdf", rp.PDF,
                              "weekly_pdf", primary=True)
         except Exception as error:
             st.error(f"Could not build the PDF: {error}")
     owner_email = (st.session_state.get("auth_user") or {}).get("email", "")
-    try:
-        import gympulse_followups as fu
-        can_email = fu.email_ready() and bool(owner_email)
-    except Exception:
-        can_email = False
-    if can_email and c2.button(f"Email it to {owner_email}", key="rep_email", use_container_width=True):
+    import gympulse_campaigns as gcamp
+    can_email = gcamp.ready() and bool(owner_email)
+    if can_email and c2.button(f"Email it to {owner_email}", key="rep_email", type="primary",
+                               icon=":material/mail:", use_container_width=True):
         try:
-            fu.send_email(owner_email, f"{business_name} · Weekly retention report", report)
-            st.success("Report sent.")
+            pdf = weekly_report_pdf(supabase, gym_id, roster, actions, business_name)
+            gcamp.email_letter(owner_email, f"{business_name}: weekly retention report", _plain(report),
+                               attachments=[(f"weekly-retention-report-{gw.today_local():%Y-%m-%d}.pdf", pdf)])
+            st.success("Report emailed with the PDF attached.")
         except Exception as error:
             st.error(f"Could not send: {error}")
     elif not can_email:
-        c2.caption("Connect email sending (RESEND_API_KEY and EMAIL_FROM on Render) to email "
-                   "this report to yourself.")
+        c2.caption("Connect email sending (RESEND_API_KEY on Render) to email this report to yourself.")
     with st.expander("Preview the report"):
         st.markdown(report)

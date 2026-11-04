@@ -22,6 +22,18 @@ Run `sql/phase5_growth.sql` in Supabase (SQL Editor → New query → paste → 
 | **Season planner** | The Nigerian year: New Year rush, Valentine's, Ramadan and Eid (estimated dates), Easter, rainy season, summer travel, back to routine, pre-December and Detty December. Each has what to do and a ready message, and is flagged 14 days ahead. Also shows the gym's own monthly visits. |
 | **Monthly report** | Last month (or this month so far) in one WhatsApp-ready message and a PDF: members kept, money kept, collected, new members, visits, top staff member and top exit reason. In the first week of each month it appears on the Dashboard, and if email sending is set up it's emailed to the owner once. |
 
+## Email first, WhatsApp for what's urgent
+
+- Every message has **Send email** as the main button. The email goes out as a letter with the gym's logo, brand colour, footer and chosen background (White or Black, set in Settings → Email & branding). Emoji are left out of emails.
+- **WhatsApp** is the second button. Renewal requests, payment reminders and first-week rescues are marked *important*, with a suggestion to also send them on WhatsApp so the member sees them the same day.
+- Emailing a renewal request moves the member to *Waiting for payment* automatically.
+- Members who unsubscribed, or who have no email address, can only be reached on WhatsApp.
+- HR reports, the monthly report and the weekly report are emailed with their PDF attached.
+
+## PDFs
+
+Every PDF has the gym's logo and brand colour in the header and a small GymPulse AI mark in the footer. If the logo is dark, the header switches to white so the logo stays visible. Amounts are written as NGN, there are no emoji, and file names use only letters, numbers and dashes, so they download on every phone.
+
 ## Notes
 
 - Members pay the gym directly. GymPulse never handles the money, and payments are marked as paid by the gym.

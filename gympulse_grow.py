@@ -126,18 +126,46 @@ def _checkins(supabase, gym_id, days=90):
     return ck
 
 
+def safe_name(text):
+    """A file name every phone accepts: letters, numbers and dashes only."""
+    import re
+    return re.sub(r"[^A-Za-z0-9]+", "-", str(text)).strip("-") or "report"
+
+
 def wa_url(phone, text):
     digits = gw.whatsapp_digits(phone)
     return f"https://wa.me/{digits}?text={quote(text)}" if digits else f"https://wa.me/?text={quote(text)}"
 
 
-def send_row(text, phone, key, done_label=None, on_done=None, args=()):
-    """WhatsApp button (opens the chat with the message ready) plus an optional 'done' button."""
-    c1, c2 = st.columns([1, 1])
-    c1.link_button("Open in WhatsApp", wa_url(phone, text), icon=":material/chat:",
-                   use_container_width=True)
+def _email_cb(supabase, gym_id, member, subject, text_key, button, on_done, args):
+    import gympulse_campaigns as gcamp
+    body = st.session_state.get(text_key) or ""
+    ok, msg = gcamp.email_member(supabase, gym_id, member, subject, body, button)
+    st.session_state["grow_flash" if ok else "grow_error"] = msg
+    if ok and on_done:
+        on_done(*args)
+        st.session_state["grow_flash"] = msg
+
+
+def send_row(text_key, member, key, subject, done_label=None, on_done=None, args=(),
+             button=None, important=False, supabase=None, gym_id=None):
+    """Email first (a branded letter from the gym), WhatsApp second. 'important'
+    messages also suggest WhatsApp, because members see it within minutes."""
+    m = dict(member)
+    text = st.session_state.get(text_key) or ""
+    has_email = "@" in gw._text(m.get("email"))
+    cols = st.columns(3 if done_label else 2)
+    cols[0].button("Send email", key=f"{key}_em", type="primary", icon=":material/mail:",
+                   use_container_width=True, disabled=not has_email,
+                   on_click=_email_cb, args=(supabase, gym_id, m, subject, text_key, button, on_done, args))
+    cols[1].link_button("WhatsApp", wa_url(m.get("phone"), text), icon=":material/chat:",
+                        use_container_width=True)
     if done_label and on_done:
-        c2.button(done_label, key=key, on_click=on_done, args=args, use_container_width=True)
+        cols[2].button(done_label, key=key, on_click=on_done, args=args, use_container_width=True)
+    if not has_email:
+        st.caption("No email address on file, so use WhatsApp, or add their email on their profile.")
+    elif important:
+        st.caption("Important message: email it, and send it on WhatsApp too so they see it today.")
 
 
 def _message_box(text, key, height=140):
@@ -189,7 +217,7 @@ def renewal_text(name, amount, plan, end, pay, ref):
                      f"{pay.get('bank_holder', '')}\nReference: {ref}")
     if pay.get("paystack_link"):
         lines.append(f"\nOr pay online with card or transfer: {pay['paystack_link']}")
-    lines.append("\nSend a screenshot here once you've paid and I'll confirm it straight away. "
+    lines.append("\nOnce you've paid, reply with a screenshot of the payment and I'll confirm it straight away. "
                  f"Thank you for training with us! 💪\n{owner}".rstrip())
     return "\n".join(lines)
 
@@ -283,13 +311,18 @@ def render_collect(supabase, gym_id, owner_id):
                                       label_visibility="collapsed")
                 c2.button("Mark as paid", key=f"grow_paid_{r['id']}", type="primary", use_container_width=True,
                           on_click=_mark_paid, args=(supabase, gym_id, m, r["amount"], r.get("plan") or "Monthly", method, r["id"]))
-                if age >= 3:
-                    c3.link_button("Send a reminder", wa_url(m.get("phone"), renewal_text(
-                        m["full_name"], r["amount"], r.get("plan") or "Monthly", m["end"], pay, r["reference"])),
-                        use_container_width=True)
-                elif c3.button("Cancel request", key=f"grow_rq_x_{r['id']}", use_container_width=True):
+                if c3.button("Cancel request", key=f"grow_rq_x_{r['id']}", use_container_width=True):
                     _update(supabase, "payment_requests", r["id"], {"status": "cancelled"})
                     st.rerun()
+                if age >= 3:
+                    k = f"grow_rem_{r['id']}"
+                    st.session_state.setdefault(k, renewal_text(m["full_name"], r["amount"], r.get("plan") or "Monthly",
+                                                                m["end"], pay, r["reference"]))
+                    with st.expander("Send a reminder"):
+                        st.text_area("Message", key=k, height=200, label_visibility="collapsed")
+                        send_row(k, m, f"grow_remb_{r['id']}", f"Reminder: your {_biz()[0]} renewal",
+                                 button=("Pay online", pay.get("paystack_link")), important=True,
+                                 supabase=supabase, gym_id=gym_id)
 
     st.markdown('<div class="section-label">ASK FOR PAYMENT</div>', unsafe_allow_html=True)
     if due.empty:
@@ -311,15 +344,18 @@ def render_collect(supabase, gym_id, owner_id):
             amt = c1.number_input("Amount (₦)", min_value=0.0, value=float(amount), step=1000.0, key=f"grow_amt_{m['id']}")
             plans = list(gw.PLAN_MONTHS)
             plan = c2.selectbox("Plan", plans, index=plans.index(plan), key=f"grow_plan_{m['id']}")
-            text = _message_box(renewal_text(m["full_name"], amt, plan, m["end"], pay, ref), f"grow_msg_{m['id']}", 220)
-            c1, c2, c3 = st.columns(3)
-            c1.link_button("Open in WhatsApp", wa_url(m.get("phone"), text), icon=":material/chat:", use_container_width=True)
-            c2.button("I've sent it", key=f"grow_req_{m['id']}", use_container_width=True,
+            k = f"grow_msg_{m['id']}_{amt:.0f}_{plan}"
+            _message_box(renewal_text(m["full_name"], amt, plan, m["end"], pay, ref), k, 220)
+            send_row(k, m, f"grow_rqe_{m['id']}", f"Your {_biz()[0]} membership renewal",
+                     button=("Pay online", pay.get("paystack_link")), important=True,
+                     on_done=_log_request, args=(supabase, gym_id, m["id"], amt, plan, ref),
+                     supabase=supabase, gym_id=gym_id)
+            c1, c2 = st.columns(2)
+            c1.button("I sent it on WhatsApp", key=f"grow_req_{m['id']}", use_container_width=True,
                       on_click=_log_request, args=(supabase, gym_id, m["id"], amt, plan, ref))
-            c3.button("Mark as paid", key=f"grow_pd_{m['id']}", type="primary", use_container_width=True,
+            c2.button("Mark as paid", key=f"grow_pd_{m['id']}", use_container_width=True,
                       on_click=_mark_paid, args=(supabase, gym_id, m, amt, plan, "Bank transfer"))
-            if not gw.whatsapp_digits(m.get("phone")):
-                st.caption("No phone number on file. WhatsApp will open without a contact selected.")
+            st.caption("Emailing it moves them to Waiting for payment automatically.")
 
 
 # ================================================================== 2. First 90 days
@@ -344,6 +380,11 @@ ONBOARDING = [
      "Hi {first}! 🎊 90 days at {biz}! Most people quit before this point and you didn't. "
      "We're proud of you. Here's to the next 90!\n{owner}"),
 ]
+
+
+ONBOARDING_SUBJECTS = {"welcome": "Welcome to {biz}", "visit3": "Three sessions in at {biz}",
+                       "trainer": "Meet one of our coaches", "day30": "Your 30-day progress check",
+                       "day60": "Let's review your goals", "day90": "90 days at {biz}"}
 
 
 def onboarding_message(step_text, m, trainer_name):
@@ -428,15 +469,17 @@ def render_onboarding(supabase, gym_id):
                         "since you joined. Is there anything stopping you? I'd love to help you get started, even a "
                         "short first session counts. 💪")
                 st.markdown("**First-week rescue**")
-                text = _message_box(text, f"grow_ob_rescue_{m['id']}")
-                send_row(text, m.get("phone"), None)
+                _message_box(text, f"grow_ob_rescue_{m['id']}")
+                send_row(f"grow_ob_rescue_{m['id']}", m, f"grow_obr_{m['id']}", f"We'd love to see you at {_biz()[0]}",
+                         important=True, supabase=supabase, gym_id=gym_id)
             if p["next"]:
                 t = gw.pick_trainer(trainers, m.get("fitness_goal"))
                 st.markdown(f"**{p['next']['title']}**")
-                text = _message_box(onboarding_message(p["next"]["text"], m, gw._text((t or {}).get("full_name"))),
-                                    f"grow_ob_{m['id']}_{p['next']['step']}")
-                send_row(text, m.get("phone"), f"grow_obd_{m['id']}_{p['next']['step']}", "Mark step done",
-                         _step_done, (supabase, gym_id, m["id"], p["next"]["step"]))
+                k = f"grow_ob_{m['id']}_{p['next']['step']}"
+                _message_box(onboarding_message(p["next"]["text"], m, gw._text((t or {}).get("full_name"))), k)
+                send_row(k, m, f"grow_obd_{m['id']}_{p['next']['step']}", ONBOARDING_SUBJECTS[p["next"]["step"]].format(biz=_biz()[0]),
+                         "Mark step done", _step_done, (supabase, gym_id, m["id"], p["next"]["step"]),
+                         supabase=supabase, gym_id=gym_id)
             gw._md(" ".join(gw.chip(("✓ " if s["done"] else "") + s["title"],
                                     "lime" if s["done"] else "grey" if s.get("skipped") else "amber" if s["due"] else "grey")
                             for s in p["steps"]))
@@ -537,10 +580,11 @@ def render_freeze(supabase, gym_id):
             back = date.fromisoformat(f["ends_on"]) + timedelta(days=1)
             gw._md(f"<b>{gw._esc(names.get(f['member_id'], 'Member'))}</b> is back on {back:%A %d %b} "
                    + gw.chip(f["reason"] or "Freeze", "cyan"))
-            text = _message_box(f"Hi {_first(m['full_name'])}! 👋 Your break ends soon. We can't wait to have you back at "
-                                f"{biz} from {back:%A %d %B}. Want me to book you in for your first session back? 💪\n{owner}",
-                                f"grow_fz_msg_{f['id']}")
-            send_row(text, m.get("phone"), None)
+            _message_box(f"Hi {_first(m['full_name'])}! 👋 Your break ends soon. We can't wait to have you back at "
+                         f"{biz} from {back:%A %d %B}. Want me to book you in for your first session back? 💪\n{owner}",
+                         f"grow_fz_msg_{f['id']}")
+            send_row(f"grow_fz_msg_{f['id']}", m, f"grow_fzs_{f['id']}", f"Welcome back to {biz}",
+                     supabase=supabase, gym_id=gym_id)
 
     if live:
         st.markdown('<div class="section-label">FROZEN AND SCHEDULED</div>', unsafe_allow_html=True)
@@ -636,8 +680,9 @@ def render_exit(supabase, gym_id):
     for _, m in (lapsed.sort_values("gone").iterrows() if len(lapsed) else []):
         guess = _reply_reason(supabase, gym_id, m["id"])
         with st.expander(f"{m['full_name']} · lapsed {m['gone']} day{'s' if m['gone'] != 1 else ''} ago" + (f" · replied: {guess}" if guess else "")):
-            text = _message_box(exit_survey_text(m["full_name"]), f"grow_ex_msg_{m['id']}", 230)
-            st.link_button("Open in WhatsApp", wa_url(m.get("phone"), text), icon=":material/chat:")
+            _message_box(exit_survey_text(m["full_name"]), f"grow_ex_msg_{m['id']}", 230)
+            send_row(f"grow_ex_msg_{m['id']}", m, f"grow_exs_{m['id']}", f"We've missed you at {_biz()[0]}",
+                     supabase=supabase, gym_id=gym_id)
             with st.form(f"grow_ex_{m['id']}"):
                 c1, c2 = st.columns([1, 2])
                 reason = c1.selectbox("Their reason", EXIT_REASONS,
@@ -751,8 +796,9 @@ def render_progress(supabase, gym_id):
         st.markdown('<div class="section-label">READY TO CELEBRATE</div>', unsafe_allow_html=True)
         for m, text in wins:
             with st.expander(f"🎉 {m['full_name']}"):
-                text = _message_box(text, f"grow_pg_sh_{m['id']}")
-                send_row(text, m.get("phone"), None)
+                _message_box(text, f"grow_pg_sh_{m['id']}")
+                send_row(f"grow_pg_sh_{m['id']}", m, f"grow_pgs_{m['id']}", "Look at your progress",
+                         supabase=supabase, gym_id=gym_id)
     if per:
         st.markdown('<div class="section-label">TRACKED MEMBERS</div>', unsafe_allow_html=True)
         table = []
@@ -818,8 +864,9 @@ def render_referrals(supabase, gym_id, owner_id):
         m = by_id[mid]
         text = _message_box(f"Hi {_first(m['full_name'])}! 🙌 Training is better with a friend. Bring someone to {biz} this "
                             f"week and when they join, you get {reward}. Just reply with their name and number, "
-                            f"and I'll sort out the rest. 💪\n{owner}", "grow_ref_ask_msg")
-        send_row(text, m.get("phone"), None)
+                            f"and I'll sort out the rest. 💪\n{owner}", f"grow_ref_ask_msg_{mid}")
+        send_row(f"grow_ref_ask_msg_{mid}", m, f"grow_refa_{mid}", f"Bring a friend to {biz}",
+                 supabase=supabase, gym_id=gym_id)
 
     with st.form("grow_ref_new", clear_on_submit=True):
         st.markdown("**Record a referral**")
@@ -861,9 +908,14 @@ def render_referrals(supabase, gym_id, owner_id):
             if r["status"] == "joined":
                 referrer = by_id.get(r["referrer_id"])
                 if referrer is not None:
-                    c1.link_button("Tell them their reward", wa_url(referrer.get("phone"),
-                                   f"Hi {_first(referrer['full_name'])}! 🎁 {r['friend_name']} just joined {biz} thanks to you. "
-                                   f"Your reward: {r.get('reward') or reward}. Thank you! 🙏\n{owner}"), use_container_width=True)
+                    k = f"grow_rw_msg_{r['id']}"
+                    st.session_state.setdefault(k, f"Hi {_first(referrer['full_name'])}! 🎁 {r['friend_name']} just joined "
+                                                   f"{biz} thanks to you. Your reward: {r.get('reward') or reward}. "
+                                                   f"Thank you! 🙏\n{owner}")
+                    with c1.popover("Tell them their reward", use_container_width=True):
+                        st.text_area("Message", key=k, height=140, label_visibility="collapsed")
+                        send_row(k, referrer, f"grow_rws_{r['id']}", "Your referral reward",
+                                 supabase=supabase, gym_id=gym_id)
                 if c2.button("Reward given", key=f"grow_rf_r_{r['id']}", type="primary", use_container_width=True):
                     _update(supabase, "referrals", r["id"], {"status": "rewarded",
                                                             "rewarded_at": datetime.now(timezone.utc).isoformat()}); st.rerun()
@@ -946,7 +998,7 @@ def render_challenges(supabase, gym_id):
         except Exception as error:
             st.error(f"Could not add: {error}")
     if len(board):
-        lines = []
+        lines, plain = [], []
         for i, r in board.iterrows():
             n = names.get(r["member_id"], "Member")
             pct = min(100, round(r["visits"] / max(c["target_visits"], 1) * 100))
@@ -955,13 +1007,36 @@ def render_challenges(supabase, gym_id):
                    f'<div style="flex:1"><b>{gw._esc(n)}</b> · {r["visits"]}/{c["target_visits"]} visits'
                    f'<div class="pbar" style="margin-top:4px"><span style="width:{pct}%;--tone:#B7F34A"></span></div></div></div>')
             lines.append(f"{medal} {n.split()[0]} · {r['visits']} visits")
+            plain.append(f"{i + 1}. {n.split()[0]}: {r['visits']} visit{'s' if r['visits'] != 1 else ''}")
         top = "\n".join(lines[:10])
         text = _message_box(f"🏆 {c['name']} leaderboard at {biz}\n\n{top}\n\n"
                             + ("Congratulations to our winners! 🎉" if ended else
                                f"{(date.fromisoformat(c['ends_on']) - today).days} days to go. Every visit counts! 💪"),
                             f"grow_ch_share_{pick}", 230)
-        st.link_button("Share the leaderboard on WhatsApp", wa_url("", text), icon=":material/chat:")
-        st.caption("Tip: paste it into your members' WhatsApp group.")
+        c1, c2 = st.columns(2)
+        if c1.button(f"Email everyone taking part ({len(board)})", key=f"grow_ch_em_{pick}", type="primary",
+                     icon=":material/mail:", use_container_width=True):
+            import gympulse_campaigns as gcamp
+            sent = skipped = 0
+            for mid in board["member_id"]:
+                m = by_id.get(mid)
+                if m is None:
+                    skipped += 1
+                    continue
+                mine = next((i + 1 for i, x in enumerate(board["member_id"]) if x == mid), None)
+                left = (date.fromisoformat(c["ends_on"]) - today).days
+                letter = (f"Hi {_first(m['full_name'])},\n\nHere is the latest leaderboard for the {c['name']} at {biz}. "
+                          f"You're in position {mine} of {len(board)}.\n\n" + "\n".join(plain[:10]) + "\n\n"
+                          + ("Congratulations to our winners, and thank you for taking part."
+                             if ended else f"{left} days to go. Every visit counts.")
+                          + (f"\n\nReward: {c['reward']}" if c.get("reward") else "") + f"\n\n{owner}\n{biz}")
+                ok, _ = gcamp.email_member(supabase, gym_id, dict(m), f"{c['name']}: the leaderboard", letter)
+                sent += ok
+                skipped += not ok
+            st.success(f"Emailed {sent} member{'s' if sent != 1 else ''}."
+                       + (f" {skipped} skipped (no email or unsubscribed)." if skipped else ""))
+        c2.link_button("Share on WhatsApp", wa_url("", text), icon=":material/chat:", use_container_width=True)
+        st.caption("Tip: paste the WhatsApp version into your members' group.")
     else:
         st.info("Add members to start the leaderboard.")
 
@@ -1059,25 +1134,39 @@ def render_corporate(supabase, gym_id):
                 st.dataframe(pd.DataFrame([{"Name": p["name"], "Visits (30 days)": p["visits"],
                                             "Status": "Active" if p["visits"] else "Not seen"} for p in rep["people"]]),
                              hide_index=True, use_container_width=True)
-                import gympulse_reports as rp
-                c1, c2 = st.columns(2)
+            else:
+                st.caption("No staff linked yet. Add them above. The report will show them once they're linked.")
+            import gympulse_reports as rp
+            biz, owner = _biz()
+            fname = f"{safe_name(c['name'])}-attendance-{_today():%Y-%m}.pdf"
+            try:
+                pdf = company_pdf(rep)
+            except Exception as error:
+                pdf = None
+                st.error(f"Could not build the PDF: {error}")
+            summary = (f"Dear {gw._text(c.get('hr_name'), 'HR team')},\n\nPlease find attached {c['name']}'s gym "
+                       f"attendance report from {biz} for the last 30 days.\n\n{rep['active']} of {rep['enrolled']} "
+                       f"enrolled staff trained ({rep['active_rate']:.0%}), with {rep['visits']} visits in total.\n\n"
+                       f"We'd be glad to help the rest of the team get started.\n\nKind regards,\n{owner}\n{biz}")
+            c1, c2, c3 = st.columns(3)
+            if pdf:
                 with c1:
+                    rp.download_link("Download HR report (PDF)", pdf, fname, rp.PDF, f"grow_co_pdf_{c['id']}")
+            import gympulse_campaigns as gcamp
+            if c.get("hr_email") and pdf and gcamp.ready():
+                if c2.button("Email the report to HR", key=f"grow_co_em_{c['id']}", type="primary",
+                             icon=":material/mail:", use_container_width=True):
                     try:
-                        rp.download_link("Download HR report (PDF)", company_pdf(rep),
-                                         f"{c['name']}-attendance-{_today():%Y-%m}.pdf", rp.PDF, f"grow_co_pdf_{c['id']}",
-                                         primary=True)
+                        gcamp.email_letter(c["hr_email"], f"{c['name']}: gym attendance report, {_today():%B %Y}",
+                                           summary, attachments=[(fname, pdf)])
+                        st.success(f"Report emailed to {c['hr_email']} with the PDF attached.")
                     except Exception as error:
-                        st.error(f"Could not build the PDF: {error}")
-                biz, owner = _biz()
-                summary = (f"Hi {gw._text(c.get('hr_name'), 'there')}, here's {c['name']}'s gym attendance at {biz} "
-                           f"for the last 30 days: {rep['active']} of {rep['enrolled']} staff trained "
-                           f"({rep['active_rate']:.0%}), {rep['visits']} visits in total. The full report is attached. "
-                           f"Happy to help get the rest of the team started!\n{owner}")
-                if c.get("hr_phone"):
-                    c2.link_button("Send summary to HR on WhatsApp", wa_url(c["hr_phone"], summary), use_container_width=True)
-                elif c.get("hr_email"):
-                    c2.link_button("Email HR", f"mailto:{c['hr_email']}?subject={quote(c['name'] + ' gym attendance')}"
-                                               f"&body={quote(summary)}", use_container_width=True)
+                        st.error(f"Could not send: {error}")
+            elif not c.get("hr_email"):
+                c2.caption("Add an HR email to send the report with the PDF attached.")
+            if c.get("hr_phone"):
+                c3.link_button("WhatsApp summary", wa_url(c["hr_phone"], summary.replace("Please find attached",
+                               "Here is").replace("The full report is attached.", "")), use_container_width=True)
             if st.button("Remove company", key=f"grow_co_rm_{c['id']}", type="tertiary"):
                 _delete(supabase, "companies", c["id"])
                 st.rerun()
@@ -1338,6 +1427,36 @@ def monthly_text(d):
     return "\n".join(lines)
 
 
+def monthly_letter(d):
+    """The monthly report as a short, professional letter for email."""
+    biz, owner = _biz()
+    month = d["start"].strftime("%B %Y")
+    lines = [f"Here is {biz}'s retention report for {month}. The full report is attached as a PDF.", ""]
+    if d["kept_n"]:
+        lines.append(f"Members kept after a retention play: {d['kept_n']}, worth {_money(d['credited'])}"
+                     + (" a month." if d.get("credited_is_fee") else "."))
+    else:
+        lines.append("No plays were closed as kept this month.")
+    lines += [f"Payments collected: {_money(d['collected'])}" + (f", including {_money(d['recovered'])} won back."
+                                                                 if d["recovered"] else "."),
+              f"New members: {d['joined']}.", f"Memberships that ended: {d['lapsed']}.",
+              f"Visits: {d['visits']} from {d['active']} active members."]
+    if d["top_staff"]:
+        lines.append(f"Top of the team: {d['top_staff']}.")
+    if d["top_reason"]:
+        lines.append(f"Main reason members left: {d['top_reason']}.")
+    lines += ["", "Open GymPulse AI to see this week's priorities."]
+    return "\n".join(lines)
+
+
+def email_monthly(to, d):
+    import gympulse_campaigns as gcamp
+    biz, _ = _biz()
+    gcamp.email_letter(to, f"{biz}: {d['start']:%B %Y} retention report", monthly_letter(d),
+                       attachments=[(f"{safe_name(biz)}-{d['start']:%Y-%m}-retention-report.pdf", monthly_pdf(d))],
+                       button=("Open GymPulse AI", "https://usegympulseai.com"))
+
+
 def monthly_pdf(d):
     import gympulse_reports as rp
     blocks = [("kpis", [("Members kept", str(d["kept_n"]), "after a play"),
@@ -1348,7 +1467,8 @@ def monthly_pdf(d):
                         ("Active members", str(d["active"]), "trained at least once"),
                         ("Ended", str(d["lapsed"]), "memberships that ended"),
                         ("Lost after a play", str(d["lost_n"]), "")]),
-              ("p", monthly_text(d).replace("*", "").split("\n", 2)[-1].replace("\n", "<br/>")),
+              ("h", "Summary"),
+              ("p", "<br/>".join(gw._esc(x) for x in monthly_letter(d).split("\n")[2:])),
               ("note", "Money kept counts renewal payments credited to retention plays. Where none were recorded, "
                        "it shows the kept members' monthly fees.")]
     return rp.build_pdf(f"{d['start']:%B %Y} retention report", f"{d['start']:%d %b} – {d['end']:%d %b %Y}", blocks)
@@ -1374,17 +1494,18 @@ def render_monthly(supabase, gym_id, assess_fn, owner_id):
     with c2:
         import gympulse_reports as rp
         try:
-            rp.download_link("Download PDF", monthly_pdf(d), f"GymPulse-{start:%Y-%m}-report.pdf", rp.PDF,
+            rp.download_link("Download PDF", monthly_pdf(d), f"{safe_name(_biz()[0])}-{start:%Y-%m}-retention-report.pdf", rp.PDF,
                              f"grow_mr_pdf_{which}", primary=True)
         except Exception as error:
             st.error(f"Could not build the PDF: {error}")
     owner_email = (st.session_state.get("auth_user") or {}).get("email", "")
-    import gympulse_followups as fu
-    if owner_email and fu.email_ready():
-        if c3.button(f"Email to {owner_email}", key="grow_mr_email", use_container_width=True):
+    import gympulse_campaigns as gcamp
+    if owner_email and gcamp.ready():
+        if c3.button(f"Email to {owner_email}", key="grow_mr_email", type="primary", icon=":material/mail:",
+                     use_container_width=True):
             try:
-                fu.send_email(owner_email, f"{_biz()[0]} · {start:%B %Y} retention report", text.replace("*", ""))
-                st.success("Report emailed.")
+                email_monthly(owner_email, d)
+                st.success("Report emailed with the PDF attached.")
             except Exception as error:
                 st.error(f"Could not send: {error}")
     if not s.get("biz_phone"):
@@ -1405,11 +1526,11 @@ def render_month_banner(supabase, gym_id, assess_fn, owner_id):
     s = _settings()
     if s.get("monthly_report_sent") != key:
         owner_email = (st.session_state.get("auth_user") or {}).get("email", "")
-        import gympulse_followups as fu
-        if owner_email and fu.email_ready() and not st.session_state.get(f"_mr_try_{key}"):
+        import gympulse_campaigns as gcamp
+        if owner_email and gcamp.ready() and not st.session_state.get(f"_mr_try_{key}"):
             st.session_state[f"_mr_try_{key}"] = True
             try:
-                fu.send_email(owner_email, f"{_biz()[0]} · {start:%B %Y} retention report", monthly_text(d).replace("*", ""))
+                email_monthly(owner_email, d)
                 profile = st.session_state.get("user_profile") or {}
                 ns = {**dict(profile.get("settings") or {}), "monthly_report_sent": key}
                 supabase.table("profiles").update({"settings": ns}).eq("id", owner_id).execute()
@@ -1435,6 +1556,9 @@ def render_grow(supabase, gym_id, assess_fn, owner_id):
     flash = st.session_state.pop("grow_flash", None)
     if flash:
         st.success(flash)
+    err = st.session_state.pop("grow_error", None)
+    if err:
+        st.error(err)
     st.session_state.setdefault("grow_section", SECTIONS[0])
     section = st.segmented_control("Grow section", SECTIONS, key="grow_section",
                                    label_visibility="collapsed") or SECTIONS[0]
