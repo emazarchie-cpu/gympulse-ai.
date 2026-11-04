@@ -42,9 +42,16 @@ def is_admin():
     return bool(email) and email in admin_emails()
 
 
+def clean_url(url):
+    """Accept the project URL however it was copied: with /rest/v1, a trailing slash or spaces."""
+    import re
+    url = (url or "").strip().strip('"').strip("'").rstrip("/")
+    return re.sub(r"/(rest|auth|storage)/v\d+.*$", "", url)
+
+
 def service_client():
     """A Supabase client that can read every gym (server-side only)."""
-    url, key = _env("SUPABASE_URL"), _env("SUPABASE_SERVICE_ROLE_KEY")
+    url, key = clean_url(_env("SUPABASE_URL")), _env("SUPABASE_SERVICE_ROLE_KEY")
     if not (url and key):
         return None
     from supabase import create_client
