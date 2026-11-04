@@ -1037,6 +1037,13 @@ if _trainer_token:
     gw.render_public_trainer(supabase, _trainer_token)
     st.stop()
 
+# Public unsubscribe page for gyms' member emails (no sign-in needed)
+if st.query_params.get("unsub"):
+    import gympulse_campaigns as gcamp
+    gd.apply()
+    gcamp.render_unsubscribe(supabase, st.query_params.get("unsub"))
+    st.stop()
+
 # Public "Book a demo" page and its cancel link (no sign-in needed)
 if st.query_params.get("demo") or st.query_params.get("demo_cancel"):
     import gympulse_booking as gb

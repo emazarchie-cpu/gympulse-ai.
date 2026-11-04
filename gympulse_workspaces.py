@@ -2701,7 +2701,7 @@ def class_when_long(dt):
 
 
 PLAY_TEXT = {
-    "Personal call": "Hi {first}, it's {owner} from {biz}.{missed} I'd love to give you a quick call to hear how your training{goal_part} is going and see how we can help. When is a good time for you?",
+    "Personal call": "Hi {first}, it's {owner} from {biz}.{missed} I'd love to give you a quick call to hear how your training is going{goal_part} and see how we can help. When is a good time for you?",
     "WhatsApp check-in": "Hi {first}! This is {owner} from {biz}.{missed} Just checking in to see how you're finding your workouts{goal_part}. Is there anything we can do to make your experience even better?",
     "Feedback request": "Hi {first}, your opinion matters a lot to us at {biz}. Could you spare a minute to tell us what we're doing well and what we could improve? Reply here and I'll read every word.",
     "Renewal offer": "Hi {first}, I have something special for you. Your membership at {biz} {renew_when}, and you can renew and {offer}.{deadline_part} Reply RENEW and I'll lock it in for you. Thank you for being part of {biz}!",
@@ -4912,7 +4912,7 @@ def render_settings(supabase, owner_id, gym_id, log_out):
         st.session_state["settings_flash"] = message
         st.rerun()
 
-    SECTIONS = ["Personal info", "Photo", "Gym", "Trainers", "Team & automation",
+    SECTIONS = ["Personal info", "Photo", "Gym", "Email & branding", "Trainers", "Team & automation",
                 "Check-in devices", "Preferences", "Account"]
     st.session_state.setdefault("settings_section", "Personal info")
     section = st.segmented_control("Settings section", SECTIONS, key="settings_section",
@@ -4966,6 +4966,10 @@ def render_settings(supabase, owner_id, gym_id, log_out):
 
     if section == "Trainers":
         render_trainers_editor(supabase, gym_id)
+
+    if section == "Email & branding":
+        import gympulse_campaigns as gcamp  # local import: gympulse_campaigns imports this module
+        gcamp.render_brand_settings(supabase, gym_id, save)
 
     if section == "Team & automation":
         import gympulse_automation as ga  # local import: gympulse_automation imports this module

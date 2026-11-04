@@ -41,6 +41,11 @@ DRAFTS = {
 
 
 def _secret(name, default=""):
+    """A setting from Render's environment variables, or Streamlit secrets."""
+    import os
+    value = os.environ.get(name)
+    if value:
+        return value.strip()
     try:
         return str(st.secrets.get(name, default) or default).strip()
     except Exception:
@@ -233,6 +238,26 @@ def _compose(supabase, gym_id, members, owner, gym):
         st.session_state["fu_channel"] = default_channel
     channel = st.radio("Send via", options, horizontal=True, key="fu_channel")
 
+    if channel == "Email" and st.toggle("Designed email with your logo and banner", value=True,
+                                        key="fu_branded"):
+        import gympulse_campaigns as gcamp
+        ctx_member = {"id": mid, "email": email, "name": name, "goal": goal}
+        roster = st.session_state.get("_fu_roster")
+        if roster is not None and not roster.empty and mid in set(roster["id"]):
+            ctx_member.update(gw.member_message_ctx(roster[roster["id"] == mid].iloc[0]))
+            ctx_member["id"], ctx_member["email"] = mid, email
+        extra = {}
+        trainers = gw.load_trainers(supabase, gym_id)
+        t = gw.pick_trainer(trainers, goal)
+        if t:
+            extra["trainer"] = gw._text(t.get("full_name"))
+        nxt = gw.next_class(gw.load_classes(supabase, gym_id))
+        if nxt:
+            extra.update(class_name=nxt["name"], class_when=gw.class_when_long(nxt["_start"]))
+        if gcamp.render_single(supabase, gym_id, ctx_member, theme, extra):
+            _after_send(supabase, mid, name, "Email")
+        return
+
     gw._md(f'<div class="chip-row">{gw.chip("Drafted by Archie", "lime", dot=True)}'
            f'{gw.chip(theme, "cyan")}</div>')
     member_ctx = {"name": name, "goal": goal}
@@ -424,13 +449,17 @@ def render_followups(supabase, gym_id, assess_fn, owner_name, gym_name):
                      "lime" if email_ready() else "grey", dot=True)]
     gw._md(f'<div class="chip-row">{"".join(chips)}</div>')
 
-    label = {"Compose": "Compose", "Inbox": f"Inbox ({unread})" if unread else "Inbox",
-             "Sent": "Sent"}
-    view = st.radio("View", ["Compose", "Inbox", "Sent"], horizontal=True,
+    label = {"Compose": "Compose", "Campaigns": "Email campaigns",
+             "Inbox": f"Inbox ({unread})" if unread else "Inbox", "Sent": "Sent"}
+    view = st.radio("View", ["Compose", "Campaigns", "Inbox", "Sent"], horizontal=True,
                     key="fu_view", format_func=lambda v: label[v],
                     label_visibility="collapsed")
     if view == "Compose":
         _compose(supabase, gym_id, members, owner_name, gym_name)
+    elif view == "Campaigns":
+        import gympulse_campaigns as gcamp
+        roster = st.session_state.get("_fu_roster")
+        gcamp.render_campaigns(supabase, gym_id, roster if roster is not None else pd.DataFrame())
     elif view == "Inbox":
         _inbox(supabase, gym_id, members)
     else:
