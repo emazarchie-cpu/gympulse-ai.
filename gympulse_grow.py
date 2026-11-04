@@ -114,6 +114,11 @@ def _members(supabase, gym_id):
     return df
 
 
+def _has_date(value):
+    """True for a real date; False for None, NaN or NaT (members with no join or end date)."""
+    return value is not None and not pd.isna(value)
+
+
 def _member_names(df):
     return {r["id"]: gw._text(r.get("full_name"), "Member") for _, r in df.iterrows()} if len(df) else {}
 
@@ -350,7 +355,7 @@ def renewal_composer(supabase, gym_id, m, amount, plan, ref, pay, story, key, re
 
 def _mark_paid(supabase, gym_id, row, amount, plan, method, req_id=None):
     import gympulse_revenue as gr
-    end = row.get("end")
+    end = row.get("end") if _has_date(row.get("end")) else None
     today = _today()
     start = end if (end and end >= today) else today
     try:
@@ -643,7 +648,7 @@ def create_freeze(supabase, gym_id, m, start, end, reason, extend=True):
            "reason": reason, "status": "scheduled", "extended": bool(extend)}
     if not _insert(supabase, "member_freezes", row):
         return False
-    if extend and m.get("end"):
+    if extend and _has_date(m.get("end")):
         days = (end - start).days + 1
         new_end = m["end"] + timedelta(days=days)
         try:
@@ -1511,8 +1516,8 @@ def monthly_data(supabase, gym_id, assess_fn, start, end):
         fees = df.set_index("id")["monthly_fee"]
         d["credited"] = float(fees.reindex(kept["member_id"]).fillna(0).sum())
         d["credited_is_fee"] = True
-    d["joined"] = int(sum(1 for j in df["joined"] if j and start <= j <= end)) if len(df) else 0
-    d["lapsed"] = int(sum(1 for x in df["end"] if x and start <= x <= end)) if len(df) else 0
+    d["joined"] = int(sum(1 for j in df["joined"] if _has_date(j) and start <= j <= end)) if len(df) else 0
+    d["lapsed"] = int(sum(1 for x in df["end"] if _has_date(x) and start <= x <= end)) if len(df) else 0
     ck = _checkins(supabase, gym_id, max((_today() - start).days + 2, 35))
     m = ck[(ck["at"] >= s) & (ck["at"] < e)] if len(ck) else ck
     d["visits"] = int(len(m.drop_duplicates(["member_id", "day"]))) if len(m) else 0

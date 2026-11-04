@@ -15,6 +15,9 @@ from datetime import date, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import logging                         # noqa: E402
+logging.getLogger("streamlit").setLevel(logging.ERROR)   # hide "missing ScriptRunContext" noise
+
 import gympulse_admin as gadm          # noqa: E402
 import gympulse_workspaces as gw       # noqa: E402
 
