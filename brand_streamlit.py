@@ -74,6 +74,10 @@ def main():
         print("[brand_streamlit] favicon.png was missing, created it")
 
     print(f"[brand_streamlit] icon replaced: {', '.join(replaced)}")
+    # Versioned icon links, so browsers and phones stop showing a cached old icon
+    sys.path.insert(0, HERE)
+    import gympulse_icons
+    gympulse_icons.install(static_dir)
     return 0
 
 

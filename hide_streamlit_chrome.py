@@ -32,21 +32,9 @@ else:
         f.write(html.replace("</head>", CSS + "</head>", 1))
     print("[hide_streamlit_chrome] applied")
 
-# Install the GymPulse favicon and touch icon in Streamlit's own static folder
-here = os.path.dirname(os.path.abspath(__file__))
-static = os.path.dirname(path)
-for src, dst in (("GymPulse_AI_favicon.png", "favicon.png"),
-                 ("apple-touch-icon.png", "apple-touch-icon.png")):
-    source = os.path.join(here, src)
-    if os.path.exists(source):
-        shutil.copyfile(source, os.path.join(static, dst))
-        print(f"[hide_streamlit_chrome] {dst} installed")
-    else:
-        print(f"[hide_streamlit_chrome] {src} not found, skipped")
-
-with open(path, encoding="utf-8") as f:
-    html = f.read()
-if "apple-touch-icon" not in html:
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(html.replace("</head>",
-                '<link rel="apple-touch-icon" href="./apple-touch-icon.png"></head>', 1))
+# Install the current GymPulse favicon and touch icon under versioned names,
+# so browsers and phones stop showing a cached old icon
+import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import gympulse_icons
+gympulse_icons.install(os.path.dirname(path))
