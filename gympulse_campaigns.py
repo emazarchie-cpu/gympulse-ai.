@@ -4,7 +4,7 @@
   address, WhatsApp, website), saved in the owner's profile settings.
 * A designed email for every retention play: a banner (gym photo + headline +
   tagline + optional offer), a personal message, a button and an unsubscribe link.
-* Sending from the gym's own name: straight away "i-Fitness <i-fitness@usegympulseai.com>"
+* Sending from the gym's own name: straight away "Gym name <gym-name@usegympulseai.com>"
   with replies going to the gym's company inbox, or from the gym's own address once
   their domain is connected (Resend domains API, RESEND_ADMIN_KEY).
 * Campaigns: one email to a group of members, personalised, skipping anyone who
@@ -37,15 +37,15 @@ SEND_DOMAIN = "usegympulseai.com"
 # {first} {gym} {goal_part} {trainer} {class_name} {class_when} {renew_when} {owner}
 TEMPLATES = {
     "Win-back": {
-        "subject": "{first}, come back to where you're loved",
-        "preheader": "We've saved your spot at {gym}.",
-        "headline": "COME\nBACK", "kicker": "to where you're loved",
-        "body": ["Life has a way of taking us to places we never planned to go.",
-                 "Sometimes we lose our rhythm. Sometimes we need a little time away. "
-                 "And sometimes, all we need is a reason to begin again.",
-                 "<b>No matter how long it's been, there's still a place for you at {gym}.</b> "
-                 "Your coaches, your community and your goals are right where you left them."],
-        "button": "I'm ready to come back", "link": "whatsapp"},
+        "subject": "{first}, your spot at {gym} is still here",
+        "preheader": "It's never too late to restart.",
+        "headline": "COME\nBACK", "kicker": "your spot is still here",
+        "body": ["It's been a while since we saw you at {gym}, and we've missed having you around.",
+                 "Breaks happen to everyone: work gets busy, plans change, motivation dips. "
+                 "What matters is the next step, and it can be a small one.",
+                 "<b>Whenever you're ready, we're ready for you.</b> Your coaches and your goals{goal_part} "
+                 "are waiting, and we'll help you ease back in at your own pace."],
+        "button": "I'm ready to restart", "link": "whatsapp"},
     "WhatsApp check-in": {
         "subject": "We miss you, {first}",
         "preheader": "A quick hello from the {gym} team.",
@@ -651,10 +651,10 @@ def render_brand_settings(supabase, gym_id, save):
     b = brand(profile)
     st.markdown("**How your emails look and who they come from**")
     c1, c2 = st.columns(2)
-    sender_name = c1.text_input("Sender name", b["sender_name"], placeholder="e.g. Susan from i-Fitness",
+    sender_name = c1.text_input("Sender name", b["sender_name"], placeholder="e.g. Emmanuel from GymPulse AI",
                                 help="Shown as the sender in your members' inbox.")
     company_email = c2.text_input("Company email (replies go here)", b["company_email"],
-                                  placeholder="e.g. hello@ifitness.com")
+                                  placeholder="e.g. hello@company.com")
     c3, c4, c5 = st.columns([1, 1, 2])
     color = c3.color_picker("Brand colour", b["color"])
     dark = c4.color_picker("Banner background", b["dark"])
@@ -703,11 +703,11 @@ def render_brand_settings(supabase, gym_id, save):
     st.markdown("**Send from your own email address**")
     frm, reply = sender_for(b)
     st.write(f"Right now your emails come from **{frm}**" + (f", and replies go to **{reply}**." if reply else "."))
-    st.caption("To send from your own address (for example susan@ifitness.com), connect your domain. "
+    st.caption("To send from your own address (for example hello@company.com), connect your domain. "
                "You'll add three DNS records where your domain is managed, the same way GymPulse AI did.")
     d1, d2 = st.columns(2)
-    domain = d1.text_input("Your domain", b["domain"], placeholder="e.g. ifitness.com", key="eb_domain")
-    sender_email = d2.text_input("Send from", b["sender_email"], placeholder="e.g. susan@ifitness.com", key="eb_sender")
+    domain = d1.text_input("Your domain", b["domain"], placeholder="e.g. company.com", key="eb_domain")
+    sender_email = d2.text_input("Send from", b["sender_email"], placeholder="e.g. hello@company.com", key="eb_sender")
     a1, a2 = st.columns(2)
     if a1.button("Connect domain", key="eb_connect", use_container_width=True, disabled=not domain.strip()):
         try:

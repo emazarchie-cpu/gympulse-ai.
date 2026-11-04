@@ -5,7 +5,7 @@ Gyms send designed emails to their members, with their own logo, photo, colours 
 ## For gym owners
 
 1. **Settings → Email & branding**
-   - Sender name (for example "Susan from i-Fitness"), company email (replies go here), brand colour, banner background, WhatsApp number, website and footer address.
+   - Sender name (for example "Emmanuel from GymPulse AI"), company email (replies go here), brand colour, banner background, WhatsApp number, website and footer address.
    - Upload your **logo** and a **gym photo**. The photo goes on the left of every banner.
 2. **Send to one member:** Follow-ups → Compose → choose the member → Send via **Email** → leave **Designed email** on.
    - The design follows the play you pick. Every part is editable: headline, tagline, offer, message, button and link.
@@ -25,8 +25,8 @@ Gyms send designed emails to their members, with their own logo, photo, colours 
 
 | Setup | From | Replies go to |
 |---|---|---|
-| Default, works straight away | `Susan from i-Fitness <i-fitness@usegympulseai.com>` | the gym's company email |
-| Gym connects its own domain | `Susan from i-Fitness <susan@ifitness.com>` | the gym's company email |
+| Default, works straight away | `Your Gym <your-gym@usegympulseai.com>` | the gym's company email |
+| Gym connects its own domain | `Emmanuel from GymPulse AI <hello@company.com>` | the gym's company email |
 
 To connect a domain, the gym goes to Settings → Email & branding → **Send from your own email address**, enters its domain and sender address, taps **Connect domain**, adds the DNS records shown, then taps **Check verification**.
 
