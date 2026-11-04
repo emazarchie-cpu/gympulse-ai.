@@ -12,11 +12,11 @@ Gym owners don't send their own monthly report. GymPulse AI sends it:
    - `SUPABASE_SERVICE_ROLE_KEY`: from Supabase → Project Settings → API → `service_role`. It can read every gym, so keep it on Render only. Never put it in the app's code or share it.
    - `SUPABASE_URL`: the same URL the app already uses.
    - Optional: `REPORTS_FROM` (default `GymPulse AI <reports@usegympulseai.com>`) and `REPORTS_REPLY_TO` (default `emmanuel@usegympulseai.com`).
-3. **Render → New → Cron Job**, connected to the same repository:
-   - Schedule: `0 7 1 * *` (07:00 UTC, which is 08:00 in Lagos, on the 1st)
-   - Command: `python scripts/send_monthly_reports.py`
-   - Environment: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY` (and `REPORTS_FROM` if set)
-   - Test it first: run `python scripts/send_monthly_reports.py --dry-run` from the Cron Job's shell to list what would be sent.
+3. **Automatic sending, free, on GitHub Actions** (`.github/workflows/monthly-reports.yml`):
+   - GitHub → the repository → **Settings → Secrets and variables → Actions → New repository secret**. Add `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` and `RESEND_API_KEY`, with the same values as on Render.
+   - Test it: go to **Actions → Monthly reports → Run workflow**, leave *Dry run* ticked, and run it. The log lists each gym as "would send" or "already sent", and nothing is sent.
+   - From then on it runs at 08:00 Lagos time on the 1st of every month. Gyms already emailed from the Admin page are skipped.
+   - Prefer Render? A Render Cron Job (`0 7 1 * *`, `python scripts/send_monthly_reports.py`) does the same thing, but it's paid.
 
 ## The Admin page
 
