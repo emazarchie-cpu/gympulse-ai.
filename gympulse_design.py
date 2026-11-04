@@ -259,6 +259,20 @@ html body .chip { border-radius: 999px; }
 .lx-strip b { display: block; font-family: var(--gp-display); font-size: 22px; color: var(--gp-text); }
 .lx-strip span { font-size: 12.5px; color: var(--gp-muted); }
 
+.lx-demo { padding: 42px 0 30px; text-align: center; }
+.lx-video { position: relative; max-width: 1040px; margin: 4px auto 0; border-radius: 22px; overflow: hidden;
+    aspect-ratio: 16 / 9; background: #05070D; border: 1px solid var(--gp-line-2);
+    box-shadow: 0 40px 90px -36px rgba(0,0,0,0.8), 0 0 80px -30px rgba(183,243,74,0.35); }
+.lx-video video { width: 100%; height: 100%; display: block; object-fit: cover; }
+.lx-demo-note { color: var(--gp-dim); font-size: 12.5px; margin-top: 10px; }
+.lx-demo-cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 18px; }
+.lx-btn { display: inline-flex; align-items: center; justify-content: center; min-height: 46px; padding: 0 24px;
+    border-radius: 12px; font-weight: 700; font-size: 15px; text-decoration: none !important;
+    color: var(--gp-text) !important; border: 1px solid var(--gp-line-2); background: rgba(255,255,255,0.04); }
+.lx-btn:hover { border-color: rgba(183,243,74,0.6); background: rgba(183,243,74,0.08); }
+.lx-btn-primary { background: var(--gp-grad); color: #0A0F1E !important; border: 0;
+    box-shadow: 0 8px 26px -12px rgba(183,243,74,0.8); }
+.lx-btn-primary:hover { filter: brightness(1.06); background: var(--gp-grad); }
 .lx-sec { padding: 64px 0 8px; }
 .lx-kicker { color: var(--gp-lime); font-size: 12px; font-weight: 700; letter-spacing: 1.8px; text-transform: uppercase; text-align: center; }
 .lx-h2 { font-size: 40px; line-height: 1.1; letter-spacing: -1.4px; font-weight: 700; color: var(--gp-text); text-align: center; margin: 10px auto 12px; max-width: 760px; }
@@ -340,6 +354,13 @@ PULSE_SVG = ('<svg class="cc-pulse" viewBox="0 0 1200 46" preserveAspectRatio="n
              '</linearGradient></defs></svg>')
 
 
+# Where "Book a demo" goes. Swap for a Calendly or WhatsApp link when you have one,
+# for example "https://calendly.com/yourname/demo" or "https://wa.me/234XXXXXXXXXX".
+BOOK_DEMO_URL = ("mailto:gympulseai22@gmail.com?subject=Book%20a%20GymPulse%20AI%20demo"
+                 "&body=Hi%2C%20I%27d%20like%20a%2015-minute%20demo%20of%20GymPulse%20AI.%0A%0A"
+                 "Gym%20name%3A%20%0AMembers%3A%20%0ABest%20time%20to%20call%3A%20")
+
+
 def landing_top(lockup_uri, icon):
     """Navigation, hero and live product preview."""
     return f"""
@@ -384,6 +405,20 @@ def landing_top(lockup_uri, icon):
           <div><b>Archie:</b> 7 of your 18 fading members renew in the next 30 days.
           Start with them: that is ₦175k of monthly fees.</div></div>
         <div class="lx-note">Illustrative example · not real member data</div>
+      </div>
+    </div>
+    <div class="lx-demo" id="demo">
+      <div class="lx-kicker">See it in action</div>
+      <div class="lx-h2">40 seconds. The whole retention loop.</div>
+      <div class="lx-video">
+        <video src="/app/static/gympulse-demo.mp4" poster="/app/static/gympulse-demo-poster.jpg"
+               autoplay muted loop playsinline controls preload="metadata"
+               aria-label="GymPulse AI product demo"></video>
+      </div>
+      <div class="lx-demo-note">Plays muted. Tap the video for sound.</div>
+      <div class="lx-demo-cta">
+        <a class="lx-btn lx-btn-primary" href="#get-started">Start free</a>
+        <a class="lx-btn" href="{BOOK_DEMO_URL}" target="_blank" rel="noopener">Book a 15-minute demo</a>
       </div>
     </div>
     <div class="lx-strip">
@@ -479,6 +514,10 @@ def landing_sections(icon, bot_svg):
     <div class="lx-cta">
       <h3>Keep more members.<br><span class="lx-grad">Keep more revenue.</span></h3>
       <p>Create your free workspace above. It takes about a minute.</p>
+      <div class="lx-demo-cta">
+        <a class="lx-btn lx-btn-primary" href="#get-started">Start free</a>
+        <a class="lx-btn" href="{BOOK_DEMO_URL}" target="_blank" rel="noopener">Book a 15-minute demo</a>
+      </div>
     </div>
     <div class="lx-foot"><span>© GymPulse AI</span><span>Smarter insights. Stronger member retention.</span></div>
     """
