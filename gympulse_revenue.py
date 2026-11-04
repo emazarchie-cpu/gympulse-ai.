@@ -289,7 +289,7 @@ def renewal_guard(supabase, gym_id, member_id, name, current_end, plan, key):
     state = gw.membership_state(current_end)
     if state["days"] is not None and state["days"] > gw.PLAN_DAYS.get(plan, 30):
         reasons.append(f"Their membership is already paid until {state['end']:%d %b %Y}, "
-                       f"more than one {plan.lower()} period ahead.")
+                       f"more than one {gw.plan_phrase(plan)} period ahead.")
     if not reasons:
         return True
     st.warning(" ".join(reasons) + " Saving again adds another period on top.")
@@ -316,8 +316,8 @@ def render_record_payment(supabase, gym_id, roster):
             return
         r = roster[roster["id"] == mid].iloc[0]
         first = is_first_payment(supabase, gym_id, mid)
-        plans = list(gw.PLAN_DAYS)
-        cur = r.get("membership_type") if r.get("membership_type") in plans else "Monthly"
+        plans = gw.PLANS
+        cur = gw.plan_name(r.get("membership_type"))
         plan = c2.selectbox("Plan", plans, index=plans.index(cur), key=f"rp_plan_{mid}")
         method = c3.selectbox("Paid by", PAYMENT_METHODS, key="rp_method")
         state = gw.membership_state(r.get("membership_end"))
