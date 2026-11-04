@@ -2363,6 +2363,28 @@ def render_member_profile(supabase, gym_id, member_id, assess_fn):
                 st.session_state["profile_flash"] = msg
                 st.rerun()
 
+        with st.expander("Correct the end date"):
+            st.caption("Fix a wrong date without recording a payment, for example a typo or a "
+                       "member moved over from another system.")
+            fix_end = st.date_input("Membership ends on", value=current_end or date.today(),
+                                    min_value=date.today() - timedelta(days=730),
+                                    key=f"fix_end_{member_id}")
+            if st.button("Save end date", key=f"fix_end_save_{member_id}",
+                         disabled=not feat["profile_ready"]):
+                try:
+                    supabase.table("members").update(
+                        {"membership_end": fix_end.isoformat()}).eq("id", member_id).execute()
+                    if act:
+                        supabase.table("member_activity").update(
+                            {"renewal_due_days": int(min(max((fix_end - date.today()).days, 0), 730))}
+                        ).eq("member_id", member_id).execute()
+                except Exception as error:
+                    st.error(f"Could not save the date: {error}")
+                else:
+                    bump_data_version()
+                    st.session_state["profile_flash"] = f"End date changed to {fix_end:%d %b %Y}."
+                    st.rerun()
+
     with tab_photo:
         if not feat["profile_ready"]:
             st.warning("Run member_profile_upgrade.sql in Supabase to turn on "
