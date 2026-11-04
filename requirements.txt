@@ -10,3 +10,4 @@ qrcode[pil]
 pillow-heif
 reportlab
 openpyxl
+sentry-sdk

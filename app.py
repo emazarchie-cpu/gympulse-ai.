@@ -1,5 +1,8 @@
+import gympulse_monitoring as gmon
+gmon.init("app")
 import gympulse_workspaces as gw
 import gympulse_followups as fu
+import gympulse_legal as gl
 import gympulse_design as gd
 import gympulse_command as gc
 import gympulse_grow as gg
@@ -1099,77 +1102,8 @@ def html(block):
     st.markdown(flat, unsafe_allow_html=True)
 
 
-@st.dialog("Terms of Service")
-def show_terms():
-    st.markdown(
-        """
-**Last updated: October 2026**
-
-By creating an account or using GymPulse AI, you agree to these terms.
-
-**1. What GymPulse AI is.** A tool that gives gym owners experimental
-estimates of member cancellation risk, plus a register for managing members.
-
-**2. Estimates are not guarantees.** The model is currently trained on
-synthetic data. Results are a guide only and should not be the sole basis
-for any decision about a member.
-
-**3. Your account.** Keep your login details private. You are responsible
-for activity under your account.
-
-**4. Your data and your members.** You confirm you have the right to enter
-and process the member information you add, and that members have agreed
-to this where the law requires it.
-
-**5. Acceptable use.** Do not misuse the service, attempt to access other
-accounts, or upload unlawful content.
-
-**6. Availability and liability.** The service is provided as is, without
-warranties. To the extent the law allows, GymPulse AI is not liable for
-losses arising from its use.
-
-**7. Changes.** We may update these terms. Continued use means you accept
-the updated terms.
-
-**8. Governing law.** These terms are governed by the laws of Nigeria.
-
-**Contact:** YOUR-COMPANY-EMAIL
-        """
-    )
-
-
-@st.dialog("Privacy Policy")
-def show_privacy():
-    st.markdown(
-        """
-**Last updated: October 2026**
-
-**What we collect.** Your name, business name and email address when you
-sign up, and the member records you choose to add (name, contact details,
-age, weight, height and fitness goal).
-
-**CSV uploads.** Files uploaded for batch assessment are processed during
-your session and are not saved by GymPulse AI.
-
-**How we use it.** To run your account, show your members, and generate
-assessments. We do not sell your data or your members' data.
-
-**Where it is stored.** In our database provider (Supabase). Each gym can
-only access its own records. Passwords are handled by the authentication
-service and are not stored in plain text.
-
-**Emails.** We send account emails such as confirmations and password
-reset codes.
-
-**Your responsibilities.** You are responsible for having permission from
-your members to store their information.
-
-**Your rights.** You can ask us to access, correct or delete your data
-under applicable law, including the Nigeria Data Protection Act.
-
-**Contact:** gympulseai22@gmail.com
-        """
-    )
+# Terms, Privacy Policy and Data Processing Agreement come from docs/legal/
+show_terms, show_privacy, show_dpa = gl.show_terms, gl.show_privacy, gl.show_dpa
 
 
 # Design system v2 sits on top of every earlier style layer
@@ -1299,6 +1233,17 @@ if st.session_state.auth_user is None:
 
                                 if profile_result.data:
                                     st.session_state.user_profile = profile_result.data[0]
+                                    # Save the terms they accepted at sign-up (kept with their login)
+                                    _legal = (result.user.user_metadata or {}).get("legal") or {}
+                                    _prof = st.session_state.user_profile
+                                    if _legal.get("version") == gl.LEGAL_VERSION and not gl.accepted(_prof):
+                                        try:
+                                            _s = {**dict(_prof.get("settings") or {}), "legal": _legal}
+                                            supabase.table("profiles").update({"settings": _s}) \
+                                                .eq("id", str(result.user.id)).execute()
+                                            _prof["settings"] = _s
+                                        except Exception:
+                                            pass
                                 else:
                                     meta = result.user.user_metadata or {}
                                     fallback = {
@@ -1361,8 +1306,9 @@ if st.session_state.auth_user is None:
                         type="password"
                     )
                     agree = st.checkbox(
-                        "I agree to the Terms of Service and Privacy Policy"
+                        "I agree to the Terms of Service, Privacy Policy and Data Processing Agreement"
                     )
+                    members_ok = st.checkbox(gl.CONSENT_TEXT)
 
                     signup_submitted = st.form_submit_button(
                         "Create free account",
@@ -1379,9 +1325,9 @@ if st.session_state.auth_user is None:
                         confirm_password
                     ]):
                         st.warning("Please complete every field.")
-                    elif not agree:
+                    elif not agree or not members_ok:
                         st.warning(
-                            "Please accept the Terms of Service and Privacy Policy."
+                            "Please tick both boxes: the terms, and that you have your members' permission."
                         )
                     elif signup_password != confirm_password:
                         st.error("Your passwords do not match.")
@@ -1398,7 +1344,8 @@ if st.session_state.auth_user is None:
                                         "data": {
                                             "full_name": full_name.strip(),
                                             "business_name": business_name.strip(),
-                                            "account_type": "gym_owner"
+                                            "account_type": "gym_owner",
+                                            "legal": gl.acceptance(signup_email.strip())
                                         }
                                     }
                                 }
@@ -1565,7 +1512,7 @@ if st.session_state.auth_user is None:
                 unsafe_allow_html=True
             )
 
-            legal_a, legal_b = st.columns(2)
+            legal_a, legal_b, legal_c = st.columns(3)
 
             with legal_a:
                 if st.button("Terms of Service", key="open_terms"):
@@ -1574,6 +1521,10 @@ if st.session_state.auth_user is None:
             with legal_b:
                 if st.button("Privacy Policy", key="open_privacy"):
                     show_privacy()
+
+            with legal_c:
+                if st.button("Data Processing Agreement", key="open_dpa"):
+                    show_dpa()
 
     # LANDING PAGE SECTIONS
     html(gd.landing_sections(icon, gw.ARCHIE_BOT_SVG))
@@ -1675,6 +1626,8 @@ try:
 
 except Exception as error:
     st.session_state.gym_id = None
+    if not (isinstance(error, PermissionError) or _auth_error(error)):
+        gmon.capture(error, "load gym workspace")
 
     if isinstance(error, PermissionError) or _auth_error(error):
         # The login lapsed: sign in again instead of showing a database error.
@@ -2569,6 +2522,8 @@ if st.session_state.get("gym_id") and st.session_state.get("_freeze_day") != str
         gg.process_freezes(supabase, st.session_state["gym_id"])
     except Exception:
         pass
+
+gl.render_acceptance_banner(supabase, owner_id)
 
 if page == "Dashboard":
     try:
