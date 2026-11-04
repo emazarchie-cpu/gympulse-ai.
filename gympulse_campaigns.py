@@ -293,6 +293,122 @@ def make_banner(headline, kicker="", offer="", color="#B7F34A", dark="#0B1020",
     return out.getvalue()
 
 
+# ------------------------------------------------------------------ trainers
+TRAINER_TEMPLATES = {"Trainer intro", "Free PT session", "Goal review"}
+
+
+def trainer_card(t, photo_url=""):
+    """What the email shows about a trainer: only what the gym entered."""
+    if not t:
+        return None
+    return {"name": gw._text(t.get("full_name"), "Your coach"),
+            "specialty": gw._text(t.get("specialty")),
+            "bio": gw._text(t.get("bio")),
+            "phone": gw._text(t.get("phone")),
+            "photo_url": photo_url,
+            "link": gw.trainer_link(t)}
+
+
+def trainer_photo_bytes(t):
+    photo = (t or {}).get("photo")
+    if not gw.has_photo(photo):
+        return None
+    try:
+        return base64.b64decode(photo.split(",", 1)[1])
+    except Exception:
+        return None
+
+
+def trainer_photo_url(supabase, gym_id, t):
+    """Host the trainer's photo so it shows in inboxes ('' if hosting isn't set up)."""
+    data = trainer_photo_bytes(t)
+    if not data:
+        return ""
+    return upload_asset(supabase, gym_id, f"trainers/{t['id']}.jpg", data, "image/jpeg") or ""
+
+
+def with_trainer(ctx, fields):
+    card = fields.get("trainer_card")
+    return {**ctx, "trainer": card["name"]} if card else ctx
+
+
+def trainer_picker(prefix, template_name, trainers, default_id=None):
+    """Which trainer an email features. Returns the trainer row, or None."""
+    if template_name not in TRAINER_TEMPLATES:
+        return None
+    if not trainers:
+        st.info("Add your trainers in Settings → Trainers to show their profile in this email.")
+        return None
+    ids = [t["id"] for t in trainers]
+    by_id = {t["id"]: t for t in trainers}
+    idx = ids.index(default_id) if default_id in ids else 0
+    c1, c2 = st.columns([2, 1])
+    tid = c1.selectbox("Trainer to feature", ids, index=idx, key=f"{prefix}_tr_{template_name}",
+                       format_func=lambda i: gw._text(by_id[i].get("full_name"), "Trainer")
+                       + (f" · {by_id[i]['specialty']}" if by_id[i].get("specialty") else ""))
+    show = c2.toggle("Show their profile", value=True, key=f"{prefix}_trs_{template_name}",
+                     help="Adds the trainer's photo, specialty, bio and contact buttons to the email.")
+    return by_id[tid], show
+
+
+def attach_trainer(fields, ctx, t, show):
+    """Put the trainer's name and profile card on the email fields (preview photo inline)."""
+    if not t:
+        return ctx
+    data = trainer_photo_bytes(t)
+    uri = "data:image/jpeg;base64," + base64.b64encode(data).decode() if data else ""
+    fields["trainer_card"] = trainer_card(t, uri)
+    fields["show_card"] = show
+    fields["_trainer_row"] = t
+    return with_trainer(ctx, fields)
+
+
+def host_trainer_photo(supabase, gym_id, fields):
+    """Swap the inline preview photo for a hosted one before sending."""
+    card, t = fields.get("trainer_card"), fields.get("_trainer_row")
+    if card and t:
+        fields["trainer_card"] = {**card, "photo_url": trainer_photo_url(supabase, gym_id, t)}
+
+
+def trainer_card_email(card, P, acc):
+    """A trainer profile block that works in email apps (tables, inline styles)."""
+    if not card:
+        return ""
+    name = ge.esc(card["name"])
+    initials = "".join(w[0] for w in card["name"].split()[:2]).upper() or "C"
+    if card.get("photo_url"):
+        pic = (f'<img src="{ge.esc(card["photo_url"])}" width="84" height="84" alt="{name}" '
+               f'style="display:block;width:84px;height:84px;border-radius:42px;border:3px solid {acc};object-fit:cover">')
+    else:
+        pic = (f'<table role="presentation" cellspacing="0" cellpadding="0"><tr><td width="84" height="84" align="center" '
+               f'bgcolor="{acc}" style="width:84px;height:84px;border-radius:42px;background-color:{acc};'
+               f'font-family:Arial,Helvetica,sans-serif;font-size:28px;font-weight:700;color:#0A0F1E">{ge.esc(initials)}</td></tr></table>')
+    spec = (f'<div style="display:inline-block;margin-top:6px;padding:3px 10px;border-radius:999px;'
+            f'background-color:{acc};color:#0A0F1E;font-size:12px;font-weight:700">{ge.esc(card["specialty"])}</div>'
+            if card.get("specialty") else "")
+    bio = (f'<p style="margin:12px 0 0;font-size:14px;line-height:1.6;color:{P["text"]}">{ge.esc(card["bio"])}</p>'
+           if card.get("bio") else "")
+    links = []
+    digits = gw.whatsapp_digits(card.get("phone"))
+    if digits:
+        links.append((f"https://wa.me/{digits}", f"WhatsApp {card['name']}"))
+    if card.get("phone"):
+        links.append((f"tel:{card['phone']}", f"Call {card['phone']}"))
+    if card.get("link"):
+        links.append((card["link"], "View full profile"))
+    link_html = "<br>".join(
+        f'<a href="{ge.esc(u)}" style="color:{P["text"]};font-weight:700;text-decoration:underline">{ge.esc(t)}</a>'
+        for u, t in links)
+    link_html = f'<p style="margin:12px 0 0;font-size:13px;line-height:1.9">{link_html}</p>' if link_html else ""
+    return (f'<table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="{P["box"]}" '
+            f'style="margin:4px 0 22px;background-color:{P["box"]};border-radius:14px;border:1px solid {P["line"]}"><tr>'
+            f'<td width="104" valign="top" style="padding:18px 0 18px 18px">{pic}</td>'
+            f'<td valign="top" style="padding:18px 18px 18px 16px;font-family:Arial,Helvetica,sans-serif">'
+            f'<div style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:{P["muted"]}">Your coach</div>'
+            f'<div style="font-size:19px;font-weight:700;color:{P["text"]};margin-top:2px">{name}</div>'
+            f'{spec}{bio}{link_html}</td></tr></table>')
+
+
 # ------------------------------------------------------------------ rendering
 def fill(text, ctx):
     try:
@@ -328,6 +444,7 @@ def render_email(fields, b, ctx, banner_url, unsub_url=""):
     """The full branded email for one member, on a white or a black background."""
     acc, dark = b["color"], b["dark"]
     theme = fields.get("theme") or b.get("email_theme") or "light"
+    ctx = with_trainer(ctx, fields)
     if theme == "dark":
         P = {"page": "#05070D", "card": "#0E1320", "text": "#E8EDF5", "muted": "#9AA6B8",
              "line": "#1F2737", "box": "#161D2C", "scheme": "dark"}
@@ -379,7 +496,7 @@ def render_email(fields, b, ctx, banner_url, unsub_url=""):
 <tr><td style="padding:0;line-height:0">{hero}</td></tr>
 <tr><td bgcolor="{P['card']}" style="padding:30px 30px 8px;background-color:{P['card']};font-family:Arial,Helvetica,sans-serif">
 <p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:{P['text']}">Hello {ge.esc(ctx["first"])},</p>
-{paras}{offer_html}{btn}
+{paras}{trainer_card_email(fields.get("trainer_card") if fields.get("show_card", True) else None, P, acc)}{offer_html}{btn}
 <p style="margin:0 0 6px;font-size:16px;line-height:1.6;color:{P['text']}">{sign}</p>
 </td></tr>
 <tr><td bgcolor="{P['card']}" style="padding:18px 30px 26px;background-color:{P['card']};font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.6;color:{P['muted']};border-top:1px solid {P['line']}">
@@ -390,8 +507,15 @@ def render_email(fields, b, ctx, banner_url, unsub_url=""):
 
 
 def plain_text(fields, ctx, unsub_url=""):
+    ctx = with_trainer(ctx, fields)
     body = "\n\n".join(re.sub("<[^>]+>", "", fill(p, ctx)) for p in fields["body"] if str(p).strip())
     offer = fill(fields.get("offer", ""), ctx)
+    card = fields.get("trainer_card") if fields.get("show_card", True) else None
+    if card:
+        lines = [f"Your coach: {card['name']}" + (f" ({card['specialty']})" if card.get("specialty") else "")]
+        lines += [x for x in (card.get("bio"), card.get("phone") and f"Phone: {card['phone']}",
+                              card.get("link") and f"Profile: {card['link']}") if x]
+        body += "\n\n" + "\n".join(lines)
     return (f"Hello {ctx['first']},\n\n{body}\n\n" + (f"{offer}\n\n" if offer else "")
             + fill(fields.get("signoff") or "{owner}\n{gym}", ctx)
             + (f"\n\nUnsubscribe: {unsub_url}" if unsub_url else ""))
@@ -505,7 +629,14 @@ def render_single(supabase, gym_id, member, play, details=None):
     name = st.selectbox("Email design", names, index=names.index(name), key=f"be_tpl_{name}")
     extra = dict(details or {})
     ctx = member_ctx(member, b, extra)
+    trainer, show_card = None, True
+    if name in TRAINER_TEMPLATES:
+        trainer, show_card = trainer_picker("be", name, gw.load_trainers(supabase, gym_id),
+                                            extra.get("trainer_id")) or (None, True)
+        if trainer:
+            ctx["trainer"] = gw._text(trainer.get("full_name"), ctx["trainer"])
     fields = editor("be", name, b, ctx)
+    ctx = attach_trainer(fields, ctx, trainer, show_card)
     png = make_banner(fill(fields["headline"], ctx), fill(fields["kicker"], ctx), fill(fields["offer"], ctx),
                       b["color"], b["dark"], _fetch_image(b["photo_url"]), _fetch_image(b["logo_url"]), b["gym"])
     with st.expander("Preview", expanded=True):
@@ -528,6 +659,7 @@ def render_single(supabase, gym_id, member, play, details=None):
     if st.button("Send branded email", type="primary", key="be_send", use_container_width=True):
         try:
             url = upload_asset(supabase, gym_id, f"banners/{_slug(name)}-{member['id'][:8]}.png", png)
+            host_trainer_photo(supabase, gym_id, fields)
             unsub = unsub_link(token)
             html = render_email(fields, b, ctx, url, unsub)
             subject = fill(fields["subject"], ctx)
@@ -599,7 +731,13 @@ def render_campaigns(supabase, gym_id, roster):
              + (f" · {len(with_email) - len(sendable)} unsubscribed" if len(with_email) != len(sendable) else "") + ".")
     sample = sendable.iloc[0] if len(sendable) else (group.iloc[0] if len(group) else roster.iloc[0])
     ctx = member_ctx(gw.member_message_ctx(sample), b)
+    trainer, show_card = None, True
+    if tname in TRAINER_TEMPLATES:
+        trainer, show_card = trainer_picker(f"camp_{aud}", tname, gw.load_trainers(supabase, gym_id)) or (None, True)
+        if trainer:
+            ctx["trainer"] = gw._text(trainer.get("full_name"), ctx["trainer"])
     fields = editor(f"camp_{aud}", tname, b, ctx)
+    ctx = attach_trainer(fields, ctx, trainer, show_card)
     png = make_banner(fill(fields["headline"], ctx), fill(fields["kicker"], ctx), fill(fields["offer"], ctx),
                       b["color"], b["dark"], _fetch_image(b["photo_url"]), _fetch_image(b["logo_url"]), b["gym"])
     with st.expander(f"Preview (as {ctx['first']} sees it)", expanded=True):
@@ -615,11 +753,12 @@ def render_campaigns(supabase, gym_id, roster):
     sure = st.checkbox(f"Yes, send this email to {len(sendable)} member(s)", key=f"camp_ok_{aud}")
     if st.button("Send campaign", type="primary", key="camp_send", disabled=not sure, use_container_width=True):
         url = upload_asset(supabase, gym_id, f"banners/campaign-{_slug(tname)}.png", png)
+        host_trainer_photo(supabase, gym_id, fields)
         import gympulse_followups as fu
         bar = st.progress(0.0, text="Sending…")
         sent = failed = 0
         for i, (_, r) in enumerate(sendable.iterrows(), 1):
-            mctx = member_ctx(gw.member_message_ctx(r), b)
+            mctx = with_trainer(member_ctx(gw.member_message_ctx(r), b), fields)
             token = flags.get(r["id"], (False, None))[1]
             unsub = unsub_link(token)
             subject = fill(fields["subject"], mctx)
