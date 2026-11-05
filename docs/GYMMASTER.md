@@ -38,3 +38,13 @@ GymMaster lets each gym choose its own columns, so headings differ. That's fine:
 - Up to 3,000 members per file. Import more in batches.
 
 There is no automatic live connection to GymMaster yet. Each gym creates its own API key under GymMaster's Settings → Integrations. With a gym's key and GymMaster's API documentation, an automatic sync can be added later.
+
+## Photos
+
+A CSV or Excel export can't hold the photos themselves, so GymPulse AI brings them in three ways:
+
+1. **Photo link column**: if the export has a column with photo web links (http/https), each photo is downloaded and saved with the member during the import.
+2. **ZIP or images**: at step "4. Photos (optional)", upload a ZIP or several images named after the member: member number (e.g. `1001.jpg`), email, phone or full name. They are matched automatically. For members you already have, use "Add photos for members you already have" under the import.
+3. **Selfie on the sign-up link**: members can add their own photo when they join through the link. This needs `sql/phase15_signup_photo.sql` to be run once in the Supabase SQL Editor.
+
+Photos are resized to a small JPEG (192px) before saving. The import also brings in member number, weight and height when the file has them.

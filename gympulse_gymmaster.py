@@ -48,6 +48,12 @@ FIELDS = [  # key, label, common GymMaster/other headings (lowercase, spaces nor
                                   "last check-in", "last visit date", "last attended", "last check in date",
                                   "last checkin date", "last seen"]),
     ("goal", "Fitness goal", ["goal", "fitness goal", "goals"]),
+    ("member_no", "Member ID / number", ["member id", "member number", "member no", "id", "client id",
+                                         "membership number", "barcode", "card number", "member code", "customer id"]),
+    ("weight", "Weight (kg)", ["weight", "weight kg", "weight (kg)", "body weight"]),
+    ("height", "Height (cm)", ["height", "height cm", "height (cm)"]),
+    ("photo", "Photo link", ["photo", "photo url", "picture", "image", "avatar", "profile picture", "photo link",
+                             "image url", "picture url", "profile photo"]),
 ]
 SOURCES = {
     "GymMaster": "In GymMaster open **Reports**, run a member list or memberships report, use **Add Column** to "
@@ -182,9 +188,15 @@ def build_rows(df, cols, plan_map, existing):
         last_visit = _date(get(r, "last_visit"))
         if last_visit and last_visit > today:
             last_visit = None
+        weight, height = _money(get(r, "weight")), _money(get(r, "height"))
+        weight = weight if weight and 20 <= weight <= 400 else None
+        height = height if height and 90 <= height <= 250 else None
+        photo = get(r, "photo")
         rows.append({"action": "Update" if member_id else "New", "member_id": member_id, "name": name,
                      "email": email, "phone": phone, "plan": plan, "fee": fee, "end": end, "start": start,
-                     "age": age, "goal": get(r, "goal"), "last_visit": last_visit, "membership": mname})
+                     "age": age, "goal": get(r, "goal"), "last_visit": last_visit, "membership": mname,
+                     "member_no": get(r, "member_no"), "weight": weight, "height": height,
+                     "photo_url": photo if photo.lower().startswith(("http://", "https://")) else ""})
     return rows
 
 
@@ -263,6 +275,10 @@ def run_import(supabase, gym_id, rows, update_existing=True, progress=None):
                 d["age"] = int(r["age"])
             if r["goal"]:
                 d["fitness_goal"] = r["goal"]
+            if r.get("weight"):
+                d["weight_kg"] = r["weight"]
+            if r.get("height"):
+                d["height_cm"] = r["height"]
             if r["end"]:
                 d["membership_end"] = r["end"].isoformat()
             items.append(d)
@@ -335,9 +351,99 @@ def run_import(supabase, gym_id, rows, update_existing=True, progress=None):
                 except Exception:
                     pass
     tick("Recording last visits…")
+    photos = photo_fail = 0
+    jobs = [(mid, r["photo_url"]) for mid, r in ready if mid and r.get("photo_url")]
+    if jobs:
+        if progress:
+            progress.progress(0.95, text=f"Downloading {len(jobs)} photos…")
+        photos, photo_fail = save_photos(supabase, gym_id, jobs)
     gw.bump_data_version()
     return {"created": created, "updated": updated, "skipped": skipped, "failed": failed,
-            "placeholders": placeholders, "visits": visits, "problems": problems}
+            "placeholders": placeholders, "visits": visits, "problems": problems, "photos": photos,
+            "photo_fail": photo_fail, "keys": {k: mid for mid, r in ready for k in _photo_keys(r) if k}}
+
+
+# ------------------------------------------------------------------ photos
+def _stem(text):
+    return re.sub(r"[^a-z0-9@.]", "", str(text).lower())
+
+
+def _photo_keys(r):
+    """Ways a photo file can be named for this member: member number, email, phone, name."""
+    keys = [_stem(r.get("member_no")), _stem(r.get("email")), _digits(r.get("phone")), _stem(r.get("name"))]
+    return [k for k in keys if k]
+
+
+def _download(url):
+    import requests
+    r = requests.get(url, timeout=12, stream=True, headers={"User-Agent": "GymPulseAI-import"})
+    r.raise_for_status()
+    data = r.raw.read(8 * 1024 * 1024 + 1, decode_content=True)
+    if len(data) > 8 * 1024 * 1024:
+        raise ValueError("photo larger than 8 MB")
+    return data
+
+
+def save_photos(supabase, gym_id, jobs, workers=8):
+    """jobs: [(member_id, url or raw bytes)]. Downloads (if a link), resizes to the app's photo size and
+    saves each photo, 8 at a time. Returns (saved, failed)."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    def one(job):
+        mid, src = job
+        try:
+            raw = _download(src) if isinstance(src, str) else src
+            photo = gw.process_photo(raw)
+            supabase.table("members").update({"photo": photo}).eq("id", mid).eq("gym_id", gym_id).execute()
+            return True
+        except Exception:
+            return False
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        results = list(pool.map(one, jobs))
+    return sum(results), len(results) - sum(results)
+
+
+IMAGE_EXT = (".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif")
+
+
+def read_photo_files(files):
+    """{filename stem: bytes} from uploaded images and/or ZIP files (folders inside ZIPs are fine)."""
+    import zipfile
+    out = {}
+    for f in files or []:
+        name = f.name.lower()
+        if name.endswith(".zip"):
+            try:
+                with zipfile.ZipFile(io.BytesIO(f.getvalue())) as z:
+                    for info in z.infolist():
+                        base = info.filename.rsplit("/", 1)[-1]
+                        if info.is_dir() or base.startswith(".") or not base.lower().endswith(IMAGE_EXT):
+                            continue
+                        if info.file_size > 15 * 1024 * 1024:
+                            continue
+                        out[_stem(base.rsplit(".", 1)[0])] = z.read(info)
+            except zipfile.BadZipFile:
+                continue
+        elif name.endswith(IMAGE_EXT):
+            out[_stem(f.name.rsplit(".", 1)[0])] = f.getvalue()
+    return out
+
+
+def match_photos(photo_files, members, extra_keys=None):
+    """[(member_id, bytes)] matched by file name: member number, email, phone or full name."""
+    index = dict(extra_keys or {})
+    for _, m in members.iterrows():
+        for k in (_stem(m.get("email")), _digits(m.get("phone")), _stem(m.get("full_name"))):
+            if k:
+                index.setdefault(k, m["id"])
+    jobs, unmatched = [], []
+    for stem, data in photo_files.items():
+        mid = index.get(stem) or index.get(_digits(stem)) if stem else None
+        if mid:
+            jobs.append((mid, data))
+        else:
+            unmatched.append(stem)
+    return jobs, unmatched
 
 
 def render_gymmaster_import(supabase, gym_id):
@@ -422,16 +528,36 @@ def render_gymmaster_import(supabase, gym_id):
     if no_end:
         st.caption(f"{no_end} member(s) have no start or end date in the file. They'll be imported, and you can "
                    "add their plan later on the Risk Radar.")
+    n_links = sum(1 for r in rows if r.get("photo_url"))
+    st.markdown("**4. Photos (optional)**")
+    st.caption((f"{n_links} photo link(s) found in the file: they'll be downloaded. " if n_links else "")
+               + "You can also add a ZIP of photos (or the image files) named by member ID, email, phone or full "
+                 "name, for example 1001.jpg or ada.obi@gmail.com.jpg or Ada Obi.jpg.")
+    photo_up = st.file_uploader("Member photos (ZIP or images)", type=["zip", "jpg", "jpeg", "png", "webp", "heic"],
+                                accept_multiple_files=True, key=f"gm_ph_{key}")
     update = st.checkbox("Update members who are already in GymPulse (email, phone and plan)", value=True,
                          key=f"gm_upd_{key}")
     if st.button(f"Import {len(rows)} member{'s' if len(rows) != 1 else ''}", type="primary",
                  icon=":material/upload:", key=f"gm_go_{key}"):
         bar = st.progress(0.0, text="Importing…")
         res = run_import(supabase, gym_id, rows, update, bar)
+        if photo_up:
+            bar.progress(0.97, text="Matching photos…")
+            files = read_photo_files(photo_up)
+            fresh = pd.DataFrame(gw.fetch_all(supabase.table("members").select("id, full_name, email, phone")
+                                              .eq("gym_id", gym_id).order("id")))
+            jobs, unmatched = match_photos(files, fresh, res["keys"]) if not fresh.empty else ([], list(files))
+            ok, bad = save_photos(supabase, gym_id, jobs)
+            res["photos"] += ok
+            res["photo_fail"] += bad + len(unmatched)
         bar.empty()
         msg = (f"Imported from {source}: {res['created']} new, {res['updated']} updated"
                + (f", {res['skipped']} skipped" if res["skipped"] else "")
-               + (f", {res['visits']} last visits recorded" if res["visits"] else "") + ".")
+               + (f", {res['visits']} last visits recorded" if res["visits"] else "")
+               + (f", {res['photos']} photos added" if res.get("photos") else "") + ".")
+        if res.get("photo_fail"):
+            msg += (f" {res['photo_fail']} photo(s) couldn't be added (the link needed a login, or no member matched "
+                    "the file name); you can add them on the member's profile or with Add photos below.")
         if res["placeholders"]:
             msg += (f" {res['placeholders']} member(s) got a placeholder age, weight or height because the file "
                     "didn't include them; you can update these on their profiles.")
@@ -440,6 +566,35 @@ def render_gymmaster_import(supabase, gym_id):
             msg += f" {res['failed']} could not be imported (see below)."
         st.session_state["gm_flash"] = msg
         st.session_state["gm_up_key"] = key + 1
+        st.rerun()
+
+
+def render_photo_bulk(supabase, gym_id):
+    """Add photos to existing members in one go, any time."""
+    st.markdown("**Add photos for members you already have**")
+    st.caption("Upload a ZIP (or the image files) named by member email, phone or full name, for example "
+               "08031112222.jpg or Ada Obi.jpg. Photos are resized to keep the app fast.")
+    key = st.session_state.get("ph_up_key", 0)
+    files = st.file_uploader("Photos (ZIP or images)", type=["zip", "jpg", "jpeg", "png", "webp", "heic"],
+                             accept_multiple_files=True, key=f"ph_up_{key}")
+    if not files:
+        return
+    photos = read_photo_files(files)
+    members = pd.DataFrame(gw.fetch_all(supabase.table("members").select("id, full_name, email, phone")
+                                        .eq("gym_id", gym_id).order("id")))
+    if members.empty or not photos:
+        st.info("No photos or no members to match.")
+        return
+    jobs, unmatched = match_photos(photos, members)
+    st.caption(f"{len(photos)} photo(s): {len(jobs)} matched to a member"
+               + (f", {len(unmatched)} not matched ({', '.join(unmatched[:5])}{'…' if len(unmatched) > 5 else ''})"
+                  if unmatched else "") + ".")
+    if jobs and st.button(f"Add {len(jobs)} photo{'s' if len(jobs) != 1 else ''}", type="primary", key=f"ph_go_{key}"):
+        with st.spinner("Adding photos…"):
+            ok, bad = save_photos(supabase, gym_id, jobs)
+        gw.bump_data_version()
+        st.session_state["gm_flash"] = f"{ok} photo(s) added." + (f" {bad} couldn't be read." if bad else "")
+        st.session_state["ph_up_key"] = key + 1
         st.rerun()
 
 

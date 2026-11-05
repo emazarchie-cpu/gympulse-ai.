@@ -4,7 +4,8 @@ The gym shares usegympulseai.com/?join=<code> on WhatsApp or as a QR code at the
 front desk. Members fill in their own name, phone, email, goal and age, agree to
 the gym storing their details, and appear in the gym's member list (marked
 "joined via link"). The owner adds their plan afterwards, or imports plans from
-their old system. Database: sql/phase14_member_signup.sql.
+their old system. Database: sql/phase14_member_signup.sql (+ phase15 for the
+optional photo).
 """
 import io
 import secrets
@@ -54,6 +55,8 @@ def render_public(supabase, code):
             c3, c4 = st.columns(2)
             goal = c3.selectbox("Your main goal", GOALS, index=2)
             age = c4.number_input("Age (optional)", min_value=0, max_value=110, value=0, step=1)
+            photo = st.file_uploader("Your photo (optional, helps the front desk greet you)",
+                                     type=["jpg", "jpeg", "png", "webp", "heic", "heif"])
             consent = st.checkbox(f"I agree that {gym} can store my details and contact me about my membership. "
                                   "They are kept private, never sold, and I can ask for them to be deleted.")
             go = st.form_submit_button("Join", type="primary", use_container_width=True)
@@ -66,13 +69,25 @@ def render_public(supabase, code):
             elif not consent:
                 st.error("Please tick the box to agree, so the gym can keep your details.")
             else:
+                args = {"p_code": str(code), "p_name": name.strip(), "p_phone": phone.strip(),
+                        "p_email": email.strip(), "p_goal": goal, "p_age": int(age) or None, "p_consent": True}
+                pic = None
+                if photo is not None:
+                    try:
+                        pic = gw.process_photo(photo.getvalue())
+                    except Exception:
+                        pic = None
+                rows = []
                 try:
-                    rows = supabase.rpc("gp_member_join", {
-                        "p_code": str(code), "p_name": name.strip(), "p_phone": phone.strip(),
-                        "p_email": email.strip(), "p_goal": goal, "p_age": int(age) or None,
-                        "p_consent": True}).execute().data or []
+                    if pic:
+                        rows = supabase.rpc("gp_member_join", {**args, "p_photo": pic}).execute().data or []
                 except Exception:
-                    rows = []
+                    rows = []                    # photo step not set up yet: join without it
+                if not rows:
+                    try:
+                        rows = supabase.rpc("gp_member_join", args).execute().data or []
+                    except Exception:
+                        rows = []
                 r = rows[0] if isinstance(rows, list) and rows else None
                 if not r:
                     st.error("Something went wrong. Please check your details and try again.")

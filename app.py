@@ -2701,6 +2701,8 @@ elif page == "Member Management":
                          expanded=bool(st.session_state.get("gm_flash") or st.session_state.get("gm_errors"))):
             import gympulse_gymmaster as ggm
             ggm.render_gymmaster_import(supabase, gym_id)
+            st.divider()
+            ggm.render_photo_bulk(supabase, gym_id)
         with st.expander("Member sign-up link and QR code: members add their own details",
                          icon=":material/qr_code_2:"):
             import gympulse_signup as gsign
