@@ -469,9 +469,9 @@ def landing_top(lockup_uri, icon):
     </div>
     <div class="lx-demo" id="demo">
       <div class="lx-kicker">See it in action</div>
-      <div class="lx-h2">40 seconds. The whole retention loop.</div>
+      <div class="lx-h2">The whole retention loop, in under a minute.</div>
       <div class="lx-video">
-        <video src="/app/static/gympulse-demo.mp4" poster="/app/static/gympulse-demo-poster.jpg"
+        <video src="/app/static/gympulse-demo.mp4?v=2" poster="/app/static/gympulse-demo-poster.jpg?v=2"
                autoplay muted loop playsinline controls preload="metadata"
                aria-label="GymPulse AI product demo"></video>
       </div>
