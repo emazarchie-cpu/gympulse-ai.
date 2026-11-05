@@ -1057,6 +1057,11 @@ if st.query_params.get("demo") or st.query_params.get("demo_cancel"):
     gb.render_router(supabase)
     st.stop()
 
+# Paystack sends payers back here (?paystack=1&reference=...): check and apply the payment
+if st.query_params.get("paystack") and (st.query_params.get("reference") or st.query_params.get("trxref")):
+    gbill.handle_return(dict(st.query_params))
+    st.query_params.clear()
+
 # Initialise login state
 if "auth_user" not in st.session_state:
     st.session_state.auth_user = None
@@ -1124,10 +1129,13 @@ if st.session_state.auth_user is None:
 
     # Landing: navigation, hero and live product preview
     html(gd.landing_top(lockup_data_uri(900), icon))
+    if st.session_state.get("bill_flash"):
+        (st.success if st.session_state.get("bill_flash_ok") else st.info)(
+            st.session_state["bill_flash"] + " Sign in below to continue.")
     html("""
     <div class="lx-auth-head" id="get-started">
       <div class="lx-kicker">Your workspace</div>
-      <div class="lx-h2" style="font-size:30px;margin-bottom:4px;">Sign in or start free</div>
+      <div class="lx-h2" style="font-size:30px;margin-bottom:4px;">Sign in or start your 30-day free trial</div>
     </div>
     """)
 
@@ -1527,8 +1535,15 @@ if st.session_state.auth_user is None:
                 if st.button("Data Processing Agreement", key="open_dpa"):
                     show_dpa()
 
-    # LANDING PAGE SECTIONS
-    html(gd.landing_sections(icon, gw.ARCHIE_BOT_SVG))
+    # LANDING PAGE SECTIONS (pricing goes just before the closing call to action)
+    _sections = gd.landing_sections(icon, gw.ARCHIE_BOT_SVG)
+    _cut = _sections.index('<div class="lx-cta">')
+    html(_sections[:_cut])
+    try:
+        gbill.render_landing_pricing(icon)
+    except Exception as _price_error:
+        gmon.capture(_price_error, "landing pricing")
+    html(_sections[_cut:])
     st.stop()
 
 # =========================================================
@@ -1839,6 +1854,8 @@ if "current_page" not in st.session_state:
     # Every sign-in starts on the Dashboard, not on the page saved in the
     # address bar from the last visit.
     st.session_state["current_page"] = "Dashboard"
+    if st.query_params.get("p") == "Subscription":        # "Renew now" links in emails
+        st.session_state["current_page"] = "Subscription"
     try:
         if st.query_params.get("p"):
             del st.query_params["p"]
@@ -2527,14 +2544,23 @@ if st.session_state.get("gym_id") and st.session_state.get("_freeze_day") != str
 
 gl.render_acceptance_banner(supabase, owner_id)
 
-# Free trial and subscription: a line at the top, and the Subscription page
-# instead of the app once a trial has ended (after a few days' grace).
+# Free trial and subscription: the Upgrade pop-up and the Subscription page
+# instead of the app once a trial or plan has ended; pages above the gym's plan
+# show an upgrade card.
+_bill_upsell = False
 try:
     gbill.render_banner(supabase, st.session_state.get("gym_id"))
     if page not in gbill.ALWAYS_OPEN and gbill.must_lock(supabase, st.session_state.get("gym_id")):
         page = "Subscription"
+    elif not gbill.page_allowed(supabase, st.session_state.get("gym_id"), page):
+        _bill_upsell = True
 except Exception as _bill_error:
     gmon.capture(_bill_error, "billing")
+
+if _bill_upsell:
+    gbill.render_upsell(supabase, st.session_state.get("gym_id"), page)
+    gw.apply_theme(st.session_state.get("theme", "dark"))
+    st.stop()
 
 if page == "Dashboard":
     try:
