@@ -39,7 +39,11 @@ the Follow-ups inbox. Delivered and read ticks are tracked.
    | `WHATSAPP_VERIFY_TOKEN` | any passphrase you make up | | | ✓ |
 
 6. **Database**: run `sql/phase17_whatsapp.sql` in the Supabase SQL Editor.
-7. **Webhook**: Supabase → Edge Functions → Deploy a new function named `whatsapp-webhook`, paste
+7. **Webhook** (easiest, works from a phone): add the GitHub secrets `SUPABASE_ACCESS_TOKEN` (Supabase → avatar →
+   Account preferences → Access tokens), `WHATSAPP_APP_SECRET` and `WHATSAPP_VERIFY_TOKEN`, then GitHub → Actions →
+   **Deploy WhatsApp webhook** → Run workflow. It deploys the function with JWT verification off, saves its secrets
+   and prints the callback URL. Then do the Meta part below.
+   Or by hand: Supabase → Edge Functions → Deploy a new function named `whatsapp-webhook`, paste
    `supabase/functions/whatsapp-webhook/index.ts`, and turn **Enforce JWT verification off** (Meta can't send a
    Supabase login; the function checks Meta's signature instead). Add the three function secrets above.
    Then in the Meta app: WhatsApp → Configuration → Webhook: callback URL
