@@ -130,8 +130,17 @@ def pricing(supabase):
     return gw._cached(("billing_pricing",), fetch, ttl=300)
 
 
+def billing_on(p):
+    """False during pilot mode (Admin → Billing): nobody is locked or asked to pay."""
+    return p.get("billing_on", True) is not False
+
+
 def subscription(supabase, gym_id):
-    """The gym's subscription row, or None when billing tables aren't set up (never lock then)."""
+    """The gym's subscription row, or None when billing tables aren't set up or pilot mode is on
+    (never lock then)."""
+    if not billing_on(pricing(supabase)):
+        return None
+
     def fetch():
         try:
             rows = supabase.table("gym_subscriptions").select("*").eq("gym_id", gym_id).limit(1).execute().data
@@ -683,7 +692,8 @@ def render_subscription_page(supabase, gym_id):
     ps = plans(p)
     if s["status"] == "off":
         gw.page_header("Subscription", "Your GymPulse AI plan.", "Account")
-        st.info("Billing isn't switched on yet. Enjoy GymPulse AI free.")
+        st.success("You're part of the GymPulse AI pilot: every feature is free for now. We'll let you know well "
+                   "before anything changes.")
         return
     if view in ("checkout", "pay", "transfer", "sent") and st.session_state.get("sub_plan") in [x["name"] for x in ps]:
         plan = next(x for x in ps if x["name"] == st.session_state["sub_plan"])
@@ -942,6 +952,42 @@ def render_admin_billing(sc, gyms, audit):
     except Exception:
         st.info("Run sql/phase10_billing.sql in Supabase to switch on free trials and subscriptions.")
         return
+    with st.container(border=True):
+        on = billing_on(p)
+        c1, c2 = st.columns([3, 1.3], vertical_alignment="center")
+        c1.markdown("**Billing is ON**: trials end after 30 days and gyms pay to continue." if on else
+                    "**Pilot mode is ON**: every gym uses all features free. Nobody is locked, asked to pay or "
+                    "sent trial emails.")
+        new = c2.toggle("Charge gyms", value=on, key="adm_billing_on",
+                        help="Turn off during your pilot. Turn on when you're ready to start charging.")
+        if new != on:
+            sc.table("platform_settings").upsert({"key": "pricing", "value": {**{k: v for k, v in p.items()
+                                                                            if k in DEFAULT_PRICING or k == "plans"},
+                                                                         "billing_on": bool(new)},
+                                                  "updated_at": datetime.now(timezone.utc).isoformat()},
+                                                 on_conflict="key").execute()
+            audit(sc, "billing_switched_on" if new else "pilot_mode_on", {"gym": {"id": None}, "name": "All gyms",
+                                                                          "email": None})
+            st.session_state.pop("_cache", None)
+            st.session_state["adm_flash"] = ("Billing is on. Give everyone a fresh trial below if your pilot gyms "
+                                             "shouldn't be locked yet." if new else
+                                             "Pilot mode is on: every gym is free until you switch billing back on.")
+            st.rerun()
+        if on:
+            restart = st.button("Give every gym a fresh 30-day trial from today", key="adm_fresh_trials",
+                                help="For gyms still on a trial or whose trial ended. Paying and free-access gyms "
+                                     "are not changed.")
+            if restart:
+                end = (today + timedelta(days=TRIAL_DAYS - 1)).isoformat()
+                n = 0
+                for g in gyms:
+                    sub_ = subs.get(g["gym"]["id"], {})
+                    if sub_.get("status") in (None, "trial"):
+                        admin_set(sc, g["gym"]["id"], status="trial", trial_ends_on=end)
+                        n += 1
+                audit(sc, "fresh_trials", {"gym": {"id": None}, "name": "All gyms", "email": None}, {"gyms": n})
+                st.session_state["adm_flash"] = f"{n} gym{'s' if n != 1 else ''} now have 30 days free from today."
+                st.rerun()
     states = {g["gym"]["id"]: state(subs.get(g["gym"]["id"], {}), today) for g in gyms}
     gw.kpi_row([("On free trial", str(sum(s["status"] == "trial" for s in states.values())), "cyan", f"{TRIAL_DAYS} days"),
                 ("Paying", str(sum(s["status"] == "active" for s in states.values())), "lime", ""),
@@ -994,7 +1040,7 @@ def render_admin_billing(sc, gyms, audit):
                 value = {"plans": plan_list, "monthly": None, "yearly": None, "currency": "NGN",
                          "pay_link": link.strip(), "bank_name": bank.strip(), "bank_account": acct.strip(),
                          "bank_holder": holder.strip(), "contact_whatsapp": wa.strip(),
-                         "contact_email": em.strip(), "note": note.strip()}
+                         "contact_email": em.strip(), "note": note.strip(), "billing_on": billing_on(p)}
                 sc.table("platform_settings").upsert({"key": "pricing", "value": value,
                                                       "updated_at": datetime.now(timezone.utc).isoformat()},
                                                      on_conflict="key").execute()
@@ -1128,9 +1174,12 @@ def gym_levels(sc):
     try:
         subs = sc.table("gym_subscriptions").select("*").execute().data or []
         rows = sc.table("platform_settings").select("value").eq("key", "pricing").limit(1).execute().data
-        ps = plans({**DEFAULT_PRICING, **(rows[0]["value"] if rows else {})})
+        p = {**DEFAULT_PRICING, **(rows[0]["value"] if rows else {})}
+        ps = plans(p)
     except Exception:
         return {}
+    if not billing_on(p):
+        return {}                                     # pilot mode: every gym gets everything
     return {r["gym_id"]: access_level(r, ps) for r in subs}
 
 
@@ -1149,6 +1198,9 @@ def trial_reminders(sc, gyms, dry_run=False, log=print):
         p = {**DEFAULT_PRICING, **(rows[0]["value"] if rows else {})}
     except Exception:
         log("billing tables missing: run sql/phase10_billing.sql")
+        return 0
+    if not billing_on(p):
+        log("pilot mode: no trial or renewal emails")
         return 0
     key, sent = gadm._env("RESEND_API_KEY"), 0
     for g in gyms:
