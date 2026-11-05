@@ -252,6 +252,15 @@ def send_receipt(sc, inv, extra_to=None):
     to = [e for e in {gw._text(inv.get("billing_email")).lower(), gw._text(extra_to).lower()} if "@" in e]
     if not (key and to):
         return False
+    copy_to = gadm._env("BILLING_COPY_TO")
+    if not copy_to:
+        try:
+            rows = sc.table("platform_settings").select("value").eq("key", "pricing").limit(1).execute().data
+            copy_to = ((rows[0]["value"] if rows else {}) or {}).get("contact_email") or ""
+        except Exception:
+            copy_to = ""
+    copy_to = copy_to or "emmanuel@usegympulseai.com"
+    bcc = [copy_to] if "@" in copy_to and copy_to.lower() not in to else []
     first = gw._text(inv.get("billing_name")).split(" ")[0] or "there"
     until = ""
     try:
@@ -271,7 +280,7 @@ def send_receipt(sc, inv, extra_to=None):
     try:
         r = requests.post("https://api.resend.com/emails", timeout=25, headers={"Authorization": f"Bearer {key}"},
                           json={"from": gadm._env("BILLING_FROM", "GymPulse AI <billing@usegympulseai.com>"),
-                                "to": to, "reply_to": "emmanuel@usegympulseai.com",
+                                "to": to, **({"bcc": bcc} if bcc else {}), "reply_to": "emmanuel@usegympulseai.com",
                                 "subject": f"Your GymPulse AI receipt {number(inv)}",
                                 "html": ge.layout("Payment received", body,
                                                   preheader=f"Receipt {number(inv)} · {money(inv.get('amount'))}"),
