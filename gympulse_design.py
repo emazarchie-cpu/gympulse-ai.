@@ -365,6 +365,17 @@ html body .st-key-auth_card { border-radius: 22px !important; border: 1px solid 
     .lx-mk b { font-size: 15px; }
 }
 
+/* ---- tool header cards ---- */
+html body [class*="st-key-intro_"] { border: 1px solid var(--gp-line); border-radius: 18px; padding: 16px 22px 14px;
+    margin: 2px 0 10px; gap: 4px !important;
+    background: radial-gradient(520px 150px at 0% 0%, rgba(183,243,74,0.10), transparent 70%), var(--gp-s1); }
+html body [class*="st-key-intro_"] p strong { font-size: 18px; font-weight: 700; color: var(--gp-text); }
+html body [class*="st-key-intro_"] [data-testid="stIconMaterial"] { color: var(--gp-lime); font-size: 22px !important; vertical-align: -4px; margin-right: 4px; }
+html body [class*="st-key-intro_"] [data-testid="stMarkdownContainer"] p { margin-bottom: 0 !important; }
+.gp-intro-s { color: var(--gp-muted); font-size: 13.5px; line-height: 1.6; max-width: 900px; margin-top: 6px; }
+.gp-intro-t { font-weight: 700; font-size: 18px; color: var(--gp-text); }
+/* Grow: group switcher above the tool tabs */
+html body .st-key-grow_groups [data-testid="stButtonGroup"] button { font-weight: 700; }
 /* ---- tables: one clean style everywhere ---- */
 .gp-tbl-wrap { border: 1px solid var(--gp-line); border-radius: 16px; overflow: auto; background: var(--gp-s1);
     margin: 4px 0 10px; -webkit-overflow-scrolling: touch; }
@@ -647,6 +658,7 @@ html body .stApp.stApp [data-testid="stVerticalBlock"]:is([class*="st-key-card_"
     box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 10px 28px -18px rgba(15,23,42,0.2) !important; }
 html body .stApp.stApp [data-testid="stExpander"] details { background: #FFFFFF !important;
     border-color: rgba(15,23,42,0.1) !important; }
+html body .stApp.stApp [data-testid="stExpander"] summary { background: #FFFFFF !important; color: #0F172A !important; }
 html body .stApp.stApp [data-testid="stExpander"] summary:hover { background: #F6F8FB !important; }
 html body .stApp.stApp [data-testid="stChatMessage"] { background: #FFFFFF !important;
     border: 1px solid rgba(15,23,42,0.08) !important; }

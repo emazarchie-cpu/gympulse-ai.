@@ -167,7 +167,7 @@ def render_team(supabase, gym_id):
     if rows is None:
         st.info(SQL_HINT)
         return
-    st.caption("Give your team their own login. Staff can run the gym day to day, while business numbers, "
+    gw.intro("Team & access", ":material/badge:", "Give your team their own login. Staff can run the gym day to day, while business numbers, "
                "billing and settings stay with you.")
     c1, c2 = st.columns(2)
     with c1.container(border=True):

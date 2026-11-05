@@ -124,7 +124,7 @@ def _send(supabase, gym_id, members, subject, body, ref):
 def render_updates(supabase, gym_id):
     import gympulse_grow as gg
     import gympulse_campaigns as gcamp
-    st.caption("Power out, AC down, no water, or anything else? Tell your members straight away, then again "
+    gw.intro("Gym updates", ":material/campaign:", "Power out, AC down, no water, or anything else? Tell your members straight away, then again "
                "when it's fixed. One bad visit with no explanation is how members quietly stop coming.")
     biz, owner = gg._biz()
     c1, c2 = st.columns(2)

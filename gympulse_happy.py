@@ -143,7 +143,7 @@ def load(supabase, gym_id):
 def render_happiness(supabase, gym_id):
     import gympulse_grow as gg
     import gympulse_loyalty as gl
-    st.caption("A one-tap question by email: \"How happy are you with the gym?\" Unhappy answers are emailed to you "
+    gw.intro("Member happiness", ":material/sentiment_satisfied:", "A one-tap question by email: \"How happy are you with the gym?\" Unhappy answers are emailed to you "
                "straight away, so you can fix things before a member quits. Switch it on in Automatic messages.")
     if not gl.auto_cfg()["pulse"]["on"]:
         st.info("The happiness check is off. Turn it on in Grow → Automatic messages.")
