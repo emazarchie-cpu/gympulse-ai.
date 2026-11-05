@@ -435,7 +435,7 @@ def _redeem(supabase, gym_id, mid, reward):
 
 def render_loyalty(supabase, gym_id, owner_id):
     import gympulse_grow as gg
-    st.caption("Members get points each time they come to the gym and when they renew on time. "
+    gw.intro("Loyalty points", ":material/loyalty:", "Members get points each time they come to the gym and when they renew on time. "
                "When they have enough points, they get a gift you choose, like a free smoothie or a free session.")
     cfg = loyalty_cfg()
     with st.expander("Points and gifts" + ("" if cfg["enabled"] else " · turn it on here"),
@@ -558,39 +558,50 @@ def _send_now(supabase, gym_id):
 
 def render_auto(supabase, gym_id, owner_id):
     import gympulse_grow as gg
-    st.caption("Turn these on and GymPulse emails your members for you every morning at 8:30, with your logo. "
+    gw.intro("Automatic messages", ":material/schedule_send:", "Turn these on and GymPulse emails your members for you every morning at 8:30, with your logo. "
                "You don't have to press send. Nobody gets the same email twice.")
     auto = auto_cfg()
-    with st.form("auto_form"):
-        c1, c2 = st.columns([1, 2])
-        r_on = c1.toggle("Remind them to renew", value=auto["renewal"]["on"])
-        r_days = c2.number_input("How many days before their membership ends", 1, 14, int(auto["renewal"]["days"]))
-        c3, c4 = st.columns([1, 2])
-        m_on = c3.toggle("\"We missed you\" when they stop coming", value=auto["missed"]["on"])
-        m_days = c4.number_input("After how many days of not coming", 3, 30, int(auto["missed"]["days"]),
-                                 help="Only for members whose membership is still running.")
-        pause_on = st.checkbox("In \"we missed you\", offer to pause their membership if now isn't a good time",
-                               value=bool(auto["missed"].get("pause", True)),
-                               help="Many members stop because money or time is tight. A pause keeps them with you.")
-        w_on = st.toggle("Check in with new members about two weeks after they join", value=auto["welcome"]["on"],
-                         help="Warmer and more practical if they've barely come in. Most members who quit do it "
-                              "in their first 3 months.")
-        pr_on = st.toggle("Monthly progress note (\"you trained 14 times in October\")", value=auto["progress"]["on"],
-                          help="Sent in the first week of the month, only to members who came 4 or more times.")
-        wk_on = st.toggle("\"How was your first week?\" 7 days after they join", value=auto["week1"]["on"])
-        ms_on = st.toggle("Celebrate milestones (25, 50, 100+ visits, 12 strong weeks, joining anniversaries)",
-                          value=auto["milestone"]["on"])
-        c5, c6 = st.columns([1, 2])
-        hp_on = c5.toggle("Happiness check (one tap)", value=auto["pulse"]["on"],
-                          help="\"How happy are you with the gym?\" Unhappy answers are emailed to you straight away. "
-                               "See answers in Grow → Happiness.")
-        hp_freq = c6.radio("How often", ["quarter", "month"], horizontal=True,
-                           index=0 if auto["pulse"].get("freq", "quarter") == "quarter" else 1,
-                           format_func=lambda v: "Every 3 months" if v == "quarter" else "Every month")
-        rw_on = st.toggle("Tell them when they've earned a gift (loyalty must be on)", value=auto["reward"]["on"])
-        lv_on = st.toggle("Tell them when they move up a loyalty level (levels must be on)", value=auto["level"]["on"])
-        cap = st.number_input("Most emails in one day", 10, 500, int(auto["daily_cap"]),
-                              help="A limit so you don't send too many at once. The free email plan allows 100 a day.")
+    with st.form("auto_form", border=False):
+        g1, g2 = st.columns(2)
+        with g1.container(border=True):
+            st.markdown("##### :material/autorenew: Renewals and win-backs")
+            c1, c2 = st.columns([1.3, 1])
+            r_on = c1.toggle("Remind them to renew", value=auto["renewal"]["on"])
+            r_days = c2.number_input("Days before it ends", 1, 14, int(auto["renewal"]["days"]))
+            c3, c4 = st.columns([1.3, 1])
+            m_on = c3.toggle("\"We missed you\"", value=auto["missed"]["on"],
+                             help="Only for members whose membership is still running.")
+            m_days = c4.number_input("Days away", 3, 30, int(auto["missed"]["days"]))
+            pause_on = st.checkbox("Offer to pause their membership if now isn't a good time",
+                                   value=bool(auto["missed"].get("pause", True)),
+                                   help="Many members stop because money or time is tight. A pause keeps them with you.")
+        with g2.container(border=True):
+            st.markdown("##### :material/person_add: New members")
+            wk_on = st.toggle("\"How was your first week?\" (day 7)", value=auto["week1"]["on"])
+            w_on = st.toggle("Two-week check-in (day 14)", value=auto["welcome"]["on"],
+                             help="Warmer and more practical if they've barely come in. Most members who quit do it "
+                                  "in their first 3 months.")
+            st.caption("Most members who quit do it in their first 3 months.")
+        g3, g4 = st.columns(2)
+        with g3.container(border=True):
+            st.markdown("##### :material/celebration: Recognition")
+            ms_on = st.toggle("Milestones (25, 50, 100+ visits, 12 strong weeks, anniversaries)",
+                              value=auto["milestone"]["on"])
+            pr_on = st.toggle("Monthly progress note (\"you trained 14 times in October\")",
+                              value=auto["progress"]["on"],
+                              help="Sent in the first week of the month, only to members who came 4 or more times.")
+            rw_on = st.toggle("Gift earned (loyalty must be on)", value=auto["reward"]["on"])
+            lv_on = st.toggle("New loyalty level (levels must be on)", value=auto["level"]["on"])
+        with g4.container(border=True):
+            st.markdown("##### :material/sentiment_satisfied: Feedback")
+            hp_on = st.toggle("Happiness check (one tap)", value=auto["pulse"]["on"],
+                              help="\"How happy are you with the gym?\" Unhappy answers are emailed to you straight "
+                                   "away. See answers in Grow → Happiness.")
+            hp_freq = st.radio("How often", ["quarter", "month"], horizontal=True,
+                               index=0 if auto["pulse"].get("freq", "quarter") == "quarter" else 1,
+                               format_func=lambda v: "Every 3 months" if v == "quarter" else "Every month")
+            cap = st.number_input("Most emails in one day", 10, 500, int(auto["daily_cap"]),
+                                  help="A limit so you don't send too many at once. The free email plan allows 100 a day.")
         if st.form_submit_button("Save", type="primary"):
             gg._save_settings(supabase, owner_id, {"auto_messages": {
                 "renewal": {"on": bool(r_on), "days": int(r_days)},

@@ -20,6 +20,13 @@ import gympulse_workspaces as gw
 
 SQL_HINT = "Run sql/phase5_growth.sql in Supabase to switch this on."
 
+GROUPS = {
+    "Renewals & messages": ["Collect renewals", "Automatic messages", "Gym updates"],
+    "Engagement": ["Happiness", "Celebrate", "Loyalty", "Challenges", "Progress", "Class invites"],
+    "New & leaving": ["New members", "Freeze", "Why they left"],
+    "Growth": ["Referrals", "Corporate", "Season planner"],
+    "Team & reports": ["Team", "Monthly report"],
+}
 SECTIONS = ["Collect renewals", "Automatic messages", "Gym updates", "Happiness", "Celebrate", "Loyalty", "New members", "Class invites", "Freeze", "Why they left", "Progress",
             "Referrals", "Challenges", "Corporate", "Team", "Season planner", "Monthly report"]
 
@@ -406,6 +413,9 @@ def _log_request(supabase, gym_id, mid, amount, plan, ref, channel="WhatsApp"):
 
 
 def render_collect(supabase, gym_id, owner_id):
+    gw.intro("Collect renewals", ":material/payments:",
+             "Everyone renewing in the next 14 days or lapsed in the last 30, with a friendly invitation to renew "
+             "by email or WhatsApp, and a board of payments you're waiting for.")
     s = _settings()
     pay = dict(s.get("collect") or {})
     with st.expander("Your payment details" + ("" if pay.get("bank_account") or pay.get("paystack_link")
@@ -616,7 +626,7 @@ def _step_done(supabase, gym_id, mid, step):
 
 
 def render_onboarding(supabase, gym_id):
-    st.caption("New members quit the most. This gives each new member 6 friendly messages in their first 3 months, "
+    gw.intro("New members", ":material/person_add:", "New members quit the most. This gives each new member 6 friendly messages in their first 3 months, "
                "and warns you if someone hasn't come in during their first week. Members who come 5 times in their "
                "first month, and 20 times in their first 60 days, usually stay: GymPulse tracks both for you.")
     done_rows = _rows(supabase, "onboarding_steps", gym_id)
@@ -728,7 +738,7 @@ def create_freeze(supabase, gym_id, m, start, end, reason, extend=True):
 
 
 def render_freeze(supabase, gym_id):
-    st.caption("Someone travelling or busy? Pause their membership instead of losing them. They don't lose the days "
+    gw.intro("Freeze a membership", ":material/pause_circle:", "Someone travelling or busy? Pause their membership instead of losing them. They don't lose the days "
                "they paid for: their end date moves forward by the days they were away.")
     rows = _rows(supabase, "member_freezes", gym_id, order="starts_on")
     if _need_sql(rows):
@@ -844,7 +854,7 @@ def _reply_reason(supabase, gym_id, member_id):
 
 
 def render_exit(supabase, gym_id):
-    st.caption("Ask members who stopped coming why they left, write down their answer, and see the most common "
+    gw.intro("Why members left", ":material/logout:", "Ask members who stopped coming why they left, write down their answer, and see the most common "
                "reasons so you know what to fix.")
     rows = _rows(supabase, "exit_reasons", gym_id)
     if _need_sql(rows):
@@ -937,7 +947,7 @@ def shoutout(name, goal, summary):
 
 
 def render_progress(supabase, gym_id):
-    st.caption("Members stay when they see results. Write down their weight or best lift, and when they improve, "
+    gw.intro("Member progress", ":material/trending_up:", "Members stay when they see results. Write down their weight or best lift, and when they improve, "
                "GymPulse writes them a \"well done\" message for you.")
     logs = _rows(supabase, "progress_logs", gym_id, order="logged_on", desc=False)
     if _need_sql(logs):
@@ -1026,7 +1036,7 @@ REF_STAGES = ["invited", "visited", "joined", "rewarded"]
 
 
 def render_referrals(supabase, gym_id, owner_id):
-    st.caption("Ask members to bring a friend. When the friend joins, the member gets a gift you choose. "
+    gw.intro("Referrals", ":material/share:", "Ask members to bring a friend. When the friend joins, the member gets a gift you choose. "
                "Keep track of every friend from invite to joining.")
     rows = _rows(supabase, "referrals", gym_id)
     if _need_sql(rows):
@@ -1135,7 +1145,7 @@ def leaderboard(challenge, entries, checkins):
 
 
 def render_challenges(supabase, gym_id):
-    st.caption("Start a challenge, like \"come 12 times this month\". Every visit counts (one per day) and the "
+    gw.intro("Challenges", ":material/emoji_events:", "Start a challenge, like \"come 12 times this month\". Every visit counts (one per day) and the "
                "ranking updates by itself.")
     chals = _rows(supabase, "challenges", gym_id, order="starts_on")
     entries = _rows(supabase, "challenge_entries", gym_id)
@@ -1267,7 +1277,7 @@ def company_pdf(rep):
 
 
 def render_corporate(supabase, gym_id):
-    st.caption("Sell gym memberships to companies for their staff. Then send the company a monthly report "
+    gw.intro("Corporate plans", ":material/apartment:", "Sell gym memberships to companies for their staff. Then send the company a monthly report "
                "showing which staff came to the gym.")
     comps = _rows(supabase, "companies", gym_id, order="name", desc=False)
     if _need_sql(comps):
@@ -1398,7 +1408,7 @@ def team_board(actions, payments, days=30):
 
 
 def render_team(supabase, gym_id, assess_fn):
-    st.caption("See which of your staff kept the most members (and money) in the last 30 days by following up "
+    gw.intro("Team leaderboard", ":material/leaderboard:", "See which of your staff kept the most members (and money) in the last 30 days by following up "
                "with members.")
     import gympulse_revenue as gr
     actions = gw.load_actions(supabase, gym_id, include_archived=True)
@@ -1506,7 +1516,7 @@ def upcoming(today=None, horizon=120):
 
 
 def render_seasons(supabase, gym_id):
-    st.caption("Busy and quiet times of the year in Nigeria (like January, Ramadan and December), what to do for each, "
+    gw.intro("Season planner", ":material/calendar_month:", "Busy and quiet times of the year in Nigeria (like January, Ramadan and December), what to do for each, "
                "and a ready message. Ramadan and Eid dates are guesses, so check them nearer the time.")
     biz, _ = _biz()
     today = _today()
@@ -1644,7 +1654,7 @@ def monthly_pdf(d):
 
 
 def render_monthly(supabase, gym_id, assess_fn, owner_id):
-    st.caption("How your gym did this month: members kept, money made, new members and visits. GymPulse AI "
+    gw.intro("Monthly report", ":material/summarize:", "How your gym did this month: members kept, money made, new members and visits. GymPulse AI "
                "also emails you this report on the 1st of every month.")
     today = _today()
     which = st.radio("Period", ["Last month", "This month so far"], horizontal=True, key="grow_mr_period")
@@ -1706,12 +1716,33 @@ def render_grow(supabase, gym_id, assess_fn, owner_id):
     # and come back to the same tab (e.g. Loyalty after opening a profile).
     if "grow_section" not in st.session_state:
         st.session_state["grow_section"] = st.session_state.get("_grow_last", SECTIONS[0])
-    sections = [x for x in SECTIONS if not (st.session_state.get("role") == "staff"
-                                            and x in ("Monthly report", "Team"))]
-    if st.session_state.get("grow_section") not in sections:
-        st.session_state["grow_section"] = sections[0]
-    section = st.segmented_control("Grow section", sections, key="grow_section",
-                                   label_visibility="collapsed") or SECTIONS[0]
+    staff = st.session_state.get("role") == "staff"
+    groups = {g: [x for x in items if not (staff and x in ("Monthly report", "Team"))]
+              for g, items in GROUPS.items()}
+    groups = {g: items for g, items in groups.items() if items}
+    allowed = [x for items in groups.values() for x in items]
+    if st.session_state.get("grow_section") is None and st.session_state.get("_grow_last") in allowed:
+        st.session_state["grow_section"] = st.session_state["_grow_last"]   # clicked the open tab again
+    if st.session_state.get("grow_section") not in allowed:
+        st.session_state["grow_section"] = allowed[0]
+    want = next(g for g, items in groups.items() if st.session_state["grow_section"] in items)
+    if st.session_state.get("grow_group") != want:
+        st.session_state["grow_group"] = want
+
+    def _group_changed():
+        g = st.session_state.get("grow_group")
+        if g is None:                       # clicked the open area again: stay where we are
+            return
+        st.session_state["grow_section"] = groups[g][0]
+
+    with st.container(key="grow_groups"):
+        group = st.segmented_control("Grow area", list(groups), key="grow_group", label_visibility="collapsed",
+                                     on_change=_group_changed) or want
+    if st.session_state["grow_section"] not in groups[group]:
+        st.session_state["grow_section"] = groups[group][0]
+    with st.container(key="grow_secs"):
+        section = st.segmented_control("Grow section", groups[group], key="grow_section",
+                                       label_visibility="collapsed") or groups[group][0]
     st.session_state["_grow_last"] = section
     if section == "Collect renewals":
         render_collect(supabase, gym_id, owner_id)

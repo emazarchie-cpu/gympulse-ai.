@@ -99,7 +99,7 @@ def status_post(biz, row, month_start):
 
 def render_celebrate(supabase, gym_id):
     import gympulse_grow as gg
-    st.caption("Members who feel seen stay longer. Here are the milestones members reached recently, and a "
+    gw.intro("Celebrate your members", ":material/celebration:", "Members who feel seen stay longer. Here are the milestones members reached recently, and a "
                "member of the month you can celebrate on your WhatsApp Status. Turn on \"Celebrate milestones\" in "
                "Automatic messages and GymPulse emails them for you.")
     members = gg._members(supabase, gym_id)

@@ -384,6 +384,14 @@ def table(rows, pills=(), wide=(), max_height=520, empty="Nothing here yet.", ca
         (target or st).caption(caption)
 
 
+def intro(title, icon, text):
+    """The header card at the top of a tool: icon, title and one line on what it's for."""
+    key = "intro_" + "".join(ch for ch in title.lower() if ch.isalnum())
+    with st.container(key=key):
+        st.markdown(f"**{icon} {title}**" if icon else f"**{title}**")
+        st.markdown(f"<div class='gp-intro-s'>{_esc(text)}</div>", unsafe_allow_html=True)
+
+
 def kpi_row(cards):
     cols = st.columns(len(cards))
     for col, card in zip(cols, cards):

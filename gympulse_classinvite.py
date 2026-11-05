@@ -49,7 +49,7 @@ def invite_text(m, classes, biz, owner):
 
 def render_class_invites(supabase, gym_id):
     import gympulse_grow as gg
-    st.caption("Members who only use the equipment are more likely to cancel than members who join group classes: "
+    gw.intro("Class invites", ":material/groups:", "Members who only use the equipment are more likely to cancel than members who join group classes: "
                "classes give them friends and a coach who notices them. These members train regularly but haven't "
                "been to a class yet.")
     classes = gw.load_classes(supabase, gym_id)
