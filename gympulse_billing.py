@@ -189,67 +189,63 @@ def render_banner(supabase, gym_id):
     return s
 
 
-def period_picker(ps, key):
-    """Monthly / Yearly switch. Returns 'monthly' or 'yearly'."""
-    save = yearly_saving(ps)
-    if not any(x.get("yearly") for x in ps):
-        return "monthly"
-    pick = st.segmented_control("Billing", ["monthly", "yearly"], default="monthly", key=key,
-                                label_visibility="collapsed",
-                                format_func=lambda v: "Monthly" if v == "monthly" else
-                                ("Yearly · " + save if save else "Yearly"))
-    return pick or "monthly"
+def _saving(plan):
+    if plan.get("monthly") and plan.get("yearly"):
+        saved = plan["monthly"] * 12 - plan["yearly"]
+        return saved if saved > 0 else 0
+    return 0
 
 
-def _price_line(plan, period):
-    amount = price_for(plan, period)
-    if not amount:
-        return "", "", ""
-    if period == "yearly":
-        sub = f"{_money(amount / 12)} a month, billed {_money(amount)} once a year"
-        if plan.get("monthly"):
-            saved = plan["monthly"] * 12 - amount
-            if saved > 0:
-                sub += f" · you save {_money(saved)}"
-        return _money(amount), "/ year", sub
-    return _money(amount), "/ month", "Billed monthly. Cancel any time."
+def compare_rows(ps):
+    """[(benefit, [True/False per plan])], cheapest level first."""
+    return [(f, [x["access"] >= lv for x in ps]) for lv in (1, 2, 3) for f in FEATURES[lv]]
 
 
-def _plan_cards(p, period="monthly", pay=None, key="pc"):
-    """Plan cards inside the app. pay(plan) is called when a Choose button is pressed."""
+def compare_table_html(ps, light=False):
+    """A plain table: one row per benefit, a tick under each plan that includes it."""
+    line = "rgba(15,23,42,0.1)" if light else "rgba(255,255,255,0.08)"
+    yes = "#4D7C0F" if light else "#B7F34A"
+    head = "".join(f'<th style="padding:10px 8px;text-align:center;font-weight:700;white-space:nowrap">'
+                   f'{gw._esc(x["name"])}</th>' for x in ps)
+    rows = "".join(
+        f'<tr style="border-top:1px solid {line}"><td style="padding:9px 8px;text-align:left">{gw._esc(f)}</td>'
+        + "".join(f'<td style="padding:9px 8px;text-align:center;color:{yes};font-weight:800">{"✓" if ok else ""}</td>'
+                  for ok in marks) + "</tr>" for f, marks in compare_rows(ps))
+    return (f'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13.5px">'
+            f'<thead><tr><th style="padding:10px 8px;text-align:left;font-weight:600;opacity:.7">What you get</th>{head}'
+            f'</tr></thead><tbody>{rows}</tbody></table></div>')
+
+
+def _plan_cards(p, pay=None, key="pc"):
+    """Plan tiles inside the app: monthly and yearly price side by side, then the comparison table."""
     ps = plans(p)
     cols = st.columns(len(ps) if len(ps) <= 3 else 3)
     for i, plan in enumerate(ps):
         with cols[i % len(cols)].container(border=True):
-            if plan.get("popular"):
-                gw._md(gw.chip("Most popular", "lime"))
-            st.markdown(f"#### {gw._esc(plan['name'])}")
-            if plan.get("tagline"):
-                st.caption(gw._esc(plan["tagline"]))
-            line = _price_line(plan, period)
-            if line[0]:
-                st.markdown(f"<div style='font-size:30px;font-weight:800;line-height:1.1'>{line[0]}"
-                            f"<span style='font-size:14px;font-weight:500;opacity:.7'> {line[1]}</span></div>",
-                            unsafe_allow_html=True)
-                st.caption(line[2])
+            title = gw._esc(plan["name"]) + ("  ·  :green[Recommended]" if plan.get("popular") else "")
+            st.markdown(f"**{title}**")
             if plan.get("for_who"):
-                st.markdown(f"**{gw._esc(plan['for_who'])}**")
+                st.caption(f"For gyms with {gw._esc(plan['for_who'][0].lower() + plan['for_who'][1:])}")
+            if plan.get("monthly"):
+                st.markdown(f"<span style='font-size:26px;font-weight:800'>{_money(plan['monthly'])}</span> "
+                            f"<span style='opacity:.7'>per month</span>", unsafe_allow_html=True)
+            if plan.get("yearly"):
+                saved = _saving(plan)
+                st.caption(f"Or {_money(plan['yearly'])} for the whole year"
+                           + (f" (you keep {_money(saved)})" if saved else ""))
             if pay:
-                pay(plan, period, i)
-            head, items = features(ps, i)
-            st.caption(head)
-            st.markdown("  \n".join(f":green[✓] {gw._esc(f)}" for f in items))
+                pay(plan, "monthly", i)
+                pay(plan, "yearly", i)
+    with st.expander("Compare what each plan includes", expanded=pay is not None):
+        gw._md(compare_table_html(ps, light=st.session_state.get("theme") == "light"))
 
 
 def _upgrade_body(p, s):
-    st.markdown("Pick a plan to keep using GymPulse AI. **All your members, check-ins and reports are saved**, "
-                "and you'll pick up right where you left off.")
-    ps = plans(p)
-    period = period_picker(ps, "upg_period")
-    _plan_cards(p, period, key="upg")
-    if st.button("Upgrade now", type="primary", use_container_width=True, icon=":material/rocket_launch:"):
+    st.markdown("Choose a plan to carry on. **Your members, check-ins and reports are all still here**, "
+                "exactly as you left them.")
+    _plan_cards(p, key="upg")
+    if st.button("Choose a plan", type="primary", use_container_width=True, icon=":material/rocket_launch:"):
         st.session_state["navigate_to"] = "Subscription"
-        st.session_state["bill_period"] = period
         st.rerun()
 
 
@@ -309,38 +305,43 @@ def public_pricing():
     return gw._cached(("public_pricing",), fetch, ttl=300)
 
 
-def landing_cards_html(ps, period, icon):
-    cards = []
-    for i, plan in enumerate(ps):
-        price, unit, sub = _price_line(plan, period)
-        head, items = features(ps, i)
-        cards.append(
-            f'<div class="lx-plan{" pop" if plan.get("popular") else ""}">'
-            + ('<div class="lx-plan-badge">Most popular</div>' if plan.get("popular") else "")
-            + f'<h4>{gw._esc(plan["name"])}</h4><div class="lx-plan-tag">{gw._esc(plan.get("tagline"))}</div>'
-            + (f'<div class="lx-plan-price">{price} <small>{unit}</small></div><div class="lx-plan-sub">{sub}</div>'
-               if price else '<div class="lx-plan-price">Ask us</div><div class="lx-plan-sub"></div>')
-            + (f'<div class="lx-plan-who">{gw._esc(plan["for_who"])}</div>' if plan.get("for_who") else "")
-            + f'<a class="lx-btn{" lx-btn-primary" if plan.get("popular") else ""}" href="#get-started">'
-              f'Start 30 days free</a>'
-            + f'<div class="lx-plan-head">{gw._esc(head)}</div><ul>'
-            + "".join(f"<li>{icon('check', 15)}<span>{gw._esc(f)}</span></li>" for f in items)
-            + "</ul></div>")
-    return f'<div class="lx-plans" style="--n:{min(len(ps), 3)}">' + "".join(cards) + "</div>"
+def landing_cards_html(ps, icon):
+    tiles = []
+    for plan in ps:
+        saved = _saving(plan)
+        tiles.append(
+            f'<div class="lx-tier{" rec" if plan.get("popular") else ""}">'
+            + ('<span class="lx-tier-rec">Recommended</span>' if plan.get("popular") else "")
+            + f'<div class="lx-tier-name">{gw._esc(plan["name"])}</div>'
+            + (f'<div class="lx-tier-who">{gw._esc(plan["for_who"])}</div>' if plan.get("for_who") else "")
+            + (f'<div class="lx-tier-line">{gw._esc(plan["tagline"])}</div>' if plan.get("tagline") else "")
+            + '<div class="lx-tier-prices">'
+            + (f'<div><b>{_money(plan["monthly"])}</b><span>per month</span></div>' if plan.get("monthly") else "")
+            + (f'<div><b>{_money(plan["yearly"])}</b><span>per year'
+               + (f' · keep {_money(saved)}' if saved else "") + '</span></div>' if plan.get("yearly") else "")
+            + "</div></div>")
+    head = "".join(f"<th>{gw._esc(x['name'])}</th>" for x in ps)
+    rows = "".join(f"<tr><td>{gw._esc(f)}</td>" + "".join(
+        f"<td>{icon('check', 16) if ok else '<i>–</i>'}</td>" for ok in marks) + "</tr>"
+        for f, marks in compare_rows(ps))
+    return (f'<div class="lx-tiers" style="--n:{min(len(ps), 3)}">' + "".join(tiles) + "</div>"
+            + f'<div class="lx-compare"><table><thead><tr><th>What you get</th>{head}</tr></thead>'
+              f'<tbody>{rows}</tbody></table></div>')
 
 
 def render_landing_pricing(icon):
     p = public_pricing()
     ps = plans(p)
     gw._md("""<div class="lx-sec" id="pricing" style="padding-bottom:0">
-      <div class="lx-kicker">Pricing</div>
-      <div class="lx-h2">Try everything free for 30 days</div>
-      <div class="lx-sub" style="margin-bottom:18px">Every plan starts with a 30-day free trial of every feature.
-        No card needed. Pick a plan when your trial ends, and pay monthly or yearly.</div></div>""")
-    with st.container(key="lx_period"):
-        period = period_picker(ps, "lx_period_pick")
-    gw._md(landing_cards_html(ps, period, icon)
-           + f'<div class="lx-plan-foot">Prices in naira. Pay by card, bank transfer or USSD. '
+      <div class="lx-kicker">Plans and prices</div>
+      <div class="lx-h2">Your first 30 days are on us</div>
+      <div class="lx-sub" style="margin-bottom:22px">Sign up and use every part of GymPulse AI free for a month,
+        with no card. After that, choose the plan that fits your gym and pay month by month, or for the whole year
+        and spend less.</div></div>""")
+    gw._md(landing_cards_html(ps, icon)
+           + '<div class="lx-demo-cta" style="margin-top:22px"><a class="lx-btn lx-btn-primary" href="#get-started">'
+             'Start your free month</a></div>'
+           + f'<div class="lx-plan-foot">All prices in naira. Card, bank transfer or USSD through Paystack. '
              f'{gw._esc(p.get("note") or "")}</div>')
 
 
@@ -530,16 +531,18 @@ def _pay_button(supabase, gym_id):
     email = (st.session_state.get("auth_user") or {}).get("email", "")
 
     def pay(plan, period, i):
-        if not price_for(plan, period):
+        amount = price_for(plan, period)
+        if not amount:
             return
+        word = "yearly" if period == "yearly" else "monthly"
         pending = st.session_state.get("bill_checkout") or {}
         if pending.get("plan") == plan["name"] and pending.get("period") == period:
-            st.link_button(f"Pay {_money(price_for(plan, period))} with Paystack", pending["url"], type="primary",
+            st.link_button(f"Continue to Paystack: {_money(amount)}", pending["url"], type="primary",
                            icon=":material/lock:", use_container_width=True)
-            st.caption("Opens Paystack's secure checkout: card, bank transfer or USSD.")
+            st.caption("Secure checkout by Paystack: card, bank transfer or USSD.")
             return
-        if st.button(f"Choose {plan['name']}", key=f"bill_choose_{i}_{period}", use_container_width=True,
-                     type="primary" if plan.get("popular") else "secondary"):
+        if st.button(f"Pay {word} · {_money(amount)}", key=f"bill_pay_{i}_{period}", use_container_width=True,
+                     type="primary" if (plan.get("popular") and period == "monthly") else "secondary"):
             url, ref = start_payment(gym_id, plan, period, email)
             if url:
                 st.session_state["bill_checkout"] = {"plan": plan["name"], "period": period, "url": url, "ref": ref}
@@ -584,11 +587,8 @@ def render_subscription_page(supabase, gym_id):
 
     st.markdown("#### Plans")
     ps = plans(p)
-    if "bill_period" in st.session_state and "sub_period" not in st.session_state:
-        st.session_state["sub_period"] = st.session_state.pop("bill_period")
-    period = period_picker(ps, "sub_period")
     online = bool(paystack_key())
-    _plan_cards(p, period, pay=_pay_button(supabase, gym_id) if online else None, key="sub")
+    _plan_cards(p, pay=_pay_button(supabase, gym_id) if online else None, key="sub")
     if p.get("note"):
         st.caption(p["note"])
 
@@ -612,7 +612,7 @@ def render_subscription_page(supabase, gym_id):
                 method = c1.selectbox("How did you pay?", ["Bank transfer", "Online payment link", "Other"])
                 ref = c2.text_input("Reference or note (optional)")
                 if st.form_submit_button("I've paid", type="primary"):
-                    _notify_paid(supabase, gym_id, method, f"{plan_pick} · {period} · {ref.strip()}".strip(" ·"))
+                    _notify_paid(supabase, gym_id, method, f"{plan_pick} · {ref.strip()}".strip(" ·"))
                     st.rerun()
     if contact:
         st.caption("Questions? " + " · ".join(contact))
@@ -660,7 +660,7 @@ def render_admin_billing(sc, gyms, audit):
                                "yearly": st.column_config.NumberColumn("Yearly (₦)", min_value=0, step=5000),
                                "for_who": st.column_config.TextColumn("Who it's for"),
                                "tagline": st.column_config.TextColumn("One-line description"),
-                               "popular": st.column_config.CheckboxColumn("Most popular")})
+                               "popular": st.column_config.CheckboxColumn("Recommended")})
             st.caption("  \n".join(f"**{label}**{' adds' if lv > 1 else ''}: " + "; ".join(FEATURES[lv])
                                    for lv, label in level_names.items()))
             link = st.text_input("Online payment link (optional)", p.get("pay_link") or "",
