@@ -1,5 +1,15 @@
 # Free trial and subscriptions
 
+## Pilot mode (switch at the top of Admin → Billing)
+- **Charge gyms: off** = pilot mode:
+  - every gym uses every feature free;
+  - nobody is locked or sees the Upgrade pop-up;
+  - no trial or renewal emails are sent.
+
+  The Subscription page tells gyms they're part of the pilot.
+- **Charge gyms: on** = normal billing. When you switch it back on, press **Give every gym a fresh 30-day trial from today** so pilot gyms aren't locked straight away. This changes gyms on a trial or whose trial ended, but not paying or free-access gyms.
+- Both switches are recorded in the Admin log.
+
 ## How it works for gyms
 - Every gym gets a **30-day free trial** of every feature from the day it signs up. Gyms that already existed when billing was switched on get 30 days from that day.
 - The website shows the trial and your plans in a **Plans and prices** section: one tile per plan with its monthly and yearly price side by side, and a table comparing what each plan includes.
