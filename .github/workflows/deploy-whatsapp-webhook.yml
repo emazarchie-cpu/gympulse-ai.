@@ -72,15 +72,15 @@ jobs:
             echo "WHATSAPP_APP_SECRET=$WHATSAPP_APP_SECRET"
             echo "WHATSAPP_VERIFY_TOKEN=$WHATSAPP_VERIFY_TOKEN"
           } > "$f"
-          supabase secrets set --env-file "$f" --project-ref "${{ steps.project.outputs.ref }}"
+          supabase secrets set --yes --env-file "$f" --project-ref "${{ steps.project.outputs.ref }}"
           rm -f "$f"
       - name: Deploy the function
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
           REF="${{ steps.project.outputs.ref }}"
-          supabase functions deploy whatsapp-webhook --no-verify-jwt --use-api --project-ref "$REF" \
-            || supabase functions deploy whatsapp-webhook --no-verify-jwt --project-ref "$REF"
+          supabase functions deploy whatsapp-webhook --yes --no-verify-jwt --use-api --project-ref "$REF" \
+            || supabase functions deploy whatsapp-webhook --yes --no-verify-jwt --project-ref "$REF"
       - name: Webhook address for Meta
         run: |
           echo "### Callback URL for Meta" >> "$GITHUB_STEP_SUMMARY"
