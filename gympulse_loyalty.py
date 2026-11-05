@@ -393,32 +393,53 @@ def send_due(supabase, gym_id, profile=None, dry_run=False, log=print):
         log("  auto_messages table missing: run sql/phase9_loyalty.sql")
         return 0, 0, 0
     cap = int(auto_cfg(profile).get("daily_cap") or 80)
+    import gympulse_whatsapp as gwa
+    mode = gwa.gym_mode(profile)
+    wa_on = mode != "email" and gwa.ready()
+    opted = gwa.opt_outs(supabase, gym_id, [d[1]["id"] for d in due]) if wa_on and due else set()
     sent = skipped = failed = 0
     for kind, m, ref, subject, body, buttons in due:
         if sent >= cap:
             skipped += 1
             continue
-        if "@" not in gw._text(m.get("email")):
+        has_email = "@" in gw._text(m.get("email"))
+        use_wa = bool(wa_on and gwa.to_digits(m.get("phone")) and m["id"] not in opted
+                      and kind in gwa.KIND_TEMPLATE)
+        use_email = has_email and (mode in ("email", "both") or not use_wa)
+        if not (use_wa or use_email):
             skipped += 1
             continue
         if dry_run:
-            log(f"  would send {kind:8} -> {m.get('full_name')} <{m.get('email')}>")
+            how = " + ".join(x for x, on in (("WhatsApp", use_wa), ("email", use_email)) if on)
+            log(f"  would send {kind:8} -> {m.get('full_name')} by {how}")
             sent += 1
             continue
-        ok, msg = gcamp.email_member(supabase, gym_id, m, subject, body, buttons)
-        if ok:
+        ok_any, why = False, []
+        if use_wa:
+            ok, msg = gwa.send_member(supabase, gym_id, m, kind, ref, subject, body, buttons, profile)
+            ok_any = ok_any or ok
+            if not ok:
+                why.append(f"WhatsApp: {msg}")
+                use_email = has_email            # WhatsApp didn't go: fall back to email
+        if use_email:
+            ok, msg = gcamp.email_member(supabase, gym_id, m, subject, body, buttons)
+            ok_any = ok_any or ok
+            if not ok:
+                why.append(msg)
+        if ok_any:
             sent += 1
             _log(supabase, gym_id, m["id"], kind, ref, "sent")
             log(f"  sent {kind:8} -> {m.get('full_name')}")
         else:
-            if "unsubscribed" in msg or "no email" in msg:
+            msg = "; ".join(why)
+            if not use_wa and ("unsubscribed" in msg or "no email" in msg):
                 skipped += 1
                 _log(supabase, gym_id, m["id"], kind, ref, "skipped")
             else:
                 failed += 1
                 log(f"  failed {kind:8} -> {m.get('full_name')}: {msg}")
                 import gympulse_monitoring as gmon
-                gmon.capture(RuntimeError(f"automatic {kind} email failed: {msg}"), "automatic messages")
+                gmon.capture(RuntimeError(f"automatic {kind} message failed: {msg}"), "automatic messages")
     return sent, skipped, failed
 
 
@@ -611,6 +632,8 @@ def render_auto(supabase, gym_id, owner_id):
                 "pulse": {"on": bool(hp_on), "freq": hp_freq},
                 "reward": {"on": bool(rw_on)}, "daily_cap": int(cap)}}, "Automatic messages saved.")
             st.rerun()
+    import gympulse_whatsapp as gwa
+    gwa.render_gym_setting(supabase, owner_id)
     if not any(auto[k]["on"] for k in AUTO_KINDS):
         st.info("Turn on at least one message above. Nothing is sent until you do.")
         return
@@ -621,10 +644,16 @@ def render_auto(supabase, gym_id, owner_id):
     label = {"renewal": "Renew reminder", "missed": "We missed you", "reward": "Gift earned",
              "welcome": "New member check-in", "progress": "Monthly progress", "update": "Gym update",
              "week1": "First week", "milestone": "Milestone", "level": "Level up", "pulse": "Happiness check"}
-    with_email = [d for d in due if "@" in gw._text(d[1].get("email"))]
+    import gympulse_whatsapp as gwa
+    wa_on = gwa.gym_mode() != "email" and gwa.ready()
+    with_email = [d for d in due if "@" in gw._text(d[1].get("email"))
+                  or (wa_on and gwa.to_digits(d[1].get("phone")))]
+    with_wa = sum(1 for d in due if wa_on and gwa.to_digits(d[1].get("phone")))
     gw.kpi_row([("To send today", str(len(due)), "cyan", "members who need a message"),
-                ("Have an email", str(len(with_email)), "lime", "will get it by email"),
-                ("No email", str(len(due) - len(with_email)), "amber", "send these on WhatsApp"),
+                ("Can be reached", str(len(with_email)), "lime",
+                 f"{with_wa} on WhatsApp" if wa_on else "will get it by email"),
+                ("No way to reach", str(len(due) - len(with_email)), "amber",
+                 "add an email or phone" if wa_on else "send these on WhatsApp yourself"),
                 ("Sends itself at", "8:30 am", "grey", "every morning")])
     if due:
         gw.table([{"Member": m.get("full_name"), "Message": label[k], "Email": m.get("email") or "–", "Subject": subj}

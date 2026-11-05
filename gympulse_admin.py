@@ -293,13 +293,17 @@ def render_admin():
     flash = st.session_state.pop("adm_flash", None)
     if flash:
         (st.error if flash.startswith("Could not") else st.success)(flash)
-    section = st.segmented_control("Admin section", ["Gyms", "Billing", "Monthly reports", "Admin log"], key="adm_section",
+    section = st.segmented_control("Admin section", ["Gyms", "Billing", "WhatsApp", "Monthly reports", "Admin log"],
+                                   key="adm_section",
                                    default="Gyms", label_visibility="collapsed") or "Gyms"
     if section == "Gyms":
         render_gyms(sc)
     elif section == "Billing":
         import gympulse_billing as gb
         gb.render_admin_billing(sc, all_gyms(sc), audit)
+    elif section == "WhatsApp":
+        import gympulse_whatsapp as gwa
+        gwa.render_admin_setup()
     elif section == "Admin log":
         render_log(sc)
     else:
