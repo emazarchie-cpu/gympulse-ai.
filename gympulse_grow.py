@@ -889,9 +889,8 @@ def render_exit(supabase, gym_id):
     if rows:
         with st.expander("All recorded reasons"):
             names = _member_names(df)
-            st.dataframe(pd.DataFrame([{"Member": names.get(r["member_id"], "Former member"), "Reason": r["reason"],
-                                        "Note": r.get("note") or "", "When": str(r["created_at"])[:10]} for r in rows]),
-                         hide_index=True, use_container_width=True)
+            gw.table([{"Member": names.get(r["member_id"], "Former member"), "Reason": r["reason"],
+                       "Note": r.get("note") or "", "When": str(r["created_at"])[:10]} for r in rows], wide=("Note",))
 
 
 # ================================================================== 5. Progress
@@ -1000,7 +999,7 @@ def render_progress(supabase, gym_id):
                           "Weight change (kg)": sm["weight_change"],
                           "Latest": str(rows[-1]["logged_on"])[:10],
                           "Personal bests": ", ".join(f"{k} {v[-1][1]:g}" for k, v in sm["pbs"].items())})
-        st.dataframe(pd.DataFrame(table), hide_index=True, use_container_width=True)
+        gw.table(table, wide=("Personal bests",))
         pick = st.selectbox("See one member's history", list(per), format_func=lambda i: names.get(i, "Member"),
                             key="grow_pg_pick")
         hist = pd.DataFrame(per[pick])
@@ -1013,11 +1012,10 @@ def render_progress(supabase, gym_id):
                 x=alt.X("Date:T", title=None),
                 y=alt.Y("Weight:Q", title="Weight (kg)", scale=alt.Scale(domain=[lo - 2, hi + 2]))
             ).properties(height=220), use_container_width=True)
-        st.dataframe(hist[[c for c in ("logged_on", "weight_kg", "waist_cm", "body_fat", "pb_name", "pb_value",
+        gw.table(hist[[c for c in ("logged_on", "weight_kg", "waist_cm", "body_fat", "pb_name", "pb_value",
                                        "note", "logged_by") if c in hist]].rename(columns={
             "logged_on": "Date", "weight_kg": "Weight", "waist_cm": "Waist", "body_fat": "Body fat %",
-            "pb_name": "PB", "pb_value": "PB value", "note": "Note", "logged_by": "By"}),
-            hide_index=True, use_container_width=True)
+            "pb_name": "PB", "pb_value": "PB value", "note": "Note", "logged_by": "By"}), wide=("Note",))
 
 
 # ================================================================== 6. Referrals
@@ -1323,9 +1321,8 @@ def render_corporate(supabase, gym_id):
                 except Exception as error:
                     st.error(f"Could not save: {error}")
             if rep["people"]:
-                st.dataframe(pd.DataFrame([{"Name": p["name"], "Visits (30 days)": p["visits"],
-                                            "Status": "Active" if p["visits"] else "Not seen"} for p in rep["people"]]),
-                             hide_index=True, use_container_width=True)
+                gw.table([{"Name": p["name"], "Visits (30 days)": p["visits"],
+                           "Status": "Active" if p["visits"] else "Not seen"} for p in rep["people"]], pills=("Status",))
             else:
                 st.caption("No staff linked yet. Add them above. The report will show them once they're linked.")
             import gympulse_reports as rp

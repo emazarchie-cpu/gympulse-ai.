@@ -347,14 +347,24 @@ def render_reports(sc):
             st.session_state["adm_flash"] += " " + " · ".join(l for l in lines if l.startswith("failed"))
         st.rerun()
 
-    for entry in gyms:
+    gw.table([{"Gym": e["name"], "Owner": e["owner"], "Email": e["email"] or "–",
+               "Report": "Sent" if (e["gym"]["id"], "email") in log else "Not sent",
+               "WhatsApp": "Sent" if (e["gym"]["id"], "whatsapp") in log else "–",
+               "Monthly reports": "Paused" if (flags.get(e["gym"]["id"]) or {}).get("reports_paused") else "On"}
+              for e in gyms], pills=("Report", "WhatsApp", "Monthly reports"), max_height=420)
+    if not gyms:
+        return
+    ids = [e["gym"]["id"] for e in gyms]
+    pick = st.selectbox("Open a gym's report", ids, key="adm_pick_rep",
+                        format_func=lambda i: next(f"{e['name']} · {e['owner'] or 'owner'}" for e in gyms if e["gym"]["id"] == i))
+    for entry in [e for e in gyms if e["gym"]["id"] == pick]:
         gid = entry["gym"]["id"]
         chips = (gw.chip("emailed", "lime") if (gid, "email") in log else gw.chip("not emailed", "grey"))
         chips += gw.chip("reports paused", "amber") if (flags.get(gid) or {}).get("reports_paused") else ""
         chips += gw.chip("WhatsApp sent", "cyan") if (gid, "whatsapp") in log else ""
-        with st.expander(f"{entry['name']} · {entry['owner'] or 'owner'} · {entry['email'] or 'no email'}",
-                         expanded=st.session_state.get("adm_rep_open") == gid):
-            gw._md(f'<div class="chip-row">{chips}</div>')
+        with st.container(border=True):
+            gw._md(f'<div style="font-size:18px;font-weight:700;margin-bottom:6px">{gw._esc(entry["name"])}</div>'
+                   f'<div class="chip-row">{chips}</div>')
             # Reports are built only for the gym you open, and kept for this session:
             # building every gym's report on every click used too much memory.
             if not st.toggle("Show this gym's report", key=f"adm_show_{gid}_{period}"):
@@ -610,7 +620,17 @@ def render_gyms(sc):
     except Exception:
         pass
 
-    for g in view:
+    gw.table(table, pills=("Status", "Reports"), max_height=460,
+             caption=f"{len(view)} gym{'s' if len(view) != 1 else ''}. Pick one below to manage it.")
+    if not view:
+        return
+    ids = [g["gym"]["id"] for g in view]
+    if st.session_state.get("adm_open") in ids and "adm_pick_gym" not in st.session_state:
+        st.session_state["adm_pick_gym"] = st.session_state["adm_open"]
+    pick = st.selectbox("Manage a gym", ids, key="adm_pick_gym",
+                        format_func=lambda i: next(f"{g['name']} · {g['owner'] or 'no name'} · {g['email'] or 'no email'}"
+                                                   for g in view if g["gym"]["id"] == i))
+    for g in [x for x in view if x["gym"]["id"] == pick]:
         gid = g["gym"]["id"]
         s = stats[gid]
         f = flags.get(gid, {})
@@ -618,9 +638,9 @@ def render_gyms(sc):
         chips = (gw.chip("suspended", "red", dot=True) if banned else gw.chip("active", "lime", dot=True))
         chips += gw.chip("reports paused", "amber") if f.get("reports_paused") else ""
         chips += gw.chip("admin", "cyan") if is_protected(g) else ""
-        with st.expander(f"{g['name']} · {g['owner'] or 'no name'} · {g['email'] or 'no email'}",
-                         expanded=st.session_state.get("adm_open") == gid):
-            gw._md(f'<div class="chip-row">{chips}</div>')
+        with st.container(border=True):
+            gw._md(f'<div style="font-size:18px;font-weight:700;margin-bottom:6px">{gw._esc(g["name"])}</div>'
+                   f'<div class="chip-row">{chips}</div>')
             gw.kpi_row([("Members", str(s["members"] if s["members"] is not None else "–"), "cyan", ""),
                         ("Check-ins (30d)", str(s["checkins_30d"] if s["checkins_30d"] is not None else "–"), "lime",
                          f"last {_when(s['last_checkin'])}"),
@@ -714,6 +734,6 @@ def render_log(sc):
     if not rows:
         st.caption("No admin actions yet.")
         return
-    st.dataframe(pd.DataFrame([{"When": _when(r.get("at") or r.get("created_at")), "Admin": r.get("actor"), "Action": r.get("action"),
-                                "Gym": r.get("gym_name"), "Owner": r.get("owner_email")} for r in rows]),
-                 hide_index=True, use_container_width=True)
+    gw.table([{"When": _when(r.get("at") or r.get("created_at")), "Action": gw._text(r.get("action")).replace("_", " ").capitalize(),
+               "Gym": r.get("gym_name"), "Owner": r.get("owner_email"), "Admin": r.get("actor")} for r in rows],
+             max_height=640)

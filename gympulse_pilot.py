@@ -196,7 +196,7 @@ def render_pilot(supabase, gym_id, roster, actions, save_settings):
             elif d:
                 change += " ↓ worse"
         rows.append({"Measure": label, "Baseline": _fmt(b, f), "Today": _fmt(n, f), "Change": change})
-    st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+    gw.table(rows)
     if st.button("Reset the baseline to today", key="pilot_reset", type="tertiary"):
         save_settings({**s, "pilot": {"baseline": now}}, "Baseline reset to today.")
 

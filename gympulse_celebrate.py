@@ -144,5 +144,4 @@ def render_celebrate(supabase, gym_id):
     if not found:
         st.info("No milestones in the last 30 days yet. They show up here as members reach them.")
         return
-    st.dataframe(pd.DataFrame([{k: v for k, v in f.items() if not k.startswith("_")} for f in found]),
-                 hide_index=True, use_container_width=True)
+    gw.table([{k: v for k, v in f.items() if not k.startswith("_")} for f in found])
