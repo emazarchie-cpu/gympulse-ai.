@@ -40,9 +40,13 @@ def render_public(supabase, code):
             return
         done = st.session_state.get("join_done")
         if done:
-            gw._md(f'<div class="bk-title">You\'re in! 🎉</div><div class="bk-sub">'
-                   + ("Welcome to " if done == "created" else "You're already on the list at ")
-                   + f'{gw._esc(gym)}. See you at the gym!</div>')
+            if done == "created":
+                gw._md(f'<div class="bk-title">You\'re in! 🎉</div><div class="bk-sub">Welcome to '
+                       f'{gw._esc(gym)}. See you at the gym!</div>')
+            else:
+                gw._md(f'<div class="bk-title">You\'re already a member 👋</div><div class="bk-sub">'
+                       f'{gw._esc(gym)} already has a member with this phone number or email, so nothing new '
+                       'was added. If your details have changed, let the front desk know.</div>')
             return
         gw._md(f'<div class="bk-title">Join {gw._esc(gym)}</div>'
                '<div class="bk-sub">Add your details so the team can keep track of your membership and help you '
