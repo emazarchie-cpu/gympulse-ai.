@@ -3,6 +3,7 @@ gmon.init("app")
 import gympulse_workspaces as gw
 import gympulse_followups as fu
 import gympulse_legal as gl
+import gympulse_billing as gb
 import gympulse_design as gd
 import gympulse_command as gc
 import gympulse_grow as gg
@@ -1821,6 +1822,7 @@ MAIN_PAGES = [
 
 MORE_PAGES = [
     "Follow-ups",
+    "Subscription",
     "FAQs",
 ]
 import gympulse_admin as gadm
@@ -2525,6 +2527,15 @@ if st.session_state.get("gym_id") and st.session_state.get("_freeze_day") != str
 
 gl.render_acceptance_banner(supabase, owner_id)
 
+# Free trial and subscription: a line at the top, and the Subscription page
+# instead of the app once a trial has ended (after a few days' grace).
+try:
+    gb.render_banner(supabase, st.session_state.get("gym_id"))
+    if page not in gb.ALWAYS_OPEN and gb.must_lock(supabase, st.session_state.get("gym_id")):
+        page = "Subscription"
+except Exception as _bill_error:
+    gmon.capture(_bill_error, "billing")
+
 if page == "Dashboard":
     try:
         gg.render_month_banner(supabase, st.session_state.get("gym_id"), assess_members, owner_id)
@@ -2555,6 +2566,8 @@ elif page == "Grow":
     gg.render_grow(supabase, st.session_state.gym_id, assess_members, owner_id)
 elif page == "Admin":
     gadm.render_admin()
+elif page == "Subscription":
+    gb.render_subscription_page(supabase, st.session_state.get("gym_id"))
 elif page == "Follow-ups":
     fu.render_followups(
         supabase,
