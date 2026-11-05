@@ -48,3 +48,16 @@ A CSV or Excel export can't hold the photos themselves, so GymPulse AI brings th
 3. **Selfie on the sign-up link**: members can add their own photo when they join through the link. This needs `sql/phase15_signup_photo.sql` to be run once in the Supabase SQL Editor.
 
 Photos are resized to a small JPEG (192px) before saving. The import also brings in member number, weight and height when the file has them.
+
+## One-drop import (phase 16)
+
+Drop everything into one box: the member list (CSV or Excel), a visit / attendance history export, and a ZIP of photos, or one ZIP containing all of them. GymPulse AI:
+
+- works out which file is the member list and which is visit history, and which software it came from;
+- shows one summary, e.g. "1,240 members · 1,198 with plans · 18,400 past visits · 312 photos found · 6 duplicates merged", with a plan table (plan name in the old software → GymPulse plan type, members, active, ended);
+- merges duplicate rows (e.g. one row per membership), keeping the newest membership;
+- keeps each member's original plan name, member number, start date, last renewal and last payment;
+- brings over the full visit / check-in history (up to 300,000 visits), so visit counts, "days since last visit" and the Risk Radar carry on from the old software; importing the same file twice never doubles visits;
+- logs each import with an **Undo** button (removes the members that import created, with their plans and visits).
+
+Column and plan matching is automatic; "Review the matching" shows and changes it. Run `sql/phase16_import.sql` once for plan names, member numbers and undo (the import works without it).
