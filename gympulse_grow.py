@@ -1650,7 +1650,8 @@ def monthly_pdf(d):
               ("p", "<br/>".join(gw._esc(x) for x in monthly_letter(d).split("\n")[2:])),
               ("note", "Money kept counts renewal payments credited to retention plays. Where none were recorded, "
                        "it shows the kept members' monthly fees.")]
-    return rp.build_pdf(f"{d['start']:%B %Y} retention report", f"{d['start']:%d %b} – {d['end']:%d %b %Y}", blocks)
+    return rp.build_pdf(f"{d['start']:%B %Y} retention report", f"{d['start']:%d %b} – {d['end']:%d %b %Y}", blocks,
+                        gym=_biz()[0], issuer="gympulse")
 
 
 def render_monthly(supabase, gym_id, assess_fn, owner_id):

@@ -101,9 +101,13 @@ def _lum(hex_colour):
         return 0
 
 
-def build_pdf(title, subtitle, blocks, gym=None):
+def build_pdf(title, subtitle, blocks, gym=None, issuer="gym"):
     """blocks: list of ("h", text) | ("p", text) | ("kpis", [(label, value, hint)])
-    | ("table", columns, rows) | ("note", text) | ("space", points)."""
+    | ("table", columns, rows) | ("note", text) | ("space", points).
+
+    issuer="gym": the gym's own document (its logo and colours in the header).
+    issuer="gympulse": a document from GymPulse AI (monthly reports): the GymPulse AI
+    logo on a white header, the gym named as who it was prepared for."""
     from reportlab.lib import colors
     from reportlab.lib.enums import TA_LEFT
     from reportlab.lib.pagesizes import A4
@@ -140,6 +144,11 @@ def build_pdf(title, subtitle, blocks, gym=None):
         except Exception:
             gym_logo = None
 
+    from_gp = issuer == "gympulse"
+    if from_gp:
+        band_fill, band_text, band_sub, accent = "#FFFFFF", INK, MUTED, LIME
+        gym_logo = ImageReader(LOGO_DARK) if os.path.exists(LOGO_DARK) else None
+
     def frame(canvas, doc):
         canvas.saveState()
         canvas.setFillColor(colors.HexColor(band_fill))
@@ -162,7 +171,8 @@ def build_pdf(title, subtitle, blocks, gym=None):
         canvas.drawRightString(W - 14 * mm, H - 12.5 * mm, title)
         canvas.setFillColor(colors.HexColor(band_sub))
         canvas.setFont("Helvetica", 8.5)
-        canvas.drawRightString(W - 14 * mm, H - 18.5 * mm, gym if gym_logo is not None else "")
+        canvas.drawRightString(W - 14 * mm, H - 18.5 * mm, (f"Prepared for {gym}" if from_gp else gym)
+                               if gym_logo is not None else "")
         canvas.drawRightString(W - 14 * mm, H - 23.5 * mm, made.strftime("Generated %d %b %Y, %H:%M"))
         canvas.setStrokeColor(colors.HexColor(LINE))
         canvas.setLineWidth(0.6)
@@ -175,7 +185,9 @@ def build_pdf(title, subtitle, blocks, gym=None):
             fx += fh * 560 / 200 + 3 * mm
         canvas.setFillColor(colors.HexColor(MUTED))
         canvas.setFont("Helvetica", 7.5)
-        canvas.drawString(fx, 9.3 * mm, f"Prepared for {gym} with GymPulse AI  |  Confidential: contains member data")
+        canvas.drawString(fx, 9.3 * mm, (f"From GymPulse AI for {gym}  |  usegympulseai.com" if from_gp else
+                                         f"Prepared for {gym} with GymPulse AI")
+                          + "  |  Confidential: contains member data")
         canvas.drawRightString(W - 14 * mm, 9.3 * mm, f"Page {doc.page}")
         canvas.restoreState()
 
