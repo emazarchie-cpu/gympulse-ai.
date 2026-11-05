@@ -26,9 +26,8 @@ PAYMENT_METHODS = ["Cash", "Bank transfer", "Card", "POS", "Mobile money", "Othe
 def _fetch_payments_uncached(supabase, gym_id, days=400):
     since = (date.today() - timedelta(days=days)).isoformat()
     try:
-        rows = (supabase.table("payments").select("*").eq("gym_id", gym_id)
-                .gte("paid_on", since).order("paid_on", desc=True).limit(5000)
-                .execute().data or [])
+        rows = gw.fetch_all(supabase.table("payments").select("*").eq("gym_id", gym_id)
+                            .gte("paid_on", since).order("paid_on", desc=True).order("id"))
     except Exception:
         return None                        # table not created yet
     df = pd.DataFrame(rows)

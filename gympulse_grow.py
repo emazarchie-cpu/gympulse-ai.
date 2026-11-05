@@ -104,8 +104,8 @@ def _members(supabase, gym_id):
     if df.empty:
         return df
     try:
-        act = pd.DataFrame(supabase.table("member_activity").select("*").eq("gym_id", gym_id)
-                           .execute().data or [])
+        act = pd.DataFrame(gw.fetch_all(supabase.table("member_activity").select("*").eq("gym_id", gym_id)
+                                        .order("member_id")))
     except Exception:
         act = pd.DataFrame()
     if not act.empty and "member_id" in act.columns:

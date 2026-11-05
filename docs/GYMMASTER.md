@@ -1,6 +1,17 @@
-# Import members from GymMaster
+# Bringing members into GymPulse AI
 
-Members → **Import members from GymMaster (CSV)**.
+Members page, two ways:
+
+1. **Bring your members in: import from GymMaster, Excel or any software.** This takes a CSV or Excel export from:
+   - GymMaster, Mindbody, Glofox or Spark;
+   - Excel or Google Sheets, or any other list.
+
+   Pick where your members are now to see how to export. It handles up to **20,000 members per file**, saved in batches of 500, so 5,000 members take seconds.
+2. **Member sign-up link and QR code.** Share one link (WhatsApp) or print the QR code (front desk), and members fill in their own name, phone, email, goal and age, with consent. New sign-ups appear in the member list, marked "joined via link". Add their plan on the Risk Radar. The owner can switch the link off or make a new one. Needs `sql/phase14_member_signup.sql`.
+
+Large gyms: member lists, activity, plays and payments now load page by page, so gyms with more than 1,000 members see everyone (Supabase returns 1,000 rows per request).
+
+## Import details
 
 ## How to export from GymMaster
 1. In GymMaster, open **Reports** and run a member report (a member list or memberships report).

@@ -1,17 +1,16 @@
-"""GymPulse AI · Import members from GymMaster.
+"""GymPulse AI · Bring members in from any software or spreadsheet.
 
-GymMaster exports any report as a CSV file, and each gym chooses the report's
-columns, so the exact headings differ from gym to gym. This importer:
-  1. reads the CSV (or Excel) file,
-  2. guesses which column is which from common GymMaster headings
-     (First Name, Surname, Email, Mobile, Membership, Start Date, Expiry Date,
-     Price, Last Visit, ...) and lets the owner correct any guess,
-  3. turns each GymMaster membership name into a GymPulse plan (the owner can
-     change each one),
-  4. matches existing members by email, phone or name (updates them instead of
-     creating duplicates),
-  5. previews, then imports: creates members, sets their plan, fee and end
-     date, and records their last visit so the Risk Radar starts with real data.
+Works with GymMaster, Mindbody, Glofox, Spark, Excel / Google Sheets or any
+CSV: each system names its columns differently (and GymMaster lets every gym
+pick its own), so the importer:
+  1. reads the CSV or Excel file (up to 20,000 members),
+  2. guesses which column is which from common headings and lets the owner
+     correct any guess,
+  3. turns each membership name into a GymPulse plan (editable),
+  4. matches existing members by email, phone or name (updates, no duplicates),
+  5. previews, then imports in batches of 500: creates members with their plan,
+     fee and end date, and records their last visit so the Risk Radar starts
+     with real data.
 """
 import io
 import re
@@ -26,23 +25,48 @@ NONE = "(not in file)"
 FIELDS = [  # key, label, common GymMaster/other headings (lowercase, spaces normalised)
     ("first", "First name", ["first name", "firstname", "first", "given name", "forename"]),
     ("last", "Surname", ["surname", "last name", "lastname", "family name", "last"]),
-    ("name", "Full name (if one column)", ["name", "full name", "member name", "member", "fullname", "client name"]),
+    ("name", "Full name (if one column)", ["name", "full name", "member name", "member", "fullname", "client name",
+                                        "client", "customer name", "names"]),
     ("email", "Email", ["email", "email address", "e-mail", "member email"]),
     ("phone", "Phone", ["mobile", "mobile phone", "mobile number", "cell", "cell phone", "cellphone", "phone",
-                        "phone number", "contact number", "home phone", "telephone"]),
+                        "phone number", "contact number", "home phone", "telephone", "whatsapp", "whatsapp number",
+                        "mobile no", "phone no", "tel"]),
     ("dob", "Date of birth", ["date of birth", "dob", "birthday", "birth date", "birthdate"]),
     ("membership", "Membership name", ["membership", "membership type", "membership name", "plan", "membership plan",
-                                       "current membership", "membership type name"]),
+                                       "current membership", "membership type name", "pricing option", "package",
+                                       "subscription", "membership package", "product"]),
     ("start", "Start date", ["start date", "membership start", "start", "joined", "join date", "member since",
-                             "date joined", "membership start date"]),
+                             "date joined", "membership start date", "activation date", "first visit",
+                             "registration date", "date registered"]),
     ("end", "End / expiry date", ["expiry", "expiry date", "end date", "expires", "membership expiry", "membership end",
-                                  "expiration date", "end", "membership expiry date", "expire date", "valid until"]),
+                                  "expiration date", "end", "membership expiry date", "expire date", "valid until",
+                                  "membership end date", "expiration", "renewal date", "due date", "next payment date",
+                                  "contract end", "paid until"]),
     ("price", "Price", ["price", "cost", "fee", "amount", "membership price", "price per period", "membership cost",
                         "regular payment", "payment amount"]),
     ("last_visit", "Last visit", ["last visit", "last attendance", "last visited", "last check in", "last checkin",
-                                  "last check-in", "last visit date", "last attended"]),
+                                  "last check-in", "last visit date", "last attended", "last check in date",
+                                  "last checkin date", "last seen"]),
     ("goal", "Fitness goal", ["goal", "fitness goal", "goals"]),
 ]
+SOURCES = {
+    "GymMaster": "In GymMaster open **Reports**, run a member list or memberships report, use **Add Column** to "
+                 "include First Name, Surname, Email, Mobile, Membership, Start Date, Expiry Date, Price and Last "
+                 "Visit, then **Export to CSV**. Leaving GymMaster? Its cancellation step also offers a full data export.",
+    "Mindbody": "In Mindbody open **Reports → Client lists** (or Memberships), include name, email, phone, "
+                "membership and expiration date, then **Export → Excel/CSV**.",
+    "Glofox": "In Glofox open **Members**, filter to active members, and use **Export** (CSV). Include membership "
+              "name and expiry date.",
+    "Spark / other gym software": "Look for **Reports** or **Members → Export** and download a CSV with name, email, "
+                                  "phone, membership and end date. Most systems have this.",
+    "Excel or Google Sheets": "Use one row per member with columns such as Name, Phone, Email, Plan, Start date, "
+                              "End date and Amount. In Google Sheets: **File → Download → CSV**.",
+    "Paper register or WhatsApp list": "Type the list into Excel or Google Sheets (Name, Phone, Plan, End date is "
+                                       "enough), or share your **member sign-up link** so members fill in their own "
+                                       "details (Members → Member sign-up link).",
+}
+MAX_ROWS = 20000
+BATCH = 500
 PLAN_WORDS = [  # (pattern, GymPulse plan), checked in order
     (r"\b(daily|day pass|1 ?day|one day|casual|drop.?in)\b", "Daily"),
     (r"\b(2|two) ?weeks?\b|fortnight", "2 weeks"),
@@ -182,68 +206,155 @@ def _insert_member(supabase, data):
     raise RuntimeError("Could not create the member.")
 
 
+def _bulk_insert_members(supabase, items):
+    """Insert up to BATCH members in one request. Adds a placeholder for a column the database insists on
+    (age, weight, height) if needed. Returns (ids in the same order, placeholder_used)."""
+    used = False
+    for _ in range(4):
+        try:
+            res = supabase.table("members").insert(items, default_to_null=False).execute().data or []
+            return [r.get("id") for r in res], used
+        except Exception as error:
+            m = re.search(r'null value in column "(\w+)"', str(error))
+            if m and m.group(1) in PLACEHOLDER:
+                items = [{**it, m.group(1): it.get(m.group(1), PLACEHOLDER[m.group(1)])} for it in items]
+                used = True
+                continue
+            raise
+    raise RuntimeError("Could not create the members.")
+
+
+def _activity_row(gym_id, mid, r, now_iso, today):
+    renew = max(0, (r["end"] - today).days) if r["end"] else 30
+    away = (today - r["last_visit"]).days if r["last_visit"] else 0
+    return {"member_id": mid, "gym_id": gym_id, "membership_type": r["plan"], "monthly_fee": float(r["fee"] or 0),
+            "days_since_last_visit": int(away), "visits_previous_30_days": 0,
+            "visits_last_30_days": 1 if r["last_visit"] and away <= 30 else 0,
+            "renewal_due_days": int(renew), "pt_sessions_attended": 0, "updated_at": now_iso}
+
+
 def run_import(supabase, gym_id, rows, update_existing=True, progress=None):
+    """Import in batches of 500 so thousands of members take seconds, not minutes."""
+    from datetime import timezone
     created = updated = skipped = failed = placeholders = visits = 0
     problems = []
-    for i, r in enumerate(rows):
+    today, now_iso = gw.today_local(), datetime.now(timezone.utc).isoformat()
+    new = [r for r in rows if r["action"] == "New"]
+    old = [r for r in rows if r["action"] == "Update"]
+    steps = max(1, len(new) // BATCH + 1 + (len(old) if update_existing else 0) // 50 + 1)
+    done = 0
+
+    def tick(text):
+        nonlocal done
+        done += 1
+        if progress:
+            progress.progress(min(1.0, done / (steps + 2)), text=text)
+
+    ready = []                               # (member_id, row) to give plans and visits to
+    for start in range(0, len(new), BATCH):
+        chunk = new[start:start + BATCH]
+        items = []
+        for r in chunk:
+            d = {"gym_id": gym_id, "full_name": r["name"]}
+            for k in ("email", "phone"):
+                if r[k]:
+                    d[k] = r[k]
+            if r["age"]:
+                d["age"] = int(r["age"])
+            if r["goal"]:
+                d["fitness_goal"] = r["goal"]
+            if r["end"]:
+                d["membership_end"] = r["end"].isoformat()
+            items.append(d)
         try:
-            if r["action"] == "Update":
-                if not update_existing:
-                    skipped += 1
-                    continue
-                fields = {k: v for k, v in (("email", r["email"]), ("phone", r["phone"])) if v}
-                if fields:
-                    supabase.table("members").update(fields).eq("id", r["member_id"]).eq("gym_id", gym_id).execute()
-                mid = r["member_id"]
-                updated += 1
-            else:
-                data = {"gym_id": gym_id, "full_name": r["name"]}
-                for k in ("email", "phone"):
-                    if r[k]:
-                        data[k] = r[k]
-                if r["age"]:
-                    data["age"] = int(r["age"])
-                if r["goal"]:
-                    data["fitness_goal"] = r["goal"]
-                mid, used = _insert_member(supabase, data)
-                placeholders += used
-                created += 1
-            if mid and r["end"]:
-                gw.save_membership(supabase, gym_id, mid, r["plan"], r["fee"], r["end"])
-            if mid and r["last_visit"]:
-                at = datetime.combine(r["last_visit"], datetime.min.time()).replace(hour=12, tzinfo=gw.APP_TZ)
-                if gw.record_checkin(supabase, gym_id, mid, "import", at=at.isoformat()) != "duplicate":
-                    visits += 1
+            ids, used = _bulk_insert_members(supabase, items)
+            placeholders += len(chunk) if used else 0
+            created += len(ids)
+            ready += [(i, r) for i, r in zip(ids, chunk) if i]
+        except Exception:
+            for d, r in zip(items, chunk):            # one bad row: find it, keep the rest
+                try:
+                    if "membership_end" in d:
+                        try:
+                            mid, used = _insert_member(supabase, dict(d))
+                        except Exception:
+                            d.pop("membership_end")
+                            mid, used = _insert_member(supabase, dict(d))
+                    else:
+                        mid, used = _insert_member(supabase, dict(d))
+                    placeholders += used
+                    created += 1
+                    ready.append((mid, r))
+                except Exception as error:
+                    failed += 1
+                    problems.append(f"{r['name']}: {str(error)[:120]}")
+        tick(f"Creating members… {min(start + BATCH, len(new))} of {len(new)}")
+
+    for i, r in enumerate(old):
+        if not update_existing:
+            skipped += 1
+            continue
+        fields = {k: v for k, v in (("email", r["email"]), ("phone", r["phone"])) if v}
+        if r["end"]:
+            fields["membership_end"] = r["end"].isoformat()
+        try:
+            if fields:
+                supabase.table("members").update(fields).eq("id", r["member_id"]).eq("gym_id", gym_id).execute()
+            updated += 1
+            ready.append((r["member_id"], r))
         except Exception as error:
             failed += 1
             problems.append(f"{r['name']}: {str(error)[:120]}")
-        if progress:
-            progress.progress((i + 1) / len(rows), text=f"Importing… {i + 1} of {len(rows)}")
+        if i % 50 == 49:
+            tick(f"Updating members… {i + 1} of {len(old)}")
+
+    acts = [_activity_row(gym_id, mid, r, now_iso, today) for mid, r in ready if r["end"] or r["membership"]]
+    for start in range(0, len(acts), BATCH):
+        try:
+            supabase.table("member_activity").upsert(acts[start:start + BATCH]).execute()
+        except Exception as error:
+            problems.append(f"Plans for {len(acts[start:start + BATCH])} members: {str(error)[:120]}")
+    tick("Saving plans…")
+
+    cks = []
+    for mid, r in ready:
+        if r["last_visit"]:
+            at = datetime.combine(r["last_visit"], datetime.min.time()).replace(hour=12, tzinfo=gw.APP_TZ).isoformat()
+            cks.append({"gym_id": gym_id, "member_id": mid, "checked_in_at": at, "source": "import",
+                        "event_id": gw.checkin_event_id(gym_id, mid, at)})
+    for start in range(0, len(cks), BATCH):
+        chunk = cks[start:start + BATCH]
+        try:
+            supabase.table("checkins").insert(chunk, default_to_null=False).execute()
+            visits += len(chunk)
+        except Exception:
+            for c in chunk:                            # duplicates or an older table: one at a time
+                try:
+                    if gw.record_checkin(supabase, gym_id, c["member_id"], "import", at=c["checked_in_at"]) != "duplicate":
+                        visits += 1
+                except Exception:
+                    pass
+    tick("Recording last visits…")
     gw.bump_data_version()
     return {"created": created, "updated": updated, "skipped": skipped, "failed": failed,
             "placeholders": placeholders, "visits": visits, "problems": problems}
 
 
 def render_gymmaster_import(supabase, gym_id):
-    gw.intro("Import from GymMaster", ":material/upload_file:",
-             "Bring your members across from GymMaster in a few minutes. GymMaster keeps running as usual; "
-             "GymPulse AI adds the retention tools on top.")
+    gw.intro("Bring your members in", ":material/upload_file:",
+             "From GymMaster, Mindbody, Glofox, Excel or any other list, from 10 members to 20,000. Your current "
+             "software can keep running; GymPulse AI adds the retention tools on top.")
     flash = st.session_state.pop("gm_flash", None)
     if flash:
         st.success(flash)
     errs = st.session_state.pop("gm_errors", None)
     if errs:
         st.error("These rows were not imported:\n\n" + "\n".join(f"- {e}" for e in errs[:20]))
-    with st.popover("How to export from GymMaster", icon=":material/help:"):
-        st.markdown(
-            "1. In GymMaster, open **Reports** and run a member report (for example a member list or "
-            "memberships report).\n"
-            "2. Use **Add Column** to include: **First Name, Surname, Email, Mobile, Membership, Start Date, "
-            "Expiry Date, Price** and, if available, **Last Visit**.\n"
-            "3. Choose **Export to CSV** and upload the file below.\n\n"
-            "Different headings are fine: you'll confirm which column is which before anything is imported.")
+    c1, c2 = st.columns([1, 2], vertical_alignment="center")
+    source = c1.selectbox("Where are your members now?", list(SOURCES), key="gm_source")
+    c2.caption(SOURCES[source])
     key = st.session_state.get("gm_up_key", 0)
-    up = st.file_uploader("GymMaster export (CSV or Excel)", type=["csv", "xlsx", "xls"], key=f"gm_up_{key}")
+    up = st.file_uploader("Your export or spreadsheet (CSV or Excel)", type=["csv", "xlsx", "xls"], key=f"gm_up_{key}")
     if up is None:
         return
     try:
@@ -255,8 +366,8 @@ def render_gymmaster_import(supabase, gym_id):
     if df.empty:
         st.error("The file has no rows.")
         return
-    if len(df) > 3000:
-        st.error("Please upload 3,000 members or fewer at a time.")
+    if len(df) > MAX_ROWS:
+        st.error(f"Please upload {MAX_ROWS:,} members or fewer at a time (split the file in two).")
         return
     st.caption(f"{len(df)} rows and {len(df.columns)} columns found.")
 
@@ -278,7 +389,7 @@ def render_gymmaster_import(supabase, gym_id):
     if cols["membership"] != NONE:
         names = sorted({gw._text(v).strip() for v in df[cols["membership"]] if gw._text(v).strip()})
         if names:
-            st.markdown("**2. Match each GymMaster membership to a plan**")
+            st.markdown("**2. Match each membership to a plan**")
             grid = st.columns(3)
             for i, n in enumerate(names[:60]):
                 g = guess_plan(n)
@@ -287,8 +398,8 @@ def render_gymmaster_import(supabase, gym_id):
                 st.caption("More than 60 membership names: the rest are matched automatically.")
 
     # 3. preview
-    existing = pd.DataFrame(supabase.table("members").select("id, full_name, email, phone").eq("gym_id", gym_id)
-                            .execute().data or [])
+    existing = pd.DataFrame(gw.fetch_all(supabase.table("members").select("id, full_name, email, phone")
+                                         .eq("gym_id", gym_id).order("id")))
     if existing.empty:
         existing = pd.DataFrame(columns=["id", "full_name", "email", "phone"])
     rows = build_rows(df, cols, plan_map, existing)
@@ -318,11 +429,11 @@ def render_gymmaster_import(supabase, gym_id):
         bar = st.progress(0.0, text="Importing…")
         res = run_import(supabase, gym_id, rows, update, bar)
         bar.empty()
-        msg = (f"Imported from GymMaster: {res['created']} new, {res['updated']} updated"
+        msg = (f"Imported from {source}: {res['created']} new, {res['updated']} updated"
                + (f", {res['skipped']} skipped" if res["skipped"] else "")
                + (f", {res['visits']} last visits recorded" if res["visits"] else "") + ".")
         if res["placeholders"]:
-            msg += (f" {res['placeholders']} member(s) got a placeholder age, weight or height because GymMaster "
+            msg += (f" {res['placeholders']} member(s) got a placeholder age, weight or height because the file "
                     "didn't include them; you can update these on their profiles.")
         if res["failed"]:
             st.session_state["gm_errors"] = res["problems"]
@@ -330,3 +441,6 @@ def render_gymmaster_import(supabase, gym_id):
         st.session_state["gm_flash"] = msg
         st.session_state["gm_up_key"] = key + 1
         st.rerun()
+
+
+render_import = render_gymmaster_import
