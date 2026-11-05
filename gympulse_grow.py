@@ -20,7 +20,7 @@ import gympulse_workspaces as gw
 
 SQL_HINT = "Run sql/phase5_growth.sql in Supabase to switch this on."
 
-SECTIONS = ["Collect renewals", "Automatic messages", "Loyalty", "New members", "Freeze", "Why they left", "Progress",
+SECTIONS = ["Collect renewals", "Automatic messages", "Gym updates", "Loyalty", "New members", "Freeze", "Why they left", "Progress",
             "Referrals", "Challenges", "Corporate", "Team", "Season planner", "Monthly report"]
 
 
@@ -230,7 +230,8 @@ def _progress_line(story, biz):
 
 def renewal_email(name, amount, plan, end, pay, story, reminder=False):
     """(subject, body) for an email that invites the member in instead of chasing money.
-    No bank details in email: members get those by replying, or on WhatsApp."""
+    Bank details only appear as a short, calm note under the sign-off, and only if the gym
+    switched that on (Grow → Collect renewals → Your payment details)."""
     biz, owner = _biz()
     first = _first(name)
     days = (end - _today()).days if end else None
@@ -263,7 +264,19 @@ def renewal_email(name, amount, plan, end, pay, story, reminder=False):
     if pay.get("paystack_link"):
         para.append("If you'd rather renew now, you can pay securely online with Paystack using the button below.")
     para.append(f"See you soon,\n{owner}\n{biz}".replace("\n\n", "\n"))
+    note = bank_note(pay)
+    if note:
+        para.append(note)
     return subject, "\n\n".join(para)
+
+
+def bank_note(pay):
+    """One quiet line for members who prefer to transfer. Off unless the gym turns it on."""
+    if not (pay.get("bank_in_email") and pay.get("bank_account")):
+        return ""
+    bank = " · ".join(x for x in (gw._text(pay.get("bank_name")), gw._text(pay.get("bank_account")),
+                                  gw._text(pay.get("bank_holder"))) if x)
+    return f"P.S. If transferring is easier for you: {bank}. Please use your name as the reference."
 
 
 def renewal_buttons(pay):
@@ -327,9 +340,11 @@ def renewal_composer(supabase, gym_id, m, amount, plan, ref, pay, story, key, re
         has_email = "@" in gw._text(m.get("email"))
         st.text_input("Subject", subject, key=f"{key}_subj")
         st.text_area("Email", body, height=300, key=f"{key}_body", label_visibility="collapsed")
-        st.caption("No bank details in emails: they look like scams in an inbox. The email invites the member in "
-                   "to renew at the front desk" + (", with a secure Paystack button." if pay.get("paystack_link") else
-                                                   ". Add a Paystack link above for a secure online option."))
+        st.caption("The email invites the member in to renew at the front desk"
+                   + (", with a secure Paystack button" if pay.get("paystack_link") else "")
+                   + (", and your bank details as a short P.S." if bank_note(pay) else
+                      ". Bank details can go in as a short P.S. (turn it on under Your payment details).")
+                   .replace("..", "."))
         with st.expander("Preview the email"):
             import gympulse_campaigns as gcamp
             import streamlit.components.v1 as components
@@ -393,8 +408,7 @@ def render_collect(supabase, gym_id, owner_id):
     with st.expander("Your payment details" + ("" if pay.get("bank_account") or pay.get("paystack_link")
                                               else " · set these up first"),
                      expanded=not (pay.get("bank_account") or pay.get("paystack_link"))):
-        st.caption("Members pay you directly. GymPulse never touches the money. Bank details only go into "
-                   "WhatsApp messages; emails invite members in and offer your Paystack link.")
+        st.caption("Members pay you directly. GymPulse never touches the money.")
         c1, c2, c3 = st.columns(3)
         bank = c1.text_input("Bank", pay.get("bank_name", ""), placeholder="e.g. GTBank")
         acct = c2.text_input("Account number", pay.get("bank_account", ""), placeholder="0123456789")
@@ -405,10 +419,14 @@ def render_collect(supabase, gym_id, owner_id):
         perk = st.text_input("Perk for renewing in person (optional)", pay.get("perk", ""),
                              placeholder="e.g. a free smoothie, or a free body-composition scan",
                              help="Only shown if you type one. GymPulse never invents offers.")
+        in_email = st.toggle("Add my bank details to renewal emails, as a short P.S.",
+                             value=bool(pay.get("bank_in_email")), key="grow_pay_inmail",
+                             help="Shown once, under your name, as an option for members who prefer to transfer. "
+                                  "The email still invites them in first, so it never reads like chasing money.")
         if st.button("Save payment details", type="primary", key="grow_pay_save"):
             _save_settings(supabase, owner_id, {"collect": {"bank_name": bank.strip(), "bank_account": acct.strip(),
                                                            "bank_holder": holder.strip(), "paystack_link": link.strip(),
-                                                           "perk": perk.strip()}},
+                                                           "perk": perk.strip(), "bank_in_email": bool(in_email)}},
                            "Payment details saved.")
             st.rerun()
 
@@ -547,7 +565,8 @@ def onboarding_plan(members, checkins, done_rows, today=None):
             s["skipped"] = not s["done"]
         nxt = latest if latest and not latest["done"] else None
         out.append({"m": m, "age": age, "visits": n, "steps": steps, "next": nxt,
-                    "no_show": age >= 7 and n == 0, "quiet": age >= 14 and n <= 2})
+                    "no_show": age >= 7 and n == 0,
+                    "quiet": (age >= 14 and n <= 2) or (age >= 30 and n < 4)})
     return sorted(out, key=lambda x: (not x["no_show"], x["next"] is None, -x["age"]))
 
 
@@ -1638,6 +1657,9 @@ def render_grow(supabase, gym_id, assess_fn, owner_id):
     elif section == "Automatic messages":
         import gympulse_loyalty as gl
         gl.render_auto(supabase, gym_id, owner_id)
+    elif section == "Gym updates":
+        import gympulse_updates as gu
+        gu.render_updates(supabase, gym_id)
     elif section == "Loyalty":
         import gympulse_loyalty as gl
         gl.render_loyalty(supabase, gym_id, owner_id)

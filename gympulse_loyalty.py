@@ -12,6 +12,8 @@ switches them on:
   * renewal reminder, N days before a plan ends
   * "we missed you", after N days with no check-in (active members only)
   * reward ready, when a member has enough points for a reward
+  * new member check-in, about two weeks after joining (warmer if they've barely come)
+  * monthly progress note, early each month, to members who trained 4+ times last month
 Each is sent at most once per member per occasion (auto_messages log),
 respects unsubscribes, and skips members without an email. They run every
 morning from scripts/send_auto_messages.py (GitHub Actions), and the owner can
@@ -41,8 +43,10 @@ LOYALTY_DEFAULTS = {
 }
 AUTO_DEFAULTS = {
     "renewal": {"on": False, "days": 3},
-    "missed": {"on": False, "days": 7},
+    "missed": {"on": False, "days": 10, "pause": True},
     "reward": {"on": False},
+    "welcome": {"on": False},
+    "progress": {"on": False},
     "daily_cap": 80,
 }
 
@@ -183,7 +187,26 @@ def due_messages(supabase, gym_id, profile=None, today=None):
             if away >= int(auto["missed"]["days"]):
                 ref = f"last:{lv.isoformat()}"
                 if (m["id"], "missed", ref) not in sent:
-                    out.append(("missed", md, ref) + missed_letter(md, lv, away, gg.member_story(md, ck)))
+                    out.append(("missed", md, ref) + missed_letter(md, lv, away, gg.member_story(md, ck),
+                                                                   auto["missed"].get("pause", True)))
+        joined = m.get("joined") if gg._has_date(m.get("joined")) else None
+        if auto["welcome"]["on"] and joined is not None and 12 <= (today - joined).days <= 20:
+            ref = f"welcome:{joined.isoformat()}"
+            if (m["id"], "welcome", ref) not in sent:
+                visits = int(ck[ck["member_id"] == m["id"]]["day"].nunique()) if len(ck) else 0
+                out.append(("welcome", md, ref) + welcome_letter(md, visits))
+        if auto["progress"]["on"] and today.day <= 7 and (end is None or end >= today) and len(ck):
+            first_this = today.replace(day=1)
+            last_month_start = (first_this - timedelta(days=1)).replace(day=1)
+            mine = ck[ck["member_id"] == m["id"]]
+            days_ = mine.drop_duplicates("day")["day"] if len(mine) else []
+            n_last = int(sum(last_month_start <= d.date() < first_this for d in days_)) if len(mine) else 0
+            if n_last >= 4:
+                prev_start = (last_month_start - timedelta(days=1)).replace(day=1)
+                n_prev = int(sum(prev_start <= d.date() < last_month_start for d in days_))
+                ref = f"progress:{last_month_start:%Y-%m}"
+                if (m["id"], "progress", ref) not in sent:
+                    out.append(("progress", md, ref) + progress_letter(md, n_last, n_prev, last_month_start))
     if auto["reward"]["on"]:
         cfg, table, _ = compute_points(supabase, gym_id, profile)
         if cfg["enabled"] and len(table):
@@ -196,7 +219,7 @@ def due_messages(supabase, gym_id, profile=None, today=None):
                         out.append(("reward", by_id[r["member_id"]], ref, subject, body, None))
     # At most one automatic email per member per day: renewal first, then we missed you,
     # then reward. The others stay due and go out on a later day.
-    order = {"renewal": 0, "missed": 1, "reward": 2}
+    order = {"renewal": 0, "missed": 1, "welcome": 2, "reward": 3, "progress": 4}
     picked, seen = [], set(had_today)
     for item in sorted(out, key=lambda x: order[x[0]]):
         if item[1]["id"] not in seen:
@@ -205,7 +228,7 @@ def due_messages(supabase, gym_id, profile=None, today=None):
     return picked
 
 
-def missed_letter(m, last_visit, away, story):
+def missed_letter(m, last_visit, away, story, pause=True):
     import gympulse_grow as gg
     biz, owner = gg._biz()
     first = gg._first(m.get("full_name"))
@@ -215,8 +238,47 @@ def missed_letter(m, last_visit, away, story):
             + (prog + " It would be a shame to lose that momentum.\n\n" if prog else "")
             + "Busy weeks happen to everyone, and even a short session gets you back on track. Reply to this email "
               "with the day you're planning to come in, and we'll have everything ready for you.\n\n"
-              f"See you soon,\n{owner}\n{biz}")
+            + ("If now isn't a good time, whether it's travel, work or anything else, just reply and we can pause "
+               "your membership so you don't lose any days.\n\n" if pause else "")
+            + f"See you soon,\n{owner}\n{biz}")
     return f"We've missed you at {biz}, {first}", body, None
+
+
+def welcome_letter(m, visits):
+    """About two weeks after joining. Warmer and more practical if they've barely come in."""
+    import gympulse_grow as gg
+    biz, owner = gg._biz()
+    first = gg._first(m.get("full_name"))
+    if visits >= 4:
+        subject = f"Two weeks in, {first}: great start"
+        middle = (f"You've already been in {visits} times since you joined. That's exactly how habits are built, "
+                  "and the first month is the hardest part, so you're doing brilliantly.")
+    elif visits >= 1:
+        subject = f"How are your first weeks at {biz}, {first}?"
+        middle = (f"You've been in {visits} time{'s' if visits != 1 else ''} so far. The first few weeks are the "
+                  "trickiest, so a simple plan helps: pick two set days a week and treat them like appointments.")
+    else:
+        subject = f"Let's get your first session booked, {first}"
+        middle = ("We haven't seen you in yet, and that's completely normal: starting is the hardest part. "
+                  "Tell us a day and time that suits you, and someone will be ready to show you around.")
+    body = (f"Hi {first},\n\nIt's been about two weeks since you joined {biz}. {middle}\n\n"
+            "If anything is getting in the way, or you'd like help with a plan, just reply to this email.\n\n"
+            f"See you soon,\n{owner}\n{biz}")
+    return subject, body, None
+
+
+def progress_letter(m, n_last, n_prev, month_start):
+    """A short, positive note about last month. No numbers they should feel bad about."""
+    import gympulse_grow as gg
+    biz, owner = gg._biz()
+    first = gg._first(m.get("full_name"))
+    better = n_prev and n_last > n_prev
+    subject = f"{first}, you trained {n_last} times in {month_start:%B}"
+    body = (f"Hi {first},\n\nQuick note from {biz}: you trained {n_last} times in {month_start:%B}"
+            + (f", up from {n_prev} the month before. That's real progress." if better else ". That's real consistency.")
+            + "\n\nResults come from showing up week after week, and you're doing it. Keep it going this month."
+            f"\n\n{owner}\n{biz}")
+    return subject, body, None
 
 
 def _log(supabase, gym_id, member_id, kind, ref, status):
@@ -391,22 +453,33 @@ def render_auto(supabase, gym_id, owner_id):
         m_on = c3.toggle("\"We missed you\" when they stop coming", value=auto["missed"]["on"])
         m_days = c4.number_input("After how many days of not coming", 3, 30, int(auto["missed"]["days"]),
                                  help="Only for members whose membership is still running.")
+        pause_on = st.checkbox("In \"we missed you\", offer to pause their membership if now isn't a good time",
+                               value=bool(auto["missed"].get("pause", True)),
+                               help="Many members stop because money or time is tight. A pause keeps them with you.")
+        w_on = st.toggle("Check in with new members about two weeks after they join", value=auto["welcome"]["on"],
+                         help="Warmer and more practical if they've barely come in. Most members who quit do it "
+                              "in their first 3 months.")
+        pr_on = st.toggle("Monthly progress note (\"you trained 14 times in October\")", value=auto["progress"]["on"],
+                          help="Sent in the first week of the month, only to members who came 4 or more times.")
         rw_on = st.toggle("Tell them when they've earned a gift (loyalty must be on)", value=auto["reward"]["on"])
         cap = st.number_input("Most emails in one day", 10, 500, int(auto["daily_cap"]),
                               help="A limit so you don't send too many at once. The free email plan allows 100 a day.")
         if st.form_submit_button("Save", type="primary"):
             gg._save_settings(supabase, owner_id, {"auto_messages": {
-                "renewal": {"on": bool(r_on), "days": int(r_days)}, "missed": {"on": bool(m_on), "days": int(m_days)},
+                "renewal": {"on": bool(r_on), "days": int(r_days)},
+                "missed": {"on": bool(m_on), "days": int(m_days), "pause": bool(pause_on)},
+                "welcome": {"on": bool(w_on)}, "progress": {"on": bool(pr_on)},
                 "reward": {"on": bool(rw_on)}, "daily_cap": int(cap)}}, "Automatic messages saved.")
             st.rerun()
-    if not (auto["renewal"]["on"] or auto["missed"]["on"] or auto["reward"]["on"]):
+    if not any(auto[k]["on"] for k in ("renewal", "missed", "reward", "welcome", "progress")):
         st.info("Turn on at least one message above. Nothing is sent until you do.")
         return
     due = due_messages(supabase, gym_id)
     if due is None:
         st.info(SQL_HINT)
         return
-    label = {"renewal": "Renew reminder", "missed": "We missed you", "reward": "Gift earned"}
+    label = {"renewal": "Renew reminder", "missed": "We missed you", "reward": "Gift earned",
+             "welcome": "New member check-in", "progress": "Monthly progress", "update": "Gym update"}
     with_email = [d for d in due if "@" in gw._text(d[1].get("email"))]
     gw.kpi_row([("To send today", str(len(due)), "cyan", "members who need a message"),
                 ("Have an email", str(len(with_email)), "lime", "will get it by email"),
