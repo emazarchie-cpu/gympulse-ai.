@@ -179,8 +179,8 @@ def _ago(stamp):
 
 
 def _channel_chip(channel):
-    return gw.chip("WhatsApp" if channel == "whatsapp" else "Email",
-                   "lime" if channel == "whatsapp" else "cyan")
+    label = {"whatsapp": "WhatsApp", "portal": "Member app"}.get(channel, "Email")
+    return gw.chip(label, {"whatsapp": "lime", "portal": "amber"}.get(channel, "cyan"))
 
 
 # ---------------------------------------------------------------- callbacks

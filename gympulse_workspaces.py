@@ -4996,6 +4996,13 @@ def render_checkin(supabase, gym_id):
         if has_rows and "class_id" in ck.columns:
             att = ck[ck["class_id"].notna()]
             counts = att.groupby("class_id")["member_id"].nunique().to_dict()
+        booked = {}
+        try:                                   # places booked from the member app (phase 18)
+            for b in (supabase.table("class_bookings").select("class_id, member_id").eq("gym_id", gym_id)
+                      .execute().data or []):
+                booked.setdefault(str(b["class_id"]), []).append(b["member_id"])
+        except Exception:
+            pass
         for c in sorted(classes, key=lambda x: x["_start"], reverse=True)[:12]:
             future = c["_start"] > now
             with st.container(border=True, key=f"card_cls_{c['id']}"):
@@ -5003,6 +5010,9 @@ def render_checkin(supabase, gym_id):
                     f'{chip(class_when(c["_start"]), "cyan")}'
                     f'{chip("Upcoming", "lime") if future else chip(str(counts.get(c["id"], 0)) + " attended", "grey")}'
                     f'</div>')
+                if future and booked.get(str(c["id"])):
+                    who = booked[str(c["id"])]
+                    st.caption(f"{len(who)} booked: " + ", ".join(names.get(i, "Member") for i in who[:15]))
                 if not future and counts.get(c["id"]):
                     who = ck[ck["class_id"] == c["id"]]["member_id"].unique()
                     st.caption("Attended: " + ", ".join(names.get(i, "Member") for i in who[:15]))

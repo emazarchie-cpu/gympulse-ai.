@@ -1051,6 +1051,16 @@ if st.query_params.get("unsub"):
     gcamp.render_unsubscribe(supabase, st.query_params.get("unsub"))
     st.stop()
 
+# Member portal: each member's own page (private link), and the page to ask for a link
+if st.query_params.get("me") or st.query_params.get("member"):
+    import gympulse_portal as gportal
+    gd.apply()
+    if st.query_params.get("me"):
+        gportal.render_portal(supabase, st.query_params.get("me"))
+    else:
+        gportal.render_login(supabase)
+    st.stop()
+
 # Public member sign-up page (the gym's link or QR code, no sign-in)
 if st.query_params.get("join"):
     import gympulse_signup as gsign
@@ -2707,6 +2717,10 @@ elif page == "Member Management":
                          icon=":material/qr_code_2:"):
             import gympulse_signup as gsign
             gsign.render_owner(supabase, gym_id)
+        with st.expander("Member app: each member's own page to renew, check in, book classes and message you",
+                         icon=":material/smartphone:"):
+            import gympulse_portal as gportal
+            gportal.render_owner(supabase, gym_id)
         st.markdown("### Register a New Member")
 
         with st.form("register_member_form"):
