@@ -162,15 +162,50 @@ def render_owner(supabase, gym_id):
         png = _qr_png(url)
         st.image(png, caption="Print this for your front desk", use_container_width=True)
         rp.download_link("Download QR code", png, "gympulse-member-signup-qr.png", "image/png", "join_qr")
+    _render_signups(supabase, gym_id)
+
+
+def _ago(stamp):
+    t = pd.to_datetime(stamp, errors="coerce", utc=True)
+    if pd.isna(t):
+        return ""
+    days = (gw.today_local() - t.tz_convert(gw.APP_TZ).date()).days
+    return "today" if days <= 0 else "yesterday" if days == 1 else f"{days} days ago"
+
+
+def _render_signups(supabase, gym_id):
+    """Members who joined through the link: photo, name (opens their profile), contact, when, plan."""
     try:
-        rows = gw.fetch_all(supabase.table("members").select("full_name, phone, email, created_at")
+        rows = gw.fetch_all(supabase.table("members").select("id, full_name, phone, email, photo, created_at")
                             .eq("gym_id", gym_id).eq("joined_via", "link").order("created_at", desc=True))
     except Exception:
         rows = []
     st.markdown('<div class="section-label">SIGNED UP THROUGH THE LINK</div>', unsafe_allow_html=True)
-    gw.table([{"Member": r["full_name"], "Phone": r.get("phone") or "–", "Email": r.get("email") or "–",
-               "Joined": str(r.get("created_at"))[:10]} for r in rows[:50]],
-             empty="No sign-ups yet. Share your link to get started.",
-             caption=(f"{len(rows)} member{'s' if len(rows) != 1 else ''} so far. Add their plan and end date on the "
-                      "Risk Radar (members without a plan are listed there), or import plans from your old system."
-                      if rows else None))
+    if not rows:
+        st.caption("No sign-ups yet. Share your link to get started.")
+        return
+    try:
+        acts = supabase.table("member_activity").select("member_id, membership_type").eq("gym_id", gym_id) \
+            .in_("member_id", [r["id"] for r in rows[:200]]).execute().data or []
+        has_plan = {x["member_id"] for x in acts if x.get("membership_type")}
+    except Exception:
+        has_plan = set()
+    no_plan = sum(1 for r in rows if r["id"] not in has_plan)
+    st.caption(f"{len(rows)} member{'s' if len(rows) != 1 else ''} so far"
+               + (f", {no_plan} still need a plan. Tap a name to open their profile and add it." if no_plan else
+                  ". Tap a name to open their profile."))
+    limit = st.session_state.get("join_list_limit", 10)
+    with st.container(border=True, key="card_join_list"):
+        for r in rows[:limit]:
+            a, b, c = st.columns([0.7, 4.3, 2], vertical_alignment="center")
+            gw._md(gw.avatar_html(r["full_name"], r.get("photo"), 44, "row-tight"), a)
+            with b:
+                st.button(str(r["full_name"]), key=f"join_open_{r['id']}", type="tertiary",
+                          on_click=gw.open_profile, args=(r["id"], "Member Management"))
+                contact = " · ".join(x for x in (gw._text(r.get("phone")), gw._text(r.get("email"))) if x)
+                gw._md(f'<div class="why" style="padding:0 0 6px;margin-top:-14px">{gw._esc(contact or "No contact details")}'
+                       f' · joined {_ago(r.get("created_at"))}</div>')
+            gw._md(gw.chip("Plan added", "lime") if r["id"] in has_plan else gw.chip("Needs a plan", "amber"), c)
+    if len(rows) > limit:
+        st.button(f"Show more ({len(rows) - limit} left)", type="tertiary", key="join_more",
+                  on_click=lambda: st.session_state.update(join_list_limit=limit + 10))
