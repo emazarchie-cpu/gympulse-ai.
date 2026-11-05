@@ -1,0 +1,88 @@
+# Deploys the WhatsApp webhook (supabase/functions/whatsapp-webhook) to Supabase,
+# with JWT verification off (Meta signs its calls; the function checks the signature),
+# and saves the function's secrets. No copy-pasting code into Supabase.
+#
+# Repository secrets (Settings -> Secrets and variables -> Actions):
+#   SUPABASE_ACCESS_TOKEN   Supabase -> your avatar -> Account preferences -> Access tokens
+#   SUPABASE_URL            already set (the project is read from it)
+#   WHATSAPP_TOKEN          already set
+#   WHATSAPP_APP_SECRET     developers.facebook.com -> app -> App settings -> Basic -> App secret
+#   WHATSAPP_VERIFY_TOKEN   any passphrase; type the same one into Meta's webhook settings
+# Run it from the Actions tab: "Deploy WhatsApp webhook" -> Run workflow.
+# It also runs by itself when the function's code changes on main.
+name: Deploy WhatsApp webhook
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "supabase/functions/whatsapp-webhook/**"
+
+concurrency:
+  group: deploy-whatsapp-webhook
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Find the project
+        id: project
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        run: |
+          REF=$(echo "$SUPABASE_URL" | sed -E 's#^https?://([a-z0-9]+)\.supabase\.co.*#\1#')
+          if [ -z "$REF" ] || [ "$REF" = "$SUPABASE_URL" ]; then
+            echo "::error::SUPABASE_URL secret is missing or not a supabase.co address."
+            exit 1
+          fi
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+      - name: Check the secrets are there
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          WHATSAPP_TOKEN: ${{ secrets.WHATSAPP_TOKEN }}
+          WHATSAPP_APP_SECRET: ${{ secrets.WHATSAPP_APP_SECRET }}
+          WHATSAPP_VERIFY_TOKEN: ${{ secrets.WHATSAPP_VERIFY_TOKEN }}
+        run: |
+          missing=""
+          for v in SUPABASE_ACCESS_TOKEN WHATSAPP_TOKEN WHATSAPP_APP_SECRET WHATSAPP_VERIFY_TOKEN; do
+            [ -n "${!v}" ] || missing="$missing $v"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Add these repository secrets first:$missing"
+            exit 1
+          fi
+      - name: Save the function's secrets
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          WHATSAPP_TOKEN: ${{ secrets.WHATSAPP_TOKEN }}
+          WHATSAPP_APP_SECRET: ${{ secrets.WHATSAPP_APP_SECRET }}
+          WHATSAPP_VERIFY_TOKEN: ${{ secrets.WHATSAPP_VERIFY_TOKEN }}
+        run: |
+          umask 077
+          f=$(mktemp)
+          {
+            echo "WHATSAPP_TOKEN=$WHATSAPP_TOKEN"
+            echo "WHATSAPP_APP_SECRET=$WHATSAPP_APP_SECRET"
+            echo "WHATSAPP_VERIFY_TOKEN=$WHATSAPP_VERIFY_TOKEN"
+          } > "$f"
+          supabase secrets set --env-file "$f" --project-ref "${{ steps.project.outputs.ref }}"
+          rm -f "$f"
+      - name: Deploy the function
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          REF="${{ steps.project.outputs.ref }}"
+          supabase functions deploy whatsapp-webhook --no-verify-jwt --use-api --project-ref "$REF" \
+            || supabase functions deploy whatsapp-webhook --no-verify-jwt --project-ref "$REF"
+      - name: Webhook address for Meta
+        run: |
+          echo "### Callback URL for Meta" >> "$GITHUB_STEP_SUMMARY"
+          echo "https://${{ steps.project.outputs.ref }}.supabase.co/functions/v1/whatsapp-webhook" >> "$GITHUB_STEP_SUMMARY"
+          echo "Callback URL: https://${{ steps.project.outputs.ref }}.supabase.co/functions/v1/whatsapp-webhook"
