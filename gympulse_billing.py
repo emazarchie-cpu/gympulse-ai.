@@ -21,12 +21,20 @@ import streamlit as st
 import gympulse_workspaces as gw
 
 TRIAL_DAYS = 30
-GRACE_DAYS = 3
+GRACE_DAYS = 0          # locks the moment the 30th day ends (owners get emails before that)
 ALWAYS_OPEN = ("Subscription", "Settings", "FAQs", "Admin")
-DEFAULT_PRICING = {"monthly": None, "yearly": None, "currency": "NGN", "pay_link": "",
+DEFAULT_PRICING = {"plans": [], "monthly": None, "yearly": None, "currency": "NGN", "pay_link": "",
                    "bank_name": "", "bank_account": "", "bank_holder": "",
                    "contact_whatsapp": "", "contact_email": "emmanuel@usegympulseai.com",
                    "note": "Founding gyms keep their price for life."}
+
+
+def plans(p):
+    """The plans the founder set in Admin → Billing: [{name, monthly, yearly, for_who}]."""
+    out = [x for x in (p.get("plans") or []) if gw._text(x.get("name")) and (x.get("monthly") or x.get("yearly"))]
+    if not out and p.get("monthly"):                 # a single price set before plans existed
+        out = [{"name": "Standard", "monthly": p["monthly"], "yearly": p.get("yearly"), "for_who": ""}]
+    return out
 
 
 def _money(x):
@@ -95,24 +103,40 @@ def is_admin_account():
 
 # ------------------------------------------------------------------ in the app
 def render_banner(supabase, gym_id):
-    """A small line at the top: trial days left, or a warning when it's ending or over."""
+    """No line at the top: owners are reminded by email. Shows the Upgrade pop-up once the trial is over."""
     s = state(subscription(supabase, gym_id))
-    if s["status"] in ("off", "free", "active") or is_admin_account():
-        return s
-    c1, c2 = st.columns([4, 1], vertical_alignment="center")
-    if s["status"] == "trial" and s["days_left"] > 7:
-        c1.caption(f"🎁 {s['label']}. Enjoy GymPulse AI free until {s['ends']:%d %B}.")
-    elif s["status"] == "trial":
-        c1.warning(f"{s['label']}. Subscribe before {s['ends']:%d %B} to keep your members' reminders running.")
-    elif s["locked"]:
-        c1.error(f"{s['label']}. Subscribe to keep using GymPulse AI. Your data is safe.")
-    else:
-        left = GRACE_DAYS + s["days_left"]
-        c1.error(f"{s['label']}. Subscribe within {left} day{'s' if left != 1 else ''} to keep using "
-                 "GymPulse AI. Your data is safe.")
-    c2.button("See plans", key="bill_banner_btn", use_container_width=True,
-              on_click=lambda: st.session_state.update(navigate_to="Subscription"))
+    if s["locked"] and not is_admin_account() and not st.session_state.get("_upgrade_shown"):
+        st.session_state["_upgrade_shown"] = True
+        upgrade_dialog(pricing(supabase), s)
     return s
+
+
+def _plan_cards(p):
+    ps = plans(p)
+    if not ps:
+        st.info("Prices are being finalised. Contact us and we'll set up your plan.")
+        return
+    cols = st.columns(min(len(ps), 3))
+    for i, plan in enumerate(ps):
+        with cols[i % len(cols)].container(border=True):
+            st.markdown(f"#### {gw._esc(plan['name'])}")
+            if plan.get("monthly"):
+                st.markdown(f"## {_money(plan['monthly'])}<span style='font-size:14px;opacity:.7'> / month</span>",
+                            unsafe_allow_html=True)
+            if plan.get("yearly"):
+                st.caption(f"or {_money(plan['yearly'])} a year")
+            if plan.get("for_who"):
+                st.caption(gw._esc(plan["for_who"]))
+
+
+@st.dialog("Your free trial has ended", width="large")
+def upgrade_dialog(p, s):
+    st.markdown("Upgrade to keep using GymPulse AI. **All your members, check-ins and reports are saved**, and "
+                "you'll pick up right where you left off.")
+    _plan_cards(p)
+    if st.button("Upgrade now", type="primary", use_container_width=True, icon=":material/rocket_launch:"):
+        st.session_state["navigate_to"] = "Subscription"
+        st.rerun()
 
 
 def must_lock(supabase, gym_id):
@@ -154,14 +178,15 @@ def render_subscription_page(supabase, gym_id):
         st.info("Billing isn't switched on yet. Enjoy GymPulse AI free.")
         return
     if s["locked"]:
-        st.error("Your free trial has ended, so GymPulse AI is paused for your gym. Everything you added is safe. "
-                 "Subscribe below and you'll pick up right where you left off.")
-    gw.kpi_row([("Your plan", {"trial": "Free trial", "active": "Subscribed", "free": "Free access",
-                              "expired": "Ended"}[s["status"]], "lime", s["label"]),
-                ("Monthly price", _money(p.get("monthly")) if p.get("monthly") else "Coming soon", "cyan", "per gym"),
-                ("Yearly price", _money(p.get("yearly")) if p.get("yearly") else "–", "amber",
-                 "pay once a year" if p.get("yearly") else ""),
+        st.error("Your free trial has ended. Upgrade below to keep using GymPulse AI. Everything you added is safe, "
+                 "and you'll pick up right where you left off.")
+    sub = subscription(supabase, gym_id) or {}
+    gw.kpi_row([("Your plan", {"trial": "Free trial", "active": gw._text(sub.get("plan"), "Subscribed"),
+                              "free": "Free access", "expired": "Ended"}[s["status"]], "lime", s["label"]),
                 ("Ends", f"{s['ends']:%d %b %Y}" if s.get("ends") else "–", "grey", "")])
+    if s["status"] != "free":
+        st.markdown("#### Plans")
+        _plan_cards(p)
     if s["status"] == "free":
         st.success("Your gym has free access to GymPulse AI. Nothing to pay.")
         return
@@ -173,9 +198,6 @@ def render_subscription_page(supabase, gym_id):
                 "- A monthly report of the members and money you kept")
     if p.get("note"):
         st.caption(p["note"])
-    if not p.get("monthly"):
-        st.info("Prices are being finalised. Contact us and we'll set up your plan, and your trial keeps running "
-                "in the meantime.")
     st.markdown("#### How to pay")
     if p.get("pay_link"):
         st.link_button("Pay securely online", p["pay_link"], type="primary", icon=":material/lock:")
@@ -191,11 +213,13 @@ def render_subscription_page(supabase, gym_id):
         st.caption("Questions? " + " · ".join(contact))
     with st.form("bill_paid"):
         st.markdown("**Already paid?** Tell us and we'll switch your subscription on.")
-        c1, c2 = st.columns(2)
+        names = [x["name"] for x in plans(p)] or ["Not sure yet"]
+        c0, c1, c2 = st.columns(3)
+        plan_pick = c0.selectbox("Plan", names)
         method = c1.selectbox("How did you pay?", ["Bank transfer", "Online payment link", "Other"])
         ref = c2.text_input("Reference or note (optional)")
         if st.form_submit_button("I've paid", type="primary"):
-            _notify_paid(supabase, gym_id, method, ref.strip())
+            _notify_paid(supabase, gym_id, method, f"{plan_pick} · {ref.strip()}".strip(" ·"))
             st.rerun()
 
 
@@ -224,11 +248,19 @@ def render_admin_billing(sc, gyms, audit):
                 ("Monthly income", _money(sum(float(subs.get(gid, {}).get("price") or 0) for gid, s in states.items()
                                               if s["status"] == "active")), "amber", "from paying gyms")])
 
-    with st.expander("Prices and how gyms pay", expanded=not p.get("monthly")):
+    with st.expander("Plans, prices and how gyms pay", expanded=not plans(p)):
         with st.form("adm_pricing"):
-            c1, c2 = st.columns(2)
-            monthly = c1.number_input("Monthly price (₦)", 0.0, step=1000.0, value=float(p.get("monthly") or 0))
-            yearly = c2.number_input("Yearly price (₦, optional)", 0.0, step=5000.0, value=float(p.get("yearly") or 0))
+            st.markdown("**Your plans** (add a row for each plan; gyms see them in the Upgrade pop-up)")
+            start_rows = plans(p) or [{"name": "Starter", "monthly": None, "yearly": None, "for_who": "Up to 100 members"},
+                                      {"name": "Growth", "monthly": None, "yearly": None, "for_who": "Up to 300 members"},
+                                      {"name": "Pro", "monthly": None, "yearly": None, "for_who": "300+ members"}]
+            plan_rows = st.data_editor(
+                pd.DataFrame(start_rows, columns=["name", "monthly", "yearly", "for_who"]), num_rows="dynamic",
+                use_container_width=True, key="adm_plans",
+                column_config={"name": st.column_config.TextColumn("Plan name"),
+                               "monthly": st.column_config.NumberColumn("Monthly price (₦)", min_value=0, step=1000),
+                               "yearly": st.column_config.NumberColumn("Yearly price (₦, optional)", min_value=0, step=5000),
+                               "for_who": st.column_config.TextColumn("Who it's for (shown under the price)")})
             link = st.text_input("Online payment link (optional)", p.get("pay_link") or "",
                                  placeholder="e.g. your Paystack payment page")
             c3, c4, c5 = st.columns(3)
@@ -240,7 +272,15 @@ def render_admin_billing(sc, gyms, audit):
             em = c7.text_input("Email for payment notices", p.get("contact_email") or "")
             note = st.text_input("Short note under the price (optional)", p.get("note") or "")
             if st.form_submit_button("Save prices", type="primary"):
-                value = {"monthly": monthly or None, "yearly": yearly or None, "currency": "NGN",
+                plan_list = []
+                for _, r in plan_rows.iterrows():
+                    name = gw._text(r.get("name")).strip()
+                    mo = float(r["monthly"]) if pd.notna(r.get("monthly")) and r.get("monthly") else None
+                    yr = float(r["yearly"]) if pd.notna(r.get("yearly")) and r.get("yearly") else None
+                    if name and (mo or yr):
+                        plan_list.append({"name": name, "monthly": mo, "yearly": yr,
+                                          "for_who": gw._text(r.get("for_who")).strip()})
+                value = {"plans": plan_list, "monthly": None, "yearly": None, "currency": "NGN",
                          "pay_link": link.strip(), "bank_name": bank.strip(), "bank_account": acct.strip(),
                          "bank_holder": holder.strip(), "contact_whatsapp": wa.strip(),
                          "contact_email": em.strip(), "note": note.strip()}
@@ -261,16 +301,23 @@ def render_admin_billing(sc, gyms, audit):
                                                           in __import__("gympulse_admin").admin_emails() else ""))
             st.caption(f"Trial ends {sub.get('trial_ends_on') or '–'} · paid until {sub.get('paid_until') or '–'} · "
                        f"price {_money(sub.get('price'))}")
-            c1, c2, c3 = st.columns(3)
+            ps = plans(p)
+            names = [x["name"] for x in ps] or ["Standard"]
+            current = gw._text(sub.get("plan")).split(" · ")[0]
+            c0, c1, c2, c3 = st.columns(4)
+            plan_name = c0.selectbox("Plan", names, index=names.index(current) if current in names else 0,
+                                     key=f"bill_plan_{gid}")
+            chosen = next((x for x in ps if x["name"] == plan_name), {})
             months = c1.selectbox("Paid for", [1, 3, 6, 12], key=f"bill_m_{gid}",
                                   format_func=lambda m: f"{m} month{'s' if m != 1 else ''}")
             price = c2.number_input("Monthly price for this gym (₦)", 0.0, step=1000.0,
-                                    value=float(sub.get("price") or p.get("monthly") or 0), key=f"bill_p_{gid}")
+                                    value=float(chosen.get("monthly") or sub.get("price") or 0),
+                                    key=f"bill_p_{gid}_{plan_name}")
             if c3.button("Mark as paid", key=f"bill_paid_{gid}", type="primary", use_container_width=True):
                 start = max(_d(sub.get("paid_until")) or today, today)
                 until = start + timedelta(days=30 * months)
                 admin_set(sc, gid, status="active", paid_until=until.isoformat(), price=price or None,
-                          plan=f"{months} month{'s' if months != 1 else ''}")
+                          plan=f"{plan_name} · {months} month{'s' if months != 1 else ''}")
                 audit(sc, "billing_paid", g, {"months": months, "until": until.isoformat(), "price": price})
                 st.session_state["adm_flash"] = f"{g['name']} is subscribed until {until:%d %b %Y}."
                 st.rerun()
@@ -326,12 +373,13 @@ def trial_reminders(sc, gyms, dry_run=False, log=print):
         if not stage or (gid, f"trial:{stage}:{end}") in done:
             continue
         first = gw._text(g["owner"]).split(" ")[0] or "there"
-        price = (f"It's {_money(p['monthly'])} a month" + (f", or {_money(p['yearly'])} a year" if p.get("yearly") else "")
-                 + ".") if p.get("monthly") else ""
+        ps = plans(p)
+        price = ("Plans: " + "; ".join(f"{x['name']} {_money(x['monthly'])} a month" for x in ps if x.get("monthly"))
+                 + ".") if ps else ""
         if stage == "ended":
             subject, title = f"{g['name']}: your GymPulse AI free trial has ended", "Your free trial has ended"
-            lead = ("Your 30-day free trial of GymPulse AI ended yesterday. Your members, check-ins and reports are "
-                    f"all saved. Subscribe within {GRACE_DAYS} days to keep everything running.")
+            lead = ("Your 30-day free trial of GymPulse AI has ended. Your members, check-ins and reports are all "
+                    "saved. Upgrade to pick up right where you left off.")
         else:
             days = {"7days": "7 days", "3days": "3 days", "1day": "1 day"}[stage]
             subject, title = f"{g['name']}: {days} left in your GymPulse AI trial", f"{days} left in your free trial"
@@ -339,7 +387,7 @@ def trial_reminders(sc, gyms, dry_run=False, log=print):
                     "reminders, Risk Radar and monthly reports running without a break.")
         body = (f"<p style=\"margin:0 0 10px\">Hi {gw._esc(first)},</p><p style=\"margin:0 0 12px\">{gw._esc(lead)}</p>"
                 + (f"<p style=\"margin:0 0 12px\">{gw._esc(price)}</p>" if price else "")
-                + ge.button("See plans and subscribe", ge.SITE + "/?p=Subscription"))
+                + ge.button("See plans and upgrade", ge.SITE))
         if dry_run:
             log(f"  would email {g['name']} <{g['email']}>: {subject}")
             sent += 1
