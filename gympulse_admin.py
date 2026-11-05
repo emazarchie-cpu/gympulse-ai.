@@ -290,10 +290,13 @@ def render_admin():
     flash = st.session_state.pop("adm_flash", None)
     if flash:
         (st.error if flash.startswith("Could not") else st.success)(flash)
-    section = st.segmented_control("Admin section", ["Gyms", "Monthly reports", "Admin log"], key="adm_section",
+    section = st.segmented_control("Admin section", ["Gyms", "Billing", "Monthly reports", "Admin log"], key="adm_section",
                                    default="Gyms", label_visibility="collapsed") or "Gyms"
     if section == "Gyms":
         render_gyms(sc)
+    elif section == "Billing":
+        import gympulse_billing as gb
+        gb.render_admin_billing(sc, all_gyms(sc), audit)
     elif section == "Admin log":
         render_log(sc)
     else:
@@ -395,7 +398,7 @@ def render_reports(sc):
 
 # ================================================================== gym management
 # Child tables first, so nothing is left behind and no foreign key blocks the delete.
-GYM_TABLES = ["loyalty_redemptions", "auto_messages", "challenge_entries", "challenges", "referrals", "progress_logs", "member_freezes", "exit_reasons",
+GYM_TABLES = ["billing_events", "gym_subscriptions", "loyalty_redemptions", "auto_messages", "challenge_entries", "challenges", "referrals", "progress_logs", "member_freezes", "exit_reasons",
               "onboarding_steps", "payment_requests", "payments", "messages", "reminder_log", "checkins",
               "retention_actions", "member_activity", "classes", "trainers", "members", "companies",
               "platform_reports", "platform_gym_flags"]

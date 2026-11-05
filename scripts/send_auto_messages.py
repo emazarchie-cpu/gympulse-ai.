@@ -47,6 +47,10 @@ def main():
         print(f"  {s} {'would send' if args.dry_run else 'sent'}, {k} skipped, {f} failed")
         total = [total[0] + s, total[1] + k, total[2] + f]
     print(f"Done: {total[0]} {'would send' if args.dry_run else 'sent'}, {total[1]} skipped, {total[2]} failed.")
+    import gympulse_billing as gb
+    print("Trial reminders")
+    n = gb.trial_reminders(sc, gadm.all_gyms(sc, fresh=True), dry_run=args.dry_run)
+    print(f"  {n} {'would send' if args.dry_run else 'sent'}")
     return 0
 
 
