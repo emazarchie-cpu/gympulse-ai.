@@ -319,11 +319,12 @@ def render_command_centre(supabase, gym_id, assess_fn, greeting, user_name, busi
         kept_value = _money(res["retained_rev"]) + "<small>/mo</small>"
         kept_hint = f"{_plural(res['retained_n'], 'member')} kept after a play · last 30 days"
         kept_tag = '<span class="gp-tag ok">Verified</span>'
+    _staff = st.session_state.get("role") == "staff"
     gw._md('<div class="cc-kpis">'
-           + _kpi("Revenue at risk", _money(k["expected_loss"]) + "<small>/mo</small>",
+           + ("" if _staff else _kpi("Revenue at risk", _money(k["expected_loss"]) + "<small>/mo</small>",
                   f"{high_n} high-risk members hold {_money(k['high_risk_revenue'])}/mo in fees",
-                  "#FF6B6B", '<span class="gp-tag est">Estimate</span>')
-           + _kpi("Revenue retained", kept_value, kept_hint, "#B7F34A", kept_tag)
+                  "#FF6B6B", '<span class="gp-tag est">Estimate</span>'))
+           + ("" if _staff else _kpi("Revenue retained", kept_value, kept_hint, "#B7F34A", kept_tag))
            + _kpi("Re-engaged", str(res["reengaged_n"]),
                   f"Checked in again after a play · save rate {rate}",
                   "#35D6ED", '<span class="gp-tag ok">Check-ins</span>')

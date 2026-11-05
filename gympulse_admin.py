@@ -411,7 +411,7 @@ def render_reports(sc):
 
 # ================================================================== gym management
 # Child tables first, so nothing is left behind and no foreign key blocks the delete.
-GYM_TABLES = ["billing_events", "gym_subscriptions", "loyalty_redemptions", "auto_messages", "challenge_entries", "challenges", "referrals", "progress_logs", "member_freezes", "exit_reasons",
+GYM_TABLES = ["gym_staff", "billing_invoices", "member_feedback", "billing_events", "gym_subscriptions", "loyalty_redemptions", "auto_messages", "challenge_entries", "challenges", "referrals", "progress_logs", "member_freezes", "exit_reasons",
               "onboarding_steps", "payment_requests", "payments", "messages", "reminder_log", "checkins",
               "retention_actions", "member_activity", "classes", "trainers", "members", "companies",
               "platform_reports", "platform_gym_flags"]
@@ -529,6 +529,15 @@ def delete_gym(sc, entry, delete_login=True):
     gid, owner = entry["gym"]["id"], entry["gym"].get("owner_id")
     st.session_state.pop("_adm_gyms", None)
     done, problems = [], []
+    try:                                    # staff logins for this gym go too
+        for r in sc.table("gym_staff").select("user_id").eq("gym_id", gid).execute().data or []:
+            if r.get("user_id"):
+                try:
+                    sc.auth.admin.delete_user(r["user_id"])
+                except Exception as error:
+                    problems.append(f"staff login: {str(error)[:60]}")
+    except Exception:
+        pass
     for table in GYM_TABLES:
         try:
             sc.table(table).delete().eq("gym_id", gid).execute()

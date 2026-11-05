@@ -185,6 +185,9 @@ def _need_sql(rows):
 
 
 def _save_settings(supabase, owner_id, patch, message):
+    if st.session_state.get("role") == "staff":
+        st.session_state["grow_error"] = "Only the gym owner can change these settings."
+        return
     profile = st.session_state.get("user_profile") or {}
     s = {**dict(profile.get("settings") or {}), **patch}
     try:
@@ -1703,7 +1706,11 @@ def render_grow(supabase, gym_id, assess_fn, owner_id):
     # and come back to the same tab (e.g. Loyalty after opening a profile).
     if "grow_section" not in st.session_state:
         st.session_state["grow_section"] = st.session_state.get("_grow_last", SECTIONS[0])
-    section = st.segmented_control("Grow section", SECTIONS, key="grow_section",
+    sections = [x for x in SECTIONS if not (st.session_state.get("role") == "staff"
+                                            and x in ("Monthly report", "Team"))]
+    if st.session_state.get("grow_section") not in sections:
+        st.session_state["grow_section"] = sections[0]
+    section = st.segmented_control("Grow section", sections, key="grow_section",
                                    label_visibility="collapsed") or SECTIONS[0]
     st.session_state["_grow_last"] = section
     if section == "Collect renewals":
