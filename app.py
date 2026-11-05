@@ -2689,6 +2689,10 @@ elif page == "Member Management":
         _mm_flash = st.session_state.pop("mm_flash", None)
         if _mm_flash:
             st.success(_mm_flash)
+        with st.expander("Import members from GymMaster (CSV)", icon=":material/upload_file:",
+                         expanded=bool(st.session_state.get("gm_flash") or st.session_state.get("gm_errors"))):
+            import gympulse_gymmaster as ggm
+            ggm.render_gymmaster_import(supabase, gym_id)
         st.markdown("### Register a New Member")
 
         with st.form("register_member_form"):
