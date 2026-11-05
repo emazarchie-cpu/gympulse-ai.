@@ -71,6 +71,15 @@ TEMPLATES = {
         "example": ["Ada", "Pulse Fitness Lekki"],
         "buttons": ["Love it", "Happy", "It's okay", "Not happy"],
     },
+    "gp_member_portal": {
+        "category": "UTILITY",
+        "body": "Hi {{1}}, here is your private link to your {{2}} membership page: renew, see your check-in code, "
+                "visits, rewards and classes. Tap the button below to open it.",
+        "example": ["Ada", "Pulse Fitness Lekki"],
+        "buttons": [],
+        "url_button": {"text": "Open my membership", "base": "https://usegympulseai.com/?me=",
+                       "example": "https://usegympulseai.com/?me=3f6c1d2e-8a4b-4c1f-9d2e-5b7a8c9d0e1f"},
+    },
 }
 KIND_TEMPLATE = {"renewal": "gp_renewal_reminder", "missed": "gp_we_miss_you", "week1": "gp_new_member_checkin",
                  "welcome": "gp_new_member_checkin", "milestone": "gp_celebration", "level": "gp_celebration",
@@ -134,11 +143,14 @@ def _post(payload):
     return (r.json().get("messages") or [{}])[0].get("id", "")
 
 
-def template_payload(digits, name, params, payloads=()):
+def template_payload(digits, name, params, payloads=(), url_suffix=None):
     comps = [{"type": "body", "parameters": [{"type": "text", "text": _clean(p)} for p in params]}]
     for i, pl in enumerate(payloads):
         comps.append({"type": "button", "sub_type": "quick_reply", "index": str(i),
                       "parameters": [{"type": "payload", "payload": pl}]})
+    if url_suffix is not None:
+        comps.append({"type": "button", "sub_type": "url", "index": str(len(payloads)),
+                      "parameters": [{"type": "text", "text": str(url_suffix)}]})
     return {"messaging_product": "whatsapp", "to": digits, "type": "template",
             "template": {"name": name, "language": {"code": LANG}, "components": comps}}
 
@@ -148,8 +160,8 @@ def _clean(text):
     return re.sub(r"\s+", " ", str(text or "")).strip()[:900] or "-"
 
 
-def send_template(digits, name, params, payloads=()):
-    return _post(template_payload(digits, name, params, payloads))
+def send_template(digits, name, params, payloads=(), url_suffix=None):
+    return _post(template_payload(digits, name, params, payloads, url_suffix))
 
 
 def send_text(digits, body):
@@ -273,8 +285,12 @@ def log(supabase, gym_id, member_id, body, wamid, digits, meta):
 def template_definition(name):
     t = TEMPLATES[name]
     comps = [{"type": "BODY", "text": t["body"], "example": {"body_text": [t["example"]]}}]
-    if t["buttons"]:
-        comps.append({"type": "BUTTONS", "buttons": [{"type": "QUICK_REPLY", "text": b} for b in t["buttons"]]})
+    buttons = [{"type": "QUICK_REPLY", "text": b} for b in t["buttons"]]
+    if t.get("url_button"):
+        u = t["url_button"]
+        buttons.append({"type": "URL", "text": u["text"], "url": u["base"] + "{{1}}", "example": [u["example"]]})
+    if buttons:
+        comps.append({"type": "BUTTONS", "buttons": buttons})
     return {"name": name, "language": LANG, "category": t["category"], "components": comps}
 
 
@@ -321,7 +337,7 @@ def render_admin_setup():
         return
     statuses = template_statuses()
     st.markdown('<div class="section-label">TEMPLATES</div>', unsafe_allow_html=True)
-    gw.table([{"Template": n, "Type": t["category"].title(), "Buttons": ", ".join(t["buttons"]),
+    gw.table([{"Template": n, "Type": t["category"].title(), "Buttons": ", ".join(t["buttons"] + ([t["url_button"]["text"] + " (link)"] if t.get("url_button") else [])),
                "Status": (statuses or {}).get(n, "Not submitted" if statuses is not None else "Unknown").title()}
               for n, t in TEMPLATES.items()],
              pills={"Status": {"Approved": "lime", "Pending": "amber", "Rejected": "red", "Not Submitted": "grey"}},
@@ -351,8 +367,9 @@ def render_admin_setup():
                 st.error("Enter a full phone number.")
             else:
                 ex = TEMPLATES[tpl]["example"]
+                url = TEMPLATES[tpl].get("url_button")
                 try:
-                    wamid = send_template(d, tpl, ex)
+                    wamid = send_template(d, tpl, ex, url_suffix=url["example"].split("=")[-1] if url else None)
                     st.success(f"Sent. Check the phone. (Message ID {wamid[:24]}…)")
                 except Exception as error:
                     st.error(str(error))
