@@ -9,11 +9,23 @@
 #   WHATSAPP_APP_SECRET     developers.facebook.com -> app -> App settings -> Basic -> App secret
 #   WHATSAPP_VERIFY_TOKEN   any passphrase; type the same one into Meta's webhook settings
 # Run it from the Actions tab: "Deploy WhatsApp webhook" -> Run workflow.
+# Fill in the App ID and WhatsApp Business Account ID (not secret) to also connect Meta
+# to the webhook: the app is subscribed to the WhatsApp account and to the "messages"
+# field, so replies, button taps and read ticks reach GymPulse.
 # It also runs by itself when the function's code changes on main.
 name: Deploy WhatsApp webhook
 
 on:
   workflow_dispatch:
+    inputs:
+      app_id:
+        description: "Meta App ID (developers.facebook.com -> your app -> App settings -> Basic). Leave empty to only deploy."
+        required: false
+        default: ""
+      waba_id:
+        description: "WhatsApp Business Account ID (the 'Messaging account ID' on the WhatsApp setup page)"
+        required: false
+        default: ""
   push:
     branches: [main]
     paths:
@@ -86,3 +98,33 @@ jobs:
           echo "### Callback URL for Meta" >> "$GITHUB_STEP_SUMMARY"
           echo "https://${{ steps.project.outputs.ref }}.supabase.co/functions/v1/whatsapp-webhook" >> "$GITHUB_STEP_SUMMARY"
           echo "Callback URL: https://${{ steps.project.outputs.ref }}.supabase.co/functions/v1/whatsapp-webhook"
+      - name: Connect Meta to the webhook
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.app_id != '' && inputs.waba_id != '' }}
+        env:
+          APP_ID: ${{ inputs.app_id }}
+          WABA_ID: ${{ inputs.waba_id }}
+          WHATSAPP_TOKEN: ${{ secrets.WHATSAPP_TOKEN }}
+          WHATSAPP_APP_SECRET: ${{ secrets.WHATSAPP_APP_SECRET }}
+          WHATSAPP_VERIFY_TOKEN: ${{ secrets.WHATSAPP_VERIFY_TOKEN }}
+          CALLBACK: https://${{ steps.project.outputs.ref }}.supabase.co/functions/v1/whatsapp-webhook
+        run: |
+          set -u
+          case "$APP_ID$WABA_ID" in *[!0-9]*) echo "::error::App ID and WhatsApp account ID must be numbers only."; exit 1;; esac
+          G=https://graph.facebook.com/v21.0
+          echo "1. Connecting the app to the WhatsApp account…"
+          r=$(curl -sS -X POST "$G/$WABA_ID/subscribed_apps" -H "Authorization: Bearer $WHATSAPP_TOKEN")
+          echo "   $r"
+          echo "$r" | grep -q '"success":true' || { echo "::error::Meta refused to connect the app to the WhatsApp account (see above)."; exit 1; }
+          echo "2. Subscribing the webhook to 'messages'…"
+          r=$(curl -sS -X POST "$G/$APP_ID/subscriptions" \
+                --data-urlencode "object=whatsapp_business_account" \
+                --data-urlencode "callback_url=$CALLBACK" \
+                --data-urlencode "verify_token=$WHATSAPP_VERIFY_TOKEN" \
+                --data-urlencode "fields=messages" \
+                --data-urlencode "access_token=$APP_ID|$WHATSAPP_APP_SECRET")
+          echo "   $r"
+          echo "$r" | grep -q '"success":true' || { echo "::error::Meta refused the webhook subscription (see above)."; exit 1; }
+          echo "3. Check:"
+          curl -sS "$G/$WABA_ID/subscribed_apps" -H "Authorization: Bearer $WHATSAPP_TOKEN"; echo
+          echo "### Meta is connected" >> "$GITHUB_STEP_SUMMARY"
+          echo "Replies, button taps and read ticks now go to the webhook. Send 'Hello' to test." >> "$GITHUB_STEP_SUMMARY"
