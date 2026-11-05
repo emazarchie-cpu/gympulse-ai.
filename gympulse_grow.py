@@ -20,7 +20,7 @@ import gympulse_workspaces as gw
 
 SQL_HINT = "Run sql/phase5_growth.sql in Supabase to switch this on."
 
-SECTIONS = ["Collect renewals", "Automatic messages", "Gym updates", "Loyalty", "New members", "Freeze", "Why they left", "Progress",
+SECTIONS = ["Collect renewals", "Automatic messages", "Gym updates", "Happiness", "Celebrate", "Loyalty", "New members", "Freeze", "Why they left", "Progress",
             "Referrals", "Challenges", "Corporate", "Team", "Season planner", "Monthly report"]
 
 
@@ -1660,6 +1660,12 @@ def render_grow(supabase, gym_id, assess_fn, owner_id):
     elif section == "Gym updates":
         import gympulse_updates as gu
         gu.render_updates(supabase, gym_id)
+    elif section == "Happiness":
+        import gympulse_happy as gh
+        gh.render_happiness(supabase, gym_id)
+    elif section == "Celebrate":
+        import gympulse_celebrate as gcel
+        gcel.render_celebrate(supabase, gym_id)
     elif section == "Loyalty":
         import gympulse_loyalty as gl
         gl.render_loyalty(supabase, gym_id, owner_id)

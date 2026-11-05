@@ -12,7 +12,11 @@ switches them on:
   * renewal reminder, N days before a plan ends
   * "we missed you", after N days with no check-in (active members only)
   * reward ready, when a member has enough points for a reward
+  * first-week check-in, 7 days after joining
   * new member check-in, about two weeks after joining (warmer if they've barely come)
+  * milestones: 25/50/100+ visits, 12 strong weeks in a row, joining anniversaries
+  * loyalty level up (Bronze → Silver → Gold), when levels are on
+  * happiness check, a one-tap question every 3 months (or monthly)
   * monthly progress note, early each month, to members who trained 4+ times last month
 Each is sent at most once per member per occasion (auto_messages log),
 respects unsubscribes, and skips members without an email. They run every
@@ -40,15 +44,26 @@ LOYALTY_DEFAULTS = {
     "rewards": [{"name": "Free smoothie", "points": 200},
                 {"name": "Free personal training session", "points": 500},
                 {"name": "One week free", "points": 1000}],
+    "levels_on": False,
+    "levels": [{"name": "Bronze", "points": 0, "perk": ""},
+               {"name": "Silver", "points": 1000, "perk": "10% off drinks and merch"},
+               {"name": "Gold", "points": 3000, "perk": "A free personal training session every quarter"}],
 }
 AUTO_DEFAULTS = {
     "renewal": {"on": False, "days": 3},
     "missed": {"on": False, "days": 10, "pause": True},
     "reward": {"on": False},
+    "week1": {"on": False},
     "welcome": {"on": False},
     "progress": {"on": False},
+    "milestone": {"on": False},
+    "level": {"on": False},
+    "pulse": {"on": False, "freq": "quarter"},
     "daily_cap": 80,
 }
+
+
+AUTO_KINDS = ("renewal", "missed", "week1", "welcome", "milestone", "level", "reward", "progress", "pulse")
 
 
 def _settings(profile=None):
@@ -61,6 +76,19 @@ def loyalty_cfg(profile=None):
     cfg["rewards"] = sorted([r for r in cfg.get("rewards") or [] if r.get("name") and int(r.get("points") or 0) > 0],
                             key=lambda r: int(r["points"]))
     return cfg
+
+
+def level_for(earned, cfg):
+    """(level, next level or None) from points earned (gifts claimed don't lower a level)."""
+    levels = sorted([l for l in cfg.get("levels") or [] if gw._text(l.get("name"))], key=lambda l: int(l.get("points") or 0))
+    if not (cfg.get("levels_on") and levels):
+        return None, None
+    cur = levels[0]
+    for l in levels:
+        if earned >= int(l.get("points") or 0):
+            cur = l
+    nxt = next((l for l in levels if int(l.get("points") or 0) > earned), None)
+    return cur, nxt
 
 
 def auto_cfg(profile=None):
@@ -190,6 +218,11 @@ def due_messages(supabase, gym_id, profile=None, today=None):
                     out.append(("missed", md, ref) + missed_letter(md, lv, away, gg.member_story(md, ck),
                                                                    auto["missed"].get("pause", True)))
         joined = m.get("joined") if gg._has_date(m.get("joined")) else None
+        if auto["week1"]["on"] and joined is not None and 6 <= (today - joined).days <= 9:
+            ref = f"week1:{joined.isoformat()}"
+            if (m["id"], "week1", ref) not in sent:
+                visits = int(ck[ck["member_id"] == m["id"]]["day"].nunique()) if len(ck) else 0
+                out.append(("week1", md, ref) + week1_letter(md, visits))
         if auto["welcome"]["on"] and joined is not None and 12 <= (today - joined).days <= 20:
             ref = f"welcome:{joined.isoformat()}"
             if (m["id"], "welcome", ref) not in sent:
@@ -207,19 +240,50 @@ def due_messages(supabase, gym_id, profile=None, today=None):
                 ref = f"progress:{last_month_start:%Y-%m}"
                 if (m["id"], "progress", ref) not in sent:
                     out.append(("progress", md, ref) + progress_letter(md, n_last, n_prev, last_month_start))
-    if auto["reward"]["on"]:
+    if auto["milestone"]["on"]:
+        import gympulse_celebrate as gc
+        ck_all = gg._checkins(supabase, gym_id, 1500)
+        for _, m in members.iterrows():
+            end = m["end"] if gg._has_date(m.get("end")) else None
+            if end is not None and end < today:
+                continue
+            for ref, title, sentence in gc.milestones(m, ck_all, today):
+                if (m["id"], "milestone", ref) not in sent:
+                    out.append(("milestone", dict(m), ref) + gc.milestone_letter(dict(m), title, sentence))
+                    break
+    if auto["pulse"]["on"]:
+        import gympulse_campaigns as gcamp
+        import gympulse_happy as gh
+        rnd = gh.round_for(today, auto["pulse"].get("freq", "quarter"))
+        ref = f"pulse:{rnd}"
+        cands = [m for _, m in members.iterrows()
+                 if (not gg._has_date(m.get("end")) or m["end"] >= today)
+                 and gg._has_date(m.get("joined")) and (today - m["joined"]).days >= 30
+                 and (m["id"], "pulse", ref) not in sent]
+        flags = gcamp.member_flags(supabase, gym_id, [m["id"] for m in cands]) if cands else {}
+        for m in cands:
+            opted, token = flags.get(m["id"], (False, None))
+            if token and not opted:
+                out.append(("pulse", dict(m), ref) + gh.pulse_letter(dict(m), token, rnd))
+    if auto["reward"]["on"] or auto["level"]["on"]:
         cfg, table, _ = compute_points(supabase, gym_id, profile)
         if cfg["enabled"] and len(table):
             by_id = {r["id"]: dict(r) for _, r in members.iterrows()}
             for _, r in table.iterrows():
-                if r["ready"] is not None and r["member_id"] in by_id:
+                lv, _nxt = level_for(int(r["earned"]), cfg)
+                if auto["level"]["on"] and lv and int(lv.get("points") or 0) > 0 and r["member_id"] in by_id:
+                    ref = f"level:{lv['name']}"
+                    if (r["member_id"], "level", ref) not in sent:
+                        out.append(("level", by_id[r["member_id"]], ref) + level_letter(r, lv, _nxt))
+                if auto["reward"]["on"] and r["ready"] is not None and r["member_id"] in by_id:
                     ref = f"reward:{r['ready']['name']}:{r['claimed']}"
                     if (r["member_id"], "reward", ref) not in sent:
                         subject, body = reward_letter(r, r["ready"], cfg)
                         out.append(("reward", by_id[r["member_id"]], ref, subject, body, None))
     # At most one automatic email per member per day: renewal first, then we missed you,
     # then reward. The others stay due and go out on a later day.
-    order = {"renewal": 0, "missed": 1, "welcome": 2, "reward": 3, "progress": 4}
+    order = {"renewal": 0, "missed": 1, "week1": 2, "welcome": 3, "milestone": 4, "level": 5, "reward": 6,
+             "progress": 7, "pulse": 8}
     picked, seen = [], set(had_today)
     for item in sorted(out, key=lambda x: order[x[0]]):
         if item[1]["id"] not in seen:
@@ -242,6 +306,37 @@ def missed_letter(m, last_visit, away, story, pause=True):
                "your membership so you don't lose any days.\n\n" if pause else "")
             + f"See you soon,\n{owner}\n{biz}")
     return f"We've missed you at {biz}, {first}", body, None
+
+
+def week1_letter(m, visits):
+    """A week after joining: how was it, and who to talk to."""
+    import gympulse_grow as gg
+    biz, owner = gg._biz()
+    first = gg._first(m.get("full_name"))
+    if visits:
+        middle = (f"You've already been in {visits} time{'s' if visits != 1 else ''}, nice work. "
+                  "How did your first week feel?")
+    else:
+        middle = ("We haven't seen you in yet, and that's okay: the first visit is always the hardest. "
+                  "Is there a day this week that works for you?")
+    body = (f"Hi {first},\n\nIt's been a week since you joined {biz}. {middle}\n\n"
+            "If anything isn't quite right, or you're not sure where to start, just reply to this email. "
+            f"It comes straight to me.\n\n{owner}\n{biz}")
+    return f"How was your first week at {biz}, {first}?", body, None
+
+
+def level_letter(row, level, nxt):
+    import gympulse_grow as gg
+    biz, owner = gg._biz()
+    first = gg._first(row["name"])
+    perk = gw._text(level.get("perk"))
+    body = (f"Hi {first},\n\nGreat news: you've reached {level['name']} level at {biz}, with "
+            f"{int(row['earned']):,} loyalty points from your visits.\n\n"
+            + (f"As a {level['name']} member you get: {perk}. Just mention it at the front desk.\n\n" if perk else "")
+            + (f"Next up is {nxt['name']} at {int(nxt['points']):,} points. Keep it going!\n\n" if nxt else
+               "That's our top level. Thank you for being one of our most committed members!\n\n")
+            + f"{owner}\n{biz}")
+    return f"{first}, you're now {level['name']} at {biz}!", body, None
 
 
 def welcome_letter(m, visits):
@@ -362,13 +457,25 @@ def render_loyalty(supabase, gym_id, owner_id):
                                  use_container_width=True, key="loy_rewards",
                                  column_config={"name": st.column_config.TextColumn("Gift"),
                                                 "points": st.column_config.NumberColumn("Points", min_value=1, step=50)})
+        st.markdown("**Levels** (members move up as they earn points; claiming gifts never moves them down)")
+        lv_on = st.toggle("Turn on levels", value=bool(cfg.get("levels_on")), key="loy_lv_on")
+        levels = st.data_editor(pd.DataFrame(cfg.get("levels") or LOYALTY_DEFAULTS["levels"]), num_rows="dynamic",
+                                use_container_width=True, key="loy_levels",
+                                column_config={"name": st.column_config.TextColumn("Level"),
+                                               "points": st.column_config.NumberColumn("Points to reach it", min_value=0,
+                                                                                       step=100),
+                                               "perk": st.column_config.TextColumn("What they get (optional)")})
         if st.button("Save", type="primary", key="loy_save"):
+            lv = sorted([{"name": str(r["name"]).strip(), "points": int(r["points"]) if pd.notna(r.get("points")) else 0,
+                          "perk": str(r.get("perk") or "").strip() if pd.notna(r.get("perk")) else ""}
+                         for _, r in levels.iterrows() if str(r.get("name") or "").strip()], key=lambda x: x["points"])
             rw = [{"name": str(r["name"]).strip(), "points": int(r["points"])} for _, r in rewards.iterrows()
                   if str(r.get("name") or "").strip() and pd.notna(r.get("points")) and int(r["points"]) > 0]
             gg._save_settings(supabase, owner_id, {"loyalty": {
                 "enabled": bool(on), "start": start.isoformat(), "per_visit": int(per_visit),
                 "week_visits": int(week_visits), "week_bonus": int(week_bonus),
-                "renewal_bonus": int(renewal_bonus), "rewards": rw}}, "Loyalty settings saved.")
+                "renewal_bonus": int(renewal_bonus), "rewards": rw,
+                "levels_on": bool(lv_on), "levels": lv}}, "Loyalty settings saved.")
             st.rerun()
     if not cfg["enabled"]:
         st.info("Turn on loyalty points above to start.")
@@ -387,6 +494,13 @@ def render_loyalty(supabase, gym_id, owner_id):
                 ("Gifts given", str(len(reds)), "grey",
                  f"{sum(1 for r in reds if pd.Timestamp(str(r['created_at'])[:10]) >= month_start)} this month")])
 
+    if cfg.get("levels_on"):
+        counts = {}
+        for e in table["earned"]:
+            lv, _ = level_for(int(e), cfg)
+            if lv:
+                counts[lv["name"]] = counts.get(lv["name"], 0) + 1
+        st.caption("Members by level: " + " · ".join(f"{k} {v}" for k, v in counts.items()))
     ready = table[table["ready"].notna()]
     if len(ready):
         st.markdown('<div class="section-label">CAN GET A GIFT NOW</div>', unsafe_allow_html=True)
@@ -414,9 +528,12 @@ def render_loyalty(supabase, gym_id, owner_id):
         nxt = r["next"]
         pct = 100 if nxt is None else min(100, round(r["balance"] / max(int(nxt["points"]), 1) * 100))
         hint = "can get any gift" if nxt is None else f"{r['to_next']:,} more points for {nxt['name']}"
+        lv, _ = level_for(int(r["earned"]), cfg)
+        badge = (f' <span style="font-size:11px;font-weight:700;padding:1px 7px;border-radius:6px;'
+                 f'border:1px solid currentColor;opacity:.85">{gw._esc(lv["name"])}</span>') if lv else ""
         c1, c2 = st.columns([6, 1], vertical_alignment="center")
         gw._md(f'<div style="display:flex;align-items:center;gap:12px;margin:6px 0"><div style="width:34px">{medal}</div>'
-               f'<div style="flex:1"><b>{gw._esc(r["name"])}</b> · {r["balance"]:,} points '
+               f'<div style="flex:1"><b>{gw._esc(r["name"])}</b>{badge} · {r["balance"]:,} points '
                f'<span style="opacity:.7">({r["visits"]} visits, {r["weeks"]} busy weeks, {r["renewals"]} paid on '
                f'time) · {gw._esc(hint)}</span>'
                f'<div class="pbar" style="margin-top:4px"><span style="width:{pct}%;--tone:#B7F34A"></span></div></div></div>', c1)
@@ -461,7 +578,18 @@ def render_auto(supabase, gym_id, owner_id):
                               "in their first 3 months.")
         pr_on = st.toggle("Monthly progress note (\"you trained 14 times in October\")", value=auto["progress"]["on"],
                           help="Sent in the first week of the month, only to members who came 4 or more times.")
+        wk_on = st.toggle("\"How was your first week?\" 7 days after they join", value=auto["week1"]["on"])
+        ms_on = st.toggle("Celebrate milestones (25, 50, 100+ visits, 12 strong weeks, joining anniversaries)",
+                          value=auto["milestone"]["on"])
+        c5, c6 = st.columns([1, 2])
+        hp_on = c5.toggle("Happiness check (one tap)", value=auto["pulse"]["on"],
+                          help="\"How happy are you with the gym?\" Unhappy answers are emailed to you straight away. "
+                               "See answers in Grow → Happiness.")
+        hp_freq = c6.radio("How often", ["quarter", "month"], horizontal=True,
+                           index=0 if auto["pulse"].get("freq", "quarter") == "quarter" else 1,
+                           format_func=lambda v: "Every 3 months" if v == "quarter" else "Every month")
         rw_on = st.toggle("Tell them when they've earned a gift (loyalty must be on)", value=auto["reward"]["on"])
+        lv_on = st.toggle("Tell them when they move up a loyalty level (levels must be on)", value=auto["level"]["on"])
         cap = st.number_input("Most emails in one day", 10, 500, int(auto["daily_cap"]),
                               help="A limit so you don't send too many at once. The free email plan allows 100 a day.")
         if st.form_submit_button("Save", type="primary"):
@@ -469,9 +597,11 @@ def render_auto(supabase, gym_id, owner_id):
                 "renewal": {"on": bool(r_on), "days": int(r_days)},
                 "missed": {"on": bool(m_on), "days": int(m_days), "pause": bool(pause_on)},
                 "welcome": {"on": bool(w_on)}, "progress": {"on": bool(pr_on)},
+                "week1": {"on": bool(wk_on)}, "milestone": {"on": bool(ms_on)}, "level": {"on": bool(lv_on)},
+                "pulse": {"on": bool(hp_on), "freq": hp_freq},
                 "reward": {"on": bool(rw_on)}, "daily_cap": int(cap)}}, "Automatic messages saved.")
             st.rerun()
-    if not any(auto[k]["on"] for k in ("renewal", "missed", "reward", "welcome", "progress")):
+    if not any(auto[k]["on"] for k in AUTO_KINDS):
         st.info("Turn on at least one message above. Nothing is sent until you do.")
         return
     due = due_messages(supabase, gym_id)
@@ -479,7 +609,8 @@ def render_auto(supabase, gym_id, owner_id):
         st.info(SQL_HINT)
         return
     label = {"renewal": "Renew reminder", "missed": "We missed you", "reward": "Gift earned",
-             "welcome": "New member check-in", "progress": "Monthly progress", "update": "Gym update"}
+             "welcome": "New member check-in", "progress": "Monthly progress", "update": "Gym update",
+             "week1": "First week", "milestone": "Milestone", "level": "Level up", "pulse": "Happiness check"}
     with_email = [d for d in due if "@" in gw._text(d[1].get("email"))]
     gw.kpi_row([("To send today", str(len(due)), "cyan", "members who need a message"),
                 ("Have an email", str(len(with_email)), "lime", "will get it by email"),

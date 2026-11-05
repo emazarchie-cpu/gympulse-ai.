@@ -1050,6 +1050,13 @@ if st.query_params.get("unsub"):
     gcamp.render_unsubscribe(supabase, st.query_params.get("unsub"))
     st.stop()
 
+# Public happiness check answer page (one tap from the member's email, no sign-in)
+if st.query_params.get("fb"):
+    import gympulse_happy as ghappy
+    gd.apply()
+    ghappy.render_public(supabase, dict(st.query_params))
+    st.stop()
+
 # Public "Book a demo" page and its cancel link (no sign-in needed)
 if st.query_params.get("demo") or st.query_params.get("demo_cancel"):
     import gympulse_booking as gb
