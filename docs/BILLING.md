@@ -5,7 +5,19 @@
 - The website shows the trial and your plans in a **Plans and prices** section: one tile per plan with its monthly and yearly price side by side, and a table comparing what each plan includes.
 - Nothing about the trial shows inside the app. GymPulse AI emails the owner **7, 3 and 1 days** before the trial ends, and the day after. Paying gyms get emails **3 and 1 days** before their plan ends, and the day after.
 - When the 30th day ends there are **no extra days**. An **Upgrade** pop-up lists the plans, and the app shows only the **Subscription** page until they pay. **No data is ever deleted.** Settings and FAQs stay open.
-- On the Subscription page they press **Pay monthly** or **Pay yearly** on a plan and pay with **Paystack** (card, bank transfer or USSD). Their plan switches on by itself as soon as Paystack confirms the payment. If they pay during the trial, the paid plan starts when the trial ends.
+- **Checkout.** On the Subscription page the owner presses **Choose Starter / Growth / Pro** and goes to a checkout page:
+  - billing details (business name, full name, phone, email for receipts);
+  - billing address (street, city, state);
+  - Monthly or Yearly;
+  - payment method;
+  - acceptance of the terms.
+
+  An order summary shows the plan, when it starts and renews, and the total.
+- **Paystack:** *Review and pay* → Paystack's secure page (card, bank transfer or USSD) → back to a **Payment successful** page with the receipt. The plan switches on by itself.
+- **Bank transfer:** the owner sees your bank details, the exact amount and an invoice number to use as the reference, then presses *I've sent the transfer*. You get an email. Confirm it in Admin → Billing → **Bank transfers to confirm**, and the plan switches on.
+- **Receipts:** every confirmed payment emails a receipt from GymPulse AI (**billing@usegympulseai.com**, or set `BILLING_FROM`) to the billing email and the owner, with a PDF receipt (GP-000001, GP-000002, ...). This covers Paystack payments, transfers you confirm, and Admin → Mark as paid. The Subscription page shows **Billing history** with receipt downloads.
+- If they pay during the trial, the paid plan starts when the trial ends.
+- Needs `sql/phase12_invoices.sql`.
 - **Higher plans unlock more.** Pages a gym's plan doesn't include show an "upgrade to unlock" card:
   - **1 · Essentials:** members, check-in, payments and renewals, Risk Radar, follow-ups, renewal reminder emails, monthly report.
   - **2 · + Growth tools:** Action Centre, Grow (campaigns, loyalty, referrals, challenges), "we missed you" and reward emails, Business Insights.
