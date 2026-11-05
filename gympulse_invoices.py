@@ -107,133 +107,170 @@ def last_details(client, gym_id):
 
 
 # ------------------------------------------------------------------ receipt PDF
+def receipt_number(inv):
+    n = (inv or {}).get("number")
+    return f"{int(n):04d}-{str((inv or {}).get('paid_at') or '')[:4] or 'GP'}" if n else number(inv)
+
+
+def pay_label(inv):
+    """'Card · Visa ending 4081', 'Bank transfer', ... for the receipt."""
+    d = (inv or {}).get("pay_detail") or ""
+    if d:
+        return d
+    return {"paystack": "Paystack", "transfer": "Bank transfer", "admin": "Bank transfer"}.get((inv or {}).get("method"), "–")
+
+
+def _fmt_date(value, fmt="%d %B %Y"):
+    try:
+        return datetime.fromisoformat(str(value)[:10]).strftime(fmt).lstrip("0")
+    except Exception:
+        return "–"
+
+
 def receipt_pdf(inv, paid=True):
-    """A clean GymPulse AI receipt (or invoice, while unpaid)."""
+    """A clean, white GymPulse AI receipt (or invoice while unpaid): title and logo, numbers, from and
+    bill-to, the amount paid, line items, totals and payment history."""
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.units import mm
+    from reportlab.lib.utils import ImageReader
     from reportlab.pdfgen import canvas
 
     W, H = A4
+    L, R = 18 * mm, W - 18 * mm
+    ink, muted, rule, soft = (colors.HexColor("#111827"), colors.HexColor("#6B7280"),
+                              colors.HexColor("#111827"), colors.HexColor("#E5E7EB"))
     buf = io.BytesIO()
     c = canvas.Canvas(buf, pagesize=A4)
+    kind = "Receipt" if paid else "Invoice"
+    c.setTitle(f"GymPulse AI {kind.lower()} {number(inv)}")
+    c.setAuthor("GymPulse AI")
 
-    def money(x):                      # the PDF font has no naira sign
-        return f"NGN {float(x or 0):,.0f}"
-    c.setTitle(f"GymPulse AI {'receipt' if paid else 'invoice'} {number(inv)}")
-    navy, ink, muted, line = colors.HexColor("#0B1020"), colors.HexColor("#111827"), \
-        colors.HexColor("#5B6678"), colors.HexColor("#E5E9F0")
-    # header band
-    c.setFillColor(navy)
-    c.rect(0, H - 36 * mm, W, 36 * mm, fill=1, stroke=0)
-    logo = os.path.join(os.path.dirname(os.path.abspath(__file__)), "gympulse-email-logo.png")
+    def money(x):                                   # the PDF font has no naira sign
+        return f"NGN {float(x or 0):,.2f}"
+
+    def text(x, y, s, size=9.5, bold=False, color=ink, right=False):
+        c.setFont("Helvetica-Bold" if bold else "Helvetica", size)
+        c.setFillColor(color)
+        (c.drawRightString if right else c.drawString)(x, y, gw._text(s))
+
+    # title and logo
+    y = H - 24 * mm
+    text(L, y, kind, 22, True)
+    logo = os.path.join(os.path.dirname(os.path.abspath(__file__)), "gympulse-logo-dark.png")
     try:
-        from reportlab.lib.utils import ImageReader
         img = ImageReader(logo)
         iw, ih = img.getSize()
-        h = 12 * mm
-        c.drawImage(img, 18 * mm, H - 24 * mm, width=h * iw / ih, height=h, mask="auto")
+        h = 16 * mm
+        c.drawImage(img, R - h * iw / ih, y - 6 * mm, width=h * iw / ih, height=h, mask="auto")
     except Exception:
-        c.setFillColor(colors.white)
-        c.setFont("Helvetica-Bold", 18)
-        c.drawString(18 * mm, H - 21 * mm, "GymPulse AI")
-    c.setFillColor(colors.HexColor("#B7F34A"))
-    c.rect(0, H - 37 * mm, W, 1 * mm, fill=1, stroke=0)
-    c.setFillColor(colors.white)
-    c.setFont("Helvetica-Bold", 20)
-    c.drawRightString(W - 18 * mm, H - 19 * mm, "Receipt" if paid else "Invoice")
-    c.setFont("Helvetica", 10)
-    c.setFillColor(colors.HexColor("#C9D3E3"))
-    c.drawRightString(W - 18 * mm, H - 26 * mm, number(inv))
+        text(R, y, "GymPulse AI", 14, True, right=True)
 
-    y = H - 52 * mm
-    def label_value(x, y, label, value, bold=False):
-        c.setFont("Helvetica", 8.5)
-        c.setFillColor(muted)
-        c.drawString(x, y, label.upper())
-        c.setFont("Helvetica-Bold" if bold else "Helvetica", 11)
-        c.setFillColor(ink)
-        c.drawString(x, y - 5.5 * mm, gw._text(value, "–"))
+    # numbers
+    y -= 13 * mm
+    paid_on = _fmt_date(inv.get("paid_at")) if paid else None
+    meta = [("Invoice number", number(inv))]
+    if paid:
+        meta += [("Receipt number", receipt_number(inv)), ("Date paid", paid_on)]
+    else:
+        meta += [("Date issued", _fmt_date(inv.get("created_at"))), ("Status", "Awaiting payment")]
+    for label, value in meta:
+        text(L, y, label, 9.5, True)
+        text(L + 33 * mm, y, value, 9.5)
+        y -= 5.2 * mm
 
-    when = gw._text(inv.get("paid_at") if paid else inv.get("created_at"))[:10]
-    try:
-        when = datetime.fromisoformat(when).strftime("%d %B %Y")
-    except Exception:
-        pass
-    label_value(18 * mm, y, "Date paid" if paid else "Date", when, True)
-    label_value(78 * mm, y, "Paid with" if paid else "Status", METHOD_LABEL.get(inv.get("method"), "–")
-                if paid else "Awaiting payment")
-    label_value(150 * mm, y, "Amount", money(inv.get("amount")), True)
+    # from / bill to
+    y -= 6 * mm
+    text(L, y, "GymPulse AI", 10, True)
+    text(L + 88 * mm, y, "Bill to", 10, True)
+    seller = ["Lagos", "Nigeria", "usegympulseai.com", "emmanuel@usegympulseai.com"]
+    buyer = [inv.get("business_name"), inv.get("billing_name"), inv.get("address"),
+             " ".join(x for x in (inv.get("city"), inv.get("state")) if x) or None, "Nigeria",
+             inv.get("billing_email"), inv.get("billing_phone")]
+    buyer = [b for b in buyer if b]
+    for i in range(max(len(seller), len(buyer))):
+        y -= 5 * mm
+        if i < len(seller):
+            text(L, y, seller[i])
+        if i < len(buyer):
+            text(L + 88 * mm, y, gw._text(buyer[i])[:48])
 
-    y -= 22 * mm
-    c.setFont("Helvetica", 8.5)
-    c.setFillColor(muted)
-    c.drawString(18 * mm, y, "BILLED TO")
-    c.drawString(110 * mm, y, "FROM")
-    c.setFillColor(ink)
-    lines_to = [inv.get("business_name"), inv.get("billing_name"), inv.get("billing_email"), inv.get("billing_phone"),
-                ", ".join(x for x in (inv.get("address"), inv.get("city"), inv.get("state")) if x) or None]
-    lines_from = ["GymPulse AI", "usegympulseai.com", "emmanuel@usegympulseai.com", "Lagos, Nigeria"]
-    for i, t in enumerate([x for x in lines_to if x]):
-        c.setFont("Helvetica-Bold" if i == 0 else "Helvetica", 10.5 if i == 0 else 9.5)
-        c.drawString(18 * mm, y - (6 + i * 5) * mm, gw._text(t)[:60])
-    for i, t in enumerate(lines_from):
-        c.setFont("Helvetica-Bold" if i == 0 else "Helvetica", 10.5 if i == 0 else 9.5)
-        c.drawString(110 * mm, y - (6 + i * 5) * mm, t)
+    # headline
+    y -= 14 * mm
+    amount = float(inv.get("amount") or 0)
+    text(L, y, f"{money(amount)} paid on {paid_on}" if paid else f"{money(amount)} due", 15, True)
 
     # line items
-    y -= 42 * mm
-    c.setStrokeColor(line)
-    c.setFillColor(colors.HexColor("#F6F8FB"))
-    c.rect(18 * mm, y - 2 * mm, W - 36 * mm, 9 * mm, fill=1, stroke=0)
-    c.setFont("Helvetica-Bold", 8.5)
-    c.setFillColor(muted)
-    c.drawString(21 * mm, y + 1 * mm, "DESCRIPTION")
-    c.drawString(120 * mm, y + 1 * mm, "PERIOD")
-    c.drawRightString(W - 21 * mm, y + 1 * mm, "AMOUNT")
-    y -= 10 * mm
-    cycle = "Yearly" if inv.get("period") == "yearly" else f"{inv.get('months') or 1} month" + \
-        ("s" if (inv.get("months") or 1) != 1 else "")
-    c.setFont("Helvetica-Bold", 10.5)
-    c.setFillColor(ink)
-    c.drawString(21 * mm, y, f"GymPulse AI {gw._text(inv.get('plan'), 'subscription')} plan")
-    c.setFont("Helvetica", 9)
-    c.setFillColor(muted)
-    c.drawString(21 * mm, y - 5 * mm, f"{cycle} subscription")
-    period = "–"
+    y -= 13 * mm
+    cols = [(L, "Description", False), (R - 84 * mm, "Qty", True), (R - 46 * mm, "Unit price", True),
+            (R - 28 * mm, "Tax", True), (R, "Amount", True)]
+    for x, label, right in cols:
+        text(x, y, label, 8.5, color=ink, right=right)
+    y -= 3 * mm
+    c.setStrokeColor(rule)
+    c.setLineWidth(1)
+    c.line(L, y, R, y)
+    y -= 6 * mm
+    cycle = "Yearly" if inv.get("period") == "yearly" else (
+        "Monthly" if int(inv.get("months") or 1) == 1 else f"{inv.get('months')} months")
+    text(L, y, f"GymPulse AI {gw._text(inv.get('plan'), 'subscription')} plan · {cycle}")
+    text(R - 84 * mm, y, "1", right=True)
+    text(R - 46 * mm, y, money(amount), right=True)
+    text(R - 28 * mm, y, "0%", right=True)
+    text(R, y, money(amount), right=True)
     if inv.get("period_start") and inv.get("period_end"):
-        try:
-            a = datetime.fromisoformat(str(inv["period_start"])[:10])
-            b = datetime.fromisoformat(str(inv["period_end"])[:10])
-            period = f"{a:%d %b %Y} – {b:%d %b %Y}"
-        except Exception:
-            pass
-    c.setFont("Helvetica", 9.5)
-    c.setFillColor(ink)
-    c.drawString(120 * mm, y, period)
-    c.setFont("Helvetica-Bold", 10.5)
-    c.drawRightString(W - 21 * mm, y, money(inv.get("amount")))
-    y -= 12 * mm
-    c.line(18 * mm, y, W - 18 * mm, y)
-    y -= 8 * mm
-    for label, value, bold in (("Subtotal", money(inv.get("amount")), False), ("VAT", "NGN 0", False),
-                               ("Total paid" if paid else "Total due", money(inv.get("amount")), True)):
-        c.setFont("Helvetica-Bold" if bold else "Helvetica", 11 if bold else 9.5)
-        c.setFillColor(ink if bold else muted)
-        c.drawString(120 * mm, y, label)
-        c.drawRightString(W - 21 * mm, y, value)
-        y -= 7 * mm
-    if inv.get("reference"):
-        c.setFont("Helvetica", 8.5)
-        c.setFillColor(muted)
-        c.drawString(18 * mm, y - 4 * mm, f"Payment reference: {inv['reference']}")
+        y -= 4.6 * mm
+        text(L, y, f"{_fmt_date(inv['period_start'], '%d %b %Y')} – {_fmt_date(inv['period_end'], '%d %b %Y')}",
+             8.5, color=muted)
+
+    # totals
+    y -= 11 * mm
+    x0 = L + 88 * mm
+    rows = [("Subtotal", money(amount), False), ("Total excluding tax", money(amount), False),
+            ("VAT (0%)", money(0), False), ("Total", money(amount), False),
+            ("Amount paid" if paid else "Amount due", money(amount), True)]
+    c.setLineWidth(0.6)
+    for label, value, bold in rows:
+        c.setStrokeColor(soft)
+        c.line(x0, y + 4.2 * mm, R, y + 4.2 * mm)
+        text(x0, y, label, 9.5, bold)
+        text(R, y, value, 9.5, bold, right=True)
+        y -= 6 * mm
+
+    # payment history
+    if paid:
+        y -= 10 * mm
+        text(L, y, "Payment history", 15, True)
+        y -= 11 * mm
+        hist = [(L, "Payment method", False), (R - 100 * mm, "Date", False), (R - 36 * mm, "Amount paid", True),
+                (R, "Receipt number", True)]
+        for x, label, right in hist:
+            text(x, y, label, 8.5, right=right)
+        y -= 3 * mm
+        c.setStrokeColor(rule)
+        c.setLineWidth(1)
+        c.line(L, y, R, y)
+        y -= 6 * mm
+        text(L, y, pay_label(inv))
+        text(R - 100 * mm, y, paid_on)
+        text(R - 36 * mm, y, money(amount), right=True)
+        text(R, y, receipt_number(inv), right=True)
+        if inv.get("reference"):
+            y -= 4.6 * mm
+            text(L, y, f"Reference {inv['reference']}", 8.5, color=muted)
+    else:
+        y -= 10 * mm
+        text(L, y, "How to pay", 15, True)
+        y -= 8 * mm
+        text(L, y, f"Pay online from your GymPulse AI Subscription page, or transfer the exact amount using "
+                   f"{number(inv)} as the reference.", 9.5)
 
     # footer
-    c.setFillColor(muted)
-    c.setFont("Helvetica", 8.5)
-    c.drawString(18 * mm, 20 * mm, "Thank you for choosing GymPulse AI. Questions about this "
-                                   + ("receipt" if paid else "invoice") + ": emmanuel@usegympulseai.com")
-    c.drawString(18 * mm, 15 * mm, "GymPulse AI · Smarter insights. Stronger member retention. · usegympulseai.com")
+    c.setStrokeColor(soft)
+    c.setLineWidth(0.6)
+    c.line(L, 22 * mm, R, 22 * mm)
+    text(L, 16 * mm, "GymPulse AI · usegympulseai.com · Questions: emmanuel@usegympulseai.com", 8.5, color=muted)
+    text(R, 16 * mm, "Page 1 of 1", 8.5, color=muted, right=True)
     c.showPage()
     c.save()
     return buf.getvalue()
@@ -271,10 +308,10 @@ def send_receipt(sc, inv, extra_to=None):
             f'<p style="margin:0 0 6px">Thank you for your payment. Your GymPulse AI '
             f'<b>{ge.esc(inv.get("plan"))}</b> plan is active' + (f" until <b>{ge.esc(until)}</b>" if until else "")
             + '. Your receipt is attached.</p>'
-            + ge.details([("Receipt", ge.esc(number(inv))), ("Plan", ge.esc(f"{inv.get('plan')} · "
+            + ge.details([("Receipt", ge.esc(receipt_number(inv))), ("Invoice", ge.esc(number(inv))), ("Plan", ge.esc(f"{inv.get('plan')} · "
                           + ("Yearly" if inv.get("period") == "yearly" else "Monthly"))),
                           ("Amount paid", ge.esc(money(inv.get("amount")))),
-                          ("Paid with", ge.esc(METHOD_LABEL.get(inv.get("method"), "–"))),
+                          ("Paid with", ge.esc(pay_label(inv))),
                           ("Business", ge.esc(inv.get("business_name") or "–"))])
             + ge.button("Open GymPulse AI", ge.SITE))
     try:

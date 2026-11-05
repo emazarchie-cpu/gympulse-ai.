@@ -490,6 +490,14 @@ def apply_payment(reference, sc=None):
         inv = gi.create(sc, gid, plan["name"], period, paid, {"billing_email": email}, "paystack", reference)
     inv = gi.update(sc, inv, status="paid", paid_at=datetime.now(timezone.utc).isoformat(), amount=paid,
                     period_start=start.isoformat(), period_end=until.isoformat())
+    auth = d.get("authorization") or {}
+    channel = d.get("channel") or auth.get("channel") or ""
+    if channel == "card" and auth.get("last4"):
+        inv["pay_detail"] = f"{gw._text(auth.get('card_type'), 'Card').strip().title()} ending {auth['last4']}"
+    elif channel in ("bank_transfer", "dedicated_nuban"):
+        inv["pay_detail"] = "Bank transfer" + (f" · {auth['bank']}" if auth.get("bank") else "")
+    elif channel:
+        inv["pay_detail"] = channel.replace("_", " ").capitalize()
     gi.send_receipt(sc, inv, extra_to=owner_email(sc, gid))         # a copy also goes to GymPulse AI
     return True, f"Your {plan['name']} plan is active until {until:%d %B %Y}.", inv
 
