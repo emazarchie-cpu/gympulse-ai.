@@ -13,9 +13,22 @@
   - acceptance of the terms.
 
   An order summary shows the plan, when it starts and renews, and the total.
-- **Paystack:** *Review and pay* → Paystack's secure page (card, bank transfer or USSD) → back to a **Payment successful** page with the receipt. The plan switches on by itself.
-- **Bank transfer:** the owner sees your bank details, the exact amount and an invoice number to use as the reference, then presses *I've sent the transfer*. You get an email. Confirm it in Admin → Billing → **Bank transfers to confirm**, and the plan switches on.
-- **Receipts:** every confirmed payment emails a receipt from GymPulse AI (**billing@usegympulseai.com**, or set `BILLING_FROM`) to the billing email and the owner, with a PDF receipt (GP-000001, GP-000002, ...). This covers Paystack payments, transfers you confirm, and Admin → Mark as paid. The Subscription page shows **Billing history** with receipt downloads.
+- **With Paystack connected**, the gym picks one of two payment methods:
+  - **Bank transfer**: Paystack shows a one-time account number. The gym transfers from any bank app, Paystack confirms in seconds, and the gym comes back to a **Payment successful** page.
+  - **Card or USSD**: Paystack's secure page.
+
+  Either way the plan and its features switch on **automatically** the moment the payment is confirmed.
+- **Without Paystack**, the only option is a manual bank transfer to your account, with the invoice number as the reference:
+  - The gym sees **"Waiting for your transfer"**, never "thank you", and **nothing is switched on**.
+  - You get an email.
+  - When the money is in your account, confirm it in **Admin → Billing → Bank transfers to confirm**. That switches the plan on and sends the receipt.
+
+  Banks don't tell GymPulse when money arrives, so manual transfers can't be confirmed automatically.
+- **Receipts:** every confirmed payment sends a branded receipt email with a PDF (GP-000001, …) from **billing@usegympulseai.com**:
+  - to the gym's billing email and the owner's login email;
+  - plus a hidden copy to you, at the "Email for payment notices" address in Admin → Billing or `BILLING_COPY_TO`.
+
+  This covers Paystack payments, transfers you confirm, and Admin → Mark as paid. The Subscription page shows **Billing history** with receipt downloads.
 - If they pay during the trial, the paid plan starts when the trial ends.
 - Needs `sql/phase12_invoices.sql`.
 - **Higher plans unlock more.** Pages a gym's plan doesn't include show an "upgrade to unlock" card:

@@ -382,7 +382,10 @@ def _paystack(method, path, **kw):
         return {"status": False, "message": f"Paystack error {r.status_code}"}
 
 
-def start_payment(gym_id, plan, period, email, reference=None, invoice_id=None):
+PAY_CHANNELS = {"pay_transfer": ["bank_transfer"], "pay_card": ["card", "ussd", "bank"]}
+
+
+def start_payment(gym_id, plan, period, email, reference=None, invoice_id=None, channels=None):
     """Create a Paystack checkout. Returns (url, reference) or (None, error)."""
     import gympulse_email as ge
     amount = price_for(plan, period)
@@ -391,7 +394,7 @@ def start_payment(gym_id, plan, period, email, reference=None, invoice_id=None):
     ref = reference or f"gp-{str(gym_id)[:8]}-{uuid.uuid4().hex[:12]}"
     r = _paystack("POST", "/transaction/initialize", json={
         "email": email, "amount": int(round(amount * 100)), "currency": "NGN", "reference": ref,
-        "callback_url": f"{ge.SITE}/?paystack=1",
+        "callback_url": f"{ge.SITE}/?paystack=1", **({"channels": channels} if channels else {}),
         "metadata": {"source": "gympulse", "gym_id": str(gym_id), "plan": plan["name"], "period": period,
                      "invoice_id": invoice_id, "cancel_action": f"{ge.SITE}/"}})
     if r.get("status") and (r.get("data") or {}).get("authorization_url"):
@@ -487,10 +490,7 @@ def apply_payment(reference, sc=None):
         inv = gi.create(sc, gid, plan["name"], period, paid, {"billing_email": email}, "paystack", reference)
     inv = gi.update(sc, inv, status="paid", paid_at=datetime.now(timezone.utc).isoformat(), amount=paid,
                     period_start=start.isoformat(), period_end=until.isoformat())
-    gi.send_receipt(sc, inv, extra_to=owner_email(sc, gid))
-    _email_founder(f"New payment: {plan['name']} {period} · ₦{paid:,.0f}",
-                   f"{inv.get('business_name') or email} paid ₦{paid:,.0f} for GymPulse AI {plan['name']} ({period}).\n"
-                   f"Receipt: {gi.number(inv)}\nGym id: {gid}\nPaid until: {until:%d %b %Y}\nPaystack reference: {reference}")
+    gi.send_receipt(sc, inv, extra_to=owner_email(sc, gid))         # a copy also goes to GymPulse AI
     return True, f"Your {plan['name']} plan is active until {until:%d %B %Y}.", inv
 
 
@@ -653,8 +653,9 @@ def _notify_transfer(inv):
                         f"{inv.get('business_name')} ({inv.get('billing_name')}, {inv.get('billing_email')}, "
                         f"{inv.get('billing_phone')}) says they've sent a bank transfer.\n\n"
                         f"Invoice: {gi.number(inv)}\nPlan: {inv.get('plan')} ({inv.get('period')})\n"
-                        f"Amount: {gi.money(inv.get('amount'))}\n\nCheck your bank, then confirm it in "
-                        "Admin → Billing → Bank transfers to confirm. The receipt is emailed automatically.",
+                        f"Amount: {gi.money(inv.get('amount'))}\n\nNothing is switched on yet. When the money is in your "
+                        "account, confirm it in Admin → Billing → Bank transfers to confirm: the plan switches on and "
+                        "the receipt is emailed to the gym and to you automatically.",
                         reply_to=inv.get("billing_email"))
     return ok
 
@@ -806,10 +807,11 @@ def _render_checkout(supabase, gym_id, plan, period, s, p, ps):
             state_ = c4.selectbox("State", states, index=states.index(prev["state"]) if prev.get("state") in states
                                   else states.index("Lagos"))
             gw._md('<div class="co-sec" style="margin-top:10px">Payment method</div>')
-            methods = (["paystack"] if online else []) + (["transfer"] if bank else [])
-            method = st.radio("Payment method", methods, label_visibility="collapsed",
-                              format_func=lambda m: "Card, bank transfer or USSD · secured by Paystack" if m == "paystack"
-                              else "Direct bank transfer · confirmed within a few hours")
+            methods = ["pay_transfer", "pay_card"] if online else (["transfer"] if bank else [])
+            method = st.radio("Payment method", methods, label_visibility="collapsed", format_func=lambda m: {
+                "pay_transfer": "Bank transfer · confirmed instantly, your plan switches on straight away",
+                "pay_card": "Card or USSD · secured by Paystack",
+                "transfer": "Bank transfer · your plan switches on when the money arrives"}[m])
             agree = st.checkbox("I agree to the Terms of Service and authorise this payment.")
             go = st.form_submit_button(f"Continue · {_money(price_for(plan, period))}", type="primary",
                                        use_container_width=True)
@@ -829,10 +831,12 @@ def _render_checkout(supabase, gym_id, plan, period, s, p, ps):
                 st.error("Checkout isn't available right now. Please try again shortly.")
                 return
             amount = price_for(plan, period)
-            if method == "paystack":
+            if method in PAY_CHANNELS:
                 ref = f"gp-{str(gym_id)[:8]}-{uuid.uuid4().hex[:12]}"
                 inv = gi.create(sc, gym_id, plan["name"], period, amount, details, "paystack", ref)
-                url, msg = start_payment(gym_id, plan, period, email.strip(), ref, inv.get("id"))
+                url, msg = start_payment(gym_id, plan, period, email.strip(), ref, inv.get("id"),
+                                         PAY_CHANNELS[method])
+                st.session_state["co_channel"] = method
                 if not url:
                     gi.update(sc, inv, status="cancelled")
                     st.session_state["bill_flash"] = msg
@@ -851,6 +855,7 @@ def _render_pay(plan, period, s, ps):
     inv = st.session_state.get("co_inv") or {}
     st.button("Change details", icon=":material/arrow_back:", type="tertiary", key="co_back2",
               on_click=_view, args=("checkout",))
+    by_transfer = st.session_state.get("co_channel") == "pay_transfer"
     gw.page_header("Review and pay", "One last step: pay securely with Paystack.", "Checkout")
     left, right = st.columns([1.35, 1], gap="large")
     with right:
@@ -862,9 +867,12 @@ def _render_pay(plan, period, s, ps):
             <div class="co-row"><span>Receipt to</span><b>{gw._esc(inv.get("billing_email"))}</b></div>
             <div class="co-row"><span>Invoice</span><b>{gw._esc(gi.number(inv))}</b></div></div>
             <div class="co-pay"><a class="lx-btn lx-btn-primary" href="{gw._esc(st.session_state.get("co_url", "#"))}"
-            target="_self">Pay {gi.money(price_for(plan, period))} securely</a>
-            <div class="co-lock">🔒 You'll pay on Paystack's secure page by card, bank transfer or USSD, then come
-            straight back here. Your receipt is emailed to {gw._esc(inv.get("billing_email"))}.</div></div>''')
+            target="_self">{"Get transfer details" if by_transfer else "Pay"} · {gi.money(price_for(plan, period))}</a>
+            <div class="co-lock">🔒 {("Paystack gives you an account number for this payment. Transfer the exact "
+            "amount from any bank app; Paystack confirms it in seconds and you come straight back here.")
+            if by_transfer else "You'll pay on Paystack's secure page by card or USSD, then come straight back here."}
+            Your plan switches on as soon as the payment is confirmed, and your receipt is emailed to
+            {gw._esc(inv.get("billing_email"))}.</div></div>''')
 
 
 def _render_transfer(supabase, gym_id, plan, period, s, p, ps):
@@ -875,17 +883,19 @@ def _render_transfer(supabase, gym_id, plan, period, s, p, ps):
     if not sent:
         st.button("Change details", icon=":material/arrow_back:", type="tertiary", key="co_back3",
                   on_click=_view, args=("checkout",))
-    gw.page_header("Bank transfer" if not sent else "Transfer received",
+    gw.page_header("Bank transfer" if not sent else "Waiting for your transfer",
                    "Send the exact amount with your invoice number as the reference." if not sent
-                   else "We'll confirm it and email your receipt.", "Checkout")
+                   else "Your plan switches on as soon as the money arrives.", "Checkout")
     left, right = st.columns([1.35, 1], gap="large")
     with right:
         gw._md(_summary_html(plan, period, s, ps))
     with left:
         if sent:
-            gw._md(f'''<div class="co-done"><div class="co-tick">✓</div><div class="co-title">Thank you</div>
-                <div class="co-sub">We'll confirm your transfer, usually within a few hours. Your plan switches on as
-                soon as it's confirmed, and your receipt is emailed to {gw._esc(inv.get("billing_email"))}.</div></div>''')
+            gw._md(f'''<div class="co-done"><div class="co-tick co-wait">…</div>
+                <div class="co-title">Waiting for your transfer</div>
+                <div class="co-sub">Invoice {gw._esc(gi.number(inv))} · {gi.money(inv.get("amount"))}. As soon as the money
+                arrives, your {gw._esc(plan["name"])} plan switches on and your receipt is emailed to
+                {gw._esc(inv.get("billing_email"))}. You can see its status under Billing history.</div></div>''')
             st.button("Back to Subscription", key="co_done_back", on_click=_view, args=("plans",),
                       use_container_width=True)
             return
@@ -897,7 +907,7 @@ def _render_transfer(supabase, gym_id, plan, period, s, p, ps):
             <div class="co-row"><span>Reference</span><b>{gw._esc(gi.number(inv))}</b></div></div>''')
         st.caption("Use the reference so we can match your payment. Your plan switches on as soon as we confirm it.")
         c1, c2 = st.columns(2)
-        if c1.button("I've sent the transfer", type="primary", use_container_width=True, key="co_sent"):
+        if c1.button("I've made the transfer", type="primary", use_container_width=True, key="co_sent"):
             _notify_transfer(inv)
             _view("sent")
             st.rerun()
