@@ -1203,363 +1203,371 @@ if st.session_state.auth_user is None:
     _, auth_col, _ = st.columns([1, 1.4, 1])
 
     with auth_col:
-        with st.container(border=True, key="auth_card"):
-# ---------------- LOGIN PAGE ----------------
-            if st.session_state.auth_mode == "login":
+        _who = st.segmented_control("Who is signing in?", ["Gym owner", "Member"], default="Gym owner",
+                                    key="who_login", label_visibility="collapsed") or "Gym owner"
+    if _who == "Member":
+        with auth_col:
+            import gympulse_portal as gportal
+            gportal.render_code_login(supabase, embedded=True)
+    else:
+      with auth_col:
+            with st.container(border=True, key="auth_card"):
+    # ---------------- LOGIN PAGE ----------------
+                if st.session_state.auth_mode == "login":
 
-                st.markdown(
-                    '<div class="auth-title">Welcome back, sign in</div>',
-                    unsafe_allow_html=True
-                )
-                _login_flash = st.session_state.pop("login_flash", None)
-                if _login_flash:
-                    st.info(_login_flash)
+                    st.markdown(
+                        '<div class="auth-title">Welcome back, sign in</div>',
+                        unsafe_allow_html=True
+                    )
+                    _login_flash = st.session_state.pop("login_flash", None)
+                    if _login_flash:
+                        st.info(_login_flash)
 
-                if st.session_state.get("password_updated", False):
-                    st.success("Password updated. Sign in with your new password.")
-                st.button(
-                    "Sign up",
-                    on_click=set_auth_mode,
-                    args=("signup",),
-                    key="to_signup"
-                )
-
-                with st.form("login_form", border=False):
-                    login_email = st.text_input("Email address")
-                    login_password = st.text_input("Password", type="password")
-
-                    login_submitted = st.form_submit_button(
-                        "Sign in with email",
-                        type="primary",
-                        use_container_width=True
+                    if st.session_state.get("password_updated", False):
+                        st.success("Password updated. Sign in with your new password.")
+                    st.button(
+                        "Sign up",
+                        on_click=set_auth_mode,
+                        args=("signup",),
+                        key="to_signup"
                     )
 
-                st.button(
-                    "Forgot password?",
-                    on_click=set_auth_mode,
-                    args=("forgot",),
-                    key="to_forgot"
-                )
+                    with st.form("login_form", border=False):
+                        login_email = st.text_input("Email address")
+                        login_password = st.text_input("Password", type="password")
 
-                if login_submitted:
-                    if not login_email or not login_password:
-                        st.warning("Enter your email and password.")
-                    else:
-                        try:
-                            result = supabase.auth.sign_in_with_password(
-                                {
-                                    "email": login_email.strip(),
-                                    "password": login_password
-                                }
-                            )
+                        login_submitted = st.form_submit_button(
+                            "Sign in with email",
+                            type="primary",
+                            use_container_width=True
+                        )
 
-                            if result.user:
-                                st.session_state.auth_user = {
-                                    "id": str(result.user.id),
-                                    "email": result.user.email
-                                }
+                    st.button(
+                        "Forgot password?",
+                        on_click=set_auth_mode,
+                        args=("forgot",),
+                        key="to_forgot"
+                    )
 
-                                profile_result = (
-                                    supabase.table("profiles")
-                                    .select("*")
-                                    .eq("id", str(result.user.id))
-                                    .execute()
+                    if login_submitted:
+                        if not login_email or not login_password:
+                            st.warning("Enter your email and password.")
+                        else:
+                            try:
+                                result = supabase.auth.sign_in_with_password(
+                                    {
+                                        "email": login_email.strip(),
+                                        "password": login_password
+                                    }
                                 )
 
-                                if profile_result.data:
-                                    st.session_state.user_profile = profile_result.data[0]
-                                    # Save the terms they accepted at sign-up (kept with their login)
-                                    _legal = (result.user.user_metadata or {}).get("legal") or {}
-                                    _prof = st.session_state.user_profile
-                                    if _legal.get("version") == gl.LEGAL_VERSION and not gl.accepted(_prof):
+                                if result.user:
+                                    st.session_state.auth_user = {
+                                        "id": str(result.user.id),
+                                        "email": result.user.email
+                                    }
+
+                                    profile_result = (
+                                        supabase.table("profiles")
+                                        .select("*")
+                                        .eq("id", str(result.user.id))
+                                        .execute()
+                                    )
+
+                                    if profile_result.data:
+                                        st.session_state.user_profile = profile_result.data[0]
+                                        # Save the terms they accepted at sign-up (kept with their login)
+                                        _legal = (result.user.user_metadata or {}).get("legal") or {}
+                                        _prof = st.session_state.user_profile
+                                        if _legal.get("version") == gl.LEGAL_VERSION and not gl.accepted(_prof):
+                                            try:
+                                                _s = {**dict(_prof.get("settings") or {}), "legal": _legal}
+                                                supabase.table("profiles").update({"settings": _s}) \
+                                                    .eq("id", str(result.user.id)).execute()
+                                                _prof["settings"] = _s
+                                            except Exception:
+                                                pass
+                                    else:
+                                        meta = result.user.user_metadata or {}
+                                        fallback = {
+                                            "id": str(result.user.id),
+                                            "full_name": meta.get("full_name") or "User",
+                                            "business_name": meta.get("business_name") or "My Gym",
+                                        }
                                         try:
-                                            _s = {**dict(_prof.get("settings") or {}), "legal": _legal}
-                                            supabase.table("profiles").update({"settings": _s}) \
-                                                .eq("id", str(result.user.id)).execute()
-                                            _prof["settings"] = _s
+                                            supabase.table("profiles").insert(fallback).execute()
                                         except Exception:
                                             pass
+                                        st.session_state.user_profile = fallback
+
+                                    gw.show_boot_overlay()
+                                    st.rerun()
+
+                            except Exception as error:
+                                reason = str(error).lower()
+                                if "not confirmed" in reason:
+                                    st.session_state["pending_confirm_email"] = login_email.strip()
+                                    st.warning("Your email isn't confirmed yet. Open the confirmation "
+                                               "email (check spam), or resend it below.")
+                                elif "rate" in reason:
+                                    st.error("Too many attempts. Please wait a few minutes and try again.")
                                 else:
-                                    meta = result.user.user_metadata or {}
-                                    fallback = {
-                                        "id": str(result.user.id),
-                                        "full_name": meta.get("full_name") or "User",
-                                        "business_name": meta.get("business_name") or "My Gym",
-                                    }
-                                    try:
-                                        supabase.table("profiles").insert(fallback).execute()
-                                    except Exception:
-                                        pass
-                                    st.session_state.user_profile = fallback
+                                    st.error("Wrong email or password. If you haven't registered yet, tap Sign up.")
 
-                                gw.show_boot_overlay()
-                                st.rerun()
+                    resend_block()
 
-                        except Exception as error:
-                            reason = str(error).lower()
-                            if "not confirmed" in reason:
-                                st.session_state["pending_confirm_email"] = login_email.strip()
-                                st.warning("Your email isn't confirmed yet. Open the confirmation "
-                                           "email (check spam), or resend it below.")
-                            elif "rate" in reason:
-                                st.error("Too many attempts. Please wait a few minutes and try again.")
-                            else:
-                                st.error("Wrong email or password. If you haven't registered yet, tap Sign up.")
+                # ---------------- SIGNUP PAGE ----------------
 
-                resend_block()
+                elif st.session_state.auth_mode == "signup":
 
-            # ---------------- SIGNUP PAGE ----------------
-
-            elif st.session_state.auth_mode == "signup":
-
-                st.markdown(
-                    '<div class="auth-title">Create your free account</div>',
-                    unsafe_allow_html=True
-                )
-
-                st.button(
-                    "Back to sign in",
-                    on_click=set_auth_mode,
-                    args=("login",),
-                    key="back_to_login_from_signup"
-                )
-
-                with st.form("signup_form", border=False):
-                    full_name = st.text_input("Your full name")
-                    business_name = st.text_input(
-                        "Gym or company name",
-                        placeholder="e.g. Nuelarch Gym"
-                    )
-                    signup_email = st.text_input("Email address", key="signup_email")
-                    signup_password = st.text_input(
-                        "Create password",
-                        type="password",
-                        key="signup_password"
-                    )
-                    confirm_password = st.text_input(
-                        "Confirm password",
-                        type="password"
-                    )
-                    agree = st.checkbox(
-                        "I agree to the Terms of Service, Privacy Policy and Data Processing Agreement"
-                    )
-                    members_ok = st.checkbox(gl.CONSENT_TEXT)
-
-                    signup_submitted = st.form_submit_button(
-                        "Create free account",
-                        type="primary",
-                        use_container_width=True
+                    st.markdown(
+                        '<div class="auth-title">Create your free account</div>',
+                        unsafe_allow_html=True
                     )
 
-                if signup_submitted:
-                    if not all([
-                        full_name.strip(),
-                        business_name.strip(),
-                        signup_email.strip(),
-                        signup_password,
-                        confirm_password
-                    ]):
-                        st.warning("Please complete every field.")
-                    elif not agree or not members_ok:
-                        st.warning(
-                            "Please tick both boxes: the terms, and that you have your members' permission."
+                    st.button(
+                        "Back to sign in",
+                        on_click=set_auth_mode,
+                        args=("login",),
+                        key="back_to_login_from_signup"
+                    )
+
+                    with st.form("signup_form", border=False):
+                        full_name = st.text_input("Your full name")
+                        business_name = st.text_input(
+                            "Gym or company name",
+                            placeholder="e.g. Nuelarch Gym"
                         )
-                    elif signup_password != confirm_password:
-                        st.error("Your passwords do not match.")
-                    elif len(signup_password) < 8:
-                        st.warning("Your password must contain at least 8 characters.")
-                    else:
-                        try:
-                            result = supabase.auth.sign_up(
-                                {
-                                    "email": signup_email.strip(),
-                                    "password": signup_password,
-                                    "options": {
-                                        "email_redirect_to": "https://usegympulseai.com",
-                                        "data": {
-                                            "full_name": full_name.strip(),
-                                            "business_name": business_name.strip(),
-                                            "account_type": "gym_owner",
-                                            "legal": gl.acceptance(signup_email.strip())
+                        signup_email = st.text_input("Email address", key="signup_email")
+                        signup_password = st.text_input(
+                            "Create password",
+                            type="password",
+                            key="signup_password"
+                        )
+                        confirm_password = st.text_input(
+                            "Confirm password",
+                            type="password"
+                        )
+                        agree = st.checkbox(
+                            "I agree to the Terms of Service, Privacy Policy and Data Processing Agreement"
+                        )
+                        members_ok = st.checkbox(gl.CONSENT_TEXT)
+
+                        signup_submitted = st.form_submit_button(
+                            "Create free account",
+                            type="primary",
+                            use_container_width=True
+                        )
+
+                    if signup_submitted:
+                        if not all([
+                            full_name.strip(),
+                            business_name.strip(),
+                            signup_email.strip(),
+                            signup_password,
+                            confirm_password
+                        ]):
+                            st.warning("Please complete every field.")
+                        elif not agree or not members_ok:
+                            st.warning(
+                                "Please tick both boxes: the terms, and that you have your members' permission."
+                            )
+                        elif signup_password != confirm_password:
+                            st.error("Your passwords do not match.")
+                        elif len(signup_password) < 8:
+                            st.warning("Your password must contain at least 8 characters.")
+                        else:
+                            try:
+                                result = supabase.auth.sign_up(
+                                    {
+                                        "email": signup_email.strip(),
+                                        "password": signup_password,
+                                        "options": {
+                                            "email_redirect_to": "https://usegympulseai.com",
+                                            "data": {
+                                                "full_name": full_name.strip(),
+                                                "business_name": business_name.strip(),
+                                                "account_type": "gym_owner",
+                                                "legal": gl.acceptance(signup_email.strip())
+                                            }
                                         }
                                     }
-                                }
-                            )
-
-                            if result.session and result.user:
-                                st.session_state.auth_user = {
-                                    "id": str(result.user.id),
-                                    "email": result.user.email
-                                }
-
-                                profile_result = (
-                                    supabase.table("profiles")
-                                    .select("*")
-                                    .eq("id", str(result.user.id))
-                                    .execute()
                                 )
 
-                                if profile_result.data:
-                                    st.session_state.user_profile = profile_result.data[0]
-                                else:
-                                    st.session_state.user_profile = {
-                                        "full_name": full_name.strip(),
-                                        "business_name": business_name.strip()
+                                if result.session and result.user:
+                                    st.session_state.auth_user = {
+                                        "id": str(result.user.id),
+                                        "email": result.user.email
                                     }
 
-                                gw.show_boot_overlay()
-                                st.rerun()
+                                    profile_result = (
+                                        supabase.table("profiles")
+                                        .select("*")
+                                        .eq("id", str(result.user.id))
+                                        .execute()
+                                    )
 
-                            else:
-                                if result.user and not (result.user.identities or []):
-                                    st.error("This email is already registered. Sign in instead, "
-                                             "or tap Forgot password.")
+                                    if profile_result.data:
+                                        st.session_state.user_profile = profile_result.data[0]
+                                    else:
+                                        st.session_state.user_profile = {
+                                            "full_name": full_name.strip(),
+                                            "business_name": business_name.strip()
+                                        }
+
+                                    gw.show_boot_overlay()
+                                    st.rerun()
+
                                 else:
+                                    if result.user and not (result.user.identities or []):
+                                        st.error("This email is already registered. Sign in instead, "
+                                                 "or tap Forgot password.")
+                                    else:
+                                        st.session_state["pending_confirm_email"] = signup_email.strip()
+                                        st.success("Registration submitted! Check your email (and spam) "
+                                                   "for the confirmation link, then come back and sign in.")
+
+                            except Exception as error:
+                                reason = str(error).lower()
+                                if "rate" in reason:
                                     st.session_state["pending_confirm_email"] = signup_email.strip()
-                                    st.success("Registration submitted! Check your email (and spam) "
-                                               "for the confirmation link, then come back and sign in.")
+                                    st.error("Several emails were sent to this address recently. "
+                                             "Wait a few minutes, then tap Resend below.")
+                                elif "already" in reason:
+                                    st.error("This email is already registered. Sign in instead.")
+                                st.error("Registration failed. Please check your details and try again.")
 
-                        except Exception as error:
-                            reason = str(error).lower()
-                            if "rate" in reason:
-                                st.session_state["pending_confirm_email"] = signup_email.strip()
-                                st.error("Several emails were sent to this address recently. "
-                                         "Wait a few minutes, then tap Resend below.")
-                            elif "already" in reason:
-                                st.error("This email is already registered. Sign in instead.")
-                            st.error("Registration failed. Please check your details and try again.")
+                    resend_block()
 
-                resend_block()
+                # ---------------- FORGOT PASSWORD PAGE ----------------
 
-            # ---------------- FORGOT PASSWORD PAGE ----------------
+                elif st.session_state.auth_mode == "forgot":
 
-            elif st.session_state.auth_mode == "forgot":
-
-                st.button(
-                    "Back to sign in",
-                    on_click=set_auth_mode,
-                    args=("login",),
-                    key="back_to_login_from_forgot"
-                )
-
-                st.markdown(
-                    '<div class="auth-title">Reset your password</div>',
-                    unsafe_allow_html=True
-                )
-
-                st.markdown(
-                    """
-                    <div style="margin-bottom: 12px;">
-                        To reset your password, enter your registered email address below.
-                        We will send an OTP to this email for password reset.
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
-
-                if not st.session_state.get("reset_email_sent", False):
-                    with st.form("reset_request_form", border=False):
-                        reset_email = st.text_input("Email address")
-                        send_code = st.form_submit_button(
-                            "Send reset code",
-                            type="primary",
-                            use_container_width=True
-                        )
-
-                    if send_code:
-                        if not reset_email.strip():
-                            st.warning("Enter your email address.")
-                        else:
-                            try:
-                                supabase.auth.reset_password_for_email(reset_email.strip())
-                            except Exception:
-                                pass
-
-                            st.session_state.reset_email = reset_email.strip()
-                            st.session_state.reset_email_sent = True
-                            st.rerun()
-
-                else:
-                    st.info(
-                        f"If an account exists for {st.session_state.reset_email}, "
-                        "a 6-digit code is on its way. Check your spam folder too."
+                    st.button(
+                        "Back to sign in",
+                        on_click=set_auth_mode,
+                        args=("login",),
+                        key="back_to_login_from_forgot"
                     )
 
-                    with st.form("reset_confirm_form", border=False):
-                        reset_code = st.text_input("6-digit code")
-                        new_password = st.text_input(
-                            "New password",
-                            type="password"
-                        )
-                        confirm_new = st.text_input(
-                            "Confirm new password",
-                            type="password"
-                        )
+                    st.markdown(
+                        '<div class="auth-title">Reset your password</div>',
+                        unsafe_allow_html=True
+                    )
 
-                        reset_submitted = st.form_submit_button(
-                            "Update password",
-                            type="primary",
-                            use_container_width=True
-                        )
+                    st.markdown(
+                        """
+                        <div style="margin-bottom: 12px;">
+                            To reset your password, enter your registered email address below.
+                            We will send an OTP to this email for password reset.
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
 
-                    if reset_submitted:
-                        if not reset_code.strip() or not new_password:
-                            st.warning("Please complete every field.")
-                        elif new_password != confirm_new:
-                            st.error("Your passwords do not match.")
-                        elif len(new_password) < 8:
-                            st.warning(
-                                "Your password must contain at least 8 characters."
+                    if not st.session_state.get("reset_email_sent", False):
+                        with st.form("reset_request_form", border=False):
+                            reset_email = st.text_input("Email address")
+                            send_code = st.form_submit_button(
+                                "Send reset code",
+                                type="primary",
+                                use_container_width=True
                             )
-                        else:
-                            try:
-                                supabase.auth.verify_otp(
-                                    {
-                                        "email": st.session_state.reset_email,
-                                        "token": reset_code.strip(),
-                                        "type": "recovery"
-                                    }
-                                )
-                            except Exception:
-                                st.error("That code is invalid or has expired. Request a new one and try again.")
+
+                        if send_code:
+                            if not reset_email.strip():
+                                st.warning("Enter your email address.")
                             else:
                                 try:
-                                    supabase.auth.update_user({"password": new_password})
-                                    supabase.auth.sign_out()
-                                except Exception as e:
-                                    reason = str(e).lower()
-                                    if "different from the old" in reason:
-                                        st.error("Your new password must be different from your current one.")
-                                    elif "password" in reason:
-                                        st.error("That password was not accepted. Try a longer one with letters and numbers.")
-                                    else:
-                                        st.error("Your code worked, but the new password could not be saved. Please try again.")
+                                    supabase.auth.reset_password_for_email(reset_email.strip())
+                                except Exception:
+                                    pass
+
+                                st.session_state.reset_email = reset_email.strip()
+                                st.session_state.reset_email_sent = True
+                                st.rerun()
+
+                    else:
+                        st.info(
+                            f"If an account exists for {st.session_state.reset_email}, "
+                            "a 6-digit code is on its way. Check your spam folder too."
+                        )
+
+                        with st.form("reset_confirm_form", border=False):
+                            reset_code = st.text_input("6-digit code")
+                            new_password = st.text_input(
+                                "New password",
+                                type="password"
+                            )
+                            confirm_new = st.text_input(
+                                "Confirm new password",
+                                type="password"
+                            )
+
+                            reset_submitted = st.form_submit_button(
+                                "Update password",
+                                type="primary",
+                                use_container_width=True
+                            )
+
+                        if reset_submitted:
+                            if not reset_code.strip() or not new_password:
+                                st.warning("Please complete every field.")
+                            elif new_password != confirm_new:
+                                st.error("Your passwords do not match.")
+                            elif len(new_password) < 8:
+                                st.warning(
+                                    "Your password must contain at least 8 characters."
+                                )
+                            else:
+                                try:
+                                    supabase.auth.verify_otp(
+                                        {
+                                            "email": st.session_state.reset_email,
+                                            "token": reset_code.strip(),
+                                            "type": "recovery"
+                                        }
+                                    )
+                                except Exception:
+                                    st.error("That code is invalid or has expired. Request a new one and try again.")
                                 else:
-                                    st.session_state.reset_email_sent = False
-                                    st.session_state.auth_mode = "login"
-                                    st.session_state.password_updated = True
-                                    st.rerun()
-            # ---------------- LEGAL LINKS ----------------
-            st.markdown(
-                '<div class="auth-secure">'
-                "Secure sign-in. Your password is never stored in plain text."
-                "</div>",
-                unsafe_allow_html=True
-            )
+                                    try:
+                                        supabase.auth.update_user({"password": new_password})
+                                        supabase.auth.sign_out()
+                                    except Exception as e:
+                                        reason = str(e).lower()
+                                        if "different from the old" in reason:
+                                            st.error("Your new password must be different from your current one.")
+                                        elif "password" in reason:
+                                            st.error("That password was not accepted. Try a longer one with letters and numbers.")
+                                        else:
+                                            st.error("Your code worked, but the new password could not be saved. Please try again.")
+                                    else:
+                                        st.session_state.reset_email_sent = False
+                                        st.session_state.auth_mode = "login"
+                                        st.session_state.password_updated = True
+                                        st.rerun()
+                # ---------------- LEGAL LINKS ----------------
+                st.markdown(
+                    '<div class="auth-secure">'
+                    "Secure sign-in. Your password is never stored in plain text."
+                    "</div>",
+                    unsafe_allow_html=True
+                )
 
-            legal_a, legal_b, legal_c = st.columns(3)
+                legal_a, legal_b, legal_c = st.columns(3)
 
-            with legal_a:
-                if st.button("Terms of Service", key="open_terms"):
-                    show_terms()
+                with legal_a:
+                    if st.button("Terms of Service", key="open_terms"):
+                        show_terms()
 
-            with legal_b:
-                if st.button("Privacy Policy", key="open_privacy"):
-                    show_privacy()
+                with legal_b:
+                    if st.button("Privacy Policy", key="open_privacy"):
+                        show_privacy()
 
-            with legal_c:
-                if st.button("Data Processing Agreement", key="open_dpa"):
-                    show_dpa()
+                with legal_c:
+                    if st.button("Data Processing Agreement", key="open_dpa"):
+                        show_dpa()
 
     # LANDING PAGE SECTIONS (pricing goes just before the closing call to action)
     _sections = gd.landing_sections(icon, gw.ARCHIE_BOT_SVG)

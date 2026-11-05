@@ -1,6 +1,6 @@
 """GymPulse AI · Member portal: each member's own page.
 
-  usegympulseai.com/?member      "Your membership": enter phone or email, get a private link
+  usegympulseai.com (choose "Member") or /?member   sign in: email, then a 6-digit code we email them
   usegympulseai.com/?me=<link>   the member's page (no password; the link is the key)
 
 The page shows the member's plan and end date with a Renew button (the gym's own
@@ -141,47 +141,173 @@ def send_link(sc, member, gym_name, force=False):
     return used
 
 
-# ------------------------------------------------------------------ public: ask for a link
+# ------------------------------------------------------------------ public: sign in with an email code
+CODE_MINUTES = 10
+MAX_TRIES = 5
+
+
+def _hash(code, member_id):
+    import hashlib
+    return hashlib.sha256(f"{code}:{member_id}:gympulse-portal".encode()).hexdigest()
+
+
+def _find(sc, contact):
+    try:
+        return sc.rpc("gp_portal_find", {"p_contact": contact}).execute().data or []
+    except Exception:
+        return []
+
+
+def _member(sc, member_id):
+    rows = sc.table("members").select("*").eq("id", member_id).limit(1).execute().data or []
+    return rows[0] if rows else None
+
+
+def send_code(sc, email):
+    """Email a 6-digit code for every membership with this email. Returns "sent", "recent" or "none"."""
+    import secrets
+    import gympulse_email as ge
+    now = datetime.now(timezone.utc)
+    members = [m for m in (_member(sc, f["member_id"]) for f in _find(sc, email)[:5]) if m]
+    if not members:
+        return "none"
+    for m in members:
+        last = pd.to_datetime(m.get("portal_sent_at"), utc=True, errors="coerce")
+        if not pd.isna(last) and (now - last.to_pydatetime()).total_seconds() < RESEND_GAP \
+                and m.get("portal_code_hash"):
+            return "recent"
+    code = f"{secrets.randbelow(10 ** 6):06d}"
+    gyms = []
+    for m in members:
+        sc.table("members").update({"portal_code_hash": _hash(code, m["id"]),
+                                    "portal_code_expires": (now + timedelta(minutes=CODE_MINUTES)).isoformat(),
+                                    "portal_code_tries": 0, "portal_sent_at": now.isoformat()}) \
+            .eq("id", m["id"]).execute()
+        gyms.append(_gym(sc, m["gym_id"])[2])
+    first = _first(members[0].get("full_name"))
+    where = ", ".join(dict.fromkeys(gyms))
+    body = (f"<p>Hi {ge.esc(first)},</p><p>Here is your code to sign in to your <b>{ge.esc(where)}</b> membership "
+            "page on GymPulse AI:</p>" + ge.code_box(code)
+            + f"<p>It works for {CODE_MINUTES} minutes. If you didn't ask for it, you can ignore this email.</p>")
+    text = (f"Hi {first},\n\nYour GymPulse AI sign-in code: {code}\n\nIt works for {CODE_MINUTES} minutes. "
+            "If you didn't ask for it, ignore this email.")
+    try:
+        _email(gw._text(members[0].get("email")).strip(), f"{code} is your sign-in code",
+               ge.layout("Your sign-in code", body, f"Your code for {where}"), text)
+    except Exception:
+        pass
+    return "sent"
+
+
+def verify_code(sc, email, code):
+    """The memberships this code opens (it then stops working). Wrong codes count towards the limit."""
+    import hmac
+    now = datetime.now(timezone.utc)
+    ok = []
+    for f in _find(sc, email)[:5]:
+        m = _member(sc, f["member_id"])
+        if not m or not m.get("portal_code_hash") or int(m.get("portal_code_tries") or 0) >= MAX_TRIES:
+            continue
+        exp = pd.to_datetime(m.get("portal_code_expires"), utc=True, errors="coerce")
+        if pd.isna(exp) or exp.to_pydatetime() < now:
+            continue
+        if hmac.compare_digest(str(m["portal_code_hash"]), _hash(code, m["id"])):
+            ok.append(m)
+        else:
+            sc.table("members").update({"portal_code_tries": int(m.get("portal_code_tries") or 0) + 1}) \
+                .eq("id", m["id"]).execute()
+    for m in ok:
+        sc.table("members").update({"portal_code_hash": None, "portal_code_tries": 0}).eq("id", m["id"]).execute()
+    return ok
+
+
+def _enter(m):
+    for k in ("mp_step", "mp_email", "mp_choices", "mp_code_tries"):
+        st.session_state.pop(k, None)
+    st.query_params.clear()
+    st.query_params["me"] = str(m["portal_token"])
+    st.rerun()
+
+
 def render_login(supabase):
-    import gympulse_booking as gb
-    gb._header()
+    render_code_login(supabase, embedded=False)
+
+
+def render_code_login(supabase, embedded=False):
+    """Members sign in: email, then the 6-digit code we email them. No sign-up, no password."""
+    if not embedded:
+        import gympulse_booking as gb
+        gb._header()
     st.markdown(CSS, unsafe_allow_html=True)
-    with st.container(key="mp_wrap"):
-        gw._md('<div class="bk-title">Your membership</div><div class="bk-sub">Enter the phone number or email your '
-               "gym has for you. We'll send you a private link by email or WhatsApp. No password needed.</div>")
-        sent = st.session_state.get("mp_sent")
-        if sent:
-            st.success(f"If {sent} belongs to a member, your link is on its way by email or WhatsApp. It can take a "
-                       "minute. Not arrived? Ask your gym to send it from GymPulse AI.")
-        with st.form("mp_login"):
-            contact = st.text_input("Phone or email", placeholder="0803 000 0000 or you@email.com")
-            go = st.form_submit_button("Send my link", type="primary", use_container_width=True)
-        if go:
-            c = contact.strip()
-            n = st.session_state.get("mp_tries", 0)
-            if len(c) < 5:
-                st.error("Please enter your phone number or email.")
-            elif n >= 5:
-                st.error("Too many tries. Please wait a little and try again, or ask your gym for your link.")
-            else:
-                st.session_state["mp_tries"] = n + 1
-                sc = _sc()
-                if sc is None:
-                    st.error("The member page isn't available yet. Please ask your gym.")
-                    return
-                try:
-                    found = sc.rpc("gp_portal_find", {"p_contact": c}).execute().data or []
-                except Exception:
-                    found = []
-                for f in found[:5]:
-                    try:
-                        m = (sc.table("members").select("*").eq("id", f["member_id"]).limit(1).execute().data or [])
-                        if m:
-                            send_link(sc, m[0], _gym(sc, m[0]["gym_id"])[2])
-                    except Exception:
-                        continue
-                st.session_state["mp_sent"] = c        # same answer either way: no guessing who's a member
+    box = st.container(border=True, key="mp_login_card") if embedded else st.container(key="mp_wrap")
+    step = st.session_state.get("mp_step", "email")
+    with box:
+        st.markdown('<div class="auth-title">Member sign in</div>' if embedded else
+                    '<div class="bk-title">Your membership</div>', unsafe_allow_html=True)
+        sc = _sc()
+        if sc is None:
+            st.info("Member sign in isn't available yet. Please ask your gym.")
+            return
+        if step == "email":
+            st.caption("Enter the email your gym has for you. We'll email you a 6-digit code: no sign-up and no "
+                       "password needed.")
+            with st.form("mp_email_form"):
+                email = st.text_input("Email", placeholder="you@email.com", key="mp_email_in")
+                go = st.form_submit_button("Email me a code", type="primary", use_container_width=True)
+            if go:
+                e = email.strip().lower()
+                n = st.session_state.get("mp_sends", 0)
+                if "@" not in e or "." not in e.split("@")[-1]:
+                    st.error("Please enter your email address.")
+                elif n >= 6:
+                    st.error("Too many codes asked for. Please wait a little and try again.")
+                else:
+                    st.session_state["mp_sends"] = n + 1
+                    send_code(sc, e)                      # same next step either way: no guessing who's a member
+                    st.session_state["mp_email"] = e
+                    st.session_state["mp_step"] = "code"
+                    st.rerun()
+            st.caption("No email with your gym? Ask the front desk to add it, or to send your private link on "
+                       "WhatsApp.")
+        elif step == "code":
+            e = st.session_state.get("mp_email", "")
+            st.info(f"If {e} belongs to a gym member, a 6-digit code is on its way. Check your spam folder too.")
+            with st.form("mp_code_form"):
+                code = st.text_input("6-digit code", max_chars=6, placeholder="123456", key="mp_code_in")
+                go = st.form_submit_button("Sign in", type="primary", use_container_width=True)
+            if go:
+                digits = "".join(ch for ch in code if ch.isdigit())
+                tries = st.session_state.get("mp_code_tries", 0)
+                if len(digits) != 6:
+                    st.error("The code has 6 numbers.")
+                elif tries >= 8:
+                    st.error("Too many tries. Ask for a new code.")
+                else:
+                    st.session_state["mp_code_tries"] = tries + 1
+                    ok = verify_code(sc, e, digits)
+                    if len(ok) == 1:
+                        _enter(ok[0])
+                    elif ok:
+                        st.session_state["mp_choices"] = [m["id"] for m in ok]
+                        st.session_state["mp_step"] = "pick"
+                        st.rerun()
+                    else:
+                        st.error("That code isn't right or has expired. Check the email, or ask for a new code.")
+            a, b = st.columns(2)
+            if a.button("Send a new code", use_container_width=True, key="mp_resend"):
+                res = send_code(sc, e)
+                (st.warning if res == "recent" else st.success)(
+                    "Please wait a minute before asking for another code." if res == "recent" else
+                    "A new code is on its way if this email belongs to a member.")
+            if b.button("Use a different email", use_container_width=True, key="mp_other"):
+                st.session_state["mp_step"] = "email"
                 st.rerun()
+        else:
+            st.markdown("You're a member of more than one gym. Which one would you like to open?")
+            for mid in st.session_state.get("mp_choices", []):
+                m = _member(sc, mid)
+                if m and st.button(_gym(sc, m["gym_id"])[2], key=f"mp_pick_{mid}", use_container_width=True):
+                    _enter(m)
 
 
 # ------------------------------------------------------------------ the member's page
@@ -473,6 +599,9 @@ def _details(sc, m, gym_name):
         st.session_state["mp_flash"] = "Your details are saved."
         st.rerun()
     st.divider()
+    if st.button("Log out", key="mp_logout", icon=":material/logout:"):
+        st.query_params.clear()
+        st.rerun()
     st.markdown("**Your private link**")
     st.caption("Lost your phone, or shared the link by mistake? Get a new one: older links stop working.")
     if st.button("Get a new link", key="mp_rotate"):
@@ -492,8 +621,8 @@ def render_owner(supabase, gym_id):
     import gympulse_signup as gsign
     gw.intro("Member app", ":material/smartphone:",
              "Each member gets their own page: renew and pay, check-in QR code, visits, streak and rewards, class "
-             "bookings and messages with you. No app to download and no password: they get a private link by email "
-             "or WhatsApp.")
+             "bookings and messages with you. No app to download and no password: they go to usegympulseai.com, tap "
+             "Member, and sign in with their email and a code we send them.")
     try:
         rows = gw.fetch_all(supabase.table("members").select("id, full_name, email, phone, portal_token, "
                                                              "portal_sent_at, portal_seen_at")
@@ -511,8 +640,8 @@ def render_owner(supabase, gym_id):
         st.code(url, language=None)
         st.markdown("**Message for your WhatsApp group**")
         st.code("Your membership is now on your phone 📱 Renew, see your check-in code, visits and rewards, and book "
-                f"classes. Enter your phone number here to get your private link: {url}", language=None,
-                wrap_lines=True)
+                f"classes. Go to {gw.APP_URL.replace('https://', '')}, tap Member, enter your email and the code we "
+                f"send you. Or open: {url}", language=None, wrap_lines=True)
     with c2:
         png = gsign._qr_png(url)
         st.image(png, caption="Print this for your front desk", use_container_width=True)

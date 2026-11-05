@@ -2,9 +2,12 @@
 
 Each member gets their own page, with no app to download and no password.
 
-- **usegympulseai.com/?member**: the member enters the phone number or email their gym has. GymPulse sends a
-  private link by email (and WhatsApp once it's set up). The answer is the same whether or not the contact
-  belongs to a member, so nobody can check who is a member.
+- **usegympulseai.com → Member** (the switch above the sign-in box), or **usegympulseai.com/?member**: the member
+  types the email their gym has, gets a 6-digit code by email (valid 10 minutes, 5 wrong tries), types it, and is
+  in. No sign-up, no password: the gym, an import or the sign-up link already added them. The answer is the same
+  whether or not the email belongs to a member, so nobody can check who is a member. A member of several gyms
+  picks which one to open. (`sql/phase19_member_code_login.sql`)
+- Private links by email or WhatsApp still work (Members → Member app → Send link).
 - **usegympulseai.com/?me=<private link>**: the member's page.
 
 | Tab | What's there |
