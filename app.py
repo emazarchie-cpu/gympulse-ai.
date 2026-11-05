@@ -1066,8 +1066,9 @@ if st.query_params.get("demo") or st.query_params.get("demo_cancel"):
 
 # Paystack sends payers back here (?paystack=1&reference=...): check and apply the payment
 if st.query_params.get("paystack") and (st.query_params.get("reference") or st.query_params.get("trxref")):
-    gbill.handle_return(dict(st.query_params))
-    st.query_params.clear()
+    gd.apply()
+    gbill.render_return_page(dict(st.query_params))
+    st.stop()
 
 # Initialise login state
 if "auth_user" not in st.session_state:

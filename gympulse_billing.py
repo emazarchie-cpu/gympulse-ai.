@@ -366,21 +366,6 @@ def _email_founder(subject, text, reply_to=None, to=None):
         return False
 
 
-def _notify_paid(supabase, gym_id, method, ref):
-    """Email the founder that a gym says it has paid by transfer, so they can confirm it in Admin."""
-    profile = st.session_state.get("user_profile") or {}
-    gym = gw._text(profile.get("business_name"), "A gym")
-    owner = (st.session_state.get("auth_user") or {}).get("email", "")
-    to = pricing(supabase).get("contact_email") or "emmanuel@usegympulseai.com"
-    ok = _email_founder(f"Payment to confirm: {gym}",
-                        f"{gym} ({owner}) says they've paid for GymPulse AI.\nMethod: {method}\n"
-                        f"Reference: {ref or '-'}\nGym id: {gym_id}\n\nConfirm it in Admin → Billing.",
-                        reply_to=owner, to=to)
-    st.session_state["bill_flash"] = ("Thanks! We've let the GymPulse AI team know. Your subscription will be "
-                                      "switched on as soon as the payment is confirmed (usually the same day)."
-                                      if ok else "Thanks! Please also send your receipt to " + to + ".")
-
-
 # ------------------------------------------------------------------ Paystack
 def paystack_key():
     import gympulse_admin as gadm
@@ -397,18 +382,18 @@ def _paystack(method, path, **kw):
         return {"status": False, "message": f"Paystack error {r.status_code}"}
 
 
-def start_payment(gym_id, plan, period, email):
-    """Create a Paystack checkout for this gym and plan. Returns (url, reference) or (None, error)."""
+def start_payment(gym_id, plan, period, email, reference=None, invoice_id=None):
+    """Create a Paystack checkout. Returns (url, reference) or (None, error)."""
     import gympulse_email as ge
     amount = price_for(plan, period)
     if not (paystack_key() and amount and email):
         return None, "Online payment isn't set up yet."
-    ref = f"gp-{str(gym_id)[:8]}-{uuid.uuid4().hex[:12]}"
+    ref = reference or f"gp-{str(gym_id)[:8]}-{uuid.uuid4().hex[:12]}"
     r = _paystack("POST", "/transaction/initialize", json={
         "email": email, "amount": int(round(amount * 100)), "currency": "NGN", "reference": ref,
         "callback_url": f"{ge.SITE}/?paystack=1",
         "metadata": {"source": "gympulse", "gym_id": str(gym_id), "plan": plan["name"], "period": period,
-                     "cancel_action": f"{ge.SITE}/?p=Subscription"}})
+                     "invoice_id": invoice_id, "cancel_action": f"{ge.SITE}/"}})
     if r.get("status") and (r.get("data") or {}).get("authorization_url"):
         return r["data"]["authorization_url"], ref
     return None, r.get("message") or "Couldn't start the payment. Please try again."
@@ -419,19 +404,54 @@ def _service():
     return gadm.service_client()
 
 
-def apply_payment(reference, sc=None):
-    """Check a payment with Paystack and switch the gym's plan on. Safe to call many times.
+def owner_email(sc, gym_id):
+    try:
+        g = sc.table("gyms").select("owner_id").eq("id", gym_id).limit(1).execute().data
+        user = getattr(sc.auth.admin.get_user_by_id(g[0]["owner_id"]), "user", None) if g else None
+        return getattr(user, "email", "") or ""
+    except Exception:
+        return ""
 
-    Returns (ok, message). The amount must match the plan's current price, and each
-    payment is used once (billing_events ref paystack:<reference>).
-    """
+
+def activate(sc, gym_id, plan_name, period, months, amount, note):
+    """Switch a plan on after a confirmed payment. A renewal continues after the current
+    paid period, and paying during the free trial keeps the rest of the trial.
+    Returns (first day, last day)."""
+    today = gw.today_local()
+    sub = (sc.table("gym_subscriptions").select("*").eq("gym_id", gym_id).limit(1).execute().data or [{}])[0]
+    base = today
+    if sub.get("status") == "active" and _d(sub.get("paid_until")):
+        base = max(base, _d(sub.get("paid_until")))
+    elif sub.get("status") == "trial" and _d(sub.get("trial_ends_on")):
+        base = max(base, _d(sub.get("trial_ends_on")))
+    start = base if base == today else base + timedelta(days=1)
+    until = base + timedelta(days=365 if period == "yearly" else 30 * int(months or 1))
+    label = "Yearly" if period == "yearly" else ("Monthly" if int(months or 1) == 1 else f"{months} months")
+    sc.table("gym_subscriptions").upsert({
+        "gym_id": gym_id, "status": "active", "paid_until": until.isoformat(), "plan": f"{plan_name} · {label}",
+        "price": round(float(amount) / (12 if period == "yearly" else int(months or 1)), 2), "note": note,
+        "updated_at": datetime.now(timezone.utc).isoformat()}, on_conflict="gym_id").execute()
+    try:
+        st.session_state.pop("_cache", None)
+    except Exception:
+        pass
+    return start, until
+
+
+def apply_payment(reference, sc=None):
+    """Check a payment with Paystack, switch the gym's plan on, mark the invoice paid and email
+    the receipt. Safe to call many times. Returns (ok, message, invoice or None).
+
+    The amount must match the plan's current price, and each payment is used once
+    (billing_events ref paystack:<reference>)."""
+    import gympulse_invoices as gi
     sc = sc or _service()
     if not (sc and paystack_key() and reference):
-        return False, "We couldn't check the payment right now. If you paid, it will show within a day."
+        return False, "We couldn't check the payment right now. If you paid, it will show within a day.", None
     r = _paystack("GET", f"/transaction/verify/{quote(str(reference), safe='')}")
     d = r.get("data") or {}
     if not r.get("status") or d.get("status") != "success":
-        return False, "That payment hasn't gone through yet. If money left your account, it will show here shortly."
+        return False, "That payment hasn't gone through yet. If money left your account, it will show here shortly.", None
     md = d.get("metadata") or {}
     if isinstance(md, str):
         try:
@@ -440,48 +460,49 @@ def apply_payment(reference, sc=None):
             md = {}
     gid, period = md.get("gym_id"), "yearly" if md.get("period") == "yearly" else "monthly"
     if md.get("source") != "gympulse" or not gid:
-        return False, "That payment isn't for a GymPulse AI plan."
+        return False, "That payment isn't for a GymPulse AI plan.", None
     rows = sc.table("platform_settings").select("value").eq("key", "pricing").limit(1).execute().data
     p = {**DEFAULT_PRICING, **(rows[0]["value"] if rows else {})}
     plan = next((x for x in plans(p) if x["name"] == md.get("plan")), None)
     paid = (d.get("amount") or 0) / 100
     expected = price_for(plan, period) if plan else None
+    inv = gi.by_reference(sc, reference)
     if d.get("currency") != "NGN" or not expected or paid + 0.5 < expected:
         _email_founder(f"Paystack payment to check: {reference}",
                        f"A payment of ₦{paid:,.0f} ({md.get('plan')}, {period}) for gym {gid} didn't match the "
                        f"current price ({_money(expected)}). Check it in Paystack, then use Mark as paid in Admin.")
-        return False, "We've received your payment and the team will confirm it shortly."
+        return False, "We've received your payment and the team will confirm it shortly.", inv
     try:
         sc.table("billing_events").insert({"gym_id": gid, "kind": "paystack", "ref": f"paystack:{reference}"}).execute()
     except Exception:
-        return True, "Payment received. Your plan is active."          # already applied
-    today = gw.today_local()
-    sub = (sc.table("gym_subscriptions").select("*").eq("gym_id", gid).limit(1).execute().data or [{}])[0]
-    base = today
-    if sub.get("status") == "active" and _d(sub.get("paid_until")):
-        base = max(base, _d(sub.get("paid_until")))
-    elif sub.get("status") == "trial" and _d(sub.get("trial_ends_on")):
-        base = max(base, _d(sub.get("trial_ends_on")))       # paying early keeps the rest of the free trial
-    until = base + timedelta(days=365 if period == "yearly" else 30)
+        return True, "Payment received. Your plan is active.", inv          # already applied
     try:
-        sc.table("gym_subscriptions").upsert({
-            "gym_id": gid, "status": "active", "paid_until": until.isoformat(),
-            "plan": f"{plan['name']} · {'Yearly' if period == 'yearly' else 'Monthly'}",
-            "price": round(paid / 12 if period == "yearly" else paid, 2),
-            "note": f"Paystack {reference}", "updated_at": datetime.now(timezone.utc).isoformat()},
-            on_conflict="gym_id").execute()
+        start, until = activate(sc, gid, plan["name"], period, 12 if period == "yearly" else 1, paid,
+                                f"Paystack {reference}")
     except Exception:
         sc.table("billing_events").delete().eq("gym_id", gid).eq("ref", f"paystack:{reference}").execute()
         raise
     email = (d.get("customer") or {}).get("email", "")
+    if not inv:
+        inv = gi.create(sc, gid, plan["name"], period, paid, {"billing_email": email}, "paystack", reference)
+    inv = gi.update(sc, inv, status="paid", paid_at=datetime.now(timezone.utc).isoformat(), amount=paid,
+                    period_start=start.isoformat(), period_end=until.isoformat())
+    gi.send_receipt(sc, inv, extra_to=owner_email(sc, gid))
     _email_founder(f"New payment: {plan['name']} {period} · ₦{paid:,.0f}",
-                   f"{email} paid ₦{paid:,.0f} for GymPulse AI {plan['name']} ({period}).\n"
-                   f"Gym id: {gid}\nPaid until: {until:%d %b %Y}\nPaystack reference: {reference}")
-    try:
-        st.session_state.pop("_cache", None)
-    except Exception:
-        pass
-    return True, f"Payment received, thank you! Your {plan['name']} plan is active until {until:%d %B %Y}."
+                   f"{inv.get('business_name') or email} paid ₦{paid:,.0f} for GymPulse AI {plan['name']} ({period}).\n"
+                   f"Receipt: {gi.number(inv)}\nGym id: {gid}\nPaid until: {until:%d %b %Y}\nPaystack reference: {reference}")
+    return True, f"Your {plan['name']} plan is active until {until:%d %B %Y}.", inv
+
+
+def confirm_transfer(sc, inv, confirmed_by="admin"):
+    """The founder confirmed a bank transfer: switch the plan on, mark the invoice paid, send the receipt."""
+    import gympulse_invoices as gi
+    start, until = activate(sc, inv["gym_id"], inv["plan"], inv["period"], inv.get("months") or 1, inv["amount"],
+                            f"Transfer {gi.number(inv)} confirmed by {confirmed_by}")
+    inv = gi.update(sc, inv, status="paid", paid_at=datetime.now(timezone.utc).isoformat(),
+                    period_start=start.isoformat(), period_end=until.isoformat())
+    gi.send_receipt(sc, inv, extra_to=owner_email(sc, inv["gym_id"]))
+    return inv, until
 
 
 def reconcile_paystack(sc, days=3, log=print):
@@ -502,121 +523,387 @@ def reconcile_paystack(sc, days=3, log=print):
                 md = {}
         if md.get("source") != "gympulse" or f"paystack:{t.get('reference')}" in done:
             continue
-        ok, msg = apply_payment(t.get("reference"), sc)
+        ok, msg, _ = apply_payment(t.get("reference"), sc)
         log(f"  {t.get('reference')}: {msg}")
         n += ok
     return n
 
 
-def handle_return(params):
-    """Paystack sends the payer back to ?paystack=1&reference=... Check it and remember the message."""
+# ------------------------------------------------------------------ the page Paystack returns to
+def render_return_page(params):
+    """?paystack=1&reference=...: a public confirmation page (works even if the owner isn't signed in)."""
+    import gympulse_booking as gb
+    import gympulse_invoices as gi
+    gb._header()
     ref = params.get("reference") or params.get("trxref")
-    if not ref:
-        return
-    try:
-        ok, msg = apply_payment(ref)
-    except Exception as error:
-        ok, msg = False, "We couldn't check the payment right now. If you paid, it will show within a day."
+    key = f"_pay_return_{ref}"
+    if key not in st.session_state:
         try:
-            import gympulse_monitoring as gmon
-            gmon.capture(error, "paystack return")
-        except Exception:
-            pass
-    st.session_state["bill_flash"] = msg
-    st.session_state["bill_flash_ok"] = ok
-    st.session_state.pop("_cache", None)
-    st.session_state.pop("_upgrade_shown", None)
+            st.session_state[key] = apply_payment(ref)
+        except Exception as error:
+            st.session_state[key] = (False, "We couldn't confirm the payment just now. If you paid, your plan will "
+                                            "switch on within a day and your receipt will be emailed.", None)
+            try:
+                import gympulse_monitoring as gmon
+                gmon.capture(error, "paystack return")
+            except Exception:
+                pass
+        st.session_state.pop("_cache", None)
+        st.session_state.pop("_upgrade_shown", None)
+    ok, msg, inv = st.session_state[key]
+    _, col, _ = st.columns([1, 2.2, 1])
+    with col:
+        if ok:
+            rows = "".join(f'<div class="co-row"><span>{a}</span><b>{gw._esc(b)}</b></div>' for a, b in [
+                ("Receipt", gi.number(inv) if inv else "–"),
+                ("Plan", f"{(inv or {}).get('plan', '')} · {'Yearly' if (inv or {}).get('period') == 'yearly' else 'Monthly'}"
+                 if inv else "–"),
+                ("Amount paid", gi.money((inv or {}).get("amount"))),
+                ("Receipt sent to", (inv or {}).get("billing_email") or "your email")])
+            gw._md(f'''<div class="co-done"><div class="co-tick">✓</div>
+                <div class="co-title">Payment successful</div>
+                <div class="co-sub">Thank you. {gw._esc(msg)} A receipt is on its way to your inbox.</div>
+                <div class="co-card">{rows}</div></div>''')
+            if inv:
+                import gympulse_reports as rp
+                rp.download_link("Download receipt (PDF)", gi.receipt_pdf(inv),
+                                 f"GymPulse-AI-receipt-{gi.number(inv)}.pdf", rp.PDF, "co_rcpt")
+        else:
+            gw._md(f'''<div class="co-done"><div class="co-tick co-wait">…</div>
+                <div class="co-title">We're confirming your payment</div>
+                <div class="co-sub">{gw._esc(msg)}</div></div>''')
+        gw._md('<div style="text-align:center;margin-top:18px"><a class="lx-btn lx-btn-primary" href="/" '
+               'target="_self">Continue to GymPulse AI</a></div>')
 
 
-def _pay_button(supabase, gym_id):
-    email = (st.session_state.get("auth_user") or {}).get("email", "")
+# ------------------------------------------------------------------ subscription page
+CO_CSS = """
+.co-head { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.co-plan { border:1px solid var(--gp-line); border-radius:20px; padding:22px; background:var(--gp-s1); }
+.co-status { display:flex; gap:28px; flex-wrap:wrap; border:1px solid var(--gp-line); border-radius:20px;
+    padding:20px 24px; background:var(--gp-s1); margin:4px 0 22px; }
+.co-status div span { display:block; font-size:11px; letter-spacing:1px; text-transform:uppercase; color:var(--gp-muted);
+    font-weight:700; }
+.co-status div b { display:block; font-size:20px; margin-top:4px; color:var(--gp-text); }
+.co-sum { border:1px solid var(--gp-line); border-radius:20px; padding:24px; background:var(--gp-s1); position:sticky; top:12px; }
+.co-sum h4 { margin:0 0 2px; font-size:13px; letter-spacing:1px; text-transform:uppercase; color:var(--gp-muted); }
+.co-sum .co-name { font-size:24px; font-weight:800; color:var(--gp-text); margin:6px 0 2px; }
+.co-sum .co-tag { color:var(--gp-muted); font-size:13.5px; margin-bottom:16px; }
+.co-row { display:flex; justify-content:space-between; gap:12px; padding:10px 0; border-top:1px solid var(--gp-line);
+    font-size:14px; color:var(--gp-muted); }
+.co-row b { color:var(--gp-text); font-weight:600; text-align:right; }
+.co-total { display:flex; justify-content:space-between; align-items:baseline; padding:14px 0 4px;
+    border-top:1px solid var(--gp-line-2); margin-top:4px; }
+.co-total span { font-weight:700; color:var(--gp-text); }
+.co-total b { font-size:28px; font-weight:800; color:var(--gp-text); letter-spacing:-.5px; }
+.co-note { color:var(--gp-muted); font-size:12.5px; line-height:1.6; margin-top:12px; }
+.co-feat { margin-top:14px; padding-top:12px; border-top:1px solid var(--gp-line); font-size:13px; color:var(--gp-muted); }
+.co-feat div { padding:3px 0; } .co-feat div::before { content:"✓  "; color:var(--gp-lime); font-weight:800; }
+.co-sec { font-size:12px; font-weight:800; letter-spacing:1.4px; text-transform:uppercase; color:var(--gp-muted);
+    margin:6px 0 2px; }
+.co-done { text-align:center; padding:26px 0 6px; }
+.co-tick { width:64px; height:64px; border-radius:50%; margin:0 auto 14px; display:grid; place-items:center; font-size:30px;
+    font-weight:800; color:#0A0F1E; background:var(--gp-grad); }
+.co-tick.co-wait { background:var(--gp-s3); color:var(--gp-text); }
+.co-title { font-size:28px; font-weight:800; color:var(--gp-text); letter-spacing:-.6px; }
+.co-sub { color:var(--gp-muted); font-size:14.5px; line-height:1.6; margin:8px auto 18px; max-width:520px; }
+.co-card { text-align:left; border:1px solid var(--gp-line); border-radius:16px; padding:6px 18px; background:var(--gp-s1); }
+.co-card .co-row:first-child { border-top:0; }
+.co-bank { border:1px solid var(--gp-line); border-radius:20px; padding:8px 22px; background:var(--gp-s1); }
+.co-bank .co-row b { font-size:16px; }
+.co-pay { display:flex; flex-direction:column; align-items:stretch; gap:10px; margin-top:14px; }
+.co-pay a { text-align:center; }
+.co-lock { color:var(--gp-muted); font-size:12.5px; text-align:center; }
+"""
 
-    def pay(plan, period, i):
-        amount = price_for(plan, period)
-        if not amount:
-            return
-        word = "yearly" if period == "yearly" else "monthly"
-        pending = st.session_state.get("bill_checkout") or {}
-        if pending.get("plan") == plan["name"] and pending.get("period") == period:
-            st.link_button(f"Continue to Paystack: {_money(amount)}", pending["url"], type="primary",
-                           icon=":material/lock:", use_container_width=True)
-            st.caption("Secure checkout by Paystack: card, bank transfer or USSD.")
-            return
-        if st.button(f"Pay {word} · {_money(amount)}", key=f"bill_pay_{i}_{period}", use_container_width=True,
-                     type="primary" if (plan.get("popular") and period == "monthly") else "secondary"):
-            url, ref = start_payment(gym_id, plan, period, email)
-            if url:
-                st.session_state["bill_checkout"] = {"plan": plan["name"], "period": period, "url": url, "ref": ref}
-            else:
-                st.session_state["bill_flash"], st.session_state["bill_flash_ok"] = ref, False
-            st.rerun()
-    return pay
+
+def _summary_html(plan, period, sub_state, ps):
+    import gympulse_invoices as gi
+    amount = price_for(plan, period)
+    today = gw.today_local()
+    if sub_state["status"] == "trial" and sub_state.get("ends"):
+        starts = sub_state["ends"] + timedelta(days=1)
+        start_note = f"Your free trial continues until {sub_state['ends']:%d %B}. Your paid plan starts {starts:%d %B %Y}."
+    elif sub_state["status"] == "active" and sub_state.get("ends"):
+        starts = sub_state["ends"] + timedelta(days=1)
+        start_note = f"This adds to your current plan, which runs until {sub_state['ends']:%d %B %Y}."
+    else:
+        starts = today
+        start_note = "Your plan starts as soon as your payment is confirmed."
+    renews = starts + timedelta(days=365 if period == "yearly" else 30)
+    i = next((n for n, x in enumerate(ps) if x["name"] == plan["name"]), 0)
+    _, items = features(ps, i)
+    saved = _saving(plan) if period == "yearly" else 0
+    rows = [("Plan", plan["name"]), ("Billing", "Yearly" if period == "yearly" else "Monthly"),
+            ("Starts", f"{starts:%d %b %Y}"), ("Renews", f"{renews:%d %b %Y}")]
+    if saved:
+        rows.append(("You save", gi.money(saved)))
+    return (f'<div class="co-sum"><h4>Order summary</h4><div class="co-name">GymPulse AI {gw._esc(plan["name"])}</div>'
+            f'<div class="co-tag">{gw._esc(plan.get("tagline") or plan.get("for_who") or "")}</div>'
+            + "".join(f'<div class="co-row"><span>{a}</span><b>{gw._esc(b)}</b></div>' for a, b in rows)
+            + f'<div class="co-row"><span>VAT</span><b>₦0</b></div>'
+            + f'<div class="co-total"><span>Total</span><b>{gi.money(amount)}</b></div>'
+            + f'<div class="co-note">{gw._esc(start_note)} Cancel any time: your plan simply won\'t renew.</div>'
+            + '<div class="co-feat">' + "".join(f"<div>{gw._esc(f)}</div>" for f in items[:5]) + "</div></div>")
+
+
+def _notify_transfer(inv):
+    import gympulse_invoices as gi
+    ok = _email_founder(f"Transfer to confirm: {gi.number(inv)} · {gi.money(inv.get('amount'))}",
+                        f"{inv.get('business_name')} ({inv.get('billing_name')}, {inv.get('billing_email')}, "
+                        f"{inv.get('billing_phone')}) says they've sent a bank transfer.\n\n"
+                        f"Invoice: {gi.number(inv)}\nPlan: {inv.get('plan')} ({inv.get('period')})\n"
+                        f"Amount: {gi.money(inv.get('amount'))}\n\nCheck your bank, then confirm it in "
+                        "Admin → Billing → Bank transfers to confirm. The receipt is emailed automatically.",
+                        reply_to=inv.get("billing_email"))
+    return ok
+
+
+def _view(v, **kw):
+    st.session_state["sub_view"] = v
+    for k, val in kw.items():
+        st.session_state[k] = val
 
 
 def render_subscription_page(supabase, gym_id):
-    gw.page_header("Subscription", "Your GymPulse AI plan.", "Account")
+    import gympulse_invoices as gi
+    gw._md(f"<style>{CO_CSS}</style>")
+    view = st.session_state.get("sub_view", "plans")
+    s = state(subscription(supabase, gym_id))
+    p = pricing(supabase)
+    ps = plans(p)
+    if s["status"] == "off":
+        gw.page_header("Subscription", "Your GymPulse AI plan.", "Account")
+        st.info("Billing isn't switched on yet. Enjoy GymPulse AI free.")
+        return
+    if view in ("checkout", "pay", "transfer", "sent") and st.session_state.get("sub_plan") in [x["name"] for x in ps]:
+        plan = next(x for x in ps if x["name"] == st.session_state["sub_plan"])
+        period = st.session_state.get("sub_period", "monthly")
+        if view == "checkout":
+            return _render_checkout(supabase, gym_id, plan, period, s, p, ps)
+        if view == "pay":
+            return _render_pay(plan, period, s, ps)
+        return _render_transfer(supabase, gym_id, plan, period, s, p, ps)
+    _render_plans(supabase, gym_id, s, p, ps)
+
+
+def _render_plans(supabase, gym_id, s, p, ps):
+    import gympulse_invoices as gi
+    gw.page_header("Subscription", "Your plan, payments and receipts.", "Account")
     flash = st.session_state.pop("bill_flash", None)
     if flash:
         (st.success if st.session_state.pop("bill_flash_ok", True) else st.warning)(flash)
-    s = state(subscription(supabase, gym_id))
-    p = pricing(supabase)
-    if s["status"] == "off":
-        st.info("Billing isn't switched on yet. Enjoy GymPulse AI free.")
-        return
-    if s["locked"]:
-        st.error(("Your free trial has ended." if (subscription(supabase, gym_id) or {}).get("status") != "active"
-                  else "Your plan has ended.") + " Pick a plan below to keep using GymPulse AI. Everything you "
-                 "added is safe, and you'll pick up right where you left off.")
     sub = subscription(supabase, gym_id) or {}
-    gw.kpi_row([("Your plan", {"trial": "Free trial", "active": gw._text(sub.get("plan"), "Subscribed"),
-                              "free": "Free access", "expired": "Ended"}[s["status"]], "lime", s["label"]),
-                ("Ends", f"{s['ends']:%d %b %Y}" if s.get("ends") else "–", "grey", "")])
+    if s["locked"]:
+        st.error(("Your free trial has ended." if sub.get("status") != "active" else "Your plan has ended.")
+                 + " Choose a plan to keep using GymPulse AI. Everything you added is safe, and you'll pick up "
+                   "right where you left off.")
+    status = {"trial": "Free trial", "active": "Active", "free": "Free access", "expired": "Ended"}[s["status"]]
+    tone = {"trial": "cyan", "active": "lime", "free": "cyan", "expired": "red"}[s["status"]]
+    plan_name = gw._text(sub.get("plan"), "Free trial" if s["status"] == "trial" else "–")
+    ends_label = {"trial": "Trial ends", "active": "Renews", "expired": "Ended", "free": "Ends"}[s["status"]]
+    gw._md(f'''<div class="co-status">
+        <div><span>Current plan</span><b>{gw._esc(plan_name)}</b></div>
+        <div><span>Status</span><b><span class="gp-pill gp-pill-{tone}" style="font-size:13px">{status}</span></b></div>
+        <div><span>{ends_label}</span><b>{f"{s['ends']:%d %b %Y}" if s.get("ends") else "–"}</b></div>
+        </div>''')
     if s["status"] == "free":
         st.success("Your gym has free access to GymPulse AI. Nothing to pay.")
-        return
-    if s["status"] == "trial":
-        st.caption("Your free trial includes every feature. Pay now or any time before it ends: your paid plan "
-                   "starts when the trial finishes, so you don't lose any free days.")
+    else:
+        st.markdown('<div class="section-label">CHOOSE A PLAN</div>', unsafe_allow_html=True)
+        cols = st.columns(len(ps) if len(ps) <= 3 else 3)
+        for i, plan in enumerate(ps):
+            with cols[i % len(cols)].container(border=True):
+                if plan.get("popular"):
+                    gw._md('<span class="gp-pill gp-pill-lime">Recommended</span>')
+                elif any(x.get("popular") for x in ps):
+                    gw._md('<span class="gp-pill" style="visibility:hidden">Recommended</span>')
+                st.markdown(f"### {gw._esc(plan['name'])}")
+                if plan.get("for_who"):
+                    st.caption(f"For gyms with {gw._esc(plan['for_who'][0].lower() + plan['for_who'][1:])}")
+                if plan.get("monthly"):
+                    gw._md(f"<div style='font-size:30px;font-weight:800;letter-spacing:-.6px'>{_money(plan['monthly'])}"
+                           f"<span style='font-size:14px;font-weight:500;opacity:.7'> / month</span></div>")
+                if plan.get("yearly"):
+                    saved = _saving(plan)
+                    st.caption(f"or {_money(plan['yearly'])} a year" + (f", save {_money(saved)}" if saved else ""))
+                if plan.get("tagline"):
+                    st.markdown(f"<div style='font-size:13.5px;opacity:.8;min-height:40px'>{gw._esc(plan['tagline'])}</div>",
+                                unsafe_allow_html=True)
+                st.button(f"Choose {plan['name']}", key=f"co_choose_{i}", use_container_width=True,
+                          type="primary" if plan.get("popular") else "secondary",
+                          on_click=_view, args=("checkout",), kwargs={"sub_plan": plan["name"], "sub_period": "monthly"})
+        with st.expander("Compare what each plan includes"):
+            gw._md(compare_table_html(ps, light=st.session_state.get("theme") == "light"))
+        if p.get("note"):
+            st.caption(p["note"])
 
-    pending = st.session_state.get("bill_checkout")
-    if pending and st.button("I've finished paying: check my payment", icon=":material/refresh:", key="bill_check"):
-        ok, msg = apply_payment(pending["ref"])
-        st.session_state["bill_flash"], st.session_state["bill_flash_ok"] = msg, ok
-        if ok:
-            st.session_state.pop("bill_checkout", None)
-        st.rerun()
-
-    st.markdown("#### Plans")
-    ps = plans(p)
-    online = bool(paystack_key())
-    _plan_cards(p, pay=_pay_button(supabase, gym_id) if online else None, key="sub")
-    if p.get("note"):
-        st.caption(p["note"])
-
-    contact = []
-    if p.get("contact_whatsapp"):
-        contact.append(f"WhatsApp {p['contact_whatsapp']}")
-    if p.get("contact_email"):
-        contact.append(p["contact_email"])
-    other = p.get("bank_account") or p.get("pay_link") or not online
-    if other:
-        with st.expander("Other ways to pay" if online else "How to pay", expanded=not online):
-            if p.get("pay_link"):
-                st.link_button("Pay with a payment link", p["pay_link"], icon=":material/link:")
-            if p.get("bank_account"):
-                st.markdown(f"**Bank transfer:** {p.get('bank_name', '')} · {p['bank_account']} · "
-                            f"{p.get('bank_holder', '')}  \nUse your gym's name as the reference.")
-            with st.form("bill_paid"):
-                st.markdown("**Paid by transfer?** Tell us and we'll switch your plan on.")
-                c0, c1, c2 = st.columns(3)
-                plan_pick = c0.selectbox("Plan", [x["name"] for x in ps])
-                method = c1.selectbox("How did you pay?", ["Bank transfer", "Online payment link", "Other"])
-                ref = c2.text_input("Reference or note (optional)")
-                if st.form_submit_button("I've paid", type="primary"):
-                    _notify_paid(supabase, gym_id, method, f"{plan_pick} · {ref.strip()}".strip(" ·"))
-                    st.rerun()
+    invoices = gi.for_gym(supabase, gym_id)
+    st.markdown('<div class="section-label">BILLING HISTORY</div>', unsafe_allow_html=True)
+    if invoices is None:
+        st.caption("Receipts appear here once billing history is switched on.")
+    else:
+        shown = [x for x in invoices if x.get("status") != "cancelled"]
+        gw.table([{"Receipt": gi.number(x), "Date": str(x.get("paid_at") or x.get("created_at"))[:10],
+                   "Plan": f"{x.get('plan')} · {'Yearly' if x.get('period') == 'yearly' else 'Monthly'}",
+                   "Amount": gi.money(x.get("amount")),
+                   "Status": {"paid": "Paid", "pending": "Awaiting payment"}.get(x.get("status"), x.get("status"))}
+                  for x in shown], pills={"Status": {"Paid": "lime", "Awaiting payment": "amber"}},
+                 empty="No payments yet. Your receipts will appear here.")
+        paid = [x for x in shown if x.get("status") == "paid"]
+        if paid:
+            import gympulse_reports as rp
+            pick = st.selectbox("Download a receipt", range(len(paid)), key="co_rc_pick",
+                                format_func=lambda j: f"{gi.number(paid[j])} · {gi.money(paid[j].get('amount'))}")
+            rp.download_link("Download receipt (PDF)", gi.receipt_pdf(paid[pick]),
+                             f"GymPulse-AI-receipt-{gi.number(paid[pick])}.pdf", rp.PDF, f"co_rc_{pick}")
+    contact = [x for x in (p.get("contact_whatsapp") and f"WhatsApp {p['contact_whatsapp']}", p.get("contact_email")) if x]
     if contact:
-        st.caption("Questions? " + " · ".join(contact))
+        st.caption("Questions about billing? " + " · ".join(contact))
+
+
+def _render_checkout(supabase, gym_id, plan, period, s, p, ps):
+    import gympulse_invoices as gi
+    st.button("Back to plans", icon=":material/arrow_back:", type="tertiary", key="co_back",
+              on_click=_view, args=("plans",))
+    gw.page_header("Checkout", f"GymPulse AI {plan['name']}. Secure payment, receipt by email.", "Subscription")
+    flash = st.session_state.pop("bill_flash", None)
+    if flash:
+        st.warning(flash)
+    options = [x for x in ("monthly", "yearly") if price_for(plan, x)]
+    if len(options) > 1:
+        saved = _saving(plan)
+        pick = st.segmented_control("Billing", options, default=period, key="co_cycle", label_visibility="collapsed",
+                                    format_func=lambda v: f"Monthly · {_money(plan['monthly'])}" if v == "monthly"
+                                    else f"Yearly · {_money(plan['yearly'])}" + (f" (save {_money(saved)})" if saved else ""))
+        if pick and pick != period:
+            st.session_state["sub_period"] = pick
+            st.rerun()
+    online, bank = bool(paystack_key()), bool(p.get("bank_account"))
+    left, right = st.columns([1.35, 1], gap="large")
+    with right:
+        gw._md(_summary_html(plan, period, s, ps))
+    with left:
+        prof = st.session_state.get("user_profile") or {}
+        prev = st.session_state.get("co_details") or gi.last_details(supabase, gym_id)
+        email0 = (st.session_state.get("auth_user") or {}).get("email", "")
+        if not (online or bank):
+            st.info("Online payment is being set up. Contact us and we'll activate your plan: "
+                    + (p.get("contact_email") or "emmanuel@usegympulseai.com"))
+            return
+        with st.form("co_form", border=False):
+            gw._md('<div class="co-sec">Billing details</div>')
+            biz = st.text_input("Business name", prev.get("business_name") or prof.get("business_name") or "")
+            c1, c2 = st.columns(2)
+            name = c1.text_input("Full name", prev.get("billing_name") or prof.get("full_name") or "")
+            phone = c2.text_input("Phone number", prev.get("billing_phone") or "", placeholder="e.g. 0803 000 0000")
+            email = st.text_input("Email for receipts", prev.get("billing_email") or email0)
+            gw._md('<div class="co-sec" style="margin-top:10px">Billing address</div>')
+            addr = st.text_input("Street address", prev.get("address") or "", placeholder="e.g. 12 Admiralty Way")
+            c3, c4 = st.columns(2)
+            city = c3.text_input("City", prev.get("city") or "", placeholder="e.g. Lekki")
+            states = gi.NG_STATES
+            state_ = c4.selectbox("State", states, index=states.index(prev["state"]) if prev.get("state") in states
+                                  else states.index("Lagos"))
+            gw._md('<div class="co-sec" style="margin-top:10px">Payment method</div>')
+            methods = (["paystack"] if online else []) + (["transfer"] if bank else [])
+            method = st.radio("Payment method", methods, label_visibility="collapsed",
+                              format_func=lambda m: "Card, bank transfer or USSD · secured by Paystack" if m == "paystack"
+                              else "Direct bank transfer · confirmed within a few hours")
+            agree = st.checkbox("I agree to the Terms of Service and authorise this payment.")
+            go = st.form_submit_button(f"Continue · {_money(price_for(plan, period))}", type="primary",
+                                       use_container_width=True)
+        if go:
+            details = {"business_name": biz, "billing_name": name, "billing_phone": phone, "billing_email": email,
+                       "address": addr, "city": city, "state": state_}
+            st.session_state["co_details"] = details
+            problems = [m for ok, m in [(biz.strip(), "your business name"), (name.strip(), "your full name"),
+                                        ("@" in email and "." in email.split("@")[-1], "a valid email"),
+                                        (len("".join(ch for ch in phone if ch.isdigit())) >= 10, "a phone number"),
+                                        (agree, "to accept the terms")] if not ok]
+            if problems:
+                st.error("Please add " + ", ".join(problems) + ".")
+                return
+            sc = _service()
+            if not sc:
+                st.error("Checkout isn't available right now. Please try again shortly.")
+                return
+            amount = price_for(plan, period)
+            if method == "paystack":
+                ref = f"gp-{str(gym_id)[:8]}-{uuid.uuid4().hex[:12]}"
+                inv = gi.create(sc, gym_id, plan["name"], period, amount, details, "paystack", ref)
+                url, msg = start_payment(gym_id, plan, period, email.strip(), ref, inv.get("id"))
+                if not url:
+                    gi.update(sc, inv, status="cancelled")
+                    st.session_state["bill_flash"] = msg
+                    st.rerun()
+                _view("pay", co_url=url, co_inv=inv)
+            else:
+                inv = gi.create(sc, gym_id, plan["name"], period, amount, details, "transfer")
+                if inv.get("number"):
+                    inv = gi.update(sc, inv, reference=gi.number(inv))
+                _view("transfer", co_inv=inv)
+            st.rerun()
+
+
+def _render_pay(plan, period, s, ps):
+    import gympulse_invoices as gi
+    inv = st.session_state.get("co_inv") or {}
+    st.button("Change details", icon=":material/arrow_back:", type="tertiary", key="co_back2",
+              on_click=_view, args=("checkout",))
+    gw.page_header("Review and pay", "One last step: pay securely with Paystack.", "Checkout")
+    left, right = st.columns([1.35, 1], gap="large")
+    with right:
+        gw._md(_summary_html(plan, period, s, ps))
+    with left:
+        gw._md(f'''<div class="co-card">
+            <div class="co-row"><span>Business</span><b>{gw._esc(inv.get("business_name"))}</b></div>
+            <div class="co-row"><span>Billed to</span><b>{gw._esc(inv.get("billing_name"))}</b></div>
+            <div class="co-row"><span>Receipt to</span><b>{gw._esc(inv.get("billing_email"))}</b></div>
+            <div class="co-row"><span>Invoice</span><b>{gw._esc(gi.number(inv))}</b></div></div>
+            <div class="co-pay"><a class="lx-btn lx-btn-primary" href="{gw._esc(st.session_state.get("co_url", "#"))}"
+            target="_self">Pay {gi.money(price_for(plan, period))} securely</a>
+            <div class="co-lock">🔒 You'll pay on Paystack's secure page by card, bank transfer or USSD, then come
+            straight back here. Your receipt is emailed to {gw._esc(inv.get("billing_email"))}.</div></div>''')
+
+
+def _render_transfer(supabase, gym_id, plan, period, s, p, ps):
+    import gympulse_invoices as gi
+    import gympulse_reports as rp
+    inv = st.session_state.get("co_inv") or {}
+    sent = st.session_state.get("sub_view") == "sent"
+    if not sent:
+        st.button("Change details", icon=":material/arrow_back:", type="tertiary", key="co_back3",
+                  on_click=_view, args=("checkout",))
+    gw.page_header("Bank transfer" if not sent else "Transfer received",
+                   "Send the exact amount with your invoice number as the reference." if not sent
+                   else "We'll confirm it and email your receipt.", "Checkout")
+    left, right = st.columns([1.35, 1], gap="large")
+    with right:
+        gw._md(_summary_html(plan, period, s, ps))
+    with left:
+        if sent:
+            gw._md(f'''<div class="co-done"><div class="co-tick">✓</div><div class="co-title">Thank you</div>
+                <div class="co-sub">We'll confirm your transfer, usually within a few hours. Your plan switches on as
+                soon as it's confirmed, and your receipt is emailed to {gw._esc(inv.get("billing_email"))}.</div></div>''')
+            st.button("Back to Subscription", key="co_done_back", on_click=_view, args=("plans",),
+                      use_container_width=True)
+            return
+        gw._md(f'''<div class="co-bank">
+            <div class="co-row"><span>Bank</span><b>{gw._esc(p.get("bank_name"))}</b></div>
+            <div class="co-row"><span>Account number</span><b>{gw._esc(p.get("bank_account"))}</b></div>
+            <div class="co-row"><span>Account name</span><b>{gw._esc(p.get("bank_holder"))}</b></div>
+            <div class="co-row"><span>Amount</span><b>{gi.money(inv.get("amount"))}</b></div>
+            <div class="co-row"><span>Reference</span><b>{gw._esc(gi.number(inv))}</b></div></div>''')
+        st.caption("Use the reference so we can match your payment. Your plan switches on as soon as we confirm it.")
+        c1, c2 = st.columns(2)
+        if c1.button("I've sent the transfer", type="primary", use_container_width=True, key="co_sent"):
+            _notify_transfer(inv)
+            _view("sent")
+            st.rerun()
+        with c2:
+            rp.download_link("Download invoice (PDF)", gi.receipt_pdf(inv, paid=False),
+                             f"GymPulse-AI-invoice-{gi.number(inv)}.pdf", rp.PDF, "co_inv_pdf")
 
 
 # ------------------------------------------------------------------ admin
@@ -718,6 +1005,29 @@ def render_admin_billing(sc, gyms, audit):
         d = _d(v)
         return f"{d:%d %b %Y}" if d else "–"
 
+    import gympulse_invoices as gi
+    pend = gi.pending_transfers(sc)
+    names = {g["gym"]["id"]: g["name"] for g in gyms}
+    if pend:
+        st.markdown('<div class="section-label">BANK TRANSFERS TO CONFIRM</div>', unsafe_allow_html=True)
+        gw.table([{"Invoice": gi.number(x), "Gym": names.get(x["gym_id"], x.get("business_name") or "–"),
+                   "Plan": f"{x.get('plan')} · {'Yearly' if x.get('period') == 'yearly' else 'Monthly'}",
+                   "Amount": gi.money(x.get("amount")), "Created": str(x.get("created_at"))[:10],
+                   "Status": "Awaiting payment"} for x in pend], pills={"Status": {"Awaiting payment": "amber"}})
+        c1, c2, c3 = st.columns([2, 1, 1])
+        pk = c1.selectbox("Transfer", range(len(pend)), key="bill_tr_pick", label_visibility="collapsed",
+                          format_func=lambda j: f"{gi.number(pend[j])} · {names.get(pend[j]['gym_id'], '')} · "
+                                                f"{gi.money(pend[j].get('amount'))}")
+        if c2.button("Confirm received", type="primary", use_container_width=True, key="bill_tr_ok"):
+            inv, until = confirm_transfer(sc, pend[pk], (st.session_state.get("auth_user") or {}).get("email", "admin"))
+            audit(sc, "billing_transfer_confirmed", next((g for g in gyms if g["gym"]["id"] == inv["gym_id"]), {}),
+                  {"invoice": gi.number(inv), "until": until.isoformat()})
+            st.session_state["adm_flash"] = f"Confirmed {gi.number(inv)}. Plan active until {until:%d %b %Y}, receipt emailed."
+            st.rerun()
+        if c3.button("Cancel invoice", use_container_width=True, key="bill_tr_no"):
+            gi.update(sc, pend[pk], status="cancelled")
+            st.session_state["adm_flash"] = f"Cancelled {gi.number(pend[pk])}."
+            st.rerun()
     st.markdown('<div class="section-label">ALL GYMS</div>', unsafe_allow_html=True)
     gw.table([{"Gym": g["name"], "Owner": g.get("email") or "–",
                "Status": status_word.get(states[g["gym"]["id"]]["status"], "–"),
@@ -756,13 +1066,22 @@ def render_admin_billing(sc, gyms, audit):
             price = c2.number_input("Monthly price for this gym (₦)", 0.0, step=1000.0,
                                     value=float(chosen.get("monthly") or sub.get("price") or 0),
                                     key=f"bill_p_{gid}_{plan_name}")
+            send_rc = st.checkbox("Email a receipt to the owner", value=bool(g.get("email")), key=f"bill_rc_{gid}",
+                                  disabled=not g.get("email"))
             if c3.button("Mark as paid", key=f"bill_paid_{gid}", type="primary", use_container_width=True):
-                start = max(_d(sub.get("paid_until")) or today, today)
-                until = start + timedelta(days=30 * months)
-                admin_set(sc, gid, status="active", paid_until=until.isoformat(), price=price or None,
-                          plan=f"{plan_name} · {months} month{'s' if months != 1 else ''}")
-                audit(sc, "billing_paid", g, {"months": months, "until": until.isoformat(), "price": price})
-                st.session_state["adm_flash"] = f"{g['name']} is subscribed until {until:%d %b %Y}."
+                import gympulse_invoices as gi
+                total = float(price or 0) * months
+                start, until = activate(sc, gid, plan_name, "monthly", months, total, "Marked as paid in Admin")
+                inv = gi.create(sc, gid, plan_name, "monthly", total,
+                                {"business_name": g["name"], "billing_name": g.get("owner"),
+                                 "billing_email": g.get("email")}, "admin", months=months)
+                inv = gi.update(sc, inv, status="paid", paid_at=datetime.now(timezone.utc).isoformat(),
+                                period_start=start.isoformat(), period_end=until.isoformat())
+                sent = gi.send_receipt(sc, inv) if send_rc and total else False
+                audit(sc, "billing_paid", g, {"months": months, "until": until.isoformat(), "price": price,
+                                              "receipt": gi.number(inv)})
+                st.session_state["adm_flash"] = (f"{g['name']} is subscribed until {until:%d %b %Y}."
+                                                 + (f" Receipt {gi.number(inv)} emailed." if sent else ""))
                 st.rerun()
             d1, d2, d3 = st.columns(3)
             if d1.button("Extend trial 14 days", key=f"bill_ext_{gid}", use_container_width=True):
