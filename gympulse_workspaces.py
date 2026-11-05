@@ -2438,14 +2438,26 @@ def render_member_profile(supabase, gym_id, member_id, assess_fn):
         """)
         fee = _num(act.get("monthly_fee") if act else None, None)
         renewed = _text(m["last_renewed_on"])[:10]
+        try:                                    # plan name / member number from an import (phase 16)
+            extra = (supabase.table("members").select("plan_name, member_no, member_since")
+                     .eq("id", member_id).limit(1).execute().data or [{}])[0]
+        except Exception:
+            extra = {}
+        plan_txt = _text(act.get("membership_type")) if act else "—"
+        if _text(extra.get("plan_name")):
+            plan_txt = f'{_text(extra.get("plan_name"))} ({plan_txt})' if act else _text(extra.get("plan_name"))
+        extra_kv = "".join(f'<div class="kv"><span>{lbl}</span><b>{_esc(_text(extra.get(k))[:10] if k == "member_since" else _text(extra.get(k)))}</b></div>'
+                           for k, lbl in (("member_no", "Member number"), ("member_since", "Member since"))
+                           if _text(extra.get(k)))
         paid = _num(m["last_payment"], None)
         _md(f"""
         <div class="panel">
-          <div class="kv"><span>Plan</span><b>{_esc(_text(act.get("membership_type")) if act else "—")}</b></div>
+          <div class="kv"><span>Plan</span><b>{_esc(plan_txt)}</b></div>
           <div class="kv"><span>Monthly fee</span><b>{"—" if fee is None else f"{fee:,.0f}"}</b></div>
           <div class="kv"><span>Plan runs until</span><b>{state["end"].strftime("%d %b %Y") if state["end"] else "—"}</b></div>
           <div class="kv"><span>Last renewed</span><b>{_esc(renewed) if renewed else "—"}</b></div>
           <div class="kv"><span>Last payment</span><b>{"—" if paid is None else f"{paid:,.0f}"}</b></div>
+          {extra_kv}
         </div>
         """)
 

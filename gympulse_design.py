@@ -372,6 +372,11 @@ html body [class*="st-key-intro_"] { border: 1px solid var(--gp-line); border-ra
 html body [class*="st-key-intro_"] p strong { font-size: 18px; font-weight: 700; color: var(--gp-text); }
 html body [class*="st-key-intro_"] [data-testid="stIconMaterial"] { color: var(--gp-lime); font-size: 22px !important; vertical-align: -4px; margin-right: 4px; }
 html body [class*="st-key-intro_"] [data-testid="stMarkdownContainer"] p { margin-bottom: 0 !important; }
+.gm-sum { border: 1px solid rgba(183,243,74,0.35); border-radius: 16px; padding: 14px 20px; margin: 6px 0 12px;
+    background: linear-gradient(90deg, rgba(183,243,74,0.10), transparent 80%), var(--gp-s1); }
+.gm-sum-k { color: var(--gp-muted); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; margin-bottom: 4px; }
+.gm-sum-v { color: var(--gp-text); font-size: 18px; line-height: 1.5; }
+.gm-sum-v b { color: var(--gp-lime); font-weight: 700; }
 .gp-intro-s { color: var(--gp-muted); font-size: 13.5px; line-height: 1.6; max-width: 900px; margin-top: 6px; }
 .gp-intro-t { font-weight: 700; font-size: 18px; color: var(--gp-text); }
 /* Grow: group switcher above the tool tabs */
