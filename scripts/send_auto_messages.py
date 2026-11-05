@@ -36,10 +36,11 @@ def main():
             settings = dict(entry["profile"].get("settings") or {})
             auto_raw = dict(settings.get("auto_messages") or {})
             auto_raw["missed"] = {**dict(auto_raw.get("missed") or {}), "on": False}
-            auto_raw["reward"] = {**dict(auto_raw.get("reward") or {}), "on": False}
+            for k in ("reward", "welcome", "progress"):
+                auto_raw[k] = {**dict(auto_raw.get(k) or {}), "on": False}
             entry = {**entry, "profile": {**entry["profile"], "settings": {**settings, "auto_messages": auto_raw}}}
         auto = gl.auto_cfg(entry["profile"])
-        if not (auto["renewal"]["on"] or auto["missed"]["on"] or auto["reward"]["on"]):
+        if not any(auto[k]["on"] for k in ("renewal", "missed", "reward", "welcome", "progress")):
             continue
         if gadm._is_banned(entry):
             print(f"{entry['name']}: suspended, skipped")
