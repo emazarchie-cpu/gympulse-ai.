@@ -38,7 +38,9 @@ def render_public(supabase, code):
         if not gym:
             st.error("This sign-up link isn't active. Please ask your gym for a new one.")
             return
-        done = st.session_state.get("join_done")
+        done = st.session_state.pop("join_done", None)      # shown once: the next visit starts a fresh form
+        if done and st.session_state.pop("join_done_code", None) != str(code):
+            done = None
         if done:
             if done == "created":
                 gw._md(f'<div class="bk-title">You\'re in! 🎉</div><div class="bk-sub">Welcome to '
@@ -81,7 +83,7 @@ def render_public(supabase, code):
                         pic = gw.process_photo(photo.getvalue())
                     except Exception:
                         pic = None
-                rows = []
+                rows, problem = [], ""
                 try:
                     if pic:
                         rows = supabase.rpc("gp_member_join", {**args, "p_photo": pic}).execute().data or []
@@ -90,13 +92,17 @@ def render_public(supabase, code):
                 if not rows:
                     try:
                         rows = supabase.rpc("gp_member_join", args).execute().data or []
-                    except Exception:
-                        rows = []
+                    except Exception as error:
+                        rows, problem = [], str(error)
                 r = rows[0] if isinstance(rows, list) and rows else None
-                if not r:
-                    st.error("Something went wrong. Please check your details and try again.")
+                if not r or r.get("status") not in ("created", "exists"):
+                    import gympulse_monitoring as gmon
+                    gmon.capture(RuntimeError(f"member sign-up link failed: {problem or rows}"), "member sign-up")
+                    st.error("Sorry, your details couldn't be saved. Please try again, or ask the front desk."
+                             + (f" (Details for the gym: {problem[:160]})" if problem else ""))
                 else:
-                    st.session_state["join_done"] = r.get("status") or "created"
+                    st.session_state["join_done"] = r["status"]
+                    st.session_state["join_done_code"] = str(code)
                     st.rerun()
 
 
