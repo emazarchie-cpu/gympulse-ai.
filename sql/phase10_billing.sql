@@ -8,7 +8,8 @@
 --  platform_settings  prices and payment details, set in Admin -> Billing
 --  billing_events     trial reminder emails already sent (so none repeat)
 --
--- Every existing gym gets a 30-day free trial starting today. New gyms get
+-- Every existing gym gets a 30-day free trial starting today (the last free
+-- day is day 30; the app locks when it ends). New gyms get
 -- one automatically when they sign up. Gym owners can READ their own
 -- subscription and the prices. Only the Admin page (service key) can change
 -- them.
@@ -19,7 +20,7 @@ begin;
 create table if not exists public.gym_subscriptions (
     gym_id         uuid primary key references public.gyms (id) on delete cascade,
     status         text not null default 'trial' check (status in ('trial', 'active', 'free')),
-    trial_ends_on  date not null default (current_date + 30),
+    trial_ends_on  date not null default (current_date + 29),
     paid_until     date,
     plan           text,
     price          numeric(12, 2),
@@ -65,7 +66,7 @@ alter table public.billing_events enable row level security;      -- no policies
 
 -- Existing gyms: 30 days free from today (or from sign-up, if that's later)
 insert into public.gym_subscriptions (gym_id, status, trial_ends_on)
-select g.id, 'trial', greatest(coalesce(g.created_at::date, current_date), current_date) + 30
+select g.id, 'trial', greatest(coalesce(g.created_at::date, current_date), current_date) + 29
 from public.gyms g
 on conflict (gym_id) do nothing;
 
@@ -74,7 +75,7 @@ create or replace function public.gp_start_trial()
 returns trigger language plpgsql security definer set search_path = public as $$
 begin
     insert into public.gym_subscriptions (gym_id, status, trial_ends_on)
-    values (new.id, 'trial', current_date + 30)
+    values (new.id, 'trial', current_date + 29)
     on conflict (gym_id) do nothing;
     return new;
 end $$;
