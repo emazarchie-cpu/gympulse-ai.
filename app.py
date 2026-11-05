@@ -1051,6 +1051,13 @@ if st.query_params.get("unsub"):
     gcamp.render_unsubscribe(supabase, st.query_params.get("unsub"))
     st.stop()
 
+# Public member sign-up page (the gym's link or QR code, no sign-in)
+if st.query_params.get("join"):
+    import gympulse_signup as gsign
+    gd.apply()
+    gsign.render_public(supabase, st.query_params.get("join"))
+    st.stop()
+
 # Public happiness check answer page (one tap from the member's email, no sign-in)
 if st.query_params.get("fb"):
     import gympulse_happy as ghappy
@@ -2689,10 +2696,15 @@ elif page == "Member Management":
         _mm_flash = st.session_state.pop("mm_flash", None)
         if _mm_flash:
             st.success(_mm_flash)
-        with st.expander("Import members from GymMaster (CSV)", icon=":material/upload_file:",
+        with st.expander("Bring your members in: import from GymMaster, Excel or any software",
+                         icon=":material/upload_file:",
                          expanded=bool(st.session_state.get("gm_flash") or st.session_state.get("gm_errors"))):
             import gympulse_gymmaster as ggm
             ggm.render_gymmaster_import(supabase, gym_id)
+        with st.expander("Member sign-up link and QR code: members add their own details",
+                         icon=":material/qr_code_2:"):
+            import gympulse_signup as gsign
+            gsign.render_owner(supabase, gym_id)
         st.markdown("### Register a New Member")
 
         with st.form("register_member_form"):

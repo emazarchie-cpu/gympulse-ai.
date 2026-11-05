@@ -1339,6 +1339,18 @@ MEMBER_SUSPEND = ["suspended"]
 MEMBER_PROFILE = ["photo", "membership_end", "last_renewed_on", "last_payment"]
 MEMBER_PROFILE_LIGHT = ["membership_end", "last_renewed_on", "last_payment"]
 
+def fetch_all(query, page=1000, cap=50000):
+    """Every row of a query, page by page. Supabase returns at most 1,000 rows per request,
+    so gyms with thousands of members would otherwise see only the first 1,000."""
+    rows, start = [], 0
+    while True:
+        chunk = query.range(start, start + page - 1).execute().data or []
+        rows += chunk
+        if len(chunk) < page or len(rows) >= cap:
+            return rows
+        start += page
+
+
 def _fetch_members_uncached(supabase, gym_id, archived=None, include_photo=True):
     profile = MEMBER_PROFILE if include_photo else MEMBER_PROFILE_LIGHT
     attempts = [MEMBER_BASE + MEMBER_SUSPEND + profile,
@@ -1351,7 +1363,7 @@ def _fetch_members_uncached(supabase, gym_id, archived=None, include_photo=True)
                      .eq("gym_id", gym_id))
             if archived is not None:
                 query = query.eq("archived", archived)
-            rows = query.order("created_at", desc=True).execute().data or []
+            rows = fetch_all(query.order("created_at", desc=True).order("id"))
             used = columns
             break
         except Exception as error:
@@ -1381,8 +1393,7 @@ def _load_roster_uncached(supabase, gym_id, assess_fn, with_photos=True):
     members = members[[c for c in keep if c in members.columns]].reset_index(drop=True)
 
     activity = pd.DataFrame(
-        supabase.table("member_activity").select("*")
-        .eq("gym_id", gym_id).execute().data or []
+        fetch_all(supabase.table("member_activity").select("*").eq("gym_id", gym_id).order("member_id"))
     )
     # Real check-ins override typed-in attendance numbers
     stats = checkin_stats(load_checkins(supabase, gym_id))
@@ -1438,7 +1449,7 @@ def _load_actions_uncached(supabase, gym_id, include_archived=False):
             query = query.is_("archived_at", "null")
         except Exception:
             pass
-    rows = query.order("created_at", desc=True).execute().data or []
+    rows = fetch_all(query.order("created_at", desc=True).order("id"))
     return pd.DataFrame(rows)
 
 def fetch_members(supabase, gym_id, archived=None, include_photo=True):
