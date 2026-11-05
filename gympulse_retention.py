@@ -106,7 +106,7 @@ def render_insights(supabase, gym_id):
     rows = [{"Month": f"{m:%b %Y}", "Members at the start": r["base"], "Kept": r["kept"], "Lost": r["lost"],
              "Kept %": _fmt(r)} for m, r in s["trend"]]
     with st.expander("Month by month"):
-        st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+        gw.table(rows)
         st.caption("Worked out from membership end dates: a member who renewed counts as kept. Members whose "
                    "membership ended and hasn't been renewed count as lost. This month is counted up to today.")
     if lm["rate"] is not None:

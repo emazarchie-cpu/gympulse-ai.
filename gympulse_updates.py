@@ -171,4 +171,4 @@ def render_updates(supabase, gym_id):
     hist = _history(supabase, gym_id)
     if hist:
         with st.expander(f"Updates sent in the last 60 days ({len(hist)})"):
-            st.dataframe(pd.DataFrame(hist), hide_index=True, use_container_width=True)
+            gw.table(hist, pills={"Type": {"Fixed": "lime", "Problem": "amber"}})

@@ -542,9 +542,8 @@ def render_loyalty(supabase, gym_id, owner_id):
     if reds:
         with st.expander("Gifts already given"):
             names = dict(zip(table["member_id"], table["name"]))
-            st.dataframe(pd.DataFrame([{"When": str(r["created_at"])[:10], "Member": names.get(r["member_id"], "Member"),
-                                        "Gift": r["reward"], "Points used": r["points"]} for r in reds]),
-                         hide_index=True, use_container_width=True)
+            gw.table([{"When": str(r["created_at"])[:10], "Member": names.get(r["member_id"], "Member"),
+                       "Gift": r["reward"], "Points used": r["points"]} for r in reds])
 
 
 # ================================================================== UI: automatic messages
@@ -617,9 +616,8 @@ def render_auto(supabase, gym_id, owner_id):
                 ("No email", str(len(due) - len(with_email)), "amber", "send these on WhatsApp"),
                 ("Sends itself at", "8:30 am", "grey", "every morning")])
     if due:
-        st.dataframe(pd.DataFrame([{"Message": label[k], "Member": m.get("full_name"),
-                                    "Email": m.get("email") or "–", "Subject": subj}
-                                   for k, m, ref, subj, body, b in due]), hide_index=True, use_container_width=True)
+        gw.table([{"Member": m.get("full_name"), "Message": label[k], "Email": m.get("email") or "–", "Subject": subj}
+                  for k, m, ref, subj, body, b in due], pills={"Message": {v: "cyan" for v in label.values()}}, wide=("Subject",))
         if st.toggle("Show me the email before it goes", key="auto_preview"):
             i = st.selectbox("Whose email?", range(len(due)), key="auto_preview_pick",
                              format_func=lambda j: f"{label[due[j][0]]} · {due[j][1].get('full_name')}")
@@ -643,7 +641,6 @@ def render_auto(supabase, gym_id, owner_id):
     if rows:
         with st.expander(f"Already sent in the last 30 days ({len(rows)})"):
             names = {r["id"]: r["full_name"] for _, r in gg._members(supabase, gym_id).iterrows()}
-            st.dataframe(pd.DataFrame([{"When": str(r["sent_at"])[:16].replace("T", " "),
-                                        "Message": label.get(r["kind"], r["kind"]),
-                                        "Member": names.get(r["member_id"], "Member")} for r in rows]),
-                         hide_index=True, use_container_width=True)
+            gw.table([{"When": str(r["sent_at"])[:16].replace("T", " "), "Member": names.get(r["member_id"], "Member"),
+                       "Message": label.get(r["kind"], r["kind"]),
+                       "Status": gw._text(r.get("status"), "sent").capitalize()} for r in rows], pills=("Status",))

@@ -710,12 +710,36 @@ def render_admin_billing(sc, gyms, audit):
                     "(Environment) and in GitHub (Settings → Secrets → Actions). See docs/BILLING.md.")
 
     order = {"expired": 0, "trial": 1, "active": 2, "free": 3, "off": 4}
-    for g in sorted(gyms, key=lambda g: (order[states[g["gym"]["id"]]["status"]],
-                                         states[g["gym"]["id"]].get("days_left") or 0)):
+    ordered = sorted(gyms, key=lambda g: (order[states[g["gym"]["id"]]["status"]],
+                                          states[g["gym"]["id"]].get("days_left") or 0))
+    status_word = {"trial": "Free trial", "active": "Paying", "free": "Free access", "expired": "Ended", "off": "–"}
+
+    def _d_txt(v):
+        d = _d(v)
+        return f"{d:%d %b %Y}" if d else "–"
+
+    st.markdown('<div class="section-label">ALL GYMS</div>', unsafe_allow_html=True)
+    gw.table([{"Gym": g["name"], "Owner": g.get("email") or "–",
+               "Status": status_word.get(states[g["gym"]["id"]]["status"], "–"),
+               "Plan": gw._text(subs.get(g["gym"]["id"], {}).get("plan"), "–"),
+               "Trial ends": _d_txt(subs.get(g["gym"]["id"], {}).get("trial_ends_on")),
+               "Paid until": _d_txt(subs.get(g["gym"]["id"], {}).get("paid_until")),
+               "Monthly": _money(subs.get(g["gym"]["id"], {}).get("price"))
+               if subs.get(g["gym"]["id"], {}).get("price") else "–"} for g in ordered],
+             pills={"Status": {"Free trial": "cyan", "Paying": "lime", "Free access": "grey", "Ended": "red"}},
+             max_height=460)
+    if not ordered:
+        return
+    ids = [g["gym"]["id"] for g in ordered]
+    pick = st.selectbox("Manage a gym's subscription", ids, key="bill_pick_gym",
+                        format_func=lambda i: next(f"{g['name']} · {states[i]['label'] or 'no plan yet'}"
+                                                   for g in ordered if g["gym"]["id"] == i))
+    for g in [x for x in ordered if x["gym"]["id"] == pick]:
         gid = g["gym"]["id"]
         s, sub = states[gid], subs.get(gid, {})
         tone = {"trial": "cyan", "active": "lime", "free": "grey", "expired": "red"}.get(s["status"], "grey")
-        with st.expander(f"{g['name']} · {s['label'] or 'no plan yet'}"):
+        with st.container(border=True):
+            gw._md(f'<div style="font-size:18px;font-weight:700;margin-bottom:6px">{gw._esc(g["name"])}</div>')
             gw._md(gw.chip(s["status"], tone, dot=True) + (gw.chip("admin", "cyan") if (g.get("email") or "").lower()
                                                           in __import__("gympulse_admin").admin_emails() else ""))
             st.caption(f"Trial ends {sub.get('trial_ends_on') or '–'} · paid until {sub.get('paid_until') or '–'} · "

@@ -311,6 +311,79 @@ def kpi_card(label, value, tone="lime", hint=""):
             f'<div class="kpi-label">{_esc(label)}</div>'
             f'<div class="kpi-value">{_esc(value)}</div>{hint_html}</div>')
 
+PILL_TONES = {
+    # common status words → colour, so tables look the same everywhere
+    "active": "lime", "paid": "lime", "paying": "lime", "sent": "lime", "kept": "lime", "on": "lime",
+    "yes": "lime", "done": "lime", "hit": "lime", "fixed": "lime", "free": "cyan", "free access": "cyan",
+    "trial": "cyan", "free trial": "cyan", "new member": "cyan", "invited": "cyan", "staff": "cyan",
+    "owner": "lime", "pending": "amber", "paused": "amber", "skipped": "amber", "waiting": "amber",
+    "problem": "amber", "medium": "amber", "expired": "red", "ended": "red", "suspended": "red",
+    "failed": "red", "lost": "red", "high": "red", "cancelled": "red", "not seen": "grey", "off": "grey",
+}
+
+
+def _cell(value):
+    if value is None:
+        return "–"
+    try:
+        if pd.isna(value):
+            return "–"
+    except (TypeError, ValueError):
+        pass
+    if isinstance(value, float):
+        return f"{value:,.0f}" if value == int(value) else f"{value:,.2f}"
+    if isinstance(value, int) and not isinstance(value, bool):
+        return f"{value:,}"
+    return str(value)
+
+
+def _is_num(text):
+    t = text.replace(",", "").replace("₦", "").replace("%", "").replace("–", "").strip()
+    try:
+        float(t)
+        return bool(t)
+    except ValueError:
+        return False
+
+
+def table_html(rows, pills=(), wide=(), max_height=520, empty="Nothing here yet."):
+    """A clean, modern table. rows: list of dicts or a DataFrame. pills: columns shown as
+    status pills (colour from PILL_TONES, or a {column: {value: tone}} dict)."""
+    if isinstance(rows, pd.DataFrame):
+        rows = rows.to_dict("records")
+    rows = list(rows or [])
+    if not rows:
+        return f'<div class="gp-tbl-empty">{_esc(empty)}</div>'
+    cols = list(rows[0].keys())
+    texts = [{c: _cell(r.get(c)) for c in cols} for r in rows]
+    numeric = {c for c in cols if c not in pills and any(t[c] != "–" for t in texts)
+               and all(_is_num(t[c]) or t[c] == "–" for t in texts)}
+    tone_map = pills if isinstance(pills, dict) else {}
+    head = "".join(f'<th class="{"num" if c in numeric else ""}">{_esc(c)}</th>' for c in cols)
+    body = []
+    for t in texts:
+        cells = []
+        for i, c in enumerate(cols):
+            v = t[c]
+            if c in pills and v != "–":
+                tone = (tone_map.get(c) or {}).get(v) or PILL_TONES.get(v.lower(), "grey")
+                inner = f'<span class="gp-pill gp-pill-{tone}">{_esc(v)}</span>'
+            else:
+                inner = _esc(v)
+            cls = " ".join(x for x in ("num" if c in numeric else "", "first" if i == 0 else "",
+                                       "wide" if c in wide else "") if x)
+            cells.append(f'<td class="{cls}">{inner}</td>')
+        body.append("<tr>" + "".join(cells) + "</tr>")
+    return (f'<div class="gp-tbl-wrap" style="max-height:{int(max_height)}px"><table class="gp-tbl">'
+            f'<thead><tr>{head}</tr></thead><tbody>{"".join(body)}</tbody></table></div>')
+
+
+def table(rows, pills=(), wide=(), max_height=520, empty="Nothing here yet.", caption=None, target=None):
+    _md(table_html(rows, pills, wide, max_height, empty), target)
+    if caption:
+        (target or st).caption(caption)
+
+
 def kpi_row(cards):
     cols = st.columns(len(cards))
     for col, card in zip(cols, cards):
@@ -1878,7 +1951,7 @@ def render_csv_import(supabase, gym_id, use_expander=True):
         c1.metric("Ready to import", len(payload))
         c2.metric("Skipped", skipped)
         if not issues.empty:
-            st.dataframe(issues, hide_index=True, use_container_width=True)
+            table(issues, wide=tuple(issues.columns[-1:]))
         if not payload:
             return
 
@@ -1886,8 +1959,7 @@ def render_csv_import(supabase, gym_id, use_expander=True):
         preview = pd.DataFrame(payload)
         preview.insert(0, "member", preview["member_id"].map(names))
         st.caption("Preview of the first 20 rows:")
-        st.dataframe(preview.drop(columns="member_id").head(20),
-                     hide_index=True, use_container_width=True)
+        table(preview.drop(columns="member_id").head(20))
 
         if st.button(f"Import {len(payload)} member(s)", key="csv_import_go",
                      type="primary"):
@@ -4638,7 +4710,7 @@ def render_checkin_import(supabase, gym_id, members, ck):
     st.write(f"**{len(rows)}** visit(s) ready to import"
              + (f", **{len(issues)}** row(s) need attention." if issues else "."))
     if issues:
-        st.dataframe(pd.DataFrame(issues)[ISSUE_COLS], hide_index=True, use_container_width=True)
+        table(pd.DataFrame(issues)[ISSUE_COLS])
     if rows and st.button(f"Import {len(rows)} visit(s)", type="primary", key="ck_import_go"):
         with st.spinner("Importing visits…"):
             saved, skipped = import_checkins(supabase, gym_id, rows, ck)

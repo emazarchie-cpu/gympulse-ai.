@@ -364,6 +364,36 @@ html body .st-key-auth_card { border-radius: 22px !important; border: 1px solid 
     .lx-mini-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
     .lx-mk b { font-size: 15px; }
 }
+
+/* ---- tables: one clean style everywhere ---- */
+.gp-tbl-wrap { border: 1px solid var(--gp-line); border-radius: 16px; overflow: auto; background: var(--gp-s1);
+    margin: 4px 0 10px; -webkit-overflow-scrolling: touch; }
+html body .gp-tbl { width: 100% !important; border-collapse: separate !important; border-spacing: 0 !important; font-size: 13.5px; display: table !important; }
+.gp-tbl thead th { position: sticky; top: 0; z-index: 1; background: var(--gp-s2); color: var(--gp-muted);
+    font-size: 11px; font-weight: 700; letter-spacing: .9px; text-transform: uppercase; text-align: left;
+    padding: 12px 16px; white-space: nowrap; border-bottom: 1px solid var(--gp-line); }
+.gp-tbl tbody td { padding: 12px 16px; border-bottom: 1px solid var(--gp-line); color: var(--gp-text);
+    vertical-align: middle; white-space: nowrap; }
+.gp-tbl tbody td.wide { white-space: normal; min-width: 220px; max-width: 420px; line-height: 1.5; }
+.gp-tbl tbody tr:last-child td { border-bottom: 0; }
+html body .gp-tbl th, html body .gp-tbl td { border-left: 0 !important; border-right: 0 !important; border-top: 0 !important; }
+html body .gp-tbl { margin: 0 !important; border: 0 !important; }
+.gp-tbl tbody tr:hover td { background: rgba(127,127,127,0.06); }
+.gp-tbl td.first { font-weight: 600; }
+.gp-tbl .num { text-align: right; font-variant-numeric: tabular-nums; }
+.gp-pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 8px; border-radius: 999px;
+    font-size: 12px; font-weight: 600; line-height: 1.4; border: 1px solid transparent; }
+.gp-pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.gp-pill-lime { color: #B7F34A; background: rgba(183,243,74,0.10); border-color: rgba(183,243,74,0.25); }
+.gp-pill-cyan { color: #35D6ED; background: rgba(53,214,237,0.10); border-color: rgba(53,214,237,0.25); }
+.gp-pill-amber { color: #FFC44D; background: rgba(255,196,77,0.10); border-color: rgba(255,196,77,0.25); }
+.gp-pill-red { color: #FF6B6B; background: rgba(255,107,107,0.10); border-color: rgba(255,107,107,0.25); }
+.gp-pill-grey { color: var(--gp-muted); background: rgba(127,127,127,0.10); border-color: rgba(127,127,127,0.22); }
+.gp-tbl-empty { border: 1px dashed var(--gp-line-2); border-radius: 14px; padding: 18px; text-align: center;
+    color: var(--gp-muted); font-size: 13.5px; }
+/* Streamlit's own grids (data editors): match the tables */
+html body [data-testid="stDataFrame"], html body [data-testid="stDataEditor"] { border-radius: 14px; overflow: hidden;
+    border: 1px solid var(--gp-line); }
 """
 
 
@@ -547,6 +577,14 @@ def landing_sections(icon, bot_svg):
 # Applied after every other style layer when the owner picks light mode.
 # =====================================================================
 LIGHT_CSS = """
+html body .stApp.stApp .gp-pill-lime { color: #3F6212; background: #EEF7DC; border-color: #D3E9A8; }
+html body .stApp.stApp .gp-pill-cyan { color: #0E7490; background: #E3F6FA; border-color: #B8E6F0; }
+html body .stApp.stApp .gp-pill-amber { color: #92400E; background: #FEF3D6; border-color: #F8DE9C; }
+html body .stApp.stApp .gp-pill-red { color: #B42318; background: #FDE8E7; border-color: #F6C2BE; }
+html body .stApp.stApp .gp-tbl tbody td { color: #0F172A; }
+html body .stApp.stApp .gp-tbl thead th { background: #F6F8FB; color: #5B6678; }
+html body .stApp.stApp .gp-tbl-wrap { background: #FFFFFF; }
+
 :root, html body {
     --gp-bg: #F4F6FA; --gp-s1: #FFFFFF; --gp-s2: #F1F4F8; --gp-s3: #E9EEF5;
     --gp-line: rgba(15,23,42,0.09); --gp-line-2: rgba(15,23,42,0.16);

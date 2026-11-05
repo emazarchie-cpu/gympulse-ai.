@@ -2936,11 +2936,9 @@ elif page == "Model Insights":
                 }
             )
 
-            st.dataframe(
-                display_results,
-                hide_index=True,
-                use_container_width=True
-            )
+            _dr = display_results.copy()
+            _dr["Estimated probability"] = _dr["Estimated probability"].map(lambda v: f"{float(v):.0%}")
+            gw.table(_dr, pills={"Provisional risk category": {"High": "red", "Medium": "amber", "Low": "lime"}})
 
             first_probability = float(
                 sensitivity_results.iloc[0]["cancellation_probability"]

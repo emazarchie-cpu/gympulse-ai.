@@ -1114,10 +1114,10 @@ def render_brand_settings(supabase, gym_id, save):
             st.error(str(error))
     recs = cur.get("domain_records") or []
     if recs:
-        st.dataframe(pd.DataFrame([{"Type": r.get("type") or r.get("record"), "Name": r.get("name"),
-                                    "Value": r.get("value"), "Priority": r.get("priority") or "",
-                                    "Status": r.get("status")} for r in recs]),
-                     hide_index=True, use_container_width=True)
+        gw.table([{"Type": r.get("type") or r.get("record"), "Name": r.get("name"),
+                   "Value": r.get("value"), "Priority": r.get("priority") or "",
+                   "Status": gw._text(r.get("status")).capitalize()} for r in recs], pills=("Status",),
+                 wide=("Value",))
         st.caption(f"Domain status: **{b['domain_status'] or 'pending'}**")
 
 

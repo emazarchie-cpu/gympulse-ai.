@@ -192,6 +192,6 @@ def render_happiness(supabase, gym_id):
     if len(rounds) > 1:
         trend = df.groupby("round")["score"].apply(lambda s: round((s >= 3).mean() * 100)).sort_index()
         st.markdown("**Happy members over time**")
-        st.dataframe(pd.DataFrame({"Period": [round_label(r) for r in trend.index], "Happy or love it": [f"{v}%" for v in trend.values],
-                                   "Answers": df.groupby("round").size().sort_index().values}),
-                     hide_index=True, use_container_width=True)
+        gw.table(pd.DataFrame({"Period": [round_label(r) for r in trend.index],
+                               "Happy or love it": [f"{v}%" for v in trend.values],
+                               "Answers": df.groupby("round").size().sort_index().values}))
