@@ -182,6 +182,9 @@ def report_rows(d):
     rows = [("Members kept", f"{d['kept_n']}" + (f", worth {_money(d['credited'])}" if d["kept_n"] else "")),
             ("Collected", _money(d["collected"]) + (f" (incl. {_money(d['recovered'])} won back)" if d["recovered"] else "")),
             ("New members", str(d["joined"])), ("Memberships ended", str(d["lapsed"])),
+            ("Retention rate", (f"{d['retention']['rate']:.0f}% ({d['retention']['kept']} of {d['retention']['base']} "
+                                f"members kept; industry average about 97% a month)")
+             if (d.get("retention") or {}).get("rate") is not None else "Not enough members yet"),
             ("Visits", f"{d['visits']} from {d['active']} active members")]
     if d.get("top_staff"):
         rows.append(("Top of the team", d["top_staff"]))

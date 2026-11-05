@@ -3794,6 +3794,11 @@ def render_business_insights(supabase, gym_id, assess_fn):
     gr.render_revenue_outcomes(supabase, gym_id, roster)
     gp.render_operations(roster, actions)
 
+    try:
+        import gympulse_retention as gret  # local import: it imports this module
+        gret.render_insights(supabase, gym_id)
+    except Exception:
+        pass
     _insights_charts(roster)
 
     st.markdown('<div class="section-label">RENEWAL PIPELINE</div>', unsafe_allow_html=True)

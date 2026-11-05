@@ -20,7 +20,7 @@ import gympulse_workspaces as gw
 
 SQL_HINT = "Run sql/phase5_growth.sql in Supabase to switch this on."
 
-SECTIONS = ["Collect renewals", "Automatic messages", "Gym updates", "Happiness", "Celebrate", "Loyalty", "New members", "Freeze", "Why they left", "Progress",
+SECTIONS = ["Collect renewals", "Automatic messages", "Gym updates", "Happiness", "Celebrate", "Loyalty", "New members", "Class invites", "Freeze", "Why they left", "Progress",
             "Referrals", "Challenges", "Corporate", "Team", "Season planner", "Monthly report"]
 
 
@@ -559,15 +559,47 @@ def onboarding_plan(members, checkins, done_rows, today=None):
             is_due = age >= day and (cond != "visits3" or n >= 3)
             steps.append({"step": step, "title": title, "due": is_due, "done": step in done.get(m["id"], set()),
                           "text": text})
+        mine = checkins[checkins["member_id"] == m["id"]] if len(checkins) else checkins
+        since = sorted({d.date() for d in mine["day"]}) if len(mine) else []
+        since = [d for d in since if d >= m["joined"]]
+        v30 = sum(1 for d in since if (d - m["joined"]).days < 30)
+        v60 = sum(1 for d in since if (d - m["joined"]).days < 60)
+        target = habit_target(age, v30, v60)
         due = [s for s in steps if s["due"]]
         latest = due[-1] if due else None
         for s in due[:-1]:
             s["skipped"] = not s["done"]
         nxt = latest if latest and not latest["done"] else None
-        out.append({"m": m, "age": age, "visits": n, "steps": steps, "next": nxt,
+        out.append({"m": m, "age": age, "visits": n, "steps": steps, "next": nxt, "v30": v30, "v60": v60,
+                    "target": target,
                     "no_show": age >= 7 and n == 0,
                     "quiet": (age >= 14 and n <= 2) or (age >= 30 and n < 4)})
     return sorted(out, key=lambda x: (not x["no_show"], x["next"] is None, -x["age"]))
+
+
+GOAL_30, GOAL_60 = 5, 20      # visits that predict a member stays: 5 in the first month, 20 in 60 days
+
+
+def habit_target(age, v30, v60):
+    """Where a new member is against the two targets. For staff only, never sent to members.
+    Returns {"label", "state"} with state ok | behind | hit | missed."""
+    if age < 30:
+        expected = GOAL_30 * age / 30
+        if v30 >= GOAL_30:
+            return {"label": f"{v30} of {GOAL_30} in month one · target hit", "state": "hit"}
+        behind = age >= 7 and v30 < max(1, round(expected * 0.6))
+        return {"label": f"Month one: {v30} of {GOAL_30}" + (" · falling behind" if behind else " · on track"),
+                "state": "behind" if behind else "ok"}
+    if age < 60:
+        expected = GOAL_60 * age / 60
+        if v60 >= GOAL_60:
+            return {"label": f"{v60} of {GOAL_60} in 60 days · target hit", "state": "hit"}
+        behind = v60 < expected * 0.6
+        return {"label": f"Day {age}: {v60} of {GOAL_60}" + (" · falling behind" if behind else " · on track"),
+                "state": "behind" if behind else "ok"}
+    if v60 >= GOAL_60:
+        return {"label": f"{v60} visits in the first 60 days · target hit", "state": "hit"}
+    return {"label": f"{v60} visits in the first 60 days (target {GOAL_60})", "state": "missed"}
 
 
 def _step_done(supabase, gym_id, mid, step):
@@ -582,7 +614,8 @@ def _step_done(supabase, gym_id, mid, step):
 
 def render_onboarding(supabase, gym_id):
     st.caption("New members quit the most. This gives each new member 6 friendly messages in their first 3 months, "
-               "and warns you if someone hasn't come in during their first week.")
+               "and warns you if someone hasn't come in during their first week. Members who come 5 times in their "
+               "first month, and 20 times in their first 60 days, usually stay: GymPulse tracks both for you.")
     done_rows = _rows(supabase, "onboarding_steps", gym_id)
     if _need_sql(done_rows):
         return
@@ -593,15 +626,28 @@ def render_onboarding(supabase, gym_id):
         st.info("No members joined in the last 90 days.")
         return
     trainers = gw.load_trainers(supabase, gym_id)
+    behind = [p for p in plan if p["target"]["state"] == "behind"]
     gw.kpi_row([
         ("New members", str(len(plan)), "cyan", "Joined in the last 90 days"),
+        ("Falling behind", str(len(behind)), "red", f"on {GOAL_30} in 30 days or {GOAL_60} in 60"),
+        ("Hit the target", str(sum(p["target"]["state"] == "hit" for p in plan)), "lime", "likely to stay"),
         ("No first-week visit", str(sum(p["no_show"] for p in plan)), "red", "Call them today"),
+    ])
+    gw.kpi_row([
         ("Steps due", str(sum(p["next"] is not None for p in plan)), "amber", "Ready to send"),
         ("Made it to 90 days", str(sum(p["age"] >= 90 for p in plan)), "lime", "Still with you"),
     ])
+    if behind:
+        st.markdown('<div class="section-label">FALLING BEHIND · FOR YOUR TEAM</div>', unsafe_allow_html=True)
+        st.caption("A friendly word at the front desk, or a call from their trainer, works better than a message "
+                   "about numbers. Members never see these counts.")
+        for p in sorted(behind, key=lambda x: x["age"]):
+            gw._md(f'<div style="margin:3px 0"><b>{gw._esc(p["m"]["full_name"])}</b> · '
+                   f'<span style="opacity:.75">{gw._esc(p["target"]["label"])}</span></div>')
     for p in plan:
         m = p["m"]
         chips = gw.chip(f"day {p['age']}", "grey") + gw.chip(f"{p['visits']} visit{'s' if p['visits'] != 1 else ''}", "cyan")
+        chips += gw.chip(p["target"]["label"], {"hit": "lime", "behind": "red", "ok": "cyan"}.get(p["target"]["state"], "grey"))
         if p["no_show"]:
             chips += gw.chip("no first-week visit", "red", dot=True)
         elif p["quiet"]:
@@ -1535,6 +1581,11 @@ def monthly_data(supabase, gym_id, assess_fn, start, end):
         fees = df.set_index("id")["monthly_fee"]
         d["credited"] = float(fees.reindex(kept["member_id"]).fillna(0).sum())
         d["credited_is_fee"] = True
+    try:
+        import gympulse_retention as gret
+        d["retention"] = gret.rate(gret.members_all(supabase, gym_id), start, end)
+    except Exception:
+        d["retention"] = {"base": 0, "kept": 0, "lost": 0, "rate": None}
     d["joined"] = int(sum(1 for j in df["joined"] if _has_date(j) and start <= j <= end)) if len(df) else 0
     d["lapsed"] = int(sum(1 for x in df["end"] if _has_date(x) and start <= x <= end)) if len(df) else 0
     ck = _checkins(supabase, gym_id, max((_today() - start).days + 2, 35))
@@ -1581,6 +1632,10 @@ def monthly_pdf(d):
                         ("Active members", str(d["active"]), "trained at least once"),
                         ("Ended", str(d["lapsed"]), "memberships that ended"),
                         ("Lost after a play", str(d["lost_n"]), "")]),
+              ("kpis", [("Retention rate", f"{d['retention']['rate']:.0f}%" if d.get("retention", {}).get("rate") is not None else "–",
+                         f"{d['retention']['kept']} of {d['retention']['base']} members kept" if d.get("retention", {}).get("rate") is not None else "not enough members yet"),
+                        ("Members lost", str(d.get("retention", {}).get("lost", 0)), "ended, not renewed"),
+                        ("Industry average", "about 97%", "a month (66% a year)")]),
               ("h", "Summary"),
               ("p", "<br/>".join(gw._esc(x) for x in monthly_letter(d).split("\n")[2:])),
               ("note", "Money kept counts renewal payments credited to retention plays. Where none were recorded, "
@@ -1601,7 +1656,9 @@ def render_monthly(supabase, gym_id, assess_fn, owner_id):
                 ("New members", str(d["joined"]), "grey", "")])
     gw.kpi_row([("Visits", str(d["visits"]), "cyan", "one per member per day"),
                 ("Active members", str(d["active"]), "lime", "trained at least once"),
-                ("Memberships ended", str(d["lapsed"]), "amber", ""),
+                ("Retention rate", f"{d['retention']['rate']:.0f}%" if d["retention"]["rate"] is not None else "–", "amber",
+                 f"{d['retention']['kept']} of {d['retention']['base']} kept · industry ~97% a month"
+                 if d["retention"]["rate"] is not None else "not enough members yet"),
                 ("Top of the team", d["top_staff"] or "–", "grey", d["top_reason"] and f"Main reason left: {d['top_reason']}" or "")])
     import gympulse_reports as rp
     try:
@@ -1671,6 +1728,9 @@ def render_grow(supabase, gym_id, assess_fn, owner_id):
         gl.render_loyalty(supabase, gym_id, owner_id)
     elif section == "New members":
         render_onboarding(supabase, gym_id)
+    elif section == "Class invites":
+        import gympulse_classinvite as gci
+        gci.render_class_invites(supabase, gym_id)
     elif section == "Freeze":
         render_freeze(supabase, gym_id)
     elif section == "Why they left":
