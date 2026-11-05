@@ -320,6 +320,30 @@ html body .st-key-auth_card { border-radius: 22px !important; border: 1px solid 
     background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01)), var(--gp-s1) !important;
     box-shadow: 0 30px 60px -30px rgba(0,0,0,0.7); }
 
+.lx-nav-links a { color: var(--gp-lime) !important; text-decoration: none !important; }
+.lx-plans { display: grid; grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)); gap: 14px; align-items: stretch; margin-top: 18px; }
+.lx-plan { position: relative; border-radius: 20px; padding: 26px 22px; border: 1px solid var(--gp-line);
+    background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01)), var(--gp-s1);
+    display: flex; flex-direction: column; min-width: 0; }
+.lx-plan.pop { border-color: rgba(183,243,74,0.55); box-shadow: 0 0 60px -28px rgba(183,243,74,0.6); }
+.lx-plan-badge { position: absolute; top: -12px; left: 22px; background: var(--gp-grad); color: #0A0F1E;
+    font-size: 11.5px; font-weight: 800; padding: 4px 12px; border-radius: 999px; letter-spacing: .3px; }
+.lx-plan h4 { margin: 0; font-size: 22px; color: var(--gp-text); font-weight: 800; }
+.lx-plan-tag { color: var(--gp-muted); font-size: 13.5px; line-height: 1.5; margin: 6px 0 18px; min-height: 40px; }
+.lx-plan-price { font-family: var(--gp-display); font-size: 38px; font-weight: 800; letter-spacing: -1.2px; color: var(--gp-text); line-height: 1; }
+.lx-plan-price small { font-size: 14px; font-weight: 500; color: var(--gp-muted); letter-spacing: 0; }
+.lx-plan-sub { color: var(--gp-dim); font-size: 12.5px; margin: 8px 0 16px; min-height: 18px; }
+.lx-plan-who { color: var(--gp-text); font-weight: 700; font-size: 14.5px; margin-bottom: 16px; }
+.lx-plan .lx-btn { width: 100%; margin-bottom: 18px; }
+.lx-plan-head { color: var(--gp-muted); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
+    border-top: 1px solid var(--gp-line); padding-top: 16px; margin-bottom: 8px; }
+.lx-plan ul { list-style: none; padding: 0; margin: 0; }
+.lx-plan li { display: flex; gap: 9px; align-items: flex-start; color: #C9D3E3; font-size: 13.5px; line-height: 1.5; padding: 5px 0; }
+.lx-plan li svg { flex: 0 0 auto; color: var(--gp-lime); margin-top: 2px; }
+.lx-plan-foot { text-align: center; color: var(--gp-dim); font-size: 12.5px; margin-top: 16px; }
+html body .st-key-lx_period { align-items: center; }
+html body .st-key-lx_period [data-testid="stButtonGroup"] { justify-content: center; display: flex; }
+@media (max-width: 900px) { .lx-plans { grid-template-columns: minmax(0, 1fr); } .lx-plan-tag { min-height: 0; } }
 @media (max-width: 900px) {
     .lx-hero, .lx-archie { grid-template-columns: minmax(0, 1fr); gap: 26px; }
     .lx-h1 { font-size: 40px; letter-spacing: -1.4px; }
@@ -359,7 +383,7 @@ def landing_top(lockup_uri, icon):
     return f"""
     <div class="lx-nav">
       <img src="{lockup_uri}" alt="GymPulse AI">
-      <div class="lx-nav-links"><span>How it works</span><span>Features</span><span>Archie AI</span></div>
+      <div class="lx-nav-links"><span>How it works</span><span>Features</span><span>Archie AI</span><a href="#pricing">Pricing</a></div>
     </div>
     <div class="lx-hero">
       <div>
@@ -369,7 +393,8 @@ def landing_top(lockup_uri, icon):
           spots members who are fading before they cancel, tells you the right play to run,
           and shows you the revenue those actions actually kept.</div>
         <div class="lx-trust">
-          <span>{icon('check', 15)} Free to start</span>
+          <span>{icon('check', 15)} 30-day free trial</span>
+          <span>{icon('check', 15)} No card needed</span>
           <span>{icon('check', 15)} Front-desk check-in or CSV</span>
           <span>{icon('check', 15)} You approve every message</span>
         </div>
@@ -410,7 +435,7 @@ def landing_top(lockup_uri, icon):
       </div>
       <div class="lx-demo-note">Plays muted. Tap the video for sound.</div>
       <div class="lx-demo-cta">
-        <a class="lx-btn lx-btn-primary" href="#get-started">Start free</a>
+        <a class="lx-btn lx-btn-primary" href="#get-started">Start your free trial</a>
         <a class="lx-btn" href="?demo=book" target="_self">Book a 15-minute demo</a>
       </div>
     </div>
@@ -506,9 +531,9 @@ def landing_sections(icon, bot_svg):
 
     <div class="lx-cta">
       <h3>Keep more members.<br><span class="lx-grad">Keep more revenue.</span></h3>
-      <p>Create your free workspace above. It takes about a minute.</p>
+      <p>Try every feature free for 30 days. Setting up takes about a minute.</p>
       <div class="lx-demo-cta">
-        <a class="lx-btn lx-btn-primary" href="#get-started">Start free</a>
+        <a class="lx-btn lx-btn-primary" href="#get-started">Start your free trial</a>
         <a class="lx-btn" href="?demo=book" target="_self">Book a 15-minute demo</a>
       </div>
     </div>

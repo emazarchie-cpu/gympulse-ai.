@@ -28,8 +28,16 @@ def main():
     if sc is None:
         print("Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.")
         return 1
+    import gympulse_billing as gbill
+    levels = gbill.gym_levels(sc)
     total = [0, 0, 0]
     for entry in gadm.all_gyms(sc, fresh=True):
+        if levels.get(entry["gym"]["id"], 3) < 2:      # Starter plan: renewal reminders only
+            settings = dict(entry["profile"].get("settings") or {})
+            auto_raw = dict(settings.get("auto_messages") or {})
+            auto_raw["missed"] = {**dict(auto_raw.get("missed") or {}), "on": False}
+            auto_raw["reward"] = {**dict(auto_raw.get("reward") or {}), "on": False}
+            entry = {**entry, "profile": {**entry["profile"], "settings": {**settings, "auto_messages": auto_raw}}}
         auto = gl.auto_cfg(entry["profile"])
         if not (auto["renewal"]["on"] or auto["missed"]["on"] or auto["reward"]["on"]):
             continue
@@ -47,10 +55,15 @@ def main():
         print(f"  {s} {'would send' if args.dry_run else 'sent'}, {k} skipped, {f} failed")
         total = [total[0] + s, total[1] + k, total[2] + f]
     print(f"Done: {total[0]} {'would send' if args.dry_run else 'sent'}, {total[1]} skipped, {total[2]} failed.")
-    import gympulse_billing as gb
-    print("Trial reminders")
-    n = gb.trial_reminders(sc, gadm.all_gyms(sc, fresh=True), dry_run=args.dry_run)
+    print("Trial and renewal reminders")
+    n = gbill.trial_reminders(sc, gadm.all_gyms(sc, fresh=True), dry_run=args.dry_run)
     print(f"  {n} {'would send' if args.dry_run else 'sent'}")
+    if not args.dry_run:
+        print("Paystack payments")
+        try:
+            print(f"  {gbill.reconcile_paystack(sc)} switched on")
+        except Exception as error:
+            print(f"  failed: {error}")
     return 0
 
 

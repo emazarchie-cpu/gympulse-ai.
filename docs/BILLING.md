@@ -1,24 +1,33 @@
 # Free trial and subscriptions
 
 ## How it works for gyms
-- Every gym gets a **30-day free trial** from the day it signs up. Gyms that already existed when billing was switched on get 30 days from that day.
-- Nothing about the trial shows inside the app. GymPulse AI emails the owner **7, 3 and 1 days** before the trial ends, and the day after.
-- When the 30th day ends there are **no extra days**. The next time the owner opens the app, an **Upgrade** pop-up lists your plans and prices. The app then shows only the **Subscription** page until they pay. **No data is ever deleted.** Settings and FAQs stay open.
-- The Subscription page shows the plans, how to pay (payment link and/or bank details), and an **I've paid** form (with the plan they chose) that emails you.
+- Every gym gets a **30-day free trial** of every feature from the day it signs up. Gyms that already existed when billing was switched on get 30 days from that day.
+- The website shows the trial and your plans in a **Pricing** section, with a **Monthly / Yearly** switch.
+- Nothing about the trial shows inside the app. GymPulse AI emails the owner **7, 3 and 1 days** before the trial ends, and the day after. Paying gyms get emails **3 and 1 days** before their plan ends, and the day after.
+- When the 30th day ends there are **no extra days**. An **Upgrade** pop-up lists the plans, and the app shows only the **Subscription** page until they pay. **No data is ever deleted.** Settings and FAQs stay open.
+- On the Subscription page they pick a plan, monthly or yearly, and pay with **Paystack** (card, bank transfer or USSD). Their plan switches on by itself as soon as Paystack confirms the payment. If they pay during the trial, the paid plan starts when the trial ends.
+- **Higher plans unlock more.** Pages a gym's plan doesn't include show an "upgrade to unlock" card:
+  - **1 · Essentials:** members, check-in, payments and renewals, Risk Radar, follow-ups, renewal reminder emails, monthly report.
+  - **2 · + Growth tools:** Action Centre, Grow (campaigns, loyalty, referrals, challenges), "we missed you" and reward emails, Business Insights.
+  - **3 · Everything:** Archie, Model insights, priority support and setup help.
 
-## How it works for you (Admin → Billing)
-- **Plans, prices and how gyms pay:** a table where each row is a plan: its name (e.g. Starter, Growth, Pro), monthly price, optional yearly price, and who it's for (e.g. "Up to 100 members"). Add, rename or remove rows any time. Also set a payment link (Paystack later), bank details, and your WhatsApp and email. Gyms see changes straight away. No code change is needed.
-- **For each gym:**
-  - **Mark as paid**: pick the plan and 1, 3, 6 or 12 months. The price fills in from the plan, and you can change it for founding gyms.
-  - **Extend trial 14 days.**
-  - **Give free access**, for test accounts, friends or partners. They're never asked to pay.
-  - **End subscription.**
-- Totals show gyms on trial, paying, ended-not-paid, and monthly income.
-- Every action is recorded in the Admin log. Admin accounts are never locked.
+## Set up Paystack (one time)
+1. Sign up at paystack.com. You can start as an individual or starter business; registering your business name lifts the limits later.
+2. Add the bank account you want to be paid into (Settings → Payouts). Paystack pays your money out to it.
+3. Copy your **secret key** (Settings → API Keys & Webhooks). Use the `sk_test_...` key first to try it, then the `sk_live_...` key once Paystack activates your account.
+4. Add it as **PAYSTACK_SECRET_KEY** in:
+   - Render → your service → **Environment**;
+   - GitHub → Settings → Secrets and variables → **Actions** (so the daily job catches any payment where the gym closed the page early).
+5. Never paste the key in chat or in code.
 
-## Set up
-1. Run `sql/phase10_billing.sql` in Supabase. It gives every existing gym a 30-day trial starting today, and new gyms get one automatically.
-2. Admin → Billing → **Give free access** to your test gyms.
-3. Admin → Billing → **Prices and how gyms pay:** enter the price when you've decided.
+Admin → Billing → **Online payments (Paystack)** shows whether it's connected, and has a **Check Paystack for missed payments** button.
 
-If the SQL hasn't been run, nothing is locked.
+## How it works for you
+- **Plans, prices and how gyms pay:** a table where each row is a plan, cheapest first. It has the plan name, **Features** level (1, 2 or 3), monthly price, yearly price (leave it blank for 2 months free), who it's for, a one-line description, and **Most popular**. The benefits list on each plan is written for you from its Features level. The starting plans are Starter ₦15,000, Growth ₦30,000 and Pro ₦50,000 a month; change them any time. Bank details and a payment link are optional fallbacks for gyms that prefer to transfer.
+- **Each gym:**
+  - **Mark as paid** for a bank transfer: pick the plan and 1, 3, 6 or 12 months.
+  - **Extend trial 14 days**.
+  - **Give free access** (for test accounts and friends).
+  - **End subscription**.
+  Every change goes in the Admin log.
+- Paystack payments email you a "New payment" note. A payment that doesn't match the price is not switched on: you get an email to check it.
