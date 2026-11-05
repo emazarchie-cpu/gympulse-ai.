@@ -3833,10 +3833,11 @@ def _insights_charts(roster):
             st.bar_chart(by_plan)
 
 
-def render_business_insights(supabase, gym_id, assess_fn):
-    page_header("Business Insights",
-                "What retention is worth, where it leaks, and what's working.",
-                "Numbers that matter")
+def render_business_insights(supabase, gym_id, assess_fn, header=True):
+    if header:
+        page_header("Business Insights",
+                    "What retention is worth, where it leaks, and what's working.",
+                    "Numbers that matter")
     _flash = st.session_state.pop("ins_flash", None)
     if _flash:
         st.success(_flash)

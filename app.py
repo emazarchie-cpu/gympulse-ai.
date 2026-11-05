@@ -7,6 +7,7 @@ import gympulse_billing as gbill
 import gympulse_design as gd
 import gympulse_command as gc
 import gympulse_grow as gg
+import gympulse_team as gteam
 import os
 import textwrap
 
@@ -1622,10 +1623,31 @@ try:
     if _session_lost:
         raise PermissionError("session expired")
 
+    # A staff login works in their owner's gym (sql/phase13_staff.sql)
+    _staff_ctx = None
+    if not gym_rows:
+        _staff_ctx = gteam.staff_context(supabase)
+
     # Create a workspace if this owner does not have one
     if gym_rows:
         gym = gym_rows[0]
         st.session_state["_had_gym"] = True
+        st.session_state["role"] = "owner"
+
+    elif _staff_ctx:
+        if (_staff_ctx.get("staff") or {}).get("status") != "active":
+            gd.apply()
+            st.warning("Your access to this gym on GymPulse AI is switched off. Please speak to the gym owner.")
+            if st.button("Sign out"):
+                for _k in list(st.session_state.keys()):
+                    del st.session_state[_k]
+                st.rerun()
+            st.stop()
+        gym = _staff_ctx["gym"]
+        st.session_state["_had_gym"] = True
+        if st.session_state.get("role") != "staff":
+            gteam.enter_staff_mode(_staff_ctx, st.session_state.get("user_profile"))
+        gteam.touch_last_seen()
 
     else:
         new_gym = (
@@ -1647,6 +1669,9 @@ try:
     # Save the workspace information for the current session
     st.session_state.gym_id = gym["id"]
     business_name = gym["business_name"]
+    if gteam.is_staff():
+        user_name = gteam.staff_name()
+        profile = st.session_state.user_profile or {}
 
 except Exception as error:
     st.session_state.gym_id = None
@@ -1848,6 +1873,11 @@ MORE_PAGES = [
     "Subscription",
     "FAQs",
 ]
+if gteam.is_staff():
+    MAIN_PAGES = [p for p in MAIN_PAGES if p not in gteam.OWNER_ONLY]
+    MORE_PAGES = [p for p in MORE_PAGES if p not in gteam.OWNER_ONLY]
+else:
+    MAIN_PAGES = ["Owner" if p == "Business Insights" else p for p in MAIN_PAGES]
 import gympulse_admin as gadm
 if gadm.is_admin():
     MORE_PAGES.append("Admin")
@@ -1856,6 +1886,7 @@ NAV_SHORT = {
     "Payments & Renewals": "Renewals",
     "Business Insights": "Insights",
     "Member Management": "Members",
+    "Owner": "Owner",
 }
 
 if "current_page" not in st.session_state:
@@ -2439,7 +2470,7 @@ with st.container(key="top_nav"):
 
             with st.container(key="top_profile"):
                 with st.popover("Profile"):
-                    _who = profile.get("full_name") or user_name
+                    _who = user_name if gteam.is_staff() else (profile.get("full_name") or user_name)
                     _gym = profile.get("business_name") or business_name
                     gw._md(
                         f'<div class="pm-id">{gw.avatar_html(_who, _av, 44)}'
@@ -2490,6 +2521,8 @@ with st.container(key="top_nav"):
                                   args=(name,), use_container_width=True)
 
     page = st.session_state["current_page"]
+    if gteam.is_staff() and page in gteam.OWNER_ONLY:
+        page = st.session_state["current_page"] = "Dashboard"
 
     if page in MAIN_PAGES + MORE_PAGES and st.query_params.get("p") != page:
         st.query_params["p"] = page
@@ -2550,14 +2583,23 @@ if st.session_state.get("gym_id") and st.session_state.get("_freeze_day") != str
     except Exception:
         pass
 
-gl.render_acceptance_banner(supabase, owner_id)
+if not gteam.is_staff():
+    gl.render_acceptance_banner(supabase, owner_id)
 
 # Free trial and subscription: the Upgrade pop-up and the Subscription page
 # instead of the app once a trial or plan has ended; pages above the gym's plan
 # show an upgrade card.
 _bill_upsell = False
 try:
-    gbill.render_banner(supabase, st.session_state.get("gym_id"))
+    if gteam.is_staff():
+        if gbill.must_lock(supabase, st.session_state.get("gym_id")) and page not in ("Settings", "FAQs"):
+            gw.page_header("Plan ended", "", "GymPulse AI")
+            st.warning("Your gym's GymPulse AI plan has ended. Please ask the gym owner to renew it. "
+                       "Everything you've added is safe.")
+            gw.apply_theme(st.session_state.get("theme", "dark"))
+            st.stop()
+    else:
+        gbill.render_banner(supabase, st.session_state.get("gym_id"))
     if page not in gbill.ALWAYS_OPEN and gbill.must_lock(supabase, st.session_state.get("gym_id")):
         page = "Subscription"
     elif not gbill.page_allowed(supabase, st.session_state.get("gym_id"), page):
@@ -2592,6 +2634,8 @@ elif page == "Risk Radar":
     gw.render_risk_radar(supabase, st.session_state.gym_id, assess_members)
 elif page == "Action Centre":
     gw.render_action_centre(supabase, st.session_state.gym_id, assess_members)
+elif page == "Owner":
+    gteam.render_owner_hub(supabase, st.session_state.gym_id, assess_members, owner_id)
 elif page == "Business Insights":
     gw.render_business_insights(supabase, st.session_state.gym_id, assess_members)
 elif page == "Payments & Renewals":
@@ -2621,12 +2665,15 @@ elif page == "Archie":
 elif page == "Check-in":
     gw.render_checkin(supabase, st.session_state.gym_id)
 elif page == "Settings":
-    gw.render_settings(
-        supabase,
-        owner_id,
-        st.session_state.gym_id,
-        log_out
-    )
+    if gteam.is_staff():
+        gteam.render_staff_settings(supabase, owner_id, log_out)
+    else:
+        gw.render_settings(
+            supabase,
+            owner_id,
+            st.session_state.gym_id,
+            log_out
+        )
 
 elif page == "Member Management":
     gw.page_header(
