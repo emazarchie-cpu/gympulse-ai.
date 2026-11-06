@@ -89,3 +89,22 @@ cost if every included message is used, as a share of the price.
 | Pro | 1,500 | 100,000 | 2,000 | 150 | ≈ ₦33,000 (33%) |
 | Business | 5,000 | 280,000 | 6,500 | 400 | ≈ ₦99,500 (36%) |
 | Enterprise | 20,000 | 750,000 | 24,000 | 1,000 | ≈ ₦330,000 (44%) |
+
+
+## Plan limits (phase 20)
+
+Run `sql/phase20_plan_limits.sql` once.
+
+- **Members (gentle).** When a paying gym has more active members than its plan covers, the owner sees a reminder on
+  the Dashboard and Members pages with 30 days to upgrade (the first day over is kept in
+  `gym_subscriptions.over_limit_since`). After 30 days, new members can't be added (registration form and import;
+  the sign-up link page warns the owner to switch it off). Everything else keeps working and nothing is deleted.
+  Upgrading clears it. Trials and pilot mode have no member limit.
+- **Archie.** Each plan includes Archie questions a month (Starter 100, Growth 300, Pro 1,000, Business 3,000,
+  Enterprise unlimited; trial 100). Counted in `archie_usage` by `gp_archie_bump()`; the Archie page shows the count,
+  and when the limit is reached Archie says so politely until the 1st.
+- **Help levels.** standard (Starter, Growth) · priority: WhatsApp support and setup done with them (Pro) ·
+  dedicated: + account manager, staff training and a monthly review call (Business, Enterprise). Shown in each plan's
+  benefits and the comparison table.
+- **Admin → Billing → Usage this month**: per gym plan, members against the limit, Archie and WhatsApp used, and who is
+  over the limit.
