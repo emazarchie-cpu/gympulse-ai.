@@ -44,6 +44,22 @@ CSS = """
 .mp-in { background: rgba(183,243,74,.14); margin-left: auto; } .mp-out { background: var(--gp-s2, #172033); }
 .mp-when { font-size: 11px; color: var(--gp-muted, #93A0B4); margin-top: 4px; }
 .st-key-mp_wrap { max-width: 620px; margin: 0 auto; width: 100%; }
+/* ---------- 2026 look: app-style tabs, soft glass cards ---------- */
+.st-key-mp_tabs [role="tablist"] { gap: 4px !important; background: rgba(255,255,255,.05); padding: 5px !important;
+  border-radius: 999px; border: 1px solid rgba(255,255,255,.07); overflow-x: auto; scrollbar-width: none; }
+.st-key-mp_tabs [role="tablist"]::after, .st-key-mp_tabs [role="tablist"] > :not([role="tab"]) { display: none !important; }
+.st-key-mp_tabs [role="tab"] { border-radius: 999px !important; padding: 8px 14px !important; white-space: nowrap;
+  border: none !important; }
+.st-key-mp_tabs [role="tab"] p { font-weight: 700 !important; }
+.st-key-mp_tabs [role="tab"][aria-selected="true"] { background: linear-gradient(135deg,#B7F34A,#35D3E8) !important; }
+.st-key-mp_tabs [role="tab"][aria-selected="true"] p { color: #0A0F1E !important; }
+.st-key-mp_tabs [role="tab"]::after, .st-key-mp_tabs [role="tab"]::before { display: none !important; }
+.st-key-mp_wrap [data-testid="stLayoutWrapper"] > div[class*="st-key"] { border-radius: 24px !important; }
+.st-key-mp_wrap [data-testid="stVerticalBlock"][class*="emotion"] { }
+.mp-card { border: none !important; border-radius: 28px !important;
+  background: radial-gradient(140% 120% at 0% 0%, rgba(183,243,74,.20), transparent 55%),
+              radial-gradient(120% 120% at 100% 100%, rgba(53,211,232,.16), transparent 55%), rgba(255,255,255,.04) !important; }
+.mp-hi { font-size: 30px !important; letter-spacing: -.6px; }
 [class*="st-key-mp_gymrow_"] { border: 1px solid var(--gp-line, #253047); border-radius: 18px; padding: 12px 14px;
   margin-bottom: 10px; background: var(--gp-s1, #101827); }
 [class*="st-key-mp_gymrow_"] [data-testid="stHorizontalBlock"] { flex-wrap: nowrap !important; gap: 12px !important; }
