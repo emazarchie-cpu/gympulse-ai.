@@ -313,7 +313,8 @@ def render_top(sc, m, gym_name, profile):
     today = gw.today_local()
     settle_challenges(sc, m["gym_id"], m["id"], gym_name)
     _nudges(sc, m, days, today)
-    _training_now(sc, m)
+    if gcom.show_training_now(profile):
+        _training_now(sc, m)
     _checkin_card(sc, m, gym_name, times, today)
     _milestone_cards(sc, m, gym_name, days, today)
     _challenges_strip(sc, m, gym_name, days)
@@ -350,7 +351,7 @@ def _training_now(sc, m):
     import gympulse_community as gcom
     now = training_now(sc, m["gym_id"])
     pp = gcom.people(sc, m["gym_id"])
-    ids = [i for i in now if i in pp]
+    ids = [i for i in now if i in pp and not pp[i].get("community_hide_now")]
     if not ids:
         return
     fol = gcom.following_of(sc, m["gym_id"], m["id"])

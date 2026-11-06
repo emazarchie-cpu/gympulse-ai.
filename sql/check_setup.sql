@@ -42,6 +42,7 @@ select step, ok from (values
   ('phase26_profiles   cover, highlights, pinned posts', exists (select 1 from col where c = 'members.community_cover')
                                                     and exists (select 1 from col where c = 'community_stories.highlight')
                                                     and exists (select 1 from col where c = 'community_posts.profile_pinned')),
+  ('phase27_privacy    hide me from Training now', exists (select 1 from col where c = 'members.community_hide_now')),
   ('security           RLS on every gym table',       not exists (
         select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace
         where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity

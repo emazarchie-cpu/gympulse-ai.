@@ -109,6 +109,34 @@ def taken_slots(supabase, day):
     return taken
 
 
+def bookable(supabase, cfg):
+    """{day: [free slots]} for the open days that still have a free time, in one database call
+    (None if booking isn't set up). The form only offers these days, so it never opens on a full day."""
+    days = open_days(cfg)
+    start = datetime.combine(days[0], time(0, 0), tzinfo=TZ)
+    end = datetime.combine(days[-1], time(0, 0), tzinfo=TZ) + timedelta(days=1)
+    try:
+        rows = supabase.rpc("demo_taken_slots", {
+            "p_from": start.astimezone(timezone.utc).isoformat(),
+            "p_to": end.astimezone(timezone.utc).isoformat()}).execute().data or []
+    except Exception:
+        return None
+    taken = set()
+    for r in rows:
+        v = r if isinstance(r, str) else (list(r.values())[0] if isinstance(r, dict) else r)
+        try:
+            taken.add(datetime.fromisoformat(str(v).replace("Z", "+00:00")).astimezone(TZ).replace(second=0, microsecond=0))
+        except Exception:
+            pass
+    soon = datetime.now(TZ) + timedelta(hours=2)
+    out = {}
+    for d in days:
+        free = [x for x in day_slots(cfg, d) if x > soon and x not in taken]
+        if free:
+            out[d] = free
+    return out
+
+
 def free_slots(supabase, cfg, day):
     taken = taken_slots(supabase, day)
     if taken is None:
@@ -279,7 +307,7 @@ def render_booking(supabase):
                'and the plays that keep them. Live on Google Meet with the founder.</div>'
                '<div class="bk-points"><span>No preparation needed</span><span>Google Meet</span>'
                '<span>Free, no obligation</span></div>')
-        days = open_days(cfg)
+        avail = bookable(supabase, cfg)
         with st.container(border=True, key="card_demo_form"):
             c1, c2 = st.columns(2)
             name = c1.text_input("Your full name", key="dm_name")
@@ -291,14 +319,24 @@ def render_booking(supabase):
                                   placeholder="e.g. 0803 000 0000")
             members = st.selectbox("How many members do you have?", MEMBER_RANGES, index=None,
                                    placeholder="Choose a range", key="dm_members")
-            day = st.selectbox("Date", days, format_func=lambda d: f"{d:%A %d %B}", key="dm_day")
-            slots = free_slots(supabase, cfg, day)
-            if slots is None:
+            if avail is None:
                 st.warning("Online booking is being set up. Email emmanuel@usegympulseai.com and we'll "
                            "book your demo straight away.")
                 return
+            if not avail:
+                st.info("Every demo time for the next few weeks is booked. Email emmanuel@usegympulseai.com "
+                        "and we'll find a time that suits you.")
+                return
+            days = list(avail)
+            if st.session_state.get("dm_day") not in days:
+                st.session_state.pop("dm_day", None)          # first open, or that day just filled up
+            today = datetime.now(TZ).date()
+            day = st.selectbox("Date", days, key="dm_day",
+                               format_func=lambda d: ("Today, " if d == today else
+                                                      "Tomorrow, " if d == today + timedelta(days=1) else "")
+                               + f"{d:%A %d %B}")
+            slots = avail[day]
             if not slots:
-                st.info("No free times on that day. Please pick another date.")
                 pick = None
             else:
                 pick = st.radio("Time (Lagos time, WAT)", slots, horizontal=True, key=f"dm_time_{day}",

@@ -288,11 +288,14 @@ def people(sc, gym_id):
     """{member_id: member} for everyone in the community (accepted the rules, not archived)."""
     def fetch():
         cols = "id, full_name, photo, community_agreed_at, community_bio, community_dm, community_blocked, archived"
-        try:
-            rows = gw.fetch_all(sc.table("members").select(cols + ", community_email_notify").eq("gym_id", gym_id)
-                                .order("full_name"))
-        except Exception:
-            rows = None
+        rows = None
+        for extra in (", community_email_notify, community_hide_now", ", community_email_notify"):
+            try:
+                rows = gw.fetch_all(sc.table("members").select(cols + extra).eq("gym_id", gym_id)
+                                    .order("full_name"))
+                break
+            except Exception:
+                rows = None
         if rows is None:
             try:
                 rows = gw.fetch_all(sc.table("members").select(cols).eq("gym_id", gym_id).order("full_name"))
@@ -527,6 +530,11 @@ def _open_chat(pid):
     _go("chat", cm_chat=pid)
 
 
+def show_training_now(profile):
+    """The gym's choice: show members who's training now (default yes)."""
+    return dict(((profile or {}).get("settings") or {}).get("community") or {}).get("training_now", True) is not False
+
+
 def active_only(profile):
     """The gym's choice: only members with a running plan can use the community (default yes)."""
     return dict(((profile or {}).get("settings") or {}).get("community") or {}).get("active_only", True) is not False
@@ -542,6 +550,7 @@ def member_active(m, today=None):
 
 
 def render_member(sc, m, gym_name, profile=None):
+    st.session_state["_cm_gym_profile"] = profile
     st.markdown(CSS, unsafe_allow_html=True)
     if not ready(sc):
         st.info(f"The {gym_name} community is coming soon.")
@@ -636,7 +645,7 @@ def _feed_body(sc, m, gym_name, social):
         _stories_bar(sc, m, gym_name)
     import gympulse_engage as ge
     st.markdown(ge.CSS, unsafe_allow_html=True)
-    ge.render_top(sc, m, gym_name, None)
+    ge.render_top(sc, m, gym_name, st.session_state.get("_cm_gym_profile"))
     if m.get("community_blocked"):
         st.warning(f"{gym_name} has paused posting from your account. You can still read the community.")
     else:
@@ -1074,6 +1083,9 @@ def edit_profile_dialog(sc, m):
                       index=list(opts).index(pp.get("community_dm") or "everyone"))
         mail = st.toggle("Email me when someone messages or follows me",
                          value=pp.get("community_email_notify", m.get("community_email_notify", True)) is not False)
+        hide = st.toggle("Hide me from \"Training now\"", value=bool(pp.get("community_hide_now")),
+                         help="When you check in, other members won't see your photo or name in the "
+                              "Training now strip.")
         cover = st.file_uploader("Cover photo", type=["jpg", "jpeg", "png", "webp", "heic"],
                                  help="A wide photo across the top of your profile.")
         st.caption("Your name and photo come from your gym details (My details tab).")
@@ -1085,12 +1097,16 @@ def edit_profile_dialog(sc, m):
                 except Exception:
                     st.error("That cover photo couldn't be used. Try a JPG or PNG.")
                     st.stop()
-            upd = {"community_bio": bio.strip() or None, "community_dm": dm, "community_email_notify": bool(mail)}
-            try:
-                sc.table("members").update(upd).eq("id", m["id"]).execute()
-            except Exception:                        # phase 23 not run yet
-                upd.pop("community_email_notify")
-                sc.table("members").update(upd).eq("id", m["id"]).execute()
+            upd = {"community_bio": bio.strip() or None, "community_dm": dm, "community_email_notify": bool(mail),
+                   "community_hide_now": bool(hide)}
+            for drop in ((), ("community_hide_now",), ("community_hide_now", "community_email_notify")):
+                row = {k: v for k, v in upd.items() if k not in drop}   # older databases lack newer columns
+                try:
+                    sc.table("members").update(row).eq("id", m["id"]).execute()
+                    break
+                except Exception:
+                    if drop and "community_email_notify" in drop:
+                        raise
             _bust(m["gym_id"])
             st.session_state["cm_flash"] = "Profile saved."
             st.rerun()
@@ -1462,6 +1478,17 @@ def render_owner(supabase, gym_id):
                 cur = dict((prof.get("settings") or {}).get("community") or {})
                 gg._save_settings(supabase, prof.get("id") or st.session_state.get("auth_user", {}).get("id"),
                                   {"community": {**cur, "active_only": bool(new_ao)}}, "Community setting saved.")
+                st.rerun()
+            tn = show_training_now(prof)
+            new_tn = st.toggle("Show members who's training now", value=tn, key="cmo_tnow",
+                               help="A strip of faces of members who checked in during the last 2 hours. Turn it off "
+                                    "if your members prefer privacy. Members can also hide themselves from it in "
+                                    "Edit profile.")
+            if new_tn != tn:
+                import gympulse_grow as gg
+                cur = dict((prof.get("settings") or {}).get("community") or {})
+                gg._save_settings(supabase, prof.get("id") or st.session_state.get("auth_user", {}).get("id"),
+                                  {"community": {**cur, "training_now": bool(new_tn)}}, "Community setting saved.")
                 st.rerun()
 
 

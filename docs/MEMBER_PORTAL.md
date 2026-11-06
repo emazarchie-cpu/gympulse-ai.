@@ -149,3 +149,12 @@ member, story highlights and pinned posts.
 **Create screen** (posts, stories and reels): **Camera**, **Text** (type on a colour background; swipe for
 colours) and **Drafts** at the top, then the **Library** with All / Photos / Videos and **Select multiple**.
 The phone's own picker opens; GymPulse only gets what the member chooses.
+
+## Training now privacy (phase 27)
+
+Run `sql/phase27_training_now_privacy.sql` once (safe to run again).
+
+- **Members:** Edit profile → "Hide me from Training now". Their photo and name no longer appear in the strip
+  other members see after a check-in.
+- **Owner:** Community → Settings → "Show members who's training now". Turn it off to hide the strip for
+  everyone (good for gyms whose members prefer privacy). No SQL needed for this switch.
