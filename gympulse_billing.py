@@ -14,6 +14,7 @@ founder confirms those in Admin.
 Tables: sql/phase10_billing.sql. If the SQL hasn't been run, nothing is locked.
 """
 import json
+import re
 import uuid
 from datetime import date, datetime, timedelta, timezone
 from urllib.parse import quote
@@ -51,14 +52,24 @@ FEATURES = {
 PAGE_LEVEL = {"Action Centre": 2, "Grow": 2, "Business Insights": 2,
               "Archie": 3, "Model Insights": 3, "About the Model": 3}
 
-DEFAULT_PLANS = [
-    {"name": "Starter", "access": 1, "monthly": 15000, "yearly": 150000, "for_who": "Up to 100 members",
-     "tagline": "Track every member and catch quiet drop-offs early.", "popular": False},
-    {"name": "Growth", "access": 2, "monthly": 30000, "yearly": 300000, "for_who": "Up to 300 members",
+DEFAULT_PLANS = [   # members: 0 = no limit · wa_renew / wa_promo: WhatsApp messages included per month
+    {"name": "Starter", "access": 1, "monthly": 20000, "yearly": 200000, "for_who": "Up to 150 members",
+     "members": 150, "wa_renew": 250, "wa_promo": 0,
+     "tagline": "Track every member and remind them to renew on WhatsApp.", "popular": False},
+    {"name": "Growth", "access": 2, "monthly": 45000, "yearly": 450000, "for_who": "Up to 500 members",
+     "members": 500, "wa_renew": 700, "wa_promo": 0,
      "tagline": "Win members back and keep them with rewards.", "popular": True},
-    {"name": "Pro", "access": 3, "monthly": 50000, "yearly": 500000, "for_who": "300+ members",
+    {"name": "Pro", "access": 3, "monthly": 100000, "yearly": 1000000, "for_who": "Up to 1,500 members",
+     "members": 1500, "wa_renew": 2000, "wa_promo": 150,
      "tagline": "Every tool, plus Archie, your AI retention assistant.", "popular": False},
+    {"name": "Business", "access": 3, "monthly": 280000, "yearly": 2800000, "for_who": "Up to 5,000 members",
+     "members": 5000, "wa_renew": 6500, "wa_promo": 400,
+     "tagline": "For big gyms and multi-branch brands.", "popular": False},
+    {"name": "Enterprise", "access": 3, "monthly": 750000, "yearly": 7500000, "for_who": "Up to 20,000 members",
+     "members": 20000, "wa_renew": 24000, "wa_promo": 1000,
+     "tagline": "For gym chains, with WhatsApp at scale.", "popular": False},
 ]
+TRIAL_ALLOWANCE = {"wa_renew": 300, "wa_promo": 30}    # free trial and pilot mode
 DEFAULT_PRICING = {"plans": [], "monthly": None, "yearly": None, "currency": "NGN", "pay_link": "",
                    "bank_name": "", "bank_account": "", "bank_holder": "",
                    "contact_whatsapp": "", "contact_email": "emmanuel@usegympulseai.com",
@@ -87,10 +98,39 @@ def plans(p):
             access = max(1, min(3, int(x.get("access") or min(i + 1, 3))))
         except (TypeError, ValueError):
             access = min(i + 1, 3)
+        who = gw._text(x.get("for_who")).strip()
+        members = _int(x.get("members"))
+        if members is None:                       # older saved plans: read "Up to 300 members"
+            m = re.search(r"([\d,]+)", who) if "up to" in who.lower() else None
+            members = int(m.group(1).replace(",", "")) if m else 0
+        wa_renew = _int(x.get("wa_renew"))
+        if wa_renew is None:
+            wa_renew = round(members * 1.3, -1) if members else 300
         out.append({"name": gw._text(x.get("name")).strip(), "access": access, "monthly": mo,
-                    "yearly": yr or (mo * 10 if mo else None), "for_who": gw._text(x.get("for_who")).strip(),
+                    "yearly": yr or (mo * 10 if mo else None), "for_who": who,
+                    "members": members, "wa_renew": int(wa_renew), "wa_promo": int(_int(x.get("wa_promo")) or 0),
                     "tagline": gw._text(x.get("tagline")).strip(), "popular": bool(x.get("popular"))})
     return out
+
+
+def _int(x):
+    try:
+        v = float(str(x).replace(",", ""))
+        return int(v) if v == v and v >= 0 else None
+    except (TypeError, ValueError):
+        return None
+
+
+def plan_lines(plan):
+    """The plan's own size and WhatsApp benefits, in plain words."""
+    lines = [f"Up to {plan['members']:,} members" if plan.get("members") else "Unlimited members"]
+    if plan.get("wa_renew"):
+        lines.append(f"{plan['wa_renew']:,} WhatsApp renewal reminders and replies a month, included")
+    if plan.get("wa_promo"):
+        lines.append(f"{plan['wa_promo']:,} WhatsApp promotional messages a month, included")
+    lines.append("Unlimited emails and member app")
+    lines.append("No extra charges: if WhatsApp messages run out, they go by email")
+    return lines
 
 
 def features(ps, i):
@@ -98,8 +138,9 @@ def features(ps, i):
     level = ps[i]["access"]
     below = [x for x in ps[:i] if x["access"] < level]
     if below and level > 1:
-        return f"Everything in {below[-1]['name']}, plus:", sum((FEATURES[l] for l in range(below[-1]["access"] + 1, level + 1)), [])
-    return "What's included:", sum((FEATURES[l] for l in range(1, level + 1)), [])
+        return (f"Everything in {below[-1]['name']}, plus:",
+                plan_lines(ps[i]) + sum((FEATURES[l] for l in range(below[-1]["access"] + 1, level + 1)), []))
+    return "What's included:", plan_lines(ps[i]) + sum((FEATURES[l] for l in range(1, level + 1)), [])
 
 
 def yearly_saving(ps):
@@ -208,7 +249,18 @@ def _saving(plan):
 
 def compare_rows(ps):
     """[(benefit, [True/False per plan])], cheapest level first."""
-    return [(f, [x["access"] >= lv for x in ps]) for lv in (1, 2, 3) for f in FEATURES[lv]]
+    size = [("Members", [f"Up to {x['members']:,}" if x.get("members") else "Unlimited" for x in ps]),
+            ("WhatsApp renewal reminders and replies / month", [f"{x['wa_renew']:,}" if x.get("wa_renew") else "–" for x in ps]),
+            ("WhatsApp promotional messages / month", [f"{x['wa_promo']:,}" if x.get("wa_promo") else "By email" for x in ps]),
+            ("Emails and member app", ["Unlimited" for _ in ps]),
+            ("Extra charges", ["None" for _ in ps])]
+    return size + [(f, [x["access"] >= lv for x in ps]) for lv in (1, 2, 3) for f in FEATURES[lv]]
+
+
+def _cell(ok, yes_html):
+    if isinstance(ok, str):
+        return gw._esc(ok)
+    return yes_html if ok else ""
 
 
 def compare_table_html(ps, light=False):
@@ -219,8 +271,8 @@ def compare_table_html(ps, light=False):
                    f'{gw._esc(x["name"])}</th>' for x in ps)
     rows = "".join(
         f'<tr style="border-top:1px solid {line}"><td style="padding:9px 8px;text-align:left">{gw._esc(f)}</td>'
-        + "".join(f'<td style="padding:9px 8px;text-align:center;color:{yes};font-weight:800">{"✓" if ok else ""}</td>'
-                  for ok in marks) + "</tr>" for f, marks in compare_rows(ps))
+        + "".join(f'<td style="padding:9px 8px;text-align:center;color:{yes};font-weight:800;white-space:nowrap">'
+                  f'{_cell(ok, "✓")}</td>' for ok in marks) + "</tr>" for f, marks in compare_rows(ps))
     return (f'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13.5px">'
             f'<thead><tr><th style="padding:10px 8px;text-align:left;font-weight:600;opacity:.7">What you get</th>{head}'
             f'</tr></thead><tbody>{rows}</tbody></table></div>')
@@ -243,6 +295,8 @@ def _plan_cards(p, pay=None, key="pc"):
                 saved = _saving(plan)
                 st.caption(f"Or {_money(plan['yearly'])} for the whole year"
                            + (f" (you keep {_money(saved)})" if saved else ""))
+            gw._md("<div style='font-size:13px;line-height:1.7'>"
+                   + "".join(f"<div>✓ {gw._esc(x)}</div>" for x in plan_lines(plan)[:3]) + "</div>")
             if pay:
                 pay(plan, "monthly", i)
                 pay(plan, "yearly", i)
@@ -278,6 +332,34 @@ def access_level(sub, ps):
     name = gw._text((sub or {}).get("plan")).split(" · ")[0].strip().lower()
     hit = next((x for x in ps if x["name"].lower() == name), None)
     return hit["access"] if hit else 3
+
+
+def wa_allowance(supabase, gym_id):
+    """WhatsApp messages included this month for a gym: {"wa_renew", "wa_promo", "plan", "members"}.
+    Paying gyms get their plan's allowance; trial, free access and pilot mode get TRIAL_ALLOWANCE."""
+    p = pricing(supabase)
+    ps = plans(p)
+    sub = subscription(supabase, gym_id)
+    s = state(sub)
+    if s["status"] == "active":
+        name = gw._text((sub or {}).get("plan")).split(" · ")[0].strip().lower()
+        hit = next((x for x in ps if x["name"].lower() == name), None)
+        if hit:
+            return {"wa_renew": hit["wa_renew"], "wa_promo": hit["wa_promo"], "plan": hit["name"],
+                    "members": hit["members"]}
+    if s["status"] == "expired":
+        return {"wa_renew": 0, "wa_promo": 0, "plan": "", "members": 0}
+    t = {**TRIAL_ALLOWANCE, **dict(p.get("trial_allowance") or {})}
+    return {"wa_renew": int(t["wa_renew"]), "wa_promo": int(t["wa_promo"]),
+            "plan": "Free trial" if s["status"] == "trial" else "Pilot", "members": 0}
+
+
+def fits(ps, members):
+    """The smallest plan whose member limit covers this many members."""
+    for x in ps:
+        if not x.get("members") or x["members"] >= members:
+            return x
+    return ps[-1] if ps else None
 
 
 def page_allowed(supabase, gym_id, page):
@@ -325,6 +407,8 @@ def landing_cards_html(ps, icon):
             + f'<div class="lx-tier-name">{gw._esc(plan["name"])}</div>'
             + (f'<div class="lx-tier-who">{gw._esc(plan["for_who"])}</div>' if plan.get("for_who") else "")
             + (f'<div class="lx-tier-line">{gw._esc(plan["tagline"])}</div>' if plan.get("tagline") else "")
+            + '<div class="lx-tier-line" style="opacity:.9">' + "<br>".join(f"✓ {gw._esc(x)}" for x in plan_lines(plan)[1:3])
+            + '</div>'
             + '<div class="lx-tier-prices">'
             + (f'<div><b>{_money(plan["monthly"])}</b><span>per month</span></div>' if plan.get("monthly") else "")
             + (f'<div><b>{_money(plan["yearly"])}</b><span>per year'
@@ -332,7 +416,7 @@ def landing_cards_html(ps, icon):
             + "</div></div>")
     head = "".join(f"<th>{gw._esc(x['name'])}</th>" for x in ps)
     rows = "".join(f"<tr><td>{gw._esc(f)}</td>" + "".join(
-        f"<td>{icon('check', 16) if ok else '<i>–</i>'}</td>" for ok in marks) + "</tr>"
+        f"<td>{_cell(ok, icon('check', 16)) or '<i>–</i>'}</td>" for ok in marks) + "</tr>"
         for f, marks in compare_rows(ps))
     return (f'<div class="lx-tiers" style="--n:{min(len(ps), 3)}">' + "".join(tiles) + "</div>"
             + f'<div class="lx-compare"><table><thead><tr><th>What you get</th>{head}</tr></thead>'
@@ -730,12 +814,22 @@ def _render_plans(supabase, gym_id, s, p, ps):
         st.success("Your gym has free access to GymPulse AI. Nothing to pay.")
     else:
         st.markdown('<div class="section-label">CHOOSE A PLAN</div>', unsafe_allow_html=True)
+        try:
+            n_members = len(gw.fetch_members(supabase, gym_id, archived=False, include_photo=False)[0])
+        except Exception:
+            n_members = 0
+        best = fits(ps, n_members) if n_members else None
+        if best:
+            st.caption(f"You have **{n_members:,} members**, so **{best['name']}** fits your gym. Every plan includes "
+                       "WhatsApp messages: no extra charges, ever.")
         cols = st.columns(len(ps) if len(ps) <= 3 else 3)
         for i, plan in enumerate(ps):
             with cols[i % len(cols)].container(border=True):
-                if plan.get("popular"):
+                if best and plan["name"] == best["name"]:
+                    gw._md('<span class="gp-pill gp-pill-lime">Fits your gym</span>')
+                elif plan.get("popular") and not best:
                     gw._md('<span class="gp-pill gp-pill-lime">Recommended</span>')
-                elif any(x.get("popular") for x in ps):
+                else:
                     gw._md('<span class="gp-pill" style="visibility:hidden">Recommended</span>')
                 st.markdown(f"### {gw._esc(plan['name'])}")
                 if plan.get("for_who"):
@@ -749,8 +843,11 @@ def _render_plans(supabase, gym_id, s, p, ps):
                 if plan.get("tagline"):
                     st.markdown(f"<div style='font-size:13.5px;opacity:.8;min-height:40px'>{gw._esc(plan['tagline'])}</div>",
                                 unsafe_allow_html=True)
+                gw._md("<div style='font-size:13px;line-height:1.7;margin:4px 0 10px'>"
+                       + "".join(f"<div>✓ {gw._esc(x)}</div>" for x in plan_lines(plan)) + "</div>")
                 st.button(f"Choose {plan['name']}", key=f"co_choose_{i}", use_container_width=True,
-                          type="primary" if plan.get("popular") else "secondary",
+                          type="primary" if (best and plan["name"] == best["name"]) or (not best and plan.get("popular"))
+                          else "secondary",
                           on_click=_view, args=("checkout",), kwargs={"sub_plan": plan["name"], "sub_period": "monthly"})
         with st.expander("Compare what each plan includes"):
             gw._md(compare_table_html(ps, light=st.session_state.get("theme") == "light"))
@@ -996,6 +1093,22 @@ def render_admin_billing(sc, gyms, audit):
                                               if s["status"] == "active")), "amber", "from paying gyms")])
 
     with st.expander("Plans, prices and how gyms pay", expanded=not plans(p)):
+        saved = [x for x in (p.get("plans") or []) if gw._text(x.get("name"))]
+        if saved and any(x.get("wa_renew") in (None, "") for x in saved):
+            st.warning("Your saved plans don't set WhatsApp messages yet, so they're estimated from the member numbers. "
+                       "Edit the WhatsApp columns below, or start from the recommended plans.")
+        a, b = st.columns([2, 3], vertical_alignment="center")
+        if a.button("Use the recommended plans", key="adm_default_plans",
+                    help="Starter, Growth, Pro, Business and Enterprise by gym size, with WhatsApp included. "
+                         "You can still change every price after."):
+            value = {**p, "plans": DEFAULT_PLANS, "monthly": None, "yearly": None}
+            sc.table("platform_settings").upsert({"key": "pricing", "value": value,
+                                                  "updated_at": datetime.now(timezone.utc).isoformat()},
+                                                 on_conflict="key").execute()
+            st.session_state["adm_flash"] = "Recommended plans saved. Check the prices below and adjust if you like."
+            st.rerun()
+        b.caption("Starter ≤150 · Growth ≤500 · Pro ≤1,500 · Business ≤5,000 · Enterprise ≤20,000 members, "
+                  "each with WhatsApp messages included.")
         with st.form("adm_pricing"):
             st.markdown("**Your plans.** One row per plan, cheapest first. Gyms see these on the website, in the "
                         "Upgrade pop-up and on their Subscription page. **Features** sets what each plan unlocks; "
@@ -1003,18 +1116,33 @@ def render_admin_billing(sc, gyms, audit):
             level_names = {1: "1 · Essentials", 2: "2 · + Growth tools", 3: "3 · Everything"}
             start_rows = [{**x, "access": level_names[x["access"]]} for x in plans(p)]
             plan_rows = st.data_editor(
-                pd.DataFrame(start_rows, columns=["name", "access", "monthly", "yearly", "for_who", "tagline", "popular"]),
+                pd.DataFrame(start_rows, columns=["name", "access", "monthly", "yearly", "members", "wa_renew", "wa_promo",
+                                                  "for_who", "tagline", "popular"]),
                 num_rows="dynamic", use_container_width=True, key="adm_plans",
                 column_config={"name": st.column_config.TextColumn("Plan name", required=True),
                                "access": st.column_config.SelectboxColumn("Features", options=list(level_names.values()),
                                                                           required=True),
                                "monthly": st.column_config.NumberColumn("Monthly (₦)", min_value=0, step=1000),
                                "yearly": st.column_config.NumberColumn("Yearly (₦)", min_value=0, step=5000),
+                               "members": st.column_config.NumberColumn("Members (0 = no limit)", min_value=0, step=50),
+                               "wa_renew": st.column_config.NumberColumn("WhatsApp renewals/month", min_value=0, step=50,
+                                                                         help="Renewal reminders and replies (utility price)"),
+                               "wa_promo": st.column_config.NumberColumn("WhatsApp promo/month", min_value=0, step=10,
+                                                                         help="We missed you, celebrations… (marketing price)"),
                                "for_who": st.column_config.TextColumn("Who it's for"),
                                "tagline": st.column_config.TextColumn("One-line description"),
                                "popular": st.column_config.CheckboxColumn("Recommended")})
             st.caption("  \n".join(f"**{label}**{' adds' if lv > 1 else ''}: " + "; ".join(FEATURES[lv])
                                    for lv, label in level_names.items()))
+            import gympulse_whatsapp as gwa
+            fx = gwa.naira_per_usd()
+            u_cost, m_cost = gwa.RATES_USD["UTILITY"] * fx, gwa.RATES_USD["MARKETING"] * fx
+            gw.table([{"Plan": x["name"], "Price / month": _money(x.get("monthly")),
+                       "WhatsApp cost if fully used": _money(x["wa_renew"] * u_cost + x["wa_promo"] * m_cost),
+                       "Share of price": (f"{(x['wa_renew'] * u_cost + x['wa_promo'] * m_cost) / x['monthly']:.0%}"
+                                          if x.get("monthly") else "–")} for x in plans(p)],
+                     caption=f"Cost check at ₦{u_cost:,.0f} per renewal message and ₦{m_cost:,.0f} per promotional "
+                             "message. Keep WhatsApp under about 40% of the price so there's profit after hosting.")
             link = st.text_input("Online payment link (optional)", p.get("pay_link") or "",
                                  placeholder="e.g. your Paystack payment page")
             c3, c4, c5 = st.columns(3)
@@ -1033,7 +1161,10 @@ def render_admin_billing(sc, gyms, audit):
                     yr = float(r["yearly"]) if pd.notna(r.get("yearly")) and r.get("yearly") else None
                     lv = next((k for k, v in level_names.items() if v == r.get("access")), 1)
                     if name and (mo or yr):
+                        num = lambda k: int(r[k]) if pd.notna(r.get(k)) and r.get(k) not in ("", None) else 0
                         plan_list.append({"name": name, "access": lv, "monthly": mo, "yearly": yr,
+                                          "members": num("members"), "wa_renew": num("wa_renew"),
+                                          "wa_promo": num("wa_promo"),
                                           "for_who": gw._text(r.get("for_who")).strip(),
                                           "tagline": gw._text(r.get("tagline")).strip(),
                                           "popular": bool(r.get("popular")) if pd.notna(r.get("popular")) else False})

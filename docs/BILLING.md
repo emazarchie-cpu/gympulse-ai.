@@ -66,3 +66,22 @@ Admin → Billing → **Online payments (Paystack)** shows whether it's connecte
   - **End subscription**.
   Every change goes in the Admin log.
 - Paystack payments email you a "New payment" note. A payment that doesn't match the price is not switched on: you get an email to check it.
+
+
+## Plans by gym size, WhatsApp included
+
+Each plan sets **members**, **WhatsApp renewal reminders and replies a month** and **WhatsApp promotional messages a
+month** (Admin → Billing → Plans; "Use the recommended plans" loads the starting set below). These show as benefits on
+the website, the Subscription page and the comparison table, with "No extra charges". When a gym's allowance is used
+up, those messages go by email until next month, so gyms never pay more and the WhatsApp bill stays capped.
+Free trials and pilot mode get 300 renewal and 30 promotional WhatsApp messages (`trial_allowance` in the pricing
+settings). The Subscription page shows which plan fits the gym's member count. Admin shows a cost check: the WhatsApp
+cost if every included message is used, as a share of the price.
+
+| Plan | Members | ₦ / month | WhatsApp renewals | WhatsApp promo | WhatsApp cost if all used |
+|---|---|---|---|---|---|
+| Starter | 150 | 20,000 | 250 | 0 | ≈ ₦2,600 (13%) |
+| Growth | 500 | 45,000 | 700 | 0 | ≈ ₦7,300 (16%) |
+| Pro | 1,500 | 100,000 | 2,000 | 150 | ≈ ₦33,000 (33%) |
+| Business | 5,000 | 280,000 | 6,500 | 400 | ≈ ₦99,500 (36%) |
+| Enterprise | 20,000 | 750,000 | 24,000 | 1,000 | ≈ ₦330,000 (44%) |

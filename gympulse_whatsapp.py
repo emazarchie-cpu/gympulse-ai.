@@ -466,7 +466,7 @@ def _render_usage():
 
 
 def render_gym_setting(supabase, owner_id, gym_id=None):
-    """The gym's choices: channel, which messages may use WhatsApp, and a monthly limit."""
+    """The gym's choices: channel and which messages use WhatsApp; the plan's included WhatsApp messages."""
     cfg = wa_settings()
     with st.container(border=True):
         st.markdown("##### :material/chat: How messages go out")
@@ -474,32 +474,34 @@ def render_gym_setting(supabase, owner_id, gym_id=None):
             st.caption("WhatsApp sending is coming soon. Until then automatic messages go by email, and you can "
                        "send any message on WhatsApp yourself from Follow-ups.")
             return
+        allow = {"wa_renew": 0, "wa_promo": 0, "plan": ""}
+        if gym_id:
+            import gympulse_billing as gbill
+            allow = gbill.wa_allowance(supabase, gym_id)
         staff = st.session_state.get("role") == "staff"
+        scopes = dict(SCOPES)
+        scopes["renewals"] = "Renewal reminders only"
+        scopes["all"] = (f"All automatic messages (uses your {allow['wa_promo']:,} promotional messages)"
+                         if allow["wa_promo"] else "All automatic messages (your plan sends promotional ones by email)")
         with st.form("wa_settings_form", border=False):
             mode = st.radio("Channel", list(MODES), index=list(MODES).index(cfg["mode"]), format_func=MODES.get,
                             key="wa_mode")
-            scope = st.radio("Which messages can use WhatsApp", list(SCOPES), index=list(SCOPES).index(cfg["scope"]),
-                             format_func=SCOPES.get, key="wa_scope",
-                             help="Other messages go by email (free). Renewal reminders bring money in, so they're "
-                                  "the best use of WhatsApp.")
-            limit = st.number_input("Most WhatsApp messages a month (0 = no limit)", 0, 100000, int(cfg["limit"]),
-                                    step=50, key="wa_limit",
-                                    help="When the limit is reached, automatic messages go by email until next month.")
+            scope = st.radio("Which messages can use WhatsApp", list(scopes), index=list(scopes).index(cfg["scope"]),
+                             format_func=scopes.get, key="wa_scope")
             save = st.form_submit_button("Save", type="primary", disabled=staff)
         if save:
             import gympulse_grow as gg
-            gg._save_settings(supabase, owner_id, {"whatsapp": {"mode": mode, "scope": scope, "limit": int(limit)}},
-                              "WhatsApp settings saved.")
+            gg._save_settings(supabase, owner_id, {"whatsapp": {"mode": mode, "scope": scope}}, "WhatsApp settings saved.")
             st.rerun()
         if gym_id and cfg["mode"] != "email":
             u = month_usage(supabase, gym_id)
-            line = (f"This month: **{u['count']:,}** WhatsApp messages, about **₦{u['naira']:,.0f}** "
-                    f"({u['utility']:,} at ₦{RATES_USD['UTILITY'] * naira_per_usd():,.0f}, "
-                    f"{u['marketing']:,} at ₦{RATES_USD['MARKETING'] * naira_per_usd():,.0f}).")
-            st.markdown(line)
-            if cfg["limit"]:
-                st.progress(min(1.0, u["count"] / cfg["limit"]),
-                            text=f"{u['count']:,} of {cfg['limit']:,}"
-                                 + (" · limit reached: the rest go by email" if u["count"] >= cfg["limit"] else ""))
+            st.markdown(f"**Included in your {gw._esc(allow['plan'] or 'plan')} this month** · no extra charges")
+            st.progress(min(1.0, u["utility"] / allow["wa_renew"]) if allow["wa_renew"] else 1.0,
+                        text=f"Renewal reminders and replies: {u['utility']:,} of {allow['wa_renew']:,}")
+            if allow["wa_promo"]:
+                st.progress(min(1.0, u["marketing"] / allow["wa_promo"]),
+                            text=f"Promotional messages: {u['marketing']:,} of {allow['wa_promo']:,}")
+            st.caption("When a WhatsApp allowance is used up, those messages go by email until next month. "
+                       "Need more? A bigger plan includes more WhatsApp messages.")
         st.caption("Members who reply STOP never get WhatsApp messages again. Replies and button taps appear in "
-                   "Follow-ups. Costs are estimates; Meta's bill is in WhatsApp Manager.")
+                   "Follow-ups.")
