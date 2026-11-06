@@ -329,9 +329,13 @@ def render_admin_setup():
              "GymPulse sends automatic messages on WhatsApp from your WhatsApp Business number. Each kind of "
              "message uses a template Meta approves once. Setup steps: docs/WHATSAPP.md.")
     stt = setup_status()
-    gw.table([{"Setting": k, "Status": "Set" if v else "Missing"} for k, v in stt.items()],
-             pills={"Status": {"Set": "lime", "Missing": "amber"}},
-             caption="Add these in Render (Environment) and GitHub (Settings → Secrets). Never paste them in chat.")
+    webhook_only = {"WHATSAPP_APP_SECRET", "WHATSAPP_VERIFY_TOKEN"}     # used by the Supabase webhook, not here
+    gw.table([{"Setting": k, "Status": "Set" if v else ("Webhook only" if k in webhook_only else "Missing")}
+              for k, v in stt.items()],
+             pills={"Status": {"Set": "lime", "Missing": "amber", "Webhook only": "grey"}},
+             caption="Add the first three in Render (Environment) and GitHub (Settings → Secrets). The app secret and "
+                     "verify token only go in GitHub: the Deploy WhatsApp webhook action saves them on Supabase. "
+                     "Never paste them in chat.")
     if not ready():
         st.info("WhatsApp is off until WHATSAPP_TOKEN and WHATSAPP_PHONE_ID are set. Email keeps working as normal.")
         return
