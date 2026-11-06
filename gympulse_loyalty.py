@@ -398,16 +398,19 @@ def send_due(supabase, gym_id, profile=None, dry_run=False, log=print):
     mode = wcfg["mode"]
     wa_on = mode != "email" and gwa.ready()
     opted = gwa.opt_outs(supabase, gym_id, [d[1]["id"] for d in due]) if wa_on and due else set()
-    wa_used = gwa.month_usage(supabase, gym_id)["count"] if wa_on and wcfg["limit"] else 0
+    import gympulse_billing as gbill
+    allow = gbill.wa_allowance(supabase, gym_id) if wa_on else {"wa_renew": 0, "wa_promo": 0}
+    used = gwa.month_usage(supabase, gym_id) if wa_on else {"utility": 0, "marketing": 0}
+    left = {"UTILITY": allow["wa_renew"] - used["utility"], "MARKETING": allow["wa_promo"] - used["marketing"]}
     sent = skipped = failed = 0
     for kind, m, ref, subject, body, buttons in due:
         if sent >= cap:
             skipped += 1
             continue
         has_email = "@" in gw._text(m.get("email"))
-        under_limit = not wcfg["limit"] or wa_used < wcfg["limit"]
+        cat = gwa.TEMPLATES.get(gwa.KIND_TEMPLATE.get(kind), {}).get("category", "UTILITY")
         use_wa = bool(wa_on and gwa.to_digits(m.get("phone")) and m["id"] not in opted
-                      and kind in gwa.KIND_TEMPLATE and gwa.allowed(kind, wcfg) and under_limit)
+                      and kind in gwa.KIND_TEMPLATE and gwa.allowed(kind, wcfg) and left[cat] > 0)
         use_email = has_email and (mode in ("email", "both") or not use_wa)
         if not (use_wa or use_email):
             skipped += 1
@@ -415,14 +418,14 @@ def send_due(supabase, gym_id, profile=None, dry_run=False, log=print):
         if dry_run:
             how = " + ".join(x for x, on in (("WhatsApp", use_wa), ("email", use_email)) if on)
             log(f"  would send {kind:8} -> {m.get('full_name')} by {how}")
-            wa_used += 1 if use_wa else 0
+            left[cat] -= 1 if use_wa else 0
             sent += 1
             continue
         ok_any, why = False, []
         if use_wa:
             ok, msg = gwa.send_member(supabase, gym_id, m, kind, ref, subject, body, buttons, profile)
             ok_any = ok_any or ok
-            wa_used += 1 if ok else 0
+            left[cat] -= 1 if ok else 0
             if not ok:
                 why.append(f"WhatsApp: {msg}")
                 use_email = has_email            # WhatsApp didn't go: fall back to email
