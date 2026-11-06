@@ -108,3 +108,24 @@ Run `sql/phase24_community_engage.sql` once. Code: `gympulse_engage.py`.
 | **Stickers & frames** | Stickers ("Leg day", "New PB"…) and the gym's branded frame on posts and stories; framed cards to save for Instagram | Member of the week photos get the frame |
 
 Notifications add: tagged in a class post, badge earned, coach replied (in the app only).
+
+
+## Photo and video editor, reels (phase 25)
+
+Run `sql/phase25_community_media.sql` once. Code: `gympulse_media.py` (Streamlit components v2).
+
+- **Choosing media:** "Choose from your photos / videos" opens the phone's own photo picker (iOS and Android ask
+  for permission there and share only what the member picks; a website can't get blanket camera-roll access).
+  "Take a photo / Record a video" opens the camera.
+- **Editing (photos):** swipe left / right to change the colour filter (Normal, Vivid, Warm, Cool, Mono, Fade, Noir,
+  Gym), or tap the filter names; add text (drag it, 7 colours, size, plain or with a background), gym stickers,
+  and the gym's frame. The photo is rendered at 1080 × 1350 (posts) or 1080 × 1920 (stories) and uploaded.
+- **Drafts:** "Save draft" keeps the edited photo and caption on that phone (browser storage, up to 8); drafts show
+  in the picker. Video drafts aren't saved (too big for browser storage).
+- **Videos:** up to 60 seconds and 45 MB, for reels and video stories. The filter and text are saved as settings and
+  shown over the video when it plays; a cover frame is captured automatically.
+- **Reels:** a 🎬 icon in the community menu. Full-height vertical reels, swipe up / down; the visible one plays
+  muted (tap 🔇 for sound); double-tap or the heart to like; comments; tap the name for the profile. Reels also
+  appear in the feed.
+- **Music:** not included yet. Real songs need licences (Instagram and TikTok pay record labels for theirs);
+  a royalty-free sound library can be added later.
