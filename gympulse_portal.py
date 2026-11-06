@@ -372,14 +372,17 @@ def render_portal(supabase, token):
         flash = st.session_state.pop("mp_flash", None)
         if flash:
             st.success(flash)
-        tabs = st.tabs(["Home", "Classes", "Messages", "My details"])
+        tabs = st.tabs(["Home", "Community", "Classes", "Messages", "My details"])
         with tabs[0]:
             _home(sc, m, gym_name, prof)
         with tabs[1]:
-            _classes(sc, m)
+            import gympulse_community as gcom
+            gcom.render_member(sc, m, gym_name)
         with tabs[2]:
-            _messages(sc, m, gym_name)
+            _classes(sc, m)
         with tabs[3]:
+            _messages(sc, m, gym_name)
+        with tabs[4]:
             _details(sc, m, gym_name)
 
 
