@@ -240,8 +240,16 @@ def people(sc, gym_id):
     def fetch():
         cols = "id, full_name, photo, community_agreed_at, community_bio, community_dm, community_blocked, archived"
         try:
-            rows = gw.fetch_all(sc.table("members").select(cols).eq("gym_id", gym_id).order("full_name"))
+            rows = gw.fetch_all(sc.table("members").select(cols + ", community_email_notify").eq("gym_id", gym_id)
+                                .order("full_name"))
         except Exception:
+            rows = None
+        if rows is None:
+            try:
+                rows = gw.fetch_all(sc.table("members").select(cols).eq("gym_id", gym_id).order("full_name"))
+            except Exception:
+                rows = None
+        if rows is None:
             rows = gw.fetch_all(sc.table("members").select("id, full_name, photo, community_agreed_at, archived")
                                 .eq("gym_id", gym_id).order("full_name"))
         return {r["id"]: r for r in rows if r.get("community_agreed_at") and not r.get("archived")}
@@ -289,9 +297,131 @@ def toggle_follow(sc, m, other_id):
         try:
             sc.table("community_follows").insert({"gym_id": m["gym_id"], "follower_id": m["id"],
                                                   "followee_id": other_id}).execute()
+            notify(sc, m, other_id, "follow")
         except Exception:
             pass
     _bust(m["gym_id"])
+
+
+# ------------------------------------------------------------------ notifications (phase 23)
+EMAIL_GAP_MIN = 30
+
+
+def notify(sc, actor, member_id, kind):
+    """Tell member_id that actor followed them / messaged them: in the app, and by email (at most every
+    EMAIL_GAP_MIN minutes per kind, if they allow it). Never fails the action that caused it."""
+    try:
+        now = datetime.now(timezone.utc)
+        if kind == "message":                       # one unread "messaged you" per person, kept fresh
+            old = sc.table("community_notifications").select("id").eq("member_id", member_id) \
+                .eq("actor_id", actor["id"]).eq("kind", "message").is_("read_at", "null").limit(1).execute().data
+            if old:
+                sc.table("community_notifications").update({"created_at": now.isoformat()}).eq("id", old[0]["id"]).execute()
+                return
+        if kind == "follow":                        # follow, unfollow, follow again: notify once a day
+            since = (now - timedelta(days=1)).isoformat()
+            if sc.table("community_notifications").select("id").eq("member_id", member_id).eq("actor_id", actor["id"]) \
+                    .eq("kind", "follow").gte("created_at", since).limit(1).execute().data:
+                return
+        row = {"gym_id": actor["gym_id"], "member_id": member_id, "actor_id": actor["id"], "kind": kind,
+               "created_at": now.isoformat()}
+        res = sc.table("community_notifications").insert(row).execute().data or []
+        _maybe_email(sc, actor, member_id, kind, (res[0] if res else {}).get("id"))
+    except Exception:
+        pass
+
+
+def _maybe_email(sc, actor, member_id, kind, note_id):
+    rows = sc.table("members").select("id, full_name, email, gym_id, community_email_notify") \
+        .eq("id", member_id).limit(1).execute().data or []
+    who = rows[0] if rows else None
+    if not who or "@" not in gw._text(who.get("email")) or who.get("community_email_notify") is False:
+        return
+    since = (datetime.now(timezone.utc) - timedelta(minutes=EMAIL_GAP_MIN)).isoformat()
+    recent = sc.table("community_notifications").select("id").eq("member_id", member_id).eq("kind", kind) \
+        .gte("emailed_at", since).limit(1).execute().data
+    if recent:
+        return
+    import gympulse_email as ge
+    import gympulse_portal as gportal
+    gym = gportal._gym(sc, who["gym_id"])[2]
+    first, name = _first(who), gw._text(actor.get("full_name"), "A member")
+    if kind == "message":
+        subject = f"{name} sent you a message"
+        line = f"<b>{ge.esc(name)}</b> sent you a message in the {ge.esc(gym)} community."
+    else:
+        subject = f"{name} started following you"
+        line = f"<b>{ge.esc(name)}</b> started following you in the {ge.esc(gym)} community."
+    url = gportal.login_url()
+    body = (f"<p>Hi {ge.esc(first)},</p><p>{line}</p>" + ge.button("Open the community", url)
+            + "<p style='color:#6B7686;font-size:13px'>Sign in with your email and the code we send you, then open "
+              "Community. To stop these emails: Community → Me → Edit profile.</p>")
+    text = (f"Hi {first},\n\n{subject} in the {gym} community.\nOpen it: {url}\n\n"
+            "To stop these emails: Community → Me → Edit profile.")
+    if gportal._email(gw._text(who["email"]).strip(), subject, ge.layout(subject, body, subject), text) and note_id:
+        sc.table("community_notifications").update({"emailed_at": datetime.now(timezone.utc).isoformat()}) \
+            .eq("id", note_id).execute()
+
+
+def notifications(sc, m, limit=30):
+    try:
+        return sc.table("community_notifications").select("*").eq("member_id", m["id"]) \
+            .order("created_at", desc=True).limit(limit).execute().data or []
+    except Exception:
+        return []
+
+
+def unread_notes(sc, m):
+    try:
+        return len(sc.table("community_notifications").select("id").eq("member_id", m["id"])
+                   .is_("read_at", "null").execute().data or [])
+    except Exception:
+        return 0
+
+
+def _mark_read(sc, m, kind=None, actor_id=None):
+    try:
+        q = sc.table("community_notifications").update({"read_at": datetime.now(timezone.utc).isoformat()}) \
+            .eq("member_id", m["id"]).is_("read_at", "null")
+        if kind:
+            q = q.eq("kind", kind)
+        if actor_id:
+            q = q.eq("actor_id", actor_id)
+        q.execute()
+    except Exception:
+        pass
+
+
+def _note_open(sc, m, n):
+    st.session_state.pop("cm_notes_open", None)
+    _mark_read(sc, m, n["kind"], n.get("actor_id"))
+    st.session_state["cm_back"] = "feed"
+    if n["kind"] == "message":
+        _go("chat", cm_chat=n["actor_id"])
+    else:
+        _go("profile", cm_pid=n["actor_id"])
+
+
+@st.dialog("Notifications")
+def notes_dialog(sc, m):
+    rows = notifications(sc, m)
+    pp = people(sc, m["gym_id"])
+    if not rows:
+        st.caption("Nothing yet. When someone follows you or sends you a message, you'll see it here.")
+    for n in rows:
+        a = pp.get(n.get("actor_id")) or {"full_name": "A member"}
+        what = "sent you a message" if n["kind"] == "message" else "started following you"
+        x, y = st.container(key=f"cm_row_note_{n['id']}").columns([1, 6], vertical_alignment="center")
+        gw._md(gw.avatar_html(a.get("full_name"), a.get("photo"), 40), x)
+        with y:
+            if st.button(f"{gw._text(a.get('full_name'), 'A member')} {what}", key=f"cm_note_{n['id']}",
+                         type="tertiary"):
+                _note_open(sc, m, n)
+                st.rerun()
+            gw._md(f'<div class="cm-when">{"🟢 " if not n.get("read_at") else ""}{_when(n.get("created_at"))}</div>')
+    if rows and st.button("Mark all as read", key="cm_notes_all", use_container_width=True):
+        _mark_read(sc, m)
+        st.rerun()
 
 
 def can_message(sc, m, other):
@@ -401,6 +531,10 @@ def _back():
 # ---------------- feed
 def _feed(sc, m, gym_name, social):
     if social:
+        n = unread_notes(sc, m)
+        if st.button(f"🔔 {n} new notification{'s' if n != 1 else ''}" if n else "🔔 Notifications",
+                     key="cm_bell", type="primary" if n else "tertiary"):
+            notes_dialog(sc, m)
         _stories_bar(sc, m, gym_name)
     if m.get("community_blocked"):
         st.warning(f"{gym_name} has paused posting from your account. You can still read the community.")
@@ -771,10 +905,16 @@ def edit_profile_dialog(sc, m):
                            placeholder="e.g. Morning lifter · training for my first 10k")
         dm = st.radio("Who can message me", list(opts), format_func=opts.get,
                       index=list(opts).index(pp.get("community_dm") or "everyone"))
+        mail = st.toggle("Email me when someone messages or follows me",
+                         value=pp.get("community_email_notify", m.get("community_email_notify", True)) is not False)
         st.caption("Your name and photo come from your gym details (My details tab).")
         if st.form_submit_button("Save", type="primary", use_container_width=True):
-            sc.table("members").update({"community_bio": bio.strip() or None, "community_dm": dm}) \
-                .eq("id", m["id"]).execute()
+            upd = {"community_bio": bio.strip() or None, "community_dm": dm, "community_email_notify": bool(mail)}
+            try:
+                sc.table("members").update(upd).eq("id", m["id"]).execute()
+            except Exception:                        # phase 23 not run yet
+                upd.pop("community_email_notify")
+                sc.table("members").update(upd).eq("id", m["id"]).execute()
             _bust(m["gym_id"])
             st.session_state["cm_flash"] = "Profile saved."
             st.rerun()
@@ -907,6 +1047,7 @@ def _chat(sc, m, other_id, gym_name):
         rows = []
     rows = [r for r in rows if {r["sender_id"], r["recipient_id"]} == {m["id"], other_id}]
     unread = [r["id"] for r in rows if r["recipient_id"] == m["id"] and not r.get("read_at")]
+    _mark_read(sc, m, "message", other_id)
     if unread:
         try:
             sc.table("community_dms").update({"read_at": datetime.now(timezone.utc).isoformat()}) \
@@ -941,6 +1082,7 @@ def _chat(sc, m, other_id, gym_name):
             return
         sc.table("community_dms").insert({"gym_id": m["gym_id"], "sender_id": m["id"], "recipient_id": other_id,
                                           "body": text.strip()[:1000]}).execute()
+        notify(sc, m, other_id, "message")
         st.rerun()
 
 

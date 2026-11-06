@@ -64,3 +64,17 @@ member app now stays on the tab you're using.
   them (everyone, people they follow, nobody). Blocking stops messages and hides profiles both ways. Members the
   gym has paused can't message. Limit: 60 messages an hour. The gym does not read members' messages.
 - Everything stays within one gym; all reads are on the server, scoped to the signed-in member's gym.
+
+
+## Community notifications (phase 23)
+
+Run `sql/phase23_community_notifications.sql` once.
+
+- **In the app:** a 🔔 button at the top of the Feed shows "N new notifications". The list shows who followed you
+  or messaged you. Tap one to open the chat or their profile; it's marked read. "Mark all as read" clears the list.
+  Opening a chat also clears that person's message notification. Several messages from the same person count as
+  one notification. Follow / unfollow / follow again notifies at most once a day.
+- **By email** (free, through Resend): "Tunde sent you a message" / "Tunde started following you", with a button
+  to the member sign-in. At most one email per kind every 30 minutes, and only to members with an email address.
+  Members switch it off in Community → Me → Edit profile.
+- No WhatsApp, because WhatsApp notifications would cost per message.
