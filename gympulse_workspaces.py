@@ -1285,7 +1285,7 @@ class _TrackedTable:
         scoped = self._name in GYM_SCOPED_TABLES
         if name in ("insert", "upsert"):
             def write(payload, *args, **kwargs):
-                st.session_state["_dv"] = st.session_state.get("_dv", 0) + 1
+                bump_data_version()
                 gid = _current_gym() if scoped else None
                 if gid:
                     rows = payload if isinstance(payload, list) else [payload]
@@ -1299,7 +1299,7 @@ class _TrackedTable:
         if name in ("update", "delete", "select"):
             def scoped_query(*args, **kwargs):
                 if name != "select":
-                    st.session_state["_dv"] = st.session_state.get("_dv", 0) + 1
+                    bump_data_version()
                 query = attr(*args, **kwargs)
                 gid = _current_gym() if scoped else None
                 return query.eq("gym_id", gid) if gid else query
@@ -1337,6 +1337,66 @@ def _cached(key, fn, ttl=60, skip_empty=False):
     return value
 
 cached = _cached
+
+
+# ---------------------------------------------------------------- shared cache (all tabs of one account)
+# Heavy data (members, scores, check-ins) is kept once per signed-in account, so a reload or a second tab
+# doesn't download a big gym again. Any write bumps the gym's version (bump_data_version), which clears it
+# for every tab at once.
+import threading as _threading
+_SHARED, _SHARED_LOCK, _GYM_VERSION = {}, _threading.Lock(), {}
+SHARED_TTL = 300
+
+
+def _account():
+    u = st.session_state.get("auth_user") or {}
+    return u.get("id") if isinstance(u, dict) else getattr(u, "id", None)
+
+
+def shared_cached(key, gym_id, fn, ttl=SHARED_TTL):
+    who = _account()
+    if not who:
+        return _cached(key, fn, ttl=min(ttl, 60))
+    k = (who,) + tuple(key)
+    ver = _GYM_VERSION.get(gym_id, 0)
+    hit = _SHARED.get(k)
+    now = time.time()
+    if hit and hit[1] == ver and now - hit[0] < ttl:
+        return _clone(hit[2])
+    value = fn()
+    with _SHARED_LOCK:
+        _SHARED[k] = (now, ver, _clone(value))
+        if len(_SHARED) > 400:                       # keep memory small: drop the oldest entries
+            for old in sorted(_SHARED, key=lambda x: _SHARED[x][0])[:100]:
+                _SHARED.pop(old, None)
+    return value
+
+
+def fetch_all_fast(make_query, page=1000, workers=8, cap=300000):
+    """Every row of a query, fetching up to `workers` pages at the same time (much faster than one page
+    after another for big gyms). make_query() must return a fresh query each time."""
+    first = make_query().range(0, page - 1).execute().data or []
+    if len(first) < page:
+        return first
+    from concurrent.futures import ThreadPoolExecutor
+    try:
+        from streamlit.runtime.scriptrunner import add_script_run_ctx, get_script_run_ctx
+        ctx = get_script_run_ctx()
+        init = (lambda: add_script_run_ctx(_threading.current_thread(), ctx)) if ctx else None
+    except Exception:
+        init = None
+    rows, start, done = list(first), page, False
+    with ThreadPoolExecutor(max_workers=workers, initializer=init) as pool:
+        while not done and len(rows) < cap:
+            starts = [start + i * page for i in range(workers)]
+            chunks = list(pool.map(lambda a: make_query().range(a, a + page - 1).execute().data or [], starts))
+            for c in chunks:
+                rows += c
+                if len(c) < page:
+                    done = True
+                    break
+            start += workers * page
+    return rows[:cap]
 
 def show_boot_overlay():
     st.markdown('<div class="boot-overlay"><div class="boot-spin"></div>'
@@ -1464,12 +1524,12 @@ def _load_actions_uncached(supabase, gym_id, include_archived=False):
     return pd.DataFrame(rows)
 
 def fetch_members(supabase, gym_id, archived=None, include_photo=True):
-    return _cached(("members", gym_id, archived, include_photo),
-                   lambda: _fetch_members_uncached(supabase, gym_id, archived, include_photo))
+    return shared_cached(("members", gym_id, archived, include_photo), gym_id,
+                         lambda: _fetch_members_uncached(supabase, gym_id, archived, include_photo))
 
 def load_roster(supabase, gym_id, assess_fn, with_photos=True):
-    return _cached(("roster", gym_id, with_photos, today_local().isoformat()),
-                   lambda: _load_roster_uncached(supabase, gym_id, assess_fn, with_photos))
+    return shared_cached(("roster", gym_id, with_photos, today_local().isoformat()), gym_id,
+                         lambda: _load_roster_uncached(supabase, gym_id, assess_fn, with_photos))
 
 def load_actions(supabase, gym_id, include_archived=False):
     return _cached(("actions", gym_id, include_archived),
@@ -2637,6 +2697,34 @@ def render_member_profile(supabase, gym_id, member_id, assess_fn):
                     st.rerun()
 
 # --------------------------------------------------------- radar
+def _short_naira(v):
+    v = float(v or 0)
+    if v >= 1_000_000:
+        return f"₦{v / 1_000_000:.1f}M".replace(".0M", "M")
+    if v >= 10_000:
+        return f"₦{v / 1_000:.0f}k"
+    return f"₦{v:,.0f}"
+
+
+def _risk_summary(view):
+    """Three plain bars an owner reads at a glance: how many members are in each band, and the fees at risk."""
+    total = max(len(view), 1)
+    rows = []
+    for level, tone, note in (("High", "#FF6B6B", "call these first"), ("Medium", "#FFC44D", "check in this week"),
+                              ("Low", "#B7F34A", "training well")):
+        part = view[view["risk_category"] == level]
+        n = len(part)
+        fees = pd.to_numeric(part.get("monthly_fee"), errors="coerce").fillna(0).sum() if n else 0
+        rows.append(
+            f'<div class="rr-row"><div class="rr-top"><b style="color:{tone}">{level}</b>'
+            f'<span>{n:,} member{"s" if n != 1 else ""} · {_short_naira(fees)}/month · {note}</span></div>'
+            f'<div class="rr-bar"><i style="width:{max(2, round(100 * n / total))}%;background:{tone}"></i></div></div>')
+    _md('<style>.rr-row{margin:0 0 12px}.rr-top{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;'
+        'font-size:14px}.rr-top span{color:#93A0B4}.rr-bar{height:10px;border-radius:99px;background:rgba(255,255,255,.07);'
+        'overflow:hidden;margin-top:6px}.rr-bar i{display:block;height:100%;border-radius:99px}</style>'
+        + "".join(rows))
+
+
 def _radar_chart(view):
     cols = ["full_name", "days_since_last_visit", "cancellation_probability",
             "risk_category", "monthly_fee"]
@@ -2647,39 +2735,54 @@ def _radar_chart(view):
         data["days_since_last_visit"], errors="coerce").fillna(0)
     data["monthly_fee"] = pd.to_numeric(
         data["monthly_fee"], errors="coerce").fillna(0)
+    _risk_summary(data)
+    cap = 60                                          # everyone away 60+ days sits on the right edge
+    data["days_shown"] = data["days_since_last_visit"].clip(upper=cap)
+    # a small, steady spread so members with the same numbers don't hide behind each other
+    jitter = (pd.util.hash_pandas_object(data["full_name"].astype(str), index=False) % 1000) / 1000 - 0.5
+    data["x"] = (data["days_shown"] + jitter.values * 0.9).clip(lower=0)
+    data["away"] = data["days_since_last_visit"].astype(int).astype(str) + " days"
 
     try:
         import altair as alt
-        x_max = max(14.0, float(data["days_since_last_visit"].max()) * 1.1)
-        colours = alt.Scale(domain=["High", "Medium", "Low"],
-                            range=["#FF6B6B", "#FFC44D", "#B7F34A"])
+        bands = pd.DataFrame({"y0": [0, 0.3, 0.5], "y1": [0.3, 0.5, 1.0],
+                              "band": ["Low", "Medium", "High"],
+                              "label": ["LOW RISK", "MEDIUM", "HIGH RISK"], "ly": [0.03, 0.33, 0.95]})
+        tint = alt.Scale(domain=["High", "Medium", "Low"],
+                         range=["rgba(255,107,107,0.10)", "rgba(255,196,77,0.10)", "rgba(183,243,74,0.07)"])
+        zone = (alt.Chart(bands).mark_rect()
+                .encode(x=alt.value(0), x2=alt.value("width"),
+                        y=alt.Y("y0:Q", scale=alt.Scale(domain=[0, 1])), y2="y1:Q",
+                        color=alt.Color("band:N", scale=tint, legend=None)))
+        bands["ly"] = [0.27, 0.47, 0.97]
+        labels = (alt.Chart(bands).mark_text(align="right", baseline="top", dx=-6, fontSize=11, fontWeight="bold",
+                                             color="rgba(244,247,251,0.7)")
+                  .encode(x=alt.value("width"), y=alt.Y("ly:Q", scale=alt.Scale(domain=[0, 1])), text="label:N"))
+        colours = alt.Scale(domain=["High", "Medium", "Low"], range=["#FF6B6B", "#FFC44D", "#B7F34A"])
         points = (
-            alt.Chart(data).mark_circle(opacity=0.9, stroke="#0B1020", strokeWidth=1.5)
+            alt.Chart(data).mark_circle(opacity=0.8, size=52)
             .encode(
-                x=alt.X("days_since_last_visit:Q", title="Days since last visit",
-                        scale=alt.Scale(domain=[0, x_max], zero=True),
-                        axis=alt.Axis(tickMinStep=1, format="d")),
-                y=alt.Y("cancellation_probability:Q", title="Cancellation estimate",
-                        scale=alt.Scale(domain=[0, 1], zero=True),
-                        axis=alt.Axis(format="%")),
-                color=alt.Color("risk_category:N", title="Risk", scale=colours),
-                size=alt.Size("monthly_fee:Q", legend=None,
-                              scale=alt.Scale(range=[110, 460])),
+                x=alt.X("x:Q", title="Days since last visit",
+                        scale=alt.Scale(domain=[0, cap + 1], nice=False),
+                        axis=alt.Axis(values=[0, 7, 14, 21, 30, 45, 60], format="d", labelFontSize=12,
+                                      titleFontSize=13,
+                                      labelExpr=f"datum.value >= {cap} ? '{cap}+' : datum.value")),
+                y=alt.Y("cancellation_probability:Q", title="Chance they leave",
+                        scale=alt.Scale(domain=[0, 1]),
+                        axis=alt.Axis(format="%", values=[0, 0.3, 0.5, 1], labelFontSize=12, titleFontSize=13)),
+                color=alt.Color("risk_category:N", title=None, scale=colours,
+                                legend=alt.Legend(orient="bottom", direction="horizontal", symbolSize=140,
+                                                  labelFontSize=13)),
                 tooltip=[
                     alt.Tooltip("full_name:N", title="Member"),
                     alt.Tooltip("risk_category:N", title="Risk"),
-                    alt.Tooltip("cancellation_probability:Q", title="Estimate", format=".0%"),
-                    alt.Tooltip("days_since_last_visit:Q", title="Days away", format=".0f"),
-                    alt.Tooltip("monthly_fee:Q", title="Monthly fee", format=",.0f"),
+                    alt.Tooltip("cancellation_probability:Q", title="Chance they leave", format=".0%"),
+                    alt.Tooltip("away:N", title="Last visit"),
+                    alt.Tooltip("monthly_fee:Q", title="Monthly fee (₦)", format=",.0f"),
                 ],
             )
         )
-        lines = (
-            alt.Chart(pd.DataFrame({"y": [0.3, 0.5]}))
-            .mark_rule(strokeDash=[5, 5], color="rgba(255,255,255,0.28)")
-            .encode(y=alt.Y("y:Q", scale=alt.Scale(domain=[0, 1])))
-        )
-        chart = alt.layer(lines, points).properties(height=340)
+        chart = alt.layer(zone, points, labels).resolve_scale(color="independent").properties(height=360)
         _show_chart(_style_chart(chart))
         return
     except Exception:
@@ -2805,8 +2908,8 @@ def render_risk_radar(supabase, gym_id, assess_fn):
         return
 
     st.markdown('<div class="section-label">THE RADAR</div>', unsafe_allow_html=True)
-    st.caption("Right = longer absent. Up = higher cancellation estimate. "
-               "Dashed lines mark Medium (30%) and High (50%).")
+    st.caption("Each dot is a member. Further right = longer since their last visit. Higher up = more likely "
+               "to leave. Tap or hover a dot to see who it is.")
     _radar_chart(view)
 
     st.markdown('<div class="section-label">PRIORITY LIST · CLICK A NAME TO OPEN THEIR PROFILE</div>',
@@ -3896,10 +3999,10 @@ def render_business_insights(supabase, gym_id, assess_fn, header=True):
         return
     k = kpis(roster, actions)
     kpi_row([
-        ("Monthly revenue", _money(k["monthly_revenue"]), "cyan", "From scored members"),
-        ("Expected monthly loss", _money(k["expected_loss"]), "red", "Estimate × monthly fee"),
-        ("Held by high-risk", _money(k["high_risk_revenue"]), "amber", "Fees at stake"),
-        ("Revenue saved", _money(k["revenue_saved"]), "lime", "From retained members"),
+        ("Monthly revenue", _short_naira(k["monthly_revenue"]), "cyan", "From scored members"),
+        ("Expected monthly loss", _short_naira(k["expected_loss"]), "red", "Estimate × monthly fee"),
+        ("Held by high-risk", _short_naira(k["high_risk_revenue"]), "amber", "Fees at stake"),
+        ("Revenue saved", _short_naira(k["revenue_saved"]), "lime", "From retained members"),
     ])
     st.caption("Expected loss = each member's estimate × their monthly fee. "
                "It is a planning figure from a synthetic-data model, not a forecast.")
@@ -4452,17 +4555,9 @@ def render_archie(supabase, gym_id, assess_fn, business_name, owner_name="the gy
 
 # ------------------------------------------------------ front desk check-in
 def _page_checkins(supabase, gym_id, since, cols):
-    rows, start = [], 0
-    while True:
-        page = (supabase.table("checkins").select(cols)
-                .eq("gym_id", gym_id).gte("checked_in_at", since)
-                .order("checked_in_at", desc=True)
-                .range(start, start + 999).execute().data or [])
-        rows += page
-        if len(page) < 1000 or len(rows) >= 20000:
-            break
-        start += 1000
-    return rows
+    return fetch_all_fast(lambda: supabase.table("checkins").select(cols)
+                          .eq("gym_id", gym_id).gte("checked_in_at", since)
+                          .order("checked_in_at", desc=True).order("id"))
 
 
 def _fetch_checkins(supabase, gym_id, days=90):
@@ -4491,8 +4586,25 @@ def _fetch_checkins(supabase, gym_id, days=90):
     return out
 
 
+CHECKIN_BASE_DAYS = 120
+
+
+def checkins_window(supabase, gym_id, days=90):
+    """Check-ins of the last `days` days. One download serves every page: the widest window asked for is
+    kept (shared across tabs) and narrower ones are cut from it in memory."""
+    want = max(int(days), CHECKIN_BASE_DAYS)
+    best = st.session_state.get(("_ck_days", gym_id), CHECKIN_BASE_DAYS)
+    span = max(want, best)
+    st.session_state[("_ck_days", gym_id)] = span
+    df = shared_cached(("ckbase", gym_id, span), gym_id, lambda: _fetch_checkins(supabase, gym_id, days=span))
+    if df is None or df.empty or days >= span:
+        return df
+    cut = pd.Timestamp(datetime.now(APP_TZ).replace(tzinfo=None) - timedelta(days=int(days)))
+    return df[df["at"] >= cut].reset_index(drop=True)
+
+
 def load_checkins(supabase, gym_id):
-    return _cached(("checkins", gym_id), lambda: _fetch_checkins(supabase, gym_id), ttl=30)
+    return checkins_window(supabase, gym_id, 90)
 
 
 def _fetch_classes(supabase, gym_id):
@@ -4548,8 +4660,11 @@ def checkin_signature(supabase, gym_id):
         return None
 
 
-def bump_data_version():
+def bump_data_version(gym_id=None):
     st.session_state["_dv"] = st.session_state.get("_dv", 0) + 1
+    gid = gym_id or st.session_state.get("gym_id")
+    if gid:
+        _GYM_VERSION[gid] = _GYM_VERSION.get(gid, 0) + 1
 
 
 def absence_alerts(ck):
@@ -5406,7 +5521,7 @@ def render_dashboard(supabase, gym_id, assess_fn, greeting, user_name, business_
         kpi_row([
             ("Members scored", k["members_scored"], "cyan", "On your radar"),
             ("High risk", k["high"], "red", "Need you first"),
-            ("Expected monthly loss", _money(k["expected_loss"]), "amber", "Estimate, not a forecast"),
+            ("Expected monthly loss", _short_naira(k["expected_loss"]), "amber", "Estimate, not a forecast"),
             ("Open actions", k["open_actions"], "lime", "Follow-ups to finish"),
         ])
         due_n = renewal_due_count(supabase, gym_id, roster)
