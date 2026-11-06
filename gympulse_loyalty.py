@@ -394,17 +394,20 @@ def send_due(supabase, gym_id, profile=None, dry_run=False, log=print):
         return 0, 0, 0
     cap = int(auto_cfg(profile).get("daily_cap") or 80)
     import gympulse_whatsapp as gwa
-    mode = gwa.gym_mode(profile)
+    wcfg = gwa.wa_settings(profile)
+    mode = wcfg["mode"]
     wa_on = mode != "email" and gwa.ready()
     opted = gwa.opt_outs(supabase, gym_id, [d[1]["id"] for d in due]) if wa_on and due else set()
+    wa_used = gwa.month_usage(supabase, gym_id)["count"] if wa_on and wcfg["limit"] else 0
     sent = skipped = failed = 0
     for kind, m, ref, subject, body, buttons in due:
         if sent >= cap:
             skipped += 1
             continue
         has_email = "@" in gw._text(m.get("email"))
+        under_limit = not wcfg["limit"] or wa_used < wcfg["limit"]
         use_wa = bool(wa_on and gwa.to_digits(m.get("phone")) and m["id"] not in opted
-                      and kind in gwa.KIND_TEMPLATE)
+                      and kind in gwa.KIND_TEMPLATE and gwa.allowed(kind, wcfg) and under_limit)
         use_email = has_email and (mode in ("email", "both") or not use_wa)
         if not (use_wa or use_email):
             skipped += 1
@@ -412,12 +415,14 @@ def send_due(supabase, gym_id, profile=None, dry_run=False, log=print):
         if dry_run:
             how = " + ".join(x for x, on in (("WhatsApp", use_wa), ("email", use_email)) if on)
             log(f"  would send {kind:8} -> {m.get('full_name')} by {how}")
+            wa_used += 1 if use_wa else 0
             sent += 1
             continue
         ok_any, why = False, []
         if use_wa:
             ok, msg = gwa.send_member(supabase, gym_id, m, kind, ref, subject, body, buttons, profile)
             ok_any = ok_any or ok
+            wa_used += 1 if ok else 0
             if not ok:
                 why.append(f"WhatsApp: {msg}")
                 use_email = has_email            # WhatsApp didn't go: fall back to email
@@ -633,7 +638,7 @@ def render_auto(supabase, gym_id, owner_id):
                 "reward": {"on": bool(rw_on)}, "daily_cap": int(cap)}}, "Automatic messages saved.")
             st.rerun()
     import gympulse_whatsapp as gwa
-    gwa.render_gym_setting(supabase, owner_id)
+    gwa.render_gym_setting(supabase, owner_id, gym_id)
     if not any(auto[k]["on"] for k in AUTO_KINDS):
         st.info("Turn on at least one message above. Nothing is sent until you do.")
         return
@@ -645,10 +650,11 @@ def render_auto(supabase, gym_id, owner_id):
              "welcome": "New member check-in", "progress": "Monthly progress", "update": "Gym update",
              "week1": "First week", "milestone": "Milestone", "level": "Level up", "pulse": "Happiness check"}
     import gympulse_whatsapp as gwa
-    wa_on = gwa.gym_mode() != "email" and gwa.ready()
-    with_email = [d for d in due if "@" in gw._text(d[1].get("email"))
-                  or (wa_on and gwa.to_digits(d[1].get("phone")))]
-    with_wa = sum(1 for d in due if wa_on and gwa.to_digits(d[1].get("phone")))
+    wcfg = gwa.wa_settings()
+    wa_on = wcfg["mode"] != "email" and gwa.ready()
+    can_wa = lambda d: wa_on and gwa.to_digits(d[1].get("phone")) and gwa.allowed(d[0], wcfg)
+    with_email = [d for d in due if "@" in gw._text(d[1].get("email")) or can_wa(d)]
+    with_wa = sum(1 for d in due if can_wa(d))
     gw.kpi_row([("To send today", str(len(due)), "cyan", "members who need a message"),
                 ("Can be reached", str(len(with_email)), "lime",
                  f"{with_wa} on WhatsApp" if wa_on else "will get it by email"),
