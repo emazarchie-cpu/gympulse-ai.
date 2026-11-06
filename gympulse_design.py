@@ -443,7 +443,7 @@ def landing_top(lockup_uri, icon):
           <span>{icon('check', 15)} 30-day free trial</span>
           <span>{icon('check', 15)} No card needed</span>
           <span>{icon('check', 15)} Front-desk check-in or CSV</span>
-          <span>{icon('check', 15)} You approve every message</span>
+          <span>{icon('check', 15)} You choose what gets sent</span>
         </div>
       </div>
       <div class="lx-app">
@@ -538,7 +538,7 @@ def landing_sections(icon, bot_svg):
         <div class="lx-card w2"><div class="lx-ic">{icon('chat')}</div>
           <h4>Follow-ups that close</h4><p>Recommended, in progress, done, each with an outcome. One board, no lost tasks.</p></div>
         <div class="lx-card w2"><div class="lx-ic">{icon('shield')}</div>
-          <h4>You stay in control</h4><p>No invented discounts, no automatic sends. Offers follow your own prices and terms.</p></div>
+          <h4>You stay in control</h4><p>Automatic messages go out only for the types you switch on, and you can see who they will reach first. Everything else waits for you to press send. Offers follow your own prices.</p></div>
       </div>
     </div>
 
@@ -573,6 +573,24 @@ def landing_sections(icon, bot_svg):
           <p>Every risk flag comes with a practical next step for your team.</p></div>
         <div class="lx-card"><div class="lx-ic">{icon('gauge')}</div><h4>Revenue you can trust</h4>
           <p>A message sent is not a member saved. Only recorded outcomes count.</p></div>
+      </div>
+    </div>
+
+    <div class="lx-sec">
+      <div class="lx-kicker">Who's behind it</div>
+      <div class="lx-h2">Built in Nigeria, for Nigerian gyms</div>
+      <div class="lx-sub">GymPulse AI is built by Emmanuel, a Lagos gym member who watched members disappear without
+        anyone noticing. You deal with a real person, not a call centre.</div>
+      <div class="lx-principles">
+        <div class="lx-card"><div class="lx-ic">{icon('chat')}</div><h4>Help when you need it</h4>
+          <p>Email <b>emmanuel@usegympulseai.com</b>, or book a 15-minute demo and we set it up with your real
+          members, at your gym or online.</p></div>
+        <div class="lx-card"><div class="lx-ic">{icon('shield')}</div><h4>Your members' data stays yours</h4>
+          <p>Each gym sees only its own members. We use the data only to run your account, and members can
+          stop messages at any time. See our Privacy Policy and Data Processing Agreement.</p></div>
+        <div class="lx-card"><div class="lx-ic">{icon('check')}</div><h4>No check-in system? Fine</h4>
+          <p>Your front desk taps each member in on a phone, or you upload your list from Excel. No scanners
+          or new hardware needed.</p></div>
       </div>
     </div>
 
