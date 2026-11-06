@@ -208,9 +208,25 @@ CSS = """<style>
 [class*="st-key-cm_stories"] { margin-bottom: -10px; }
 [class*="st-key-cm_hd_"] .cm-when, [class*="st-key-cm_row_"] .cm-when { margin-top: 0 !important; }
 [class*="st-key-cm_chat"] { max-height: 55vh; overflow-y: auto; }
+[class*="st-key-cm_topbar"] [data-testid="stHorizontalBlock"] { flex-wrap: nowrap !important; gap: 6px !important; }
+[class*="st-key-cm_topbar"] [data-testid="stColumn"] { min-width: 0 !important; width: auto !important; flex: 1 1 auto !important; }
+[class*="st-key-cm_topbar"] [data-testid="stColumn"]:last-child { flex: 0 0 auto !important; }
+[class*="st-key-cm_topbar"] [data-testid="stPopover"] button { border: none !important; background: transparent !important;
+  box-shadow: none !important; min-height: 44px !important; padding: 0 10px !important; font-size: 15px !important; }
+[class*="st-key-cm_topbar"] [data-testid="stPopover"] button span[role="img"] { font-size: 26px !important; }
+[class*="st-key-cm_topbar"] [data-testid="stPopover"] button > div > div[aria-hidden="true"] { display: none !important; }
+[class*="st-key-cm_topbar"] [data-testid="stPopover"] button p { color: var(--gp-text, #F4F7FB) !important; font-weight: 800 !important; }
 [class*="st-key-cm_nav_bar"] [data-testid="stButtonGroup"] > div { flex-wrap: nowrap !important; width: 100% !important; }
-[class*="st-key-cm_nav_bar"] button { flex: 1 1 0 !important; min-width: 0 !important; padding: 6px 4px !important;
-  font-size: 13px !important; white-space: nowrap !important; }
+[class*="st-key-cm_nav_bar"] [data-testid="stButtonGroup"] { border: none !important; }
+[class*="st-key-cm_nav_bar"] button { flex: 1 1 0 !important; min-width: 0 !important; padding: 6px 4px 9px !important;
+  min-height: 44px !important; white-space: nowrap !important; border: none !important; border-radius: 0 !important;
+  background: transparent !important; box-shadow: none !important; color: var(--gp-muted, #93A0B4) !important;
+  border-bottom: 2px solid transparent !important; font-weight: 800 !important; }
+[class*="st-key-cm_nav_bar"] button span[role="img"], [class*="st-key-cm_nav_bar"] button p { font-size: 26px !important; }
+[class*="st-key-cm_topbar"] [data-testid="stPopover"] button p { font-size: 15px !important; }
+[class*="st-key-cm_topbar"] [data-testid="stPopover"] button span[role="img"] { font-size: 26px !important; vertical-align: middle !important; }
+[class*="st-key-cm_nav_bar"] button[aria-checked="true"], [class*="st-key-cm_nav_bar"] button[data-selected="true"] {
+  color: #B7F34A !important; border-bottom-color: #B7F34A !important; }
 [class*="st-key-cm_scope"] button { padding: 4px 14px !important; }
 </style>"""
 
@@ -404,8 +420,9 @@ def _note_open(sc, m, n):
         _go("profile", cm_pid=n["actor_id"])
 
 
-@st.dialog("Notifications")
-def notes_dialog(sc, m):
+def notes_list(sc, m):
+    """Notifications inside the bell's drop-down (doesn't cover the app)."""
+    st.markdown("**Notifications**")
     rows = notifications(sc, m)
     pp = people(sc, m["gym_id"])
     if not rows:
@@ -538,15 +555,21 @@ def render_member(sc, m, gym_name, profile=None):
         view = "feed"
     if view in ("feed", "search", "inbox", "me") and social:
         unread = unread_count(sc, m)
-        labels = {"feed": ":material/home: Feed", "search": ":material/search: Search",
-                  "inbox": f":material/chat: Inbox{f' ({unread})' if unread else ''}",
-                  "me": ":material/person: Me"}
+        labels = {"feed": ":material/home:", "search": ":material/search:",
+                  "inbox": f":material/send:{f' {unread}' if unread else ''}",
+                  "me": ":material/person:"}
         st.session_state["cm_nav_bar"] = view           # the menu always shows the current screen
 
         def _nav():
             st.session_state["cm_view"] = st.session_state.get("cm_nav_bar") or view
-        st.segmented_control("Community", list(labels), format_func=labels.get, key="cm_nav_bar",
-                             on_change=_nav, label_visibility="collapsed", width="stretch")
+        nav, bell = st.container(key="cm_topbar").columns([5, 1], vertical_alignment="center")
+        with nav:
+            st.segmented_control("Community", list(labels), format_func=labels.get, key="cm_nav_bar",
+                                 on_change=_nav, label_visibility="collapsed", width="stretch")
+        with bell:
+            n = unread_notes(sc, m)
+            with st.popover(f":material/notifications:{f' {n}' if n else ''}", use_container_width=True):
+                notes_list(sc, m)
     if view == "search":
         _search(sc, m, gym_name)
     elif view == "inbox":
@@ -570,10 +593,6 @@ def _back():
 # ---------------- feed
 def _feed(sc, m, gym_name, social):
     if social:
-        n = unread_notes(sc, m)
-        if st.button(f"🔔 {n} new notification{'s' if n != 1 else ''}" if n else "🔔 Notifications",
-                     key="cm_bell", type="primary" if n else "tertiary"):
-            notes_dialog(sc, m)
         _stories_bar(sc, m, gym_name)
     import gympulse_engage as ge
     st.markdown(ge.CSS, unsafe_allow_html=True)

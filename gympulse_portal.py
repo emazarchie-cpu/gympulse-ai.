@@ -44,6 +44,14 @@ CSS = """
 .mp-in { background: rgba(183,243,74,.14); margin-left: auto; } .mp-out { background: var(--gp-s2, #172033); }
 .mp-when { font-size: 11px; color: var(--gp-muted, #93A0B4); margin-top: 4px; }
 .st-key-mp_wrap { max-width: 620px; margin: 0 auto; width: 100%; }
+[class*="st-key-mp_gymrow_"] { border: 1px solid var(--gp-line, #253047); border-radius: 18px; padding: 12px 14px;
+  margin-bottom: 10px; background: var(--gp-s1, #101827); }
+[class*="st-key-mp_gymrow_"] [data-testid="stHorizontalBlock"] { flex-wrap: nowrap !important; gap: 12px !important; }
+[class*="st-key-mp_gymrow_"] [data-testid="stColumn"] { min-width: 0 !important; width: auto !important; flex: 1 1 auto !important; }
+[class*="st-key-mp_gymrow_"] [data-testid="stColumn"]:first-child, [class*="st-key-mp_gymrow_"] [data-testid="stColumn"]:last-child {
+  flex: 0 0 auto !important; }
+.mp-gym-logo { width: 46px; height: 46px; border-radius: 12px; object-fit: contain; background: #fff; padding: 4px; }
+.mp-gym-name { font-weight: 800; font-size: 16px; color: var(--gp-text, #F4F7FB); margin-bottom: 4px; }
 </style>
 """
 
@@ -221,6 +229,21 @@ def verify_code(sc, email, code):
     return ok
 
 
+def _end(m):
+    e = pd.to_datetime(m.get("membership_end"), errors="coerce")
+    return None if pd.isna(e) else e.date()
+
+
+def _one_per_gym(members):
+    """One membership per gym: the one that runs latest (duplicate records with the same email collapse)."""
+    best = {}
+    for m in members:
+        cur = best.get(m["gym_id"])
+        if cur is None or (_end(m) or date.min) > (_end(cur) or date.min):
+            best[m["gym_id"]] = m
+    return list(best.values())
+
+
 def _enter(m):
     for k in ("mp_step", "mp_email", "mp_choices", "mp_code_tries"):
         st.session_state.pop(k, None)
@@ -284,7 +307,7 @@ def render_code_login(supabase, embedded=False):
                     st.error("Too many tries. Ask for a new code.")
                 else:
                     st.session_state["mp_code_tries"] = tries + 1
-                    ok = verify_code(sc, e, digits)
+                    ok = _one_per_gym(verify_code(sc, e, digits))
                     if len(ok) == 1:
                         _enter(ok[0])
                     elif ok:
@@ -306,8 +329,20 @@ def render_code_login(supabase, embedded=False):
             st.markdown("You're a member of more than one gym. Which one would you like to open?")
             for mid in st.session_state.get("mp_choices", []):
                 m = _member(sc, mid)
-                if m and st.button(_gym(sc, m["gym_id"])[2], key=f"mp_pick_{mid}", use_container_width=True):
-                    _enter(m)
+                if not m:
+                    continue
+                g, prof, name = _gym(sc, m["gym_id"])
+                logo = gw._text(dict((prof.get("settings") or {}).get("email_brand") or {}).get("logo_url"))
+                pic = (f'<img src="{gw._esc(logo)}" alt="" class="mp-gym-logo">' if logo else
+                       gw.avatar_html(name, None, 46))
+                active = status_of(_end(m), gw.today_local())
+                with st.container(key=f"mp_gymrow_{mid}"):
+                    a, b, c = st.columns([1, 5, 1.6], vertical_alignment="center")
+                    gw._md(pic, a)
+                    gw._md(f'<div class="mp-gym-name">{gw._esc(name)}</div>'
+                           f'<span class="mp-pill {active[1]}" style="margin-left:0">{active[0]}</span>', b)
+                    if c.button("Open", key=f"mp_pick_{mid}", type="primary", use_container_width=True):
+                        _enter(m)
 
 
 # ------------------------------------------------------------------ the member's page
