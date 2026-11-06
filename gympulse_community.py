@@ -470,7 +470,21 @@ def _open_chat(pid):
     _go("chat", cm_chat=pid)
 
 
-def render_member(sc, m, gym_name):
+def active_only(profile):
+    """The gym's choice: only members with a running plan can use the community (default yes)."""
+    return dict(((profile or {}).get("settings") or {}).get("community") or {}).get("active_only", True) is not False
+
+
+def member_active(m, today=None):
+    """(active, end date): a plan that runs today or later, and not suspended or archived."""
+    today = today or gw.today_local()
+    end = pd.to_datetime(m.get("membership_end"), errors="coerce")
+    end = None if pd.isna(end) else end.date()
+    ok = bool(end and end >= today and not m.get("suspended") and not m.get("archived"))
+    return ok, end
+
+
+def render_member(sc, m, gym_name, profile=None):
     st.markdown(CSS, unsafe_allow_html=True)
     if not ready(sc):
         st.info(f"The {gym_name} community is coming soon.")
@@ -478,6 +492,24 @@ def render_member(sc, m, gym_name):
     if not enabled(sc, m["gym_id"]):
         st.info(f"{gym_name} hasn't switched the community on.")
         return
+    if active_only(profile):
+        ok, end = member_active(m)
+        if not ok:
+            with st.container(border=True):
+                st.markdown(f"#### The {gw._esc(gym_name)} community is for active members")
+                if m.get("suspended"):
+                    st.markdown("Your membership is paused. When it's active again, you'll be straight back in.")
+                elif end:
+                    st.markdown(f"Your membership ended on **{end:%d %B %Y}**. Renew and you'll be straight back in, "
+                                "with your posts, followers and messages just as you left them.")
+                else:
+                    st.markdown("Once the gym has added your plan, you'll get access. Ask at the front desk.")
+                pay = dict(((profile or {}).get("settings") or {}).get("collect") or {})
+                if pay.get("paystack_link") and not m.get("suspended"):
+                    st.link_button("Renew with Paystack", pay["paystack_link"], type="primary",
+                                   use_container_width=True)
+                st.caption("Your renewal details are on the Home tab.")
+            return
     flash = st.session_state.pop("cm_flash", None)
     if flash:
         st.toast(flash)
@@ -1104,6 +1136,17 @@ def render_owner(supabase, gym_id):
     if not staff:
         if st.toggle("Community switched on for my members", value=on, key="cmo_on") != on:
             supabase.table("gyms").update({"community_enabled": not on}).eq("id", gym_id).execute()
+            st.rerun()
+        prof = st.session_state.get("user_profile") or {}
+        ao = active_only(prof)
+        new_ao = st.toggle("Only members with an active plan can use it", value=ao, key="cmo_active",
+                           help="Members whose plan has ended see a renew button instead. They're back in, with "
+                                "everything as they left it, as soon as they renew.")
+        if new_ao != ao:
+            import gympulse_grow as gg
+            cur = dict((prof.get("settings") or {}).get("community") or {})
+            gg._save_settings(supabase, prof.get("id") or st.session_state.get("auth_user", {}).get("id"),
+                              {"community": {**cur, "active_only": bool(new_ao)}}, "Community setting saved.")
             st.rerun()
 
     with st.form("cmo_new", clear_on_submit=True):

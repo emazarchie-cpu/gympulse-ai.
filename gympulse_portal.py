@@ -377,7 +377,7 @@ def render_portal(supabase, token):
             _home(sc, m, gym_name, prof)
         with tabs[1]:
             import gympulse_community as gcom
-            gcom.render_member(sc, m, gym_name)
+            gcom.render_member(sc, m, gym_name, prof)
         with tabs[2]:
             _classes(sc, m)
         with tabs[3]:
