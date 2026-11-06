@@ -542,6 +542,33 @@ def is_history(df):
     return len(df) <= 3 or vals.nunique() < len(df)
 
 
+_DATE_FORMATS = ("%d/%m/%Y %H:%M", "%d/%m/%Y %H:%M:%S", "%d/%m/%Y", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M",
+                 "%Y-%m-%d", "%Y-%m-%dT%H:%M:%S", "%d-%m-%Y %H:%M", "%d-%m-%Y", "%d.%m.%Y %H:%M", "%d.%m.%Y")
+
+
+def _fast_dates(when):
+    """Parse a column of dates quickly: try the usual export formats in one go (fast), and only fall back to
+    reading each value separately (slow on big files) when none of them fits."""
+    sample = when.head(200)
+    for fmt in _DATE_FORMATS:
+        if pd.to_datetime(sample, errors="coerce", format=fmt).notna().mean() >= 0.95:
+            out = pd.to_datetime(when, errors="coerce", format=fmt)
+            if out.notna().mean() >= 0.95:
+                return out
+    iso = when.astype(str).str.strip().str.match(r"^\d{4}-\d{1,2}-\d{1,2}")   # 2026-11-01: year first, never day-first
+    out = pd.Series(pd.NaT, index=when.index, dtype="datetime64[ns]")
+    zoned = iso & when.astype(str).str.strip().str.contains(r"(?:Z|[+-]\d{2}:?\d{2})$")
+    plain = iso & ~zoned
+    if zoned.any():                                   # with a time zone: convert to Lagos time
+        out[zoned] = pd.to_datetime(when[zoned], errors="coerce", format="ISO8601", utc=True) \
+            .dt.tz_convert(gw.APP_TZ).dt.tz_localize(None).astype("datetime64[ns]")
+    if plain.any():                                   # no time zone: already local time
+        out[plain] = pd.to_datetime(when[plain], errors="coerce", format="ISO8601").astype("datetime64[ns]")
+    if (~iso).any():
+        out[~iso] = pd.to_datetime(when[~iso], errors="coerce", dayfirst=True, format="mixed").astype("datetime64[ns]")
+    return out
+
+
 def build_history(df, cols):
     """[(keys, naive local datetime)] for each past visit, newest first, at most MAX_HISTORY."""
     if cols.get("date", NONE) == NONE:
@@ -549,7 +576,7 @@ def build_history(df, cols):
     when = df[cols["date"]].astype(str)
     if cols.get("time", NONE) != NONE:
         when = when + " " + df[cols["time"]].astype(str)
-    stamps = pd.to_datetime(when, errors="coerce", dayfirst=True, format="mixed")
+    stamps = _fast_dates(when)
     if getattr(stamps.dt, "tz", None) is not None:
         stamps = stamps.dt.tz_convert(gw.APP_TZ).dt.tz_localize(None)
     now = datetime.now(gw.APP_TZ).replace(tzinfo=None)
@@ -783,11 +810,24 @@ def render_gymmaster_import(supabase, gym_id):
                            accept_multiple_files=True, key=f"gm_up_{key}")
     if not ups:
         return
-    sheets, photo_files, unread = read_uploads(ups)
+    sig = (key,) + tuple((f.name, getattr(f, "size", 0)) for f in ups)
+    cached = st.session_state.get("gm_parsed")
+    if cached and cached[0] == sig:
+        sheets, photo_files, unread, hist_parsed = cached[1:]
+    else:
+        st.session_state.pop("gm_parsed", None)
+        with st.spinner("Reading your files… big exports with visit history can take up to a minute."):
+            sheets, photo_files, unread = read_uploads(ups)
+            hist_parsed = {}
+            for n, d in sheets:
+                if is_history(d):
+                    hg = guess_history(list(d.columns))
+                    hist_parsed[n] = (hg, build_history(d.fillna("").astype(str), hg))
+        st.session_state["gm_parsed"] = (sig, sheets, photo_files, unread, hist_parsed)
     if unread:
         st.warning("Couldn't read: " + ", ".join(unread[:5]) + ". Save it as CSV and try again.")
-    member_sheets = [(n, d) for n, d in sheets if not is_history(d)]
-    hist_sheets = [(n, d) for n, d in sheets if is_history(d)]
+    member_sheets = [(n, d) for n, d in sheets if n not in hist_parsed]
+    hist_sheets = [(n, d) for n, d in sheets if n in hist_parsed]
     if not member_sheets:
         st.info("Add the member list (CSV or Excel) as well." if (hist_sheets or photo_files) else
                 "No member list found in what you dropped in. Export it as CSV or Excel and try again.")
@@ -820,9 +860,9 @@ def render_gymmaster_import(supabase, gym_id):
 
     history, hcols_all = [], []
     for n, d in hist_sheets:
-        hg = guess_history(list(d.columns))
+        hg, parsed = hist_parsed[n]
         hcols_all.append((n, d, hg))
-        history += build_history(d.fillna("").astype(str), hg)
+        history += parsed
 
     # Who the visits and photos belong to (preview: rows in the file + members already here)
     index = {}
@@ -945,6 +985,7 @@ def render_gymmaster_import(supabase, gym_id):
             msg += " Something look wrong? Undo this import under Recent imports."
         st.session_state["gm_flash"] = msg
         st.session_state.pop(f"gm_choices_{key}", None)
+        st.session_state.pop("gm_parsed", None)
         st.session_state["gm_up_key"] = key + 1
         st.rerun()
 
