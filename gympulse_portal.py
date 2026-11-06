@@ -65,8 +65,11 @@ def portal_url(token):
 
 
 def _sc():
+    """The server client, with a few seconds' read cache (gympulse_qcache) so taps stay fast."""
     import gympulse_admin as gadm
-    return gadm.service_client()
+    import gympulse_qcache as qc
+    raw = gadm.service_client()
+    return qc.CachedClient(raw) if raw is not None else None
 
 
 def _token(value):
@@ -399,10 +402,12 @@ def render_portal(supabase, token):
             st.link_button("Get a new link", login_url(), type="primary", use_container_width=True)
         return
     gym, prof, gym_name = _gym(sc, m["gym_id"])
-    try:
-        sc.table("members").update({"portal_seen_at": datetime.now(timezone.utc).isoformat()}).eq("id", m["id"]).execute()
-    except Exception:
-        pass
+    if st.session_state.get("_mp_seen") != m["id"]:          # once per visit, not on every tap
+        st.session_state["_mp_seen"] = m["id"]
+        try:
+            sc.table("members").update({"portal_seen_at": datetime.now(timezone.utc).isoformat()}).eq("id", m["id"]).execute()
+        except Exception:
+            pass
     with col, gadm.as_gym({"profile": prof, "gym": gym, "email": ""}):
         flash = st.session_state.pop("mp_flash", None)
         if flash:
