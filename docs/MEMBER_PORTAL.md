@@ -78,3 +78,13 @@ Run `sql/phase23_community_notifications.sql` once.
   to the member sign-in. At most one email per kind every 30 minutes, and only to members with an email address.
   Members switch it off in Community → Me → Edit profile.
 - No WhatsApp, because WhatsApp notifications would cost per message.
+
+
+## Active members only
+
+By default only members whose plan runs today or later (not suspended or archived) can open the Community tab.
+Others see "The community is for active members", with the date their plan ended and a "Renew with Paystack"
+button when the gym has a Paystack link. As soon as their end date moves forward (renewal recorded, or a Paystack
+payment confirmed), they're back in, with their posts, followers and messages as they left them. Members with no
+plan yet are asked to see the front desk. Gyms can turn this off in Members → Member community ("Only members with
+an active plan can use it"; stored in the owner's settings as `community.active_only`).
