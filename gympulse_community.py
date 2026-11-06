@@ -208,6 +208,36 @@ CSS = """<style>
 [class*="st-key-cm_stories"] { margin-bottom: -10px; }
 [class*="st-key-cm_hd_"] .cm-when, [class*="st-key-cm_row_"] .cm-when { margin-top: 0 !important; }
 [class*="st-key-cm_chat"] { max-height: 55vh; overflow-y: auto; }
+/* ---------- 2026 look ---------- */
+[class*="st-key-cm_post_"] { border: none !important; border-radius: 26px !important; padding: 14px 14px 6px !important;
+  background: linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.02)) !important;
+  box-shadow: 0 1px 0 rgba(255,255,255,.06) inset, 0 18px 40px -24px rgba(0,0,0,.8) !important; margin-bottom: 14px !important; }
+[class*="st-key-cm_post_"] .cm-img, [class*="st-key-cm_post_"] video { border-radius: 20px !important; }
+[class*="st-key-cm_post_"] .cm-body { font-size: 15.5px; line-height: 1.6; margin: 10px 2px 8px; }
+[class*="st-key-cm_hd_"] [data-testid="stColumn"]:first-child .avatar { box-shadow: 0 0 0 2px #070B14, 0 0 0 4px rgba(183,243,74,.7); }
+[class*="st-key-cm_act_"] [data-testid="stColumn"] { flex: 0 0 auto !important; }
+[class*="st-key-cm_act_"] [data-testid="stColumn"]:nth-child(3) { flex: 1 1 auto !important; }
+[class*="st-key-cm_act_"] button { border: none !important; background: transparent !important; box-shadow: none !important;
+  padding: 2px 6px !important; min-height: 36px !important; color: var(--gp-text, #F4F7FB) !important; font-weight: 800 !important; }
+[class*="st-key-cm_act_"] button span[role="img"], [class*="st-key-cm_act_"] button p { font-size: 22px !important; }
+[class*="st-key-cm_act_"] button:hover { color: #B7F34A !important; transform: scale(1.06); }
+[class*="st-key-cm_act_"] [data-testid="stColumn"]:last-child button { color: var(--gp-muted, #93A0B4) !important; }
+[class*="st-key-cm_feedwrap"] [data-testid="stExpander"] { border: none !important; border-radius: 999px !important;
+  background: linear-gradient(90deg, rgba(183,243,74,.12), rgba(53,211,232,.10)) !important; overflow: hidden; }
+[class*="st-key-cm_feedwrap"] [data-testid="stExpander"] details[open] { border-radius: 26px !important; }
+[class*="st-key-cm_feedwrap"] [data-testid="stExpander"] summary { padding: 14px 18px !important; font-weight: 700 !important;
+  color: var(--gp-muted, #93A0B4) !important; }
+[class*="st-key-cm_feedwrap"] [data-testid="stExpander"]:has(details[open]) { border-radius: 26px !important; }
+[class*="st-key-cm_scope"] [data-testid="stButtonGroup"] button { border-radius: 999px !important; border: none !important;
+  background: rgba(255,255,255,.06) !important; margin-right: 6px !important; font-weight: 700 !important; }
+[class*="st-key-cm_scope"] button[aria-checked="true"] { background: #F4F7FB !important; color: #0A0F1E !important; }
+[class*="st-key-cm_scope"] button[aria-checked="true"] p { color: #0A0F1E !important; }
+.cm-ring { width: 66px; height: 66px; } .cm-name { letter-spacing: -.1px; }
+.eg-nudge { border: none !important; background: linear-gradient(90deg, rgba(183,243,74,.14), rgba(53,211,232,.08)) !important;
+  border-radius: 18px !important; font-weight: 600; }
+[class*="st-key-eg_ch_"], [class*="st-key-eg_ck"], [class*="st-key-eg_ms_"], [class*="st-key-eg_bd_"] {
+  border: none !important; border-radius: 26px !important;
+  background: radial-gradient(120% 120% at 0% 0%, rgba(183,243,74,.14), transparent 60%), rgba(255,255,255,.035) !important; }
 [class*="st-key-cm_topbar"] [data-testid="stHorizontalBlock"] { flex-wrap: nowrap !important; gap: 6px !important; }
 [class*="st-key-cm_topbar"] [data-testid="stColumn"] { min-width: 0 !important; width: auto !important; flex: 1 1 auto !important; }
 [class*="st-key-cm_topbar"] [data-testid="stColumn"]:last-child { flex: 0 0 auto !important; }
@@ -597,6 +627,11 @@ def _back():
 
 # ---------------- feed
 def _feed(sc, m, gym_name, social):
+    with st.container(key="cm_feedwrap"):
+        _feed_body(sc, m, gym_name, social)
+
+
+def _feed_body(sc, m, gym_name, social):
     if social:
         _stories_bar(sc, m, gym_name)
     import gympulse_engage as ge
@@ -605,7 +640,7 @@ def _feed(sc, m, gym_name, social):
     if m.get("community_blocked"):
         st.warning(f"{gym_name} has paused posting from your account. You can still read the community.")
     else:
-        with st.expander("Create a post", icon=":material/add_photo_alternate:",
+        with st.expander(f"What's on your mind, {_first(m)}?", icon=":material/add_photo_alternate:",
                          expanded=bool(st.session_state.get("cm_compose_open"))):
             how = st.segmented_control("How", ["media", "write"], default="media", key="cm_how",
                                        format_func={"media": "📸 Photo", "write": "✍️ Write or ask"}.get,
@@ -804,9 +839,9 @@ def _post_card(sc, m, p, gym_name, social=True):
         ge.post_label(sc, m, p)
         gw._md(_post_html(p, gym_name, header=False).replace('<div class="cm-pin">📌 Pinned by the gym</div>', ""))
         ge.post_poll(sc, m, p)
-        x, y, z = st.container(key=f"cm_act_{p['id']}").columns([1.2, 1.4, 1.4])
-        if x.button(f"{'❤️' if liked else '🤍'} {len(p['likes']) or ''}".strip(), key=f"cm_like_{p['id']}",
-                    use_container_width=True):
+        x, y, _sp, z = st.container(key=f"cm_act_{p['id']}").columns([1, 1, 3, 1])
+        if x.button(f"{'❤️' if liked else ':material/favorite_border:'} {len(p['likes']) or ''}".strip(),
+                    key=f"cm_like_{p['id']}", use_container_width=True):
             if liked:
                 sc.table("community_likes").delete().eq("post_id", p["id"]).eq("member_id", m["id"]).execute()
             else:
@@ -818,15 +853,17 @@ def _post_card(sc, m, p, gym_name, social=True):
             st.rerun()
         show_key = f"cm_show_{p['id']}"
         n = len(p["comments"])
-        if y.button(f"💬 {n}" if n else "💬 Comment", key=f"cm_cbtn_{p['id']}", use_container_width=True):
+        if y.button(f":material/chat_bubble_outline: {n or ''}".strip(), key=f"cm_cbtn_{p['id']}",
+                    use_container_width=True):
             st.session_state[show_key] = not st.session_state.get(show_key, False)
             st.rerun()
         if mine:
-            if z.button("Delete", key=f"cm_del_{p['id']}", use_container_width=True):
+            if z.button(":material/delete_outline:", key=f"cm_del_{p['id']}", use_container_width=True,
+                        help="Delete"):
                 sc.table("community_posts").delete().eq("id", p["id"]).eq("member_id", m["id"]).execute()
                 st.session_state["cm_flash"] = "Post deleted."
                 st.rerun()
-        elif z.button("Report", key=f"cm_rep_{p['id']}", use_container_width=True):
+        elif z.button(":material/flag:", key=f"cm_rep_{p['id']}", use_container_width=True, help="Report"):
             sc.table("community_reports").insert({"gym_id": m["gym_id"], "post_id": p["id"], "member_id": m["id"],
                                                   "reason": "Reported from the member app"}).execute()
             st.session_state["cm_flash"] = "Thanks. The gym will take a look."
