@@ -70,3 +70,22 @@ Run `sql/phase9_loyalty.sql` once in Supabase.
 - All of them start switched off. They go out every morning at 08:30 Lagos time from `.github/workflows/auto-messages.yml`, which uses the same repository secrets as Monthly reports. You can also tap **Send today's … now**.
 - Each member gets each message at most once per occasion, and at most one automatic email a day (renewal, we missed you, first week, new member check-in, milestone, level up, reward, progress, then happiness check). Unsubscribed members are skipped. Members with no email are listed with a WhatsApp button. There's a daily cap (default 80), because Resend's free plan allows 100 emails a day.
 - Renewal emails use the same invitation as Collect renewals: a Paystack button if you've added a link, and your bank details as a P.S. only if you switched that on.
+
+## Automatic follow-up: no reply means a person calls
+
+Automatic messages are only half the job. If a member gets "We missed you" (or a renewal reminder and their
+membership then ends) and does nothing, a person should follow up.
+
+- **When:** a set number of days after the message (3 by default), if the member hasn't replied, checked in or
+  renewed. Set it in Grow → Automatic messages → "No reply? Add a call for my team". It's on by default.
+- **Where:** Follow-ups → **Calls**. Each call shows why it's there, when the member usually trains, their phone
+  number (Call and WhatsApp buttons) and what to say. Calls are shared out between the staff names in your
+  automation settings.
+- **No answer:** tap it and the call comes back in 3 days. After 3 tries it's marked "No response".
+- **We talked:** pick why they stopped (moved, money, time, injury, motivation, other). GymPulse shows what to
+  offer for that reason. Then tap "Coming back" or "Not coming back".
+- **Closes by itself** as Retained when the member checks in or renews.
+- **Why members stop** at the bottom of Calls adds up the reasons from the last 90 days.
+
+The daily automatic-messages job adds and closes calls every morning, and opening Follow-ups does the same.
+Calls are ordinary Action Centre plays, so staff workload and outcome reports include them. No SQL needed.

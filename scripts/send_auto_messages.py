@@ -51,6 +51,11 @@ def main():
         try:
             with gadm.as_gym(entry):
                 s, k, f = gl.send_due(sc, entry["gym"]["id"], entry["profile"], dry_run=args.dry_run)
+                import gympulse_chase as gch
+                a, c = gch.run(sc, entry["gym"]["id"], entry["profile"], entry.get("name") or "your gym",
+                               dry_run=args.dry_run)
+                if a or c:
+                    print(f"  follow-up calls: {a} {'would add' if args.dry_run else 'added'}, {c} closed")
         except Exception as error:
             print(f"  failed: {error}")
             total[2] += 1

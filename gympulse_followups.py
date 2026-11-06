@@ -452,13 +452,21 @@ def render_followups(supabase, gym_id, assess_fn, owner_name, gym_name):
                      "lime" if email_ready() else "grey", dot=True)]
     gw._md(f'<div class="chip-row">{"".join(chips)}</div>')
 
+    import gympulse_chase as gch
+    try:
+        calls = gch.open_count(supabase, gym_id)
+    except Exception:
+        calls = 0
     label = {"Compose": "Compose", "Campaigns": "Email campaigns",
-             "Inbox": f"Inbox ({unread})" if unread else "Inbox", "Sent": "Sent"}
-    view = st.radio("View", ["Compose", "Campaigns", "Inbox", "Sent"], horizontal=True,
+             "Inbox": f"Inbox ({unread})" if unread else "Inbox", "Sent": "Sent",
+             "Calls": f"Calls ({calls})" if calls else "Calls"}
+    view = st.radio("View", ["Compose", "Calls", "Campaigns", "Inbox", "Sent"], horizontal=True,
                     key="fu_view", format_func=lambda v: label[v],
                     label_visibility="collapsed")
     if view == "Compose":
         _compose(supabase, gym_id, members, owner_name, gym_name)
+    elif view == "Calls":
+        gch.render_calls(supabase, gym_id, gym_name, owner_name)
     elif view == "Campaigns":
         import gympulse_campaigns as gcamp
         roster = st.session_state.get("_fu_roster")
