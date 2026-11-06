@@ -234,6 +234,9 @@ CSS = """<style>
 def _post_html(p, gym_name, header=True):
     name, badge = _author(p, gym_name)
     img = f'<img class="cm-img" src="{gw._esc(p["photo"])}" alt="">' if p.get("photo") else ""
+    if (p.get("meta") or {}).get("video"):
+        import gympulse_media as gm
+        img = gm.video_html(p["meta"], p.get("photo"), gym_name)
     pin = '<div class="cm-pin">📌 Pinned by the gym</div>' if p.get("pinned") else ""
     head = ('<div style="display:flex;align-items:center;gap:10px">'
             + gw.avatar_html(p.get("author_name") or gym_name, p.get("avatar"), 40)
@@ -553,9 +556,9 @@ def render_member(sc, m, gym_name, profile=None):
     view = st.session_state.get("cm_view", "feed")
     if not social and view not in ("feed",):
         view = "feed"
-    if view in ("feed", "search", "inbox", "me") and social:
+    if view in ("feed", "reels", "search", "inbox", "me") and social:
         unread = unread_count(sc, m)
-        labels = {"feed": ":material/home:", "search": ":material/search:",
+        labels = {"feed": ":material/home:", "reels": ":material/movie:", "search": ":material/search:",
                   "inbox": f":material/send:{f' {unread}' if unread else ''}",
                   "me": ":material/person:"}
         st.session_state["cm_nav_bar"] = view           # the menu always shows the current screen
@@ -570,7 +573,9 @@ def render_member(sc, m, gym_name, profile=None):
             n = unread_notes(sc, m)
             with st.popover(f":material/notifications:{f' {n}' if n else ''}", use_container_width=True):
                 notes_list(sc, m)
-    if view == "search":
+    if view == "reels":
+        _reels(sc, m, gym_name)
+    elif view == "search":
         _search(sc, m, gym_name)
     elif view == "inbox":
         _inbox(sc, m, gym_name)
@@ -602,7 +607,12 @@ def _feed(sc, m, gym_name, social):
     else:
         with st.expander("Create a post", icon=":material/add_photo_alternate:",
                          expanded=bool(st.session_state.get("cm_compose_open"))):
-            if ge.ready(sc):
+            how = st.segmented_control("How", ["media", "write"], default="media", key="cm_how",
+                                       format_func={"media": "📸 Photo", "write": "✍️ Write or ask"}.get,
+                                       label_visibility="collapsed") or "media"
+            if how == "media":
+                _media_post(sc, m, gym_name)
+            elif ge.ready(sc):
                 ge.composer(sc, m, gym_name)
             else:
                 _composer(sc, m)
@@ -632,6 +642,112 @@ def _feed(sc, m, gym_name, social):
     if len(posts) >= limit:
         if st.button("Show more", key="cm_more", use_container_width=True):
             st.session_state["cm_limit"] = limit + PAGE
+            st.rerun()
+
+
+def _media_post(sc, m, gym_name, mode="post"):
+    """Photo (or reel) through the editor, then into the feed."""
+    import gympulse_media as gm
+    n = st.session_state.get("cm_me_n", 0)
+    media = gm.media_editor(mode, gym_name, key=f"cm_me_{mode}_{n}", draftkey=f"{m['id']}")
+    if not media:
+        return
+    since = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
+    try:
+        today = sc.table("community_posts").select("id").eq("member_id", m["id"]).gte("created_at", since) \
+            .execute().data or []
+    except Exception:
+        today = []
+    if len(today) >= POSTS_PER_DAY:
+        st.error("That's a lot of posts today. Please try again tomorrow.")
+        return
+    try:
+        pic, meta = gm.store_media(sc, m["gym_id"], media)
+    except Exception:
+        st.error("That couldn't be uploaded. Try again, or a shorter video.")
+        return
+    row = {"gym_id": m["gym_id"], "member_id": m["id"], "author_name": gw._text(m.get("full_name"), "Member"),
+           "body": (media.get("caption") or "")[:MAX_BODY], "photo": pic}
+    if meta:
+        row.update({"kind": "reel", "meta": meta})
+    sc.table("community_posts").insert(row).execute()
+    st.session_state["cm_me_n"] = n + 1
+    st.session_state["cm_flash"] = "Your reel is live 🎬" if meta else "Posted."
+    st.rerun()
+
+
+@st.dialog("New reel")
+def new_reel_dialog(sc, m, gym_name):
+    _media_post(sc, m, gym_name, mode="reel")
+
+
+@st.dialog("Comments")
+def comments_dialog(sc, m, post_id, gym_name):
+    posts = [p for p in load_feed(sc, m["gym_id"], 200) if p["id"] == post_id]
+    if not posts:
+        st.info("This post is no longer available.")
+        return
+    p = posts[0]
+    if not p["comments"]:
+        st.caption("No comments yet. Say something nice 💬")
+    for cm in p["comments"]:
+        badge = ('<span class="cm-coach">Coach</span>' if cm.get("author_role") == "coach"
+                 else " (gym)" if not cm.get("member_id") else "")
+        gw._md(f'<div class="cm-c"><b>{gw._esc(cm.get("author_name") or gym_name)}</b>{badge} {gw._esc(cm.get("body"))}'
+               f' <span class="cm-when">· {_when(cm.get("created_at"))}</span></div>')
+    if not m.get("community_blocked"):
+        with st.form("cm_dlg_cf", clear_on_submit=True, border=False):
+            text = st.text_input("Comment", max_chars=MAX_COMMENT, label_visibility="collapsed", placeholder="Add a comment…")
+            if st.form_submit_button("Send", type="primary") and text.strip():
+                sc.table("community_comments").insert({"post_id": p["id"], "gym_id": m["gym_id"], "member_id": m["id"],
+                                                       "author_name": gw._text(m.get("full_name"), "Member"),
+                                                       "body": text.strip()[:MAX_COMMENT]}).execute()
+                st.rerun(scope="fragment")
+
+
+def _reels(sc, m, gym_name):
+    import gympulse_media as gm
+    a, b = st.columns([3, 1.4], vertical_alignment="center")
+    a.markdown("#### Reels")
+    if not m.get("community_blocked") and b.button("New reel", icon=":material/videocam:", type="primary",
+                                                     key="cm_new_reel", use_container_width=True):
+        new_reel_dialog(sc, m, gym_name)
+    try:
+        rows = sc.table("community_posts").select("*").eq("gym_id", m["gym_id"]).eq("kind", "reel") \
+            .eq("hidden", False).order("created_at", desc=True).limit(40).execute().data or []
+    except Exception:
+        rows = []
+    ids = [r["id"] for r in rows]
+    feed = {p["id"]: p for p in load_feed(sc, m["gym_id"], 200) if p["id"] in set(ids)}
+    mine_b, theirs_b = _blocks(sc, m["gym_id"], m["id"])
+    reels = []
+    for r in rows:
+        p = feed.get(r["id"], {**r, "likes": [], "comments": [], "avatar": None})
+        meta = p.get("meta") or {}
+        if not meta.get("video") or p.get("member_id") in mine_b | theirs_b:
+            continue
+        reels.append({"id": p["id"], "video": meta["video"], "poster": p.get("photo") or "", "filter": meta.get("filter"),
+                      "items": meta.get("items") or [], "caption": p.get("body") or "",
+                      "author": gw._text(p.get("author_name"), gym_name), "avatar": p.get("avatar") or "",
+                      "initials": gw.initials(p.get("author_name") or gym_name), "member_id": p.get("member_id"),
+                      "likes": len(p["likes"]), "liked": m["id"] in p["likes"], "comments": len(p["comments"])})
+    evt = gm.reels_viewer(reels)
+    if evt:
+        kind, pid = evt
+        if kind == "like":
+            p = feed.get(pid)
+            if p and m["id"] in p["likes"]:
+                sc.table("community_likes").delete().eq("post_id", pid).eq("member_id", m["id"]).execute()
+            else:
+                try:
+                    sc.table("community_likes").insert({"post_id": pid, "gym_id": m["gym_id"], "member_id": m["id"]}).execute()
+                except Exception:
+                    pass
+            st.rerun()
+        elif kind == "comments":
+            comments_dialog(sc, m, pid, gym_name)
+        elif kind == "profile" and pid:
+            _open_profile(pid)
             st.rerun()
 
 
@@ -806,31 +922,31 @@ def _story_times():
 
 @st.dialog("New story")
 def add_story_dialog(sc, m):
-    st.caption("Stories disappear after 24 hours. Only you can see them later, in your story archive.")
-    with st.form("cm_story_new", border=False):
-        photo = st.file_uploader("Photo", type=["jpg", "jpeg", "png", "webp", "heic", "heif"])
-        text = st.text_input("Text (optional)", max_chars=140)
-        import gympulse_engage as ge
-        c1, c2 = st.columns(2)
-        stk = c1.selectbox("Sticker", ge.STICKERS, format_func=lambda s: s or "No sticker")
-        frm = c2.toggle("Gym frame", value=True)
-        go = st.form_submit_button("Share story", type="primary", use_container_width=True)
-    if go:
-        if photo is None and not text.strip():
-            st.error("Add a photo or some text.")
-            return
-        pic = None
-        if photo is not None:
-            raw = _image(photo.getvalue())
-            if stk or frm:
-                import gympulse_portal as gportal
-                raw = ge.frame_photo(raw, gportal._gym(sc, m["gym_id"])[2], stk, frm)
-            pic = _store_photo(sc, m["gym_id"], raw)
-        sc.table("community_stories").insert({"gym_id": m["gym_id"], "member_id": m["id"],
-                                              "author_name": gw._text(m.get("full_name"), "Member"),
-                                              "photo": pic, "body": text.strip(), **_story_times()}).execute()
-        st.session_state["cm_flash"] = "Story shared for 24 hours."
-        st.rerun()
+    import gympulse_media as gm
+    import gympulse_portal as gportal
+    gym_name = gportal._gym(sc, m["gym_id"])[2]
+    n = st.session_state.get("cm_me_n", 0)
+    media = gm.media_editor("story", gym_name, key=f"cm_me_story_{n}", draftkey=f"{m['id']}")
+    if not media:
+        st.caption("Stories disappear after 24 hours. Only you can see them later, in your story archive.")
+        return
+    try:
+        pic, meta = gm.store_media(sc, m["gym_id"], media)
+    except Exception:
+        st.error("That couldn't be uploaded. Try a shorter video or a photo.")
+        return
+    row = {"gym_id": m["gym_id"], "member_id": m["id"], "author_name": gw._text(m.get("full_name"), "Member"),
+           "photo": pic, "body": (media.get("caption") or "")[:140], **_story_times()}
+    if meta:
+        row["meta"] = meta
+    try:
+        sc.table("community_stories").insert(row).execute()
+    except Exception:
+        row.pop("meta", None)                     # phase 25 not run: photo stories still work
+        sc.table("community_stories").insert(row).execute()
+    st.session_state["cm_me_n"] = n + 1
+    st.session_state["cm_flash"] = "Story shared for 24 hours."
+    st.rerun()
 
 
 @st.dialog("Stories", width="small")
@@ -851,7 +967,11 @@ def story_dialog(sc, m, order, groups, gym_name):
     bars = "".join(f'<i class="{"on" if j <= pos[1] else ""}"></i>' for j in range(len(items)))
     gw._md(f'<div class="cm-bar">{bars}</div><div class="cm-name">{gw._esc(who)} '
            f'<span class="cm-when">· {_when(s.get("created_at"))}</span></div>')
-    if s.get("photo"):
+    if (s.get("meta") or {}).get("video"):
+        import gympulse_media as gm
+        gw._md(gm.video_html(s["meta"], s.get("photo"), gym_name, autoplay=True, height="70vh")
+               + (f'<div class="cm-body" style="text-align:center">{gw._esc(s.get("body"))}</div>' if s.get("body") else ""))
+    elif s.get("photo"):
         gw._md(f'<div class="cm-story"><img src="{gw._esc(s["photo"])}" alt=""></div>'
                + (f'<div class="cm-body" style="text-align:center">{gw._esc(s.get("body"))}</div>' if s.get("body") else ""))
     else:
