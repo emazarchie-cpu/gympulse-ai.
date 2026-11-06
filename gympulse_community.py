@@ -1039,85 +1039,8 @@ def story_dialog(sc, m, order, groups, gym_name):
 
 # ---------------- profile
 def _profile(sc, m, pid, gym_name):
-    pp = people(sc, m["gym_id"])
-    me = pid == m["id"]
-    if not me:
-        _back()
-    p = pp.get(pid) or ({**m} if me else None)
-    if not p:
-        st.info("This member isn't in the community.")
-        return
-    mine_b, theirs_b = _blocks(sc, m["gym_id"], m["id"])
-    if pid in theirs_b:
-        st.info("This profile isn't available.")
-        return
-    try:
-        posts = sc.table("community_posts").select("*").eq("gym_id", m["gym_id"]).eq("member_id", pid) \
-            .eq("hidden", False).order("created_at", desc=True).limit(60).execute().data or []
-    except Exception:
-        posts = []
-    fol, fing = followers_of(sc, m["gym_id"], pid), following_of(sc, m["gym_id"], pid)
-    gw._md('<div class="cm-prof">' + '<div style="display:flex;justify-content:center">'
-           + gw.avatar_html(p.get("full_name"), p.get("photo"), 92) + "</div>"
-           + f'<div class="cm-prof-name">{gw._esc(p.get("full_name"))}</div>'
-           + (f'<div class="cm-prof-bio">{gw._esc(p.get("community_bio"))}</div>' if p.get("community_bio") else "")
-           + "</div>")
-    a, b, c = st.container(key="cm_stats").columns(3)
-    a.button(f"**{len(posts)}** {'post' if len(posts) == 1 else 'posts'}", key="cm_st_posts", type="tertiary",
-             use_container_width=True)
-    if b.button(f"**{len(fol)}** {'follower' if len(fol) == 1 else 'followers'}", key="cm_st_fol", type="tertiary",
-                use_container_width=True):
-        people_dialog(sc, m, "Followers", fol)
-    if c.button(f"**{len(fing)}** following", key="cm_st_fing", type="tertiary", use_container_width=True):
-        people_dialog(sc, m, "Following", fing)
-    import gympulse_engage as ge
-    st.markdown(ge.CSS, unsafe_allow_html=True)
-    ge.profile_extras(sc, m, pid)
-    if me:
-        x, y = st.container(key="cm_pbtn_me").columns(2)
-        if x.button("Edit profile", key="cm_edit", icon=":material/edit:", use_container_width=True):
-            edit_profile_dialog(sc, m)
-        if y.button("Story archive", key="cm_arch", icon=":material/history:", use_container_width=True):
-            archive_dialog(sc, m)
-    else:
-        following = pid in following_of(sc, m["gym_id"], m["id"])
-        x, y, z = st.container(key="cm_pbtn_other").columns([1.3, 1.3, 1])
-        if x.button("Following" if following else "Follow", key="cm_follow", use_container_width=True,
-                    type="secondary" if following else "primary"):
-            toggle_follow(sc, m, pid)
-            st.rerun()
-        if y.button("Message", key="cm_msg", icon=":material/chat:", use_container_width=True):
-            _open_chat(pid)
-            st.rerun()
-        if z.button("Unblock" if pid in mine_b else "Block", key="cm_block", use_container_width=True):
-            if pid in mine_b:
-                sc.table("community_blocks").delete().eq("blocker_id", m["id"]).eq("blocked_id", pid).execute()
-                st.session_state["cm_flash"] = "Unblocked."
-            else:
-                sc.table("community_blocks").insert({"gym_id": m["gym_id"], "blocker_id": m["id"],
-                                                     "blocked_id": pid}).execute()
-                sc.table("community_follows").delete().eq("follower_id", m["id"]).eq("followee_id", pid).execute()
-                sc.table("community_follows").delete().eq("follower_id", pid).eq("followee_id", m["id"]).execute()
-                _bust(m["gym_id"])
-                st.session_state["cm_flash"] = "Blocked. They can't message you or see your profile."
-            st.rerun()
-        if pid in mine_b:
-            st.caption("You've blocked this member.")
-            return
-    if not posts:
-        st.caption("No posts yet." if not me else "You haven't posted yet. Share something from the Feed.")
-        return
-    st.markdown('<div class="section-label">POSTS</div>', unsafe_allow_html=True)
-    for i in range(0, len(posts), 3):
-        cols = st.container(key=f"cm_grid_{i}").columns(3)
-        for col, post in zip(cols, posts[i:i + 3]):
-            with col:
-                if post.get("photo"):
-                    gw._md(f'<img class="cm-tile" src="{gw._esc(post["photo"])}" alt="">')
-                else:
-                    gw._md(f'<div class="cm-tile-t">{gw._esc(gw._text(post.get("body"))[:140])}</div>')
-                if st.button("Open", key=f"cm_open_{post['id']}", type="tertiary", use_container_width=True):
-                    post_dialog(sc, m, post["id"], gym_name)
+    import gympulse_profile as gpf
+    gpf.render(sc, m, pid, gym_name)
 
 
 @st.dialog("Post")
@@ -1151,8 +1074,17 @@ def edit_profile_dialog(sc, m):
                       index=list(opts).index(pp.get("community_dm") or "everyone"))
         mail = st.toggle("Email me when someone messages or follows me",
                          value=pp.get("community_email_notify", m.get("community_email_notify", True)) is not False)
+        cover = st.file_uploader("Cover photo", type=["jpg", "jpeg", "png", "webp", "heic"],
+                                 help="A wide photo across the top of your profile.")
         st.caption("Your name and photo come from your gym details (My details tab).")
         if st.form_submit_button("Save", type="primary", use_container_width=True):
+            if cover is not None:
+                try:
+                    import gympulse_profile as gpf
+                    gpf.save_cover(sc, m, cover.getvalue())
+                except Exception:
+                    st.error("That cover photo couldn't be used. Try a JPG or PNG.")
+                    st.stop()
             upd = {"community_bio": bio.strip() or None, "community_dm": dm, "community_email_notify": bool(mail)}
             try:
                 sc.table("members").update(upd).eq("id", m["id"]).execute()
@@ -1183,7 +1115,35 @@ def archive_dialog(sc, m):
                     gw._md(f'<img class="cm-tile" src="{gw._esc(s["photo"])}" alt="">')
                 else:
                     gw._md(f'<div class="cm-tile-t">{gw._esc(s.get("body"))}</div>')
-                st.caption(pd.to_datetime(s["created_at"]).strftime("%d %b"))
+                st.caption(pd.to_datetime(s["created_at"]).strftime("%d %b")
+                           + (f" · ✨ {s['highlight']}" if s.get("highlight") else ""))
+    if rows:
+        _highlight_form(sc, m, rows)
+
+
+def _highlight_form(sc, m, rows):
+    """Save archived stories into a named highlight shown on the profile."""
+    st.markdown("**Highlights**")
+    st.caption("Keep stories on your profile in a named circle, e.g. Leg day, Transformation, Events.")
+    names = sorted({s["highlight"] for s in rows if s.get("highlight")})
+    with st.form("cm_hl_form", border=False):
+        pick = st.multiselect("Stories", [s["id"] for s in rows],
+                              format_func=lambda i: next((pd.to_datetime(s["created_at"]).strftime("%d %b")
+                                                          + " · " + (gw._text(s.get("body"))[:30] or "photo")
+                                                          for s in rows if s["id"] == i), i))
+        name = st.text_input("Highlight name", max_chars=24, placeholder=names[0] if names else "Leg day")
+        x, y = st.columns(2)
+        add = x.form_submit_button("Add to highlight", type="primary", use_container_width=True)
+        rem = y.form_submit_button("Remove from highlight", use_container_width=True)
+    if (add or rem) and pick:
+        if add and not name.strip():
+            st.error("Give the highlight a name.")
+            return
+        for i in pick:
+            sc.table("community_stories").update({"highlight": name.strip()[:24] if add else None}) \
+                .eq("id", i).eq("member_id", m["id"]).execute()
+        st.session_state["cm_flash"] = "Highlight saved." if add else "Removed from highlight."
+        st.rerun()
 
 
 # ---------------- search
