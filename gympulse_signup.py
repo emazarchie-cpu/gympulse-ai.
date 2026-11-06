@@ -28,7 +28,7 @@ def link_for(code):
 def render_public(supabase, code):
     import gympulse_booking as gb
     gb._header()
-    _, col, _ = st.columns([1, 2.2, 1])
+    col = gw.center("signup", 640)
     with col:
         try:
             info = supabase.rpc("gp_join_info", {"p_code": str(code)}).execute().data or []

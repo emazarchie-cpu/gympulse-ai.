@@ -1200,7 +1200,7 @@ if st.session_state.auth_user is None:
                     st.error("Too many emails were sent to this address. Wait a few minutes and try again.")
                 else:
                     st.error("Could not resend right now. Please try again shortly.")
-    _, auth_col, _ = st.columns([1, 1.4, 1])
+    auth_col = gw.center("auth", 520)
 
     with auth_col:
         _who = st.segmented_control("Who is signing in?", ["Gym owner", "Member"], default="Gym owner",
