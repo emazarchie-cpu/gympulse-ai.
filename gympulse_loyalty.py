@@ -604,6 +604,13 @@ def render_auto(supabase, gym_id, owner_id):
             pause_on = st.checkbox("Offer to pause their membership if now isn't a good time",
                                    value=bool(auto["missed"].get("pause", True)),
                                    help="Many members stop because money or time is tight. A pause keeps them with you.")
+            import gympulse_chase as gch
+            ch = gch.cfg()
+            c5, c6 = st.columns([1.3, 1])
+            ch_on = c5.toggle("No reply? Add a call for my team", value=ch["on"],
+                              help="If a member doesn't reply, check in or renew after one of these messages, "
+                                   "they appear in Follow-ups → Calls so a person can call them.")
+            ch_wait = c6.number_input("Days to wait", 2, 10, int(ch["wait"]))
         with g2.container(border=True):
             st.markdown("##### :material/person_add: New members")
             wk_on = st.toggle("\"How was your first week?\" (day 7)", value=auto["week1"]["on"])
@@ -638,7 +645,8 @@ def render_auto(supabase, gym_id, owner_id):
                 "welcome": {"on": bool(w_on)}, "progress": {"on": bool(pr_on)},
                 "week1": {"on": bool(wk_on)}, "milestone": {"on": bool(ms_on)}, "level": {"on": bool(lv_on)},
                 "pulse": {"on": bool(hp_on), "freq": hp_freq},
-                "reward": {"on": bool(rw_on)}, "daily_cap": int(cap)}}, "Automatic messages saved.")
+                "reward": {"on": bool(rw_on)}, "daily_cap": int(cap)},
+                "chase": {"on": bool(ch_on), "wait": int(ch_wait)}}, "Automatic messages saved.")
             st.rerun()
     import gympulse_whatsapp as gwa
     gwa.render_gym_setting(supabase, owner_id, gym_id)
