@@ -40,6 +40,14 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+# Switching workspace: hide the previous page's leftovers straight away, so the new page never shows
+# old content while it loads. Always the same element here, so ordinary taps don't hide anything.
+_nav_new = bool(st.session_state.get("navigate_to")) or (
+    st.session_state.get("_rendered_page") is not None
+    and st.session_state.get("current_page") != st.session_state.get("_rendered_page"))
+st.markdown('<style>[data-testid="stElementContainer"][data-stale="true"]{display:none !important}</style>'
+            if _nav_new else '<style></style>', unsafe_allow_html=True)
+
 
 
 # =========================================================
@@ -2549,6 +2557,7 @@ with st.container(key="top_nav"):
     page = st.session_state["current_page"]
     if gteam.is_staff() and page in gteam.OWNER_ONLY:
         page = st.session_state["current_page"] = "Dashboard"
+    st.session_state["_rendered_page"] = page
 
     if page in MAIN_PAGES + MORE_PAGES and st.query_params.get("p") != page:
         st.query_params["p"] = page
@@ -2558,6 +2567,10 @@ with st.container(key="top_nav"):
         try:
             @_fragment(run_every=None if page == "Archie" else 20)
             def _watch_inbox():
+                import time as _t
+                if _t.time() - st.session_state.get("_watch_at", 0) < 15:
+                    return                       # checked moments ago: don't slow down this tap
+                st.session_state["_watch_at"] = _t.time()
                 count = _unread_now()
                 if count and count > st.session_state.get("last_unread", 0):
                     st.session_state["last_unread"] = count

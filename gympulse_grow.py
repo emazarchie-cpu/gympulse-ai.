@@ -132,7 +132,7 @@ def _member_names(df):
 
 def _checkins(supabase, gym_id, days=90):
     key = ("grow_ck", gym_id, days)
-    ck = gw._cached(key, lambda: gw._fetch_checkins(supabase, gym_id, days=days), ttl=60)
+    ck = gw.checkins_window(supabase, gym_id, days)
     if ck is None:
         return pd.DataFrame(columns=["member_id", "at", "day"])
     return ck
