@@ -47,29 +47,40 @@ FEATURES = {
     3: ["Archie, your AI retention assistant",
         "Model insights: why each member was flagged"],
 }
-SERVICES = ["Priority WhatsApp support from the GymPulse team",
-            "We import your members and set everything up with you"]
+SUPPORT = {"standard": "Standard help", "priority": "Priority help", "dedicated": "Dedicated account manager"}
+SERVICE_LEVEL = [   # (service, lowest support level that includes it)
+    ("Priority WhatsApp support from the GymPulse team", "priority"),
+    ("We import your members and set everything up with you", "priority"),
+    ("A dedicated account manager", "dedicated"),
+    ("Staff training and a monthly review call", "dedicated"),
+]
+SERVICES = [x for x, _ in SERVICE_LEVEL]
+GRACE_OVER_LIMIT = 30          # days to upgrade after going over the plan's member limit
+
+
+def _support_rank(level):
+    return list(SUPPORT).index(level) if level in SUPPORT else 0
 PAGE_LEVEL = {"Action Centre": 2, "Grow": 2, "Business Insights": 2,
               "Archie": 3, "Model Insights": 3, "About the Model": 3}
 
 DEFAULT_PLANS = [   # every plan has every feature; price follows gym size and the WhatsApp messages included
     {"name": "Starter", "access": 3, "monthly": 20000, "yearly": 200000, "for_who": "Up to 150 members",
-     "members": 150, "wa_renew": 250, "wa_promo": 0, "priority": False,
+     "members": 150, "wa_renew": 250, "wa_promo": 0, "archie": 100, "support": "standard",
      "tagline": "Every feature, sized for a small gym.", "popular": False},
     {"name": "Growth", "access": 3, "monthly": 45000, "yearly": 450000, "for_who": "Up to 500 members",
-     "members": 500, "wa_renew": 700, "wa_promo": 0, "priority": False,
+     "members": 500, "wa_renew": 700, "wa_promo": 0, "archie": 300, "support": "standard",
      "tagline": "Every feature, for a busy neighbourhood gym.", "popular": True},
     {"name": "Pro", "access": 3, "monthly": 100000, "yearly": 1000000, "for_who": "Up to 1,500 members",
-     "members": 1500, "wa_renew": 2000, "wa_promo": 150, "priority": True,
+     "members": 1500, "wa_renew": 2000, "wa_promo": 150, "archie": 1000, "support": "priority",
      "tagline": "Every feature, WhatsApp promotions and priority help.", "popular": False},
     {"name": "Business", "access": 3, "monthly": 280000, "yearly": 2800000, "for_who": "Up to 5,000 members",
-     "members": 5000, "wa_renew": 6500, "wa_promo": 400, "priority": True,
+     "members": 5000, "wa_renew": 6500, "wa_promo": 400, "archie": 3000, "support": "dedicated",
      "tagline": "For big gyms and multi-branch brands.", "popular": False},
     {"name": "Enterprise", "access": 3, "monthly": 750000, "yearly": 7500000, "for_who": "Up to 20,000 members",
-     "members": 20000, "wa_renew": 24000, "wa_promo": 1000, "priority": True,
+     "members": 20000, "wa_renew": 24000, "wa_promo": 1000, "archie": 0, "support": "dedicated",
      "tagline": "For gym chains, with WhatsApp at scale.", "popular": False},
 ]
-TRIAL_ALLOWANCE = {"wa_renew": 300, "wa_promo": 30}    # free trial and pilot mode
+TRIAL_ALLOWANCE = {"wa_renew": 300, "wa_promo": 30, "archie": 100}    # free trial and pilot mode
 DEFAULT_PRICING = {"plans": [], "monthly": None, "yearly": None, "currency": "NGN", "pay_link": "",
                    "bank_name": "", "bank_account": "", "bank_holder": "",
                    "contact_whatsapp": "", "contact_email": "emmanuel@usegympulseai.com",
@@ -109,8 +120,12 @@ def plans(p):
         out.append({"name": gw._text(x.get("name")).strip(), "access": access, "monthly": mo,
                     "yearly": yr or (mo * 10 if mo else None), "for_who": who,
                     "members": members, "wa_renew": int(wa_renew), "wa_promo": int(_int(x.get("wa_promo")) or 0),
-                    "priority": (bool(x.get("priority")) if x.get("priority") is not None
-                                 else (members == 0 or members >= 1500)),
+                    "support": (x.get("support") if x.get("support") in SUPPORT
+                                else "priority" if x.get("priority") or (x.get("priority") is None
+                                                                         and (members == 0 or members >= 1500))
+                                else "standard"),
+                    "archie": int(_int(x.get("archie")) if _int(x.get("archie")) is not None
+                                  else (0 if not members else max(100, members * 2))),
                     "tagline": gw._text(x.get("tagline")).strip(), "popular": bool(x.get("popular"))})
     return out
 
@@ -130,10 +145,11 @@ def plan_lines(plan):
         lines.append(f"{plan['wa_renew']:,} WhatsApp renewal reminders and replies a month, included")
     if plan.get("wa_promo"):
         lines.append(f"{plan['wa_promo']:,} WhatsApp promotional messages a month, included")
+    lines.append(f"Archie AI: {plan['archie']:,} questions a month" if plan.get("archie") else "Archie AI: unlimited questions")
     lines.append("Unlimited emails and member app")
     lines.append("No extra charges: if WhatsApp messages run out, they go by email")
-    if plan.get("priority"):
-        lines += SERVICES
+    rank = _support_rank(plan.get("support"))
+    lines += [svc for svc, lv in SERVICE_LEVEL if rank >= _support_rank(lv)]
     return lines
 
 
@@ -258,7 +274,8 @@ def compare_rows(ps):
             ("WhatsApp promotional messages / month", [f"{x['wa_promo']:,}" if x.get("wa_promo") else "By email" for x in ps]),
             ("Emails and member app", ["Unlimited" for _ in ps]),
             ("Extra charges", ["None" for _ in ps])]
-    size += [(svc, [bool(x.get("priority")) for x in ps]) for svc in SERVICES]
+    size.insert(3, ("Archie AI questions / month", [f"{x['archie']:,}" if x.get("archie") else "Unlimited" for x in ps]))
+    size += [(svc, [_support_rank(x.get("support")) >= _support_rank(lv) for x in ps]) for svc, lv in SERVICE_LEVEL]
     return size + [(f, [x["access"] >= lv for x in ps]) for lv in (1, 2, 3) for f in FEATURES[lv]]
 
 
@@ -339,9 +356,9 @@ def access_level(sub, ps):
     return hit["access"] if hit else 3
 
 
-def wa_allowance(supabase, gym_id):
-    """WhatsApp messages included this month for a gym: {"wa_renew", "wa_promo", "plan", "members"}.
-    Paying gyms get their plan's allowance; trial, free access and pilot mode get TRIAL_ALLOWANCE."""
+def plan_limits(supabase, gym_id):
+    """What a gym's plan includes this month: {"wa_renew", "wa_promo", "archie", "members", "plan", "status"}.
+    Paying gyms get their plan; trial, free access and pilot mode get TRIAL_ALLOWANCE (no member limit)."""
     p = pricing(supabase)
     ps = plans(p)
     sub = subscription(supabase, gym_id)
@@ -350,13 +367,121 @@ def wa_allowance(supabase, gym_id):
         name = gw._text((sub or {}).get("plan")).split(" · ")[0].strip().lower()
         hit = next((x for x in ps if x["name"].lower() == name), None)
         if hit:
-            return {"wa_renew": hit["wa_renew"], "wa_promo": hit["wa_promo"], "plan": hit["name"],
-                    "members": hit["members"]}
+            return {"wa_renew": hit["wa_renew"], "wa_promo": hit["wa_promo"], "archie": hit["archie"],
+                    "members": hit["members"], "plan": hit["name"], "status": "active"}
     if s["status"] == "expired":
-        return {"wa_renew": 0, "wa_promo": 0, "plan": "", "members": 0}
+        return {"wa_renew": 0, "wa_promo": 0, "archie": 0, "members": 0, "plan": "", "status": "expired"}
     t = {**TRIAL_ALLOWANCE, **dict(p.get("trial_allowance") or {})}
-    return {"wa_renew": int(t["wa_renew"]), "wa_promo": int(t["wa_promo"]),
-            "plan": "Free trial" if s["status"] == "trial" else "Pilot", "members": 0}
+    return {"wa_renew": int(t["wa_renew"]), "wa_promo": int(t["wa_promo"]), "archie": int(t.get("archie") or 0),
+            "members": 0, "plan": "Free trial" if s["status"] == "trial" else "Pilot", "status": s["status"]}
+
+
+def wa_allowance(supabase, gym_id):
+    return plan_limits(supabase, gym_id)
+
+
+# ------------------------------------------------------------------ member limit (gentle)
+def member_limit_status(supabase, gym_id, today=None):
+    """None when the gym is within its plan; otherwise {"members", "limit", "plan", "since", "days_left",
+    "blocked"}. A paying gym over its member limit has GRACE_OVER_LIMIT days to upgrade; after that it can't add
+    new members (everything else keeps working). The first day over is kept in gym_subscriptions.over_limit_since."""
+    today = today or gw.today_local()
+    lim = plan_limits(supabase, gym_id)
+    if lim["status"] != "active" or not lim["members"]:
+        return None
+    try:
+        n = len(gw.fetch_members(supabase, gym_id, archived=False, include_photo=False)[0])
+    except Exception:
+        return None
+    sub = subscription(supabase, gym_id) or {}
+    since = _d(sub.get("over_limit_since"))
+    if n <= lim["members"]:
+        if since:
+            _set_over_since(gym_id, None)
+        return None
+    if not since:
+        since = today
+        _set_over_since(gym_id, since)
+    left = GRACE_OVER_LIMIT - (today - since).days
+    return {"members": n, "limit": lim["members"], "plan": lim["plan"], "since": since,
+            "days_left": max(0, left), "blocked": left <= 0}
+
+
+def _set_over_since(gym_id, day):
+    sc = _service()
+    if sc is None:
+        return
+    try:
+        sc.table("gym_subscriptions").update({"over_limit_since": day.isoformat() if day else None}) \
+            .eq("gym_id", gym_id).execute()
+        st.session_state.get("_cache", {}).pop(("billing_sub", gym_id), None)
+    except Exception:
+        pass                                          # phase 20 not run yet: reminder still shows
+
+
+def can_add_members(supabase, gym_id):
+    """(ok, message): False once a gym has been over its member limit for longer than the grace period."""
+    if is_admin_account():
+        return True, ""
+    m = member_limit_status(supabase, gym_id)
+    if m and m["blocked"]:
+        return False, (f"Your {m['plan']} plan covers up to {m['limit']:,} members and you have {m['members']:,}. "
+                       "Upgrade your plan to add new members. Everything else keeps working.")
+    return True, ""
+
+
+def render_limit_banner(supabase, gym_id):
+    """A friendly reminder at the top of the app when a paying gym has outgrown its plan."""
+    m = member_limit_status(supabase, gym_id)
+    if not m:
+        return
+    nxt = fits(plans(pricing(supabase)), m["members"])
+    up = f" **{nxt['name']}** covers up to {nxt['members']:,} members." if nxt and nxt.get("members") else ""
+    msg = (f"You have **{m['members']:,} members** and your **{m['plan']}** plan covers up to {m['limit']:,}.{up} ")
+    if m["blocked"]:
+        st.error(msg + "Upgrade to add new members. Everything else keeps working.", icon=":material/group_add:")
+    else:
+        st.warning(msg + f"Please upgrade within **{m['days_left']} day{'s' if m['days_left'] != 1 else ''}**; "
+                         "after that, new members can't be added until you do.", icon=":material/trending_up:")
+    if st.button("See plans", key="limit_plans", icon=":material/rocket_launch:"):
+        st.session_state["navigate_to"] = "Subscription"
+        st.rerun()
+
+
+# ------------------------------------------------------------------ Archie questions
+def _month():
+    return f"{gw.today_local():%Y-%m}"
+
+
+def archie_used(supabase, gym_id):
+    try:
+        rows = supabase.table("archie_usage").select("questions").eq("gym_id", gym_id).eq("month", _month()) \
+            .limit(1).execute().data or []
+        return int(rows[0]["questions"]) if rows else 0
+    except Exception:
+        return 0
+
+
+def archie_allowed(supabase, gym_id):
+    """(ok, used, limit, message). limit 0 = unlimited."""
+    lim = plan_limits(supabase, gym_id)["archie"]
+    if is_admin_account():
+        return True, 0, 0, ""
+    used = archie_used(supabase, gym_id)
+    if plan_limits(supabase, gym_id)["status"] == "expired":
+        return False, used, lim, "Archie is part of your GymPulse plan. Renew your plan to keep asking Archie."
+    if lim and used >= lim:
+        first = (gw.today_local().replace(day=1) + timedelta(days=32)).replace(day=1)
+        return False, used, lim, (f"You've used all {lim:,} Archie questions in your plan this month. They reset on "
+                                  f"{first:%d %B}. A bigger plan includes more questions.")
+    return True, used, lim, ""
+
+
+def archie_count(supabase, gym_id):
+    try:
+        supabase.rpc("gp_archie_bump", {"p_gym": gym_id, "p_month": _month()}).execute()
+    except Exception:
+        pass
 
 
 def fits(ps, members):
@@ -1044,6 +1169,44 @@ def admin_set(sc, gym_id, **fields):
     st.session_state.pop("_cache", None)
 
 
+def _render_usage_table(sc, gyms, p):
+    """One row per gym: plan, members against the limit, Archie and WhatsApp used this month."""
+    import gympulse_whatsapp as gwa
+    ps = {x["name"].lower(): x for x in plans(p)}
+    try:
+        subs = {r["gym_id"]: r for r in sc.table("gym_subscriptions").select("*").execute().data or []}
+    except Exception:
+        subs = {}
+    try:
+        arch = {r["gym_id"]: r["questions"] for r in sc.table("archie_usage").select("gym_id, questions")
+                .eq("month", _month()).execute().data or []}
+    except Exception:
+        arch = {}
+    wa = gwa.month_usage(sc)["by_gym"]
+    counts = {}
+    try:
+        for r in gw.fetch_all(sc.table("members").select("gym_id").eq("archived", False).order("gym_id")):
+            counts[r["gym_id"]] = counts.get(r["gym_id"], 0) + 1
+    except Exception:
+        pass
+    rows = []
+    for e in gyms:
+        gid = e["gym"]["id"]
+        sub = subs.get(gid) or {}
+        plan = ps.get(gw._text(sub.get("plan")).split(" · ")[0].strip().lower()) if sub.get("status") == "active" else None
+        n = counts.get(gid, 0)
+        lim = plan["members"] if plan else 0
+        over = bool(lim and n > lim)
+        rows.append({"Gym": e["name"], "Plan": plan["name"] if plan else gw._text(sub.get("status"), "trial").title(),
+                     "Members": f"{n:,}" + (f" / {lim:,}" if lim else ""),
+                     "Archie": f"{arch.get(gid, 0):,}" + (f" / {plan['archie']:,}" if plan and plan["archie"] else ""),
+                     "WhatsApp": f"{wa.get(gid, {}).get('count', 0):,}",
+                     "Status": "Over limit" if over else "OK"})
+    gw.table(sorted(rows, key=lambda r: r["Status"] != "Over limit"), pills={"Status": {"OK": "lime", "Over limit": "amber"}},
+             caption="Gyms over their member limit see a reminder and have 30 days to upgrade before new members are "
+                     "paused. Archie and WhatsApp reset on the 1st.")
+
+
 def render_admin_billing(sc, gyms, audit):
     """Admin → Billing: prices, payment details, and each gym's plan."""
     today = gw.today_local()
@@ -1097,6 +1260,9 @@ def render_admin_billing(sc, gyms, audit):
                 ("Monthly income", _money(sum(float(subs.get(gid, {}).get("price") or 0) for gid, s in states.items()
                                               if s["status"] == "active")), "amber", "from paying gyms")])
 
+    with st.expander("Usage this month: members, Archie and WhatsApp per gym"):
+        _render_usage_table(sc, gyms, p)
+
     with st.expander("Plans, prices and how gyms pay", expanded=not plans(p)):
         saved = [x for x in (p.get("plans") or []) if gw._text(x.get("name"))]
         if saved and any(x.get("wa_renew") in (None, "") for x in saved):
@@ -1122,7 +1288,7 @@ def render_admin_billing(sc, gyms, audit):
             start_rows = [{**x, "access": level_names[x["access"]]} for x in plans(p)]
             plan_rows = st.data_editor(
                 pd.DataFrame(start_rows, columns=["name", "access", "monthly", "yearly", "members", "wa_renew", "wa_promo",
-                                                  "priority", "for_who", "tagline", "popular"]),
+                                                  "archie", "support", "for_who", "tagline", "popular"]),
                 num_rows="dynamic", use_container_width=True, key="adm_plans",
                 column_config={"name": st.column_config.TextColumn("Plan name", required=True),
                                "access": st.column_config.SelectboxColumn("Features", options=list(level_names.values()),
@@ -1134,8 +1300,12 @@ def render_admin_billing(sc, gyms, audit):
                                                                          help="Renewal reminders and replies (utility price)"),
                                "wa_promo": st.column_config.NumberColumn("WhatsApp promo/month", min_value=0, step=10,
                                                                          help="We missed you, celebrations… (marketing price)"),
-                               "priority": st.column_config.CheckboxColumn("Priority help",
-                                                                           help="Priority WhatsApp support and done-for-you setup"),
+                               "archie": st.column_config.NumberColumn("Archie questions/month (0 = unlimited)",
+                                                                       min_value=0, step=50),
+                               "support": st.column_config.SelectboxColumn("Help", options=list(SUPPORT),
+                                                                           help="standard · priority (WhatsApp support, "
+                                                                                "setup done for them) · dedicated "
+                                                                                "(+ account manager, training, review calls)"),
                                "for_who": st.column_config.TextColumn("Who it's for"),
                                "tagline": st.column_config.TextColumn("One-line description"),
                                "popular": st.column_config.CheckboxColumn("Recommended")})
@@ -1172,7 +1342,8 @@ def render_admin_billing(sc, gyms, audit):
                         plan_list.append({"name": name, "access": lv, "monthly": mo, "yearly": yr,
                                           "members": num("members"), "wa_renew": num("wa_renew"),
                                           "wa_promo": num("wa_promo"),
-                                          "priority": bool(r.get("priority")) if pd.notna(r.get("priority")) else False,
+                                          "archie": num("archie"),
+                                          "support": r.get("support") if r.get("support") in SUPPORT else "standard",
                                           "for_who": gw._text(r.get("for_who")).strip(),
                                           "tagline": gw._text(r.get("tagline")).strip(),
                                           "popular": bool(r.get("popular")) if pd.notna(r.get("popular")) else False})

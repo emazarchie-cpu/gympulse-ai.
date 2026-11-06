@@ -4251,7 +4251,21 @@ ARCHIE_SYSTEM = (
 
 
 def archie_reply(messages, context):
-    """Ask Claude for Archie's answer. Returns (text, used_live_ai)."""
+    """Ask Claude for Archie's answer. Returns (text, used_live_ai). Counts towards the gym's monthly Archie
+    questions (plan limit, gympulse_billing.archie_allowed)."""
+    gid, sb = st.session_state.get("gym_id"), st.session_state.get("supabase_client")
+    if gid and sb:
+        import gympulse_billing as gbill
+        ok, _used, _lim, why = gbill.archie_allowed(sb, gid)
+        if not ok:
+            return why, False
+    text, live = _archie_reply(messages, context)
+    if live and gid and sb:
+        gbill.archie_count(sb, gid)
+    return text, live
+
+
+def _archie_reply(messages, context):
     key = os.environ.get("ANTHROPIC_API_KEY")
     if not key:
         try:
@@ -4392,6 +4406,15 @@ def render_archie(supabase, gym_id, assess_fn, business_name, owner_name="the gy
             st.markdown(m["content"])
             if m["role"] == "assistant":
                 _mention_buttons(m["content"], roster, f"h{i}", supabase, gym_id)
+    try:
+        import gympulse_billing as gbill
+        _ok, _used, _lim, _why = gbill.archie_allowed(supabase, gym_id)
+        if _lim:
+            st.caption(f"{_used:,} of {_lim:,} Archie questions used this month.")
+        if not _ok:
+            st.info(_why)
+    except Exception:
+        pass
     typed = st.chat_input("Ask Archie...")
     question = typed or picked or st.session_state.pop("archie_pending", None)
     if question:

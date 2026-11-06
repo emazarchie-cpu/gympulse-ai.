@@ -2625,6 +2625,8 @@ try:
             st.stop()
     else:
         gbill.render_banner(supabase, st.session_state.get("gym_id"))
+        if st.session_state.get("gym_id") and st.session_state.get("current_page") in ("Dashboard", "Member Management"):
+            gbill.render_limit_banner(supabase, st.session_state.get("gym_id"))
     if page not in gbill.ALWAYS_OPEN and gbill.must_lock(supabase, st.session_state.get("gym_id")):
         page = "Subscription"
     elif not gbill.page_allowed(supabase, st.session_state.get("gym_id"), page):
@@ -2730,6 +2732,10 @@ elif page == "Member Management":
             import gympulse_portal as gportal
             gportal.render_owner(supabase, gym_id)
         st.markdown("### Register a New Member")
+        import gympulse_billing as _gb_lim
+        _can_add, _why_full = _gb_lim.can_add_members(supabase, gym_id)
+        if not _can_add:
+            st.info(_why_full)
 
         with st.form("register_member_form"):
 
@@ -2802,7 +2808,8 @@ elif page == "Member Management":
             submitted = st.form_submit_button(
                 "Register Member",
                 type="primary",
-                use_container_width=True
+                use_container_width=True,
+                disabled=not _can_add
             )
 
         if submitted:

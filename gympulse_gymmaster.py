@@ -902,7 +902,13 @@ def render_gymmaster_import(supabase, gym_id):
     update = _render_matching(df, cols, plan_names, plan_map, key, store, hcols_all, rows=rows,
                               visits_by=visits_by)
 
-    if st.button(f"Import {len(rows):,} member{'s' if len(rows) != 1 else ''}", type="primary",
+    import gympulse_billing as gbill
+    can_add, why_full = gbill.can_add_members(supabase, gym_id)
+    if not can_add and new:
+        st.info(why_full + f" The {new:,} new member(s) in this file will be skipped; existing members are still "
+                           "updated.")
+        rows = [r for r in rows if r["action"] != "New"]
+    if rows and st.button(f"Import {len(rows):,} member{'s' if len(rows) != 1 else ''}", type="primary",
                  icon=":material/upload:", key=f"gm_go_{key}", use_container_width=True):
         bar = st.progress(0.0, text="Importing…")
         summary = {"members": len(rows), "with_plans": with_plan, "visits": n_visits, "photos": n_photos,

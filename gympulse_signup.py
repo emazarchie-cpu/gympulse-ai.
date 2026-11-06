@@ -135,6 +135,10 @@ def render_owner(supabase, gym_id):
         return
     if st.session_state.get("role") == "staff":
         st.caption("Only the gym owner can switch the link off or make a new one.")
+    import gympulse_billing as gbill
+    _ok, _why = gbill.can_add_members(supabase, gym_id)
+    if not _ok:
+        st.warning(_why + " Switch the sign-up link off until you upgrade, so new members aren't left waiting.")
     url = link_for(g["join_code"])
     on = bool(g.get("join_enabled", True))
     c1, c2 = st.columns([2, 1])
