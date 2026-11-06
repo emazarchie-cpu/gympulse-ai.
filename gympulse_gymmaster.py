@@ -1039,20 +1039,31 @@ def _render_recent(supabase, gym_id):
 def render_photo_bulk(supabase, gym_id):
     """Add photos to existing members in one go, any time."""
     st.markdown("**Add photos for members you already have**")
-    st.caption("Upload a ZIP (or the image files) named by member email, phone or full name, for example "
-               "08031112222.jpg or Ada Obi.jpg. Photos are resized to keep the app fast.")
+    st.caption("Upload a ZIP (or the image files) named by member ID from your old software, email, phone or "
+               "full name, for example 1001.jpg, 08031112222.jpg or Ada Obi.jpg. Member ID is safest, because two "
+               "members can share a name. Photos are resized to keep the app fast.")
     key = st.session_state.get("ph_up_key", 0)
     files = st.file_uploader("Photos (ZIP or images)", type=["zip", "jpg", "jpeg", "png", "webp", "heic"],
                              accept_multiple_files=True, key=f"ph_up_{key}")
     if not files:
         return
     photos = read_photo_files(files)
-    members = pd.DataFrame(gw.fetch_all(supabase.table("members").select("id, full_name, email, phone")
-                                        .eq("gym_id", gym_id).order("id")))
+    try:                                            # member_no: the ID from the old software (phase 16)
+        rows = gw.fetch_all(supabase.table("members").select("id, full_name, email, phone, member_no")
+                            .eq("gym_id", gym_id).order("id"))
+    except Exception:
+        rows = gw.fetch_all(supabase.table("members").select("id, full_name, email, phone")
+                            .eq("gym_id", gym_id).order("id"))
+    members = pd.DataFrame(rows)
     if members.empty or not photos:
         st.info("No photos or no members to match.")
         return
-    jobs, unmatched = match_photos(photos, members)
+    by_no = {}
+    if "member_no" in members.columns:
+        for mid, no in zip(members["id"], members["member_no"]):
+            if _stem(no):
+                by_no.setdefault(_stem(no), mid)
+    jobs, unmatched = match_photos(photos, members, by_no)
     st.caption(f"{len(photos)} photo(s): {len(jobs)} matched to a member"
                + (f", {len(unmatched)} not matched ({', '.join(unmatched[:5])}{'…' if len(unmatched) > 5 else ''})"
                   if unmatched else "") + ".")
