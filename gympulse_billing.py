@@ -45,28 +45,28 @@ FEATURES = {
         "Happiness check-ins: hear from unhappy members before they quit",
         "Business Insights: revenue, renewals and trends"],
     3: ["Archie, your AI retention assistant",
-        "Model insights: why each member was flagged",
-        "Priority WhatsApp support",
-        "Help importing your members and setting up"],
+        "Model insights: why each member was flagged"],
 }
+SERVICES = ["Priority WhatsApp support from the GymPulse team",
+            "We import your members and set everything up with you"]
 PAGE_LEVEL = {"Action Centre": 2, "Grow": 2, "Business Insights": 2,
               "Archie": 3, "Model Insights": 3, "About the Model": 3}
 
-DEFAULT_PLANS = [   # members: 0 = no limit · wa_renew / wa_promo: WhatsApp messages included per month
-    {"name": "Starter", "access": 1, "monthly": 20000, "yearly": 200000, "for_who": "Up to 150 members",
-     "members": 150, "wa_renew": 250, "wa_promo": 0,
-     "tagline": "Track every member and remind them to renew on WhatsApp.", "popular": False},
-    {"name": "Growth", "access": 2, "monthly": 45000, "yearly": 450000, "for_who": "Up to 500 members",
-     "members": 500, "wa_renew": 700, "wa_promo": 0,
-     "tagline": "Win members back and keep them with rewards.", "popular": True},
+DEFAULT_PLANS = [   # every plan has every feature; price follows gym size and the WhatsApp messages included
+    {"name": "Starter", "access": 3, "monthly": 20000, "yearly": 200000, "for_who": "Up to 150 members",
+     "members": 150, "wa_renew": 250, "wa_promo": 0, "priority": False,
+     "tagline": "Every feature, sized for a small gym.", "popular": False},
+    {"name": "Growth", "access": 3, "monthly": 45000, "yearly": 450000, "for_who": "Up to 500 members",
+     "members": 500, "wa_renew": 700, "wa_promo": 0, "priority": False,
+     "tagline": "Every feature, for a busy neighbourhood gym.", "popular": True},
     {"name": "Pro", "access": 3, "monthly": 100000, "yearly": 1000000, "for_who": "Up to 1,500 members",
-     "members": 1500, "wa_renew": 2000, "wa_promo": 150,
-     "tagline": "Every tool, plus Archie, your AI retention assistant.", "popular": False},
+     "members": 1500, "wa_renew": 2000, "wa_promo": 150, "priority": True,
+     "tagline": "Every feature, WhatsApp promotions and priority help.", "popular": False},
     {"name": "Business", "access": 3, "monthly": 280000, "yearly": 2800000, "for_who": "Up to 5,000 members",
-     "members": 5000, "wa_renew": 6500, "wa_promo": 400,
+     "members": 5000, "wa_renew": 6500, "wa_promo": 400, "priority": True,
      "tagline": "For big gyms and multi-branch brands.", "popular": False},
     {"name": "Enterprise", "access": 3, "monthly": 750000, "yearly": 7500000, "for_who": "Up to 20,000 members",
-     "members": 20000, "wa_renew": 24000, "wa_promo": 1000,
+     "members": 20000, "wa_renew": 24000, "wa_promo": 1000, "priority": True,
      "tagline": "For gym chains, with WhatsApp at scale.", "popular": False},
 ]
 TRIAL_ALLOWANCE = {"wa_renew": 300, "wa_promo": 30}    # free trial and pilot mode
@@ -109,6 +109,8 @@ def plans(p):
         out.append({"name": gw._text(x.get("name")).strip(), "access": access, "monthly": mo,
                     "yearly": yr or (mo * 10 if mo else None), "for_who": who,
                     "members": members, "wa_renew": int(wa_renew), "wa_promo": int(_int(x.get("wa_promo")) or 0),
+                    "priority": (bool(x.get("priority")) if x.get("priority") is not None
+                                 else (members == 0 or members >= 1500)),
                     "tagline": gw._text(x.get("tagline")).strip(), "popular": bool(x.get("popular"))})
     return out
 
@@ -130,6 +132,8 @@ def plan_lines(plan):
         lines.append(f"{plan['wa_promo']:,} WhatsApp promotional messages a month, included")
     lines.append("Unlimited emails and member app")
     lines.append("No extra charges: if WhatsApp messages run out, they go by email")
+    if plan.get("priority"):
+        lines += SERVICES
     return lines
 
 
@@ -254,6 +258,7 @@ def compare_rows(ps):
             ("WhatsApp promotional messages / month", [f"{x['wa_promo']:,}" if x.get("wa_promo") else "By email" for x in ps]),
             ("Emails and member app", ["Unlimited" for _ in ps]),
             ("Extra charges", ["None" for _ in ps])]
+    size += [(svc, [bool(x.get("priority")) for x in ps]) for svc in SERVICES]
     return size + [(f, [x["access"] >= lv for x in ps]) for lv in (1, 2, 3) for f in FEATURES[lv]]
 
 
@@ -1099,7 +1104,7 @@ def render_admin_billing(sc, gyms, audit):
                        "Edit the WhatsApp columns below, or start from the recommended plans.")
         a, b = st.columns([2, 3], vertical_alignment="center")
         if a.button("Use the recommended plans", key="adm_default_plans",
-                    help="Starter, Growth, Pro, Business and Enterprise by gym size, with WhatsApp included. "
+                    help="Starter, Growth, Pro, Business and Enterprise by gym size: every feature, WhatsApp included. "
                          "You can still change every price after."):
             value = {**p, "plans": DEFAULT_PLANS, "monthly": None, "yearly": None}
             sc.table("platform_settings").upsert({"key": "pricing", "value": value,
@@ -1117,7 +1122,7 @@ def render_admin_billing(sc, gyms, audit):
             start_rows = [{**x, "access": level_names[x["access"]]} for x in plans(p)]
             plan_rows = st.data_editor(
                 pd.DataFrame(start_rows, columns=["name", "access", "monthly", "yearly", "members", "wa_renew", "wa_promo",
-                                                  "for_who", "tagline", "popular"]),
+                                                  "priority", "for_who", "tagline", "popular"]),
                 num_rows="dynamic", use_container_width=True, key="adm_plans",
                 column_config={"name": st.column_config.TextColumn("Plan name", required=True),
                                "access": st.column_config.SelectboxColumn("Features", options=list(level_names.values()),
@@ -1129,6 +1134,8 @@ def render_admin_billing(sc, gyms, audit):
                                                                          help="Renewal reminders and replies (utility price)"),
                                "wa_promo": st.column_config.NumberColumn("WhatsApp promo/month", min_value=0, step=10,
                                                                          help="We missed you, celebrations… (marketing price)"),
+                               "priority": st.column_config.CheckboxColumn("Priority help",
+                                                                           help="Priority WhatsApp support and done-for-you setup"),
                                "for_who": st.column_config.TextColumn("Who it's for"),
                                "tagline": st.column_config.TextColumn("One-line description"),
                                "popular": st.column_config.CheckboxColumn("Recommended")})
@@ -1165,6 +1172,7 @@ def render_admin_billing(sc, gyms, audit):
                         plan_list.append({"name": name, "access": lv, "monthly": mo, "yearly": yr,
                                           "members": num("members"), "wa_renew": num("wa_renew"),
                                           "wa_promo": num("wa_promo"),
+                                          "priority": bool(r.get("priority")) if pd.notna(r.get("priority")) else False,
                                           "for_who": gw._text(r.get("for_who")).strip(),
                                           "tagline": gw._text(r.get("tagline")).strip(),
                                           "popular": bool(r.get("popular")) if pd.notna(r.get("popular")) else False})
