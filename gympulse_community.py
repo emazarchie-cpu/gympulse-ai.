@@ -1183,10 +1183,15 @@ def _chat(sc, m, other_id, gym_name):
 
 # ------------------------------------------------------------------ gym side (owner and staff)
 def render_owner(supabase, gym_id):
-    gw.intro("Member community", ":material/forum:",
-             "A private feed for your members inside their member app: progress photos, shout-outs and your "
-             "announcements. Only your members can see it. You can pin, hide and remove posts.")
-    st.markdown(CSS, unsafe_allow_html=True)
+    """The gym's Community workspace: what's happening, the feed as the gym, stories, challenges,
+    polls and questions, recognition, insights and settings."""
+    import gympulse_engage as ge
+    import gympulse_qcache as qc
+    if not isinstance(supabase, qc.CachedClient):
+        supabase = qc.CachedClient(supabase)
+    st.markdown(CSS + ge.CSS, unsafe_allow_html=True)
+    gw.page_header("Community", "Your members' private feed: posts, stories, challenges and recognition.",
+                   "Community")
     if not ready(supabase):
         st.info(SQL_HINT)
         return
@@ -1195,127 +1200,231 @@ def render_owner(supabase, gym_id):
         st.success(flash)
     staff = st.session_state.get("role") == "staff"
     gym_name = gw._text((st.session_state.get("user_profile") or {}).get("business_name"), "Your gym")
-    on = enabled(supabase, gym_id)
-    if not staff:
-        if st.toggle("Community switched on for my members", value=on, key="cmo_on") != on:
-            supabase.table("gyms").update({"community_enabled": not on}).eq("id", gym_id).execute()
-            st.rerun()
-        prof = st.session_state.get("user_profile") or {}
-        ao = active_only(prof)
-        new_ao = st.toggle("Only members with an active plan can use it", value=ao, key="cmo_active",
-                           help="Members whose plan has ended see a renew button instead. They're back in, with "
-                                "everything as they left it, as soon as they renew.")
-        if new_ao != ao:
-            import gympulse_grow as gg
-            cur = dict((prof.get("settings") or {}).get("community") or {})
-            gg._save_settings(supabase, prof.get("id") or st.session_state.get("auth_user", {}).get("id"),
-                              {"community": {**cur, "active_only": bool(new_ao)}}, "Community setting saved.")
-            st.rerun()
-
-    with st.form("cmo_new", clear_on_submit=True):
-        body = st.text_area(f"Post as {gym_name}", max_chars=MAX_BODY,
-                            placeholder="New class times, a challenge, member of the month…")
-        c1, c2 = st.columns([3, 1], vertical_alignment="bottom")
-        photo = c1.file_uploader("Photo (optional)", type=["jpg", "jpeg", "png", "webp", "heic", "heif"])
-        pin = c2.checkbox("Pin to the top")
-        go = st.form_submit_button("Post", type="primary")
-    if go and (body.strip() or photo is not None):
-        pic = _store_photo(supabase, gym_id, _image(photo.getvalue())) if photo is not None else None
-        if pin:
-            supabase.table("community_posts").update({"pinned": False}).eq("gym_id", gym_id).execute()
-        supabase.table("community_posts").insert({"gym_id": gym_id, "member_id": None, "author_name": gym_name,
-                                                  "body": body.strip()[:MAX_BODY], "photo": pic,
-                                                  "pinned": bool(pin)}).execute()
-        st.session_state["cmo_flash"] = "Posted to your members."
-        st.rerun()
-
-    if social_ready(supabase):
-        with st.expander("Stories (24 hours)", icon=":material/amp_stories:"):
-            with st.form("cmo_story", clear_on_submit=True, border=False):
-                sp = st.file_uploader("Story photo", type=["jpg", "jpeg", "png", "webp", "heic", "heif"], key="cmo_sp")
-                stx = st.text_input("Story text (optional)", max_chars=140)
-                if st.form_submit_button("Share a gym story", type="primary") and (sp is not None or stx.strip()):
-                    pic = _store_photo(supabase, gym_id, _image(sp.getvalue())) if sp is not None else None
-                    supabase.table("community_stories").insert({"gym_id": gym_id, "member_id": None,
-                                                                "author_name": gym_name, "photo": pic,
-                                                                "body": stx.strip(), **_story_times()}).execute()
-                    st.session_state["cmo_flash"] = "Story shared with your members for 24 hours."
-                    st.rerun()
-            live = active_stories(supabase, gym_id)
-            if not live:
-                st.caption("No stories right now.")
-            for sto in live:
-                a, b = st.columns([5, 1], vertical_alignment="center")
-                a.markdown(f"**{gw._esc(sto.get('author_name'))}** · {gw._esc(gw._text(sto.get('body'))[:60]) or 'photo'}"
-                           f" · {_when(sto.get('created_at'))}")
-                if b.button("Remove", key=f"cmo_srm_{sto['id']}"):
-                    supabase.table("community_stories").update({"hidden": True}).eq("id", sto["id"]) \
-                        .eq("gym_id", gym_id).execute()
-                    st.rerun()
-
-    import gympulse_engage as ge
+    _owner_stats(supabase, gym_id)
     _eng_ready = ge.ready(supabase)
-    st.markdown('<div class="section-label">CHALLENGES · POLLS · RECOGNITION</div>', unsafe_allow_html=True)
-    ge.render_owner_tabs(supabase, gym_id, gym_name, staff)
-    st.markdown('<div class="section-label">POSTS</div>', unsafe_allow_html=True)
-    try:
-        reports = supabase.table("community_reports").select("*").eq("gym_id", gym_id).eq("resolved", False) \
-            .order("created_at", desc=True).execute().data or []
-    except Exception:
-        reports = []
-    reported = {r["post_id"] for r in reports if r.get("post_id")}
-    posts = load_feed(supabase, gym_id, st.session_state.get("cmo_limit", 20), include_hidden=True)
-    posts.sort(key=lambda p: (p["id"] not in reported,))
-    if reported:
-        st.warning(f"{len(reported)} post{'s' if len(reported) != 1 else ''} reported by members: shown first.")
-    if not posts:
-        st.caption("No posts yet. Post a welcome message to get things started.")
-    for p in posts:
-        with st.container(border=True, key=f"cmo_post_{p['id']}"):
-            if p["id"] in reported:
-                gw._md('<span class="gp-pill gp-pill-amber">Reported</span>')
-            if p.get("hidden"):
-                gw._md('<span class="gp-pill">Hidden from members</span>')
-            gw._md(_post_html(p, gym_name))
-            st.caption(f"❤️ {len(p['likes'])} · 💬 {len(p['comments'])}")
-            if not p.get("hidden") and _eng_ready:
-                import gympulse_engage as ge
-                ge.coach_reply(supabase, gym_id, p["id"], gym_name, key=f"p_{p['id']}")
-            for cm in p["comments"]:
-                x, y = st.columns([6, 1.2], vertical_alignment="center")
-                gw._md(f'<div class="cm-c" style="{"opacity:.45" if cm.get("hidden") else ""}"><b>'
-                       f'{gw._esc(cm.get("author_name") or gym_name)}</b> {gw._esc(cm.get("body"))}</div>', x)
-                if y.button("Show" if cm.get("hidden") else "Hide", key=f"cmo_ch_{cm['id']}"):
-                    supabase.table("community_comments").update({"hidden": not cm.get("hidden")}) \
-                        .eq("id", cm["id"]).eq("gym_id", gym_id).execute()
-                    st.rerun()
-            b = st.columns(4)
-            if b[0].button("Unpin" if p.get("pinned") else "Pin", key=f"cmo_pin_{p['id']}", use_container_width=True):
-                if not p.get("pinned"):
-                    supabase.table("community_posts").update({"pinned": False}).eq("gym_id", gym_id).execute()
-                supabase.table("community_posts").update({"pinned": not p.get("pinned")}).eq("id", p["id"]).execute()
-                st.rerun()
-            if b[1].button("Show" if p.get("hidden") else "Hide", key=f"cmo_hide_{p['id']}", use_container_width=True):
-                supabase.table("community_posts").update({"hidden": not p.get("hidden")}).eq("id", p["id"]).execute()
-                _resolve(supabase, gym_id, p["id"])
-                st.rerun()
-            if p["id"] in reported and b[2].button("Looks fine", key=f"cmo_ok_{p['id']}", use_container_width=True):
-                _resolve(supabase, gym_id, p["id"])
-                st.rerun()
-            if p.get("member_id") and not staff:
-                blocked = _is_blocked(supabase, p["member_id"])
-                if b[3].button("Allow posting" if blocked else "Stop posting", key=f"cmo_blk_{p['id']}",
-                               use_container_width=True,
-                               help="Stops this member posting and commenting. They can still read."):
-                    supabase.table("members").update({"community_blocked": not blocked}) \
-                        .eq("id", p["member_id"]).eq("gym_id", gym_id).execute()
-                    st.session_state["cmo_flash"] = ("They can post again." if blocked else
-                                                     "They can no longer post or comment.")
-                    st.rerun()
-    if len(posts) >= st.session_state.get("cmo_limit", 20):
-        if st.button("Show more", key="cmo_more"):
-            st.session_state["cmo_limit"] = st.session_state.get("cmo_limit", 20) + 20
+    names = ["Feed", "Stories", "Challenges", "Polls & Q&A", "Recognition", "Insights", "Settings"]
+    tabs = st.tabs(names, key="cmo_tabs")
+    with tabs[0]:
+        with st.form("cmo_new", clear_on_submit=True):
+            body = st.text_area(f"Post as {gym_name}", max_chars=MAX_BODY,
+                                placeholder="New class times, a challenge, member of the month…")
+            c1, c2 = st.columns([3, 1], vertical_alignment="bottom")
+            photo = c1.file_uploader("Photo (optional)", type=["jpg", "jpeg", "png", "webp", "heic", "heif"])
+            pin = c2.checkbox("Pin to the top")
+            go = st.form_submit_button("Post", type="primary")
+        if go and (body.strip() or photo is not None):
+            pic = _store_photo(supabase, gym_id, _image(photo.getvalue())) if photo is not None else None
+            if pin:
+                supabase.table("community_posts").update({"pinned": False}).eq("gym_id", gym_id).execute()
+            supabase.table("community_posts").insert({"gym_id": gym_id, "member_id": None, "author_name": gym_name,
+                                                      "body": body.strip()[:MAX_BODY], "photo": pic,
+                                                      "pinned": bool(pin)}).execute()
+            st.session_state["cmo_flash"] = "Posted to your members."
             st.rerun()
+
+
+        try:
+            reports = supabase.table("community_reports").select("*").eq("gym_id", gym_id).eq("resolved", False) \
+                .order("created_at", desc=True).execute().data or []
+        except Exception:
+            reports = []
+        reported = {r["post_id"] for r in reports if r.get("post_id")}
+        posts = load_feed(supabase, gym_id, st.session_state.get("cmo_limit", 20), include_hidden=True)
+        posts.sort(key=lambda p: (p["id"] not in reported,))
+        if reported:
+            st.warning(f"{len(reported)} post{'s' if len(reported) != 1 else ''} reported by members: shown first.")
+        if not posts:
+            st.caption("No posts yet. Post a welcome message to get things started.")
+        for p in posts:
+            with st.container(border=True, key=f"cmo_post_{p['id']}"):
+                if p["id"] in reported:
+                    gw._md('<span class="gp-pill gp-pill-amber">Reported</span>')
+                if p.get("hidden"):
+                    gw._md('<span class="gp-pill">Hidden from members</span>')
+                gw._md(_post_html(p, gym_name))
+                st.caption(f"❤️ {len(p['likes'])} · 💬 {len(p['comments'])}")
+                if not p.get("hidden") and _eng_ready:
+                    import gympulse_engage as ge
+                    ge.coach_reply(supabase, gym_id, p["id"], gym_name, key=f"p_{p['id']}")
+                for cm in p["comments"]:
+                    x, y = st.columns([6, 1.2], vertical_alignment="center")
+                    gw._md(f'<div class="cm-c" style="{"opacity:.45" if cm.get("hidden") else ""}"><b>'
+                           f'{gw._esc(cm.get("author_name") or gym_name)}</b> {gw._esc(cm.get("body"))}</div>', x)
+                    if y.button("Show" if cm.get("hidden") else "Hide", key=f"cmo_ch_{cm['id']}"):
+                        supabase.table("community_comments").update({"hidden": not cm.get("hidden")}) \
+                            .eq("id", cm["id"]).eq("gym_id", gym_id).execute()
+                        st.rerun()
+                b = st.columns(4)
+                if b[0].button("Unpin" if p.get("pinned") else "Pin", key=f"cmo_pin_{p['id']}", use_container_width=True):
+                    if not p.get("pinned"):
+                        supabase.table("community_posts").update({"pinned": False}).eq("gym_id", gym_id).execute()
+                    supabase.table("community_posts").update({"pinned": not p.get("pinned")}).eq("id", p["id"]).execute()
+                    st.rerun()
+                if b[1].button("Show" if p.get("hidden") else "Hide", key=f"cmo_hide_{p['id']}", use_container_width=True):
+                    supabase.table("community_posts").update({"hidden": not p.get("hidden")}).eq("id", p["id"]).execute()
+                    _resolve(supabase, gym_id, p["id"])
+                    st.rerun()
+                if p["id"] in reported and b[2].button("Looks fine", key=f"cmo_ok_{p['id']}", use_container_width=True):
+                    _resolve(supabase, gym_id, p["id"])
+                    st.rerun()
+                if p.get("member_id") and not staff:
+                    blocked = _is_blocked(supabase, p["member_id"])
+                    if b[3].button("Allow posting" if blocked else "Stop posting", key=f"cmo_blk_{p['id']}",
+                                   use_container_width=True,
+                                   help="Stops this member posting and commenting. They can still read."):
+                        supabase.table("members").update({"community_blocked": not blocked}) \
+                            .eq("id", p["member_id"]).eq("gym_id", gym_id).execute()
+                        st.session_state["cmo_flash"] = ("They can post again." if blocked else
+                                                         "They can no longer post or comment.")
+                        st.rerun()
+        if len(posts) >= st.session_state.get("cmo_limit", 20):
+            if st.button("Show more", key="cmo_more"):
+                st.session_state["cmo_limit"] = st.session_state.get("cmo_limit", 20) + 20
+                st.rerun()
+
+
+
+    with tabs[1]:
+        if social_ready(supabase):
+            if True:
+                with st.form("cmo_story", clear_on_submit=True, border=False):
+                    sp = st.file_uploader("Story photo", type=["jpg", "jpeg", "png", "webp", "heic", "heif"], key="cmo_sp")
+                    stx = st.text_input("Story text (optional)", max_chars=140)
+                    if st.form_submit_button("Share a gym story", type="primary") and (sp is not None or stx.strip()):
+                        pic = _store_photo(supabase, gym_id, _image(sp.getvalue())) if sp is not None else None
+                        supabase.table("community_stories").insert({"gym_id": gym_id, "member_id": None,
+                                                                    "author_name": gym_name, "photo": pic,
+                                                                    "body": stx.strip(), **_story_times()}).execute()
+                        st.session_state["cmo_flash"] = "Story shared with your members for 24 hours."
+                        st.rerun()
+                live = active_stories(supabase, gym_id)
+                if not live:
+                    st.caption("No stories right now.")
+                for sto in live:
+                    a, b = st.columns([5, 1], vertical_alignment="center")
+                    a.markdown(f"**{gw._esc(sto.get('author_name'))}** · {gw._esc(gw._text(sto.get('body'))[:60]) or 'photo'}"
+                               f" · {_when(sto.get('created_at'))}")
+                    if b.button("Remove", key=f"cmo_srm_{sto['id']}"):
+                        supabase.table("community_stories").update({"hidden": True}).eq("id", sto["id"]) \
+                            .eq("gym_id", gym_id).execute()
+                        st.rerun()
+
+
+    with tabs[2]:
+        if _eng_ready:
+            ge._owner_challenges(supabase, gym_id, gym_name)
+        else:
+            st.info("Run sql/phase24_community_engage.sql to switch on challenges.")
+    with tabs[3]:
+        if _eng_ready:
+            ge._owner_polls(supabase, gym_id, gym_name)
+        else:
+            st.info("Run sql/phase24_community_engage.sql to switch on polls and questions.")
+    with tabs[4]:
+        if _eng_ready:
+            ge._owner_recognition(supabase, gym_id, gym_name)
+        else:
+            st.info("Run sql/phase24_community_engage.sql to switch on recognition.")
+    with tabs[5]:
+        _owner_insights(supabase, gym_id)
+    with tabs[6]:
+        if staff:
+            st.caption("Only the gym owner can change community settings.")
+        on = enabled(supabase, gym_id)
+        if not staff:
+            if st.toggle("Community switched on for my members", value=on, key="cmo_on") != on:
+                supabase.table("gyms").update({"community_enabled": not on}).eq("id", gym_id).execute()
+                st.rerun()
+            prof = st.session_state.get("user_profile") or {}
+            ao = active_only(prof)
+            new_ao = st.toggle("Only members with an active plan can use it", value=ao, key="cmo_active",
+                               help="Members whose plan has ended see a renew button instead. They're back in, with "
+                                    "everything as they left it, as soon as they renew.")
+            if new_ao != ao:
+                import gympulse_grow as gg
+                cur = dict((prof.get("settings") or {}).get("community") or {})
+                gg._save_settings(supabase, prof.get("id") or st.session_state.get("auth_user", {}).get("id"),
+                                  {"community": {**cur, "active_only": bool(new_ao)}}, "Community setting saved.")
+                st.rerun()
+
+
+        st.markdown("**Community rules members accept**")
+        st.markdown("\n".join(f"- {r}" for r in RULES))
+
+
+def _since(days):
+    return (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+
+
+def _owner_stats(sc, gym_id):
+    pp = people(sc, gym_id)
+    try:
+        week = sc.table("community_posts").select("id, member_id, kind").eq("gym_id", gym_id) \
+            .gte("created_at", _since(7)).execute().data or []
+    except Exception:
+        week = []
+    try:
+        reports = len(sc.table("community_reports").select("id").eq("gym_id", gym_id).eq("resolved", False)
+                      .execute().data or [])
+    except Exception:
+        reports = 0
+    posters = {p["member_id"] for p in week if p.get("member_id")}
+    checkins = sum(1 for p in week if p.get("kind") == "checkin")
+    gw.kpi_row([("In the community", f"{len(pp):,}", "cyan", "members who joined"),
+                ("Posts this week", f"{len(week):,}", "lime", f"{len(posters)} members posting"),
+                ("Check-ins shared", f"{checkins:,}", "white", "this week"),
+                ("Reports", f"{reports:,}", "amber" if reports else "grey", "to review" if reports else "all clear")])
+
+
+def _owner_insights(sc, gym_id):
+    pp = people(sc, gym_id)
+    try:
+        posts = sc.table("community_posts").select("id, member_id, created_at, kind").eq("gym_id", gym_id) \
+            .gte("created_at", _since(56)).execute().data or []
+        likes = sc.table("community_likes").select("post_id, member_id").eq("gym_id", gym_id) \
+            .gte("created_at", _since(30)).execute().data or []
+        comments = sc.table("community_comments").select("member_id").eq("gym_id", gym_id) \
+            .gte("created_at", _since(30)).execute().data or []
+    except Exception:
+        posts, likes, comments = [], [], []
+    if posts:
+        df = pd.DataFrame(posts)
+        df["week"] = pd.to_datetime(df["created_at"], utc=True, errors="coerce").dt.tz_convert(gw.APP_TZ) \
+            .dt.to_period("W-SUN").dt.start_time.dt.strftime("%d %b")
+        st.markdown("**Posts per week**")
+        st.bar_chart(df.groupby("week", sort=False).size().iloc[::-1], color="#B7F34A", height=220)
+    score = {}
+    month = [p for p in posts if str(p.get("created_at")) >= _since(30)]
+    for p in month:
+        if p.get("member_id"):
+            score.setdefault(p["member_id"], [0, 0, 0])[0] += 1
+    for c in comments:
+        if c.get("member_id"):
+            score.setdefault(c["member_id"], [0, 0, 0])[1] += 1
+    owner_of = {p["id"]: p.get("member_id") for p in posts}
+    for l in likes:
+        mid = owner_of.get(l["post_id"])
+        if mid:
+            score.setdefault(mid, [0, 0, 0])[2] += 1
+    top = sorted(score.items(), key=lambda kv: -(kv[1][0] * 3 + kv[1][1] * 2 + kv[1][2]))[:10]
+    st.markdown("**Most active members (30 days)**")
+    gw.table([{"Member": gw._text((pp.get(mid) or {}).get("full_name"), "Member"), "Posts": v[0], "Comments": v[1],
+               "Likes received": v[2]} for mid, v in top],
+             empty="No activity in the last 30 days yet.",
+             caption="Great people to celebrate as member of the week, or to ask to welcome newcomers.")
+    quiet = []
+    try:
+        recent = {c["member_id"] for c in sc.table("checkins").select("member_id").eq("gym_id", gym_id)
+                  .gte("checked_in_at", _since(14)).execute().data or []}
+        active = {p.get("member_id") for p in month} | {c.get("member_id") for c in comments}
+        quiet = [pp[m] for m in active if m in pp and m not in recent]
+    except Exception:
+        pass
+    st.markdown("**Active in the community, quiet at the gym**")
+    gw.table([{"Member": gw._text(m.get("full_name"), "Member")} for m in quiet[:15]],
+             empty="Nobody: everyone active online has also visited in the last 2 weeks.",
+             caption="They still feel part of the gym but haven't visited for 2 weeks: a friendly message or a "
+                     "class invite now can bring them back.")
 
 
 def _resolve(supabase, gym_id, post_id):

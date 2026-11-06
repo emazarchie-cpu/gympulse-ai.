@@ -1890,6 +1890,7 @@ MAIN_PAGES = [
     "Grow",
     "Archie",
     "Member Management",
+    "Community",
     "Check-in",
 ]
 
@@ -2689,6 +2690,9 @@ elif page == "Archie":
         business_name,
         user_name
     )
+elif page == "Community":
+    import gympulse_community as gcom
+    gcom.render_owner(supabase, st.session_state.gym_id)
 elif page == "Check-in":
     gw.render_checkin(supabase, st.session_state.gym_id)
 elif page == "Settings":
@@ -2731,10 +2735,8 @@ elif page == "Member Management":
                          icon=":material/smartphone:"):
             import gympulse_portal as gportal
             gportal.render_owner(supabase, gym_id)
-        with st.expander("Member community: your members' feed of posts, photos and your announcements",
-                         icon=":material/forum:", expanded=bool(st.session_state.get("cmo_flash"))):
-            import gympulse_community as gcom
-            gcom.render_owner(supabase, gym_id)
+        st.button("Member community: open your Community page", icon=":material/forum:", key="mm_to_comm",
+                  on_click=show_page, args=("Community",), type="tertiary")
         st.markdown("### Register a New Member")
         import gympulse_billing as _gb_lim
         _can_add, _why_full = _gb_lim.can_add_members(supabase, gym_id)
