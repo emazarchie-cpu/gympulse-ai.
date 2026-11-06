@@ -70,6 +70,10 @@ Admin → Billing → **Online payments (Paystack)** shows whether it's connecte
 
 ## Plans by gym size, WhatsApp included
 
+Every recommended plan includes every feature (access 3). Price follows gym size and the WhatsApp messages
+included. Pro and up also include priority WhatsApp support and done-for-you setup (the "Priority help" column),
+because those cost the founder's time, not software.
+
 Each plan sets **members**, **WhatsApp renewal reminders and replies a month** and **WhatsApp promotional messages a
 month** (Admin → Billing → Plans; "Use the recommended plans" loads the starting set below). These show as benefits on
 the website, the Subscription page and the comparison table, with "No extra charges". When a gym's allowance is used
