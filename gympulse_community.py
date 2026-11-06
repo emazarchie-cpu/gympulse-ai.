@@ -398,6 +398,8 @@ def _note_open(sc, m, n):
     st.session_state["cm_back"] = "feed"
     if n["kind"] == "message":
         _go("chat", cm_chat=n["actor_id"])
+    elif n["kind"] in ("badge", "comment", "challenge") or not n.get("actor_id"):
+        _go("me" if n["kind"] == "badge" else "feed")
     else:
         _go("profile", cm_pid=n["actor_id"])
 
@@ -410,12 +412,17 @@ def notes_dialog(sc, m):
         st.caption("Nothing yet. When someone follows you or sends you a message, you'll see it here.")
     for n in rows:
         a = pp.get(n.get("actor_id")) or {"full_name": "A member"}
-        what = "sent you a message" if n["kind"] == "message" else "started following you"
+        what = {"message": "sent you a message", "follow": "started following you",
+                "tag": "tagged you in a class post"}.get(n["kind"])
+        if n["kind"] == "badge":
+            a, what = {"full_name": gw._text(m.get("full_name"))}, ""
+        label = (f"{gw._text(a.get('full_name'), 'A member')} {what}" if what else
+                 "🏅 You earned a new badge: see it on your profile" if n["kind"] == "badge" else
+                 "💬 The coach replied to your post" if n["kind"] == "comment" else "🏆 Challenge update")
         x, y = st.container(key=f"cm_row_note_{n['id']}").columns([1, 6], vertical_alignment="center")
         gw._md(gw.avatar_html(a.get("full_name"), a.get("photo"), 40), x)
         with y:
-            if st.button(f"{gw._text(a.get('full_name'), 'A member')} {what}", key=f"cm_note_{n['id']}",
-                         type="tertiary"):
+            if st.button(label, key=f"cm_note_{n['id']}", type="tertiary"):
                 _note_open(sc, m, n)
                 st.rerun()
             gw._md(f'<div class="cm-when">{"🟢 " if not n.get("read_at") else ""}{_when(n.get("created_at"))}</div>')
@@ -568,17 +575,28 @@ def _feed(sc, m, gym_name, social):
                      key="cm_bell", type="primary" if n else "tertiary"):
             notes_dialog(sc, m)
         _stories_bar(sc, m, gym_name)
+    import gympulse_engage as ge
+    st.markdown(ge.CSS, unsafe_allow_html=True)
+    ge.render_top(sc, m, gym_name, None)
     if m.get("community_blocked"):
         st.warning(f"{gym_name} has paused posting from your account. You can still read the community.")
     else:
         with st.expander("Create a post", icon=":material/add_photo_alternate:",
                          expanded=bool(st.session_state.get("cm_compose_open"))):
-            _composer(sc, m)
+            if ge.ready(sc):
+                ge.composer(sc, m, gym_name)
+            else:
+                _composer(sc, m)
     scope = "all"
     if social:
-        scope = st.segmented_control("Show", ["all", "following"], default="all", key="cm_scope",
-                                     format_func={"all": "Everyone", "following": "Following"}.get,
-                                     label_visibility="collapsed") or "all"
+        opts = {"all": "Everyone", "following": "Following"}
+        if ge.ready(sc):
+            opts["classes"] = "Classes"
+        scope = st.segmented_control("Show", list(opts), default="all", key="cm_scope",
+                                     format_func=opts.get, label_visibility="collapsed") or "all"
+    if scope == "classes":
+        ge.render_class_feeds(sc, m, gym_name)
+        return
     limit = st.session_state.get("cm_limit", PAGE)
     posts = load_feed(sc, m["gym_id"], limit)
     if social:
@@ -647,7 +665,10 @@ def _post_card(sc, m, p, gym_name, social=True):
             else:
                 gw._md(f'<div class="cm-name">{_author(p, gym_name)[0]}{_author(p, gym_name)[1]}</div>')
             gw._md(f'<div class="cm-when" style="margin-top:-6px">{_when(p.get("created_at"))}</div>')
+        import gympulse_engage as ge
+        ge.post_label(sc, m, p)
         gw._md(_post_html(p, gym_name, header=False).replace('<div class="cm-pin">📌 Pinned by the gym</div>', ""))
+        ge.post_poll(sc, m, p)
         x, y, z = st.container(key=f"cm_act_{p['id']}").columns([1.2, 1.4, 1.4])
         if x.button(f"{'❤️' if liked else '🤍'} {len(p['likes']) or ''}".strip(), key=f"cm_like_{p['id']}",
                     use_container_width=True):
@@ -679,7 +700,9 @@ def _post_card(sc, m, p, gym_name, social=True):
             for cm in p["comments"]:
                 name = gw._esc(cm.get("author_name") or ("Member" if cm.get("member_id") else gym_name))
                 c1, c2 = st.container(key=f"cm_crow_{cm['id']}").columns([6, 1], vertical_alignment="center")
-                gw._md(f'<div class="cm-c"><b>{name}</b>{" (gym)" if not cm.get("member_id") else ""} '
+                badge = ('<span class="cm-coach">Coach</span>' if cm.get("author_role") == "coach"
+                         else " (gym)" if not cm.get("member_id") else "")
+                gw._md(f'<div class="cm-c"><b>{name}</b>{badge} '
                        f'{gw._esc(cm.get("body"))} <span class="cm-when">· {_when(cm.get("created_at"))}</span></div>', c1)
                 if cm.get("member_id") == m["id"] and c2.button("✕", key=f"cm_cdel_{cm['id']}", help="Delete"):
                     sc.table("community_comments").delete().eq("id", cm["id"]).eq("member_id", m["id"]).execute()
@@ -768,12 +791,22 @@ def add_story_dialog(sc, m):
     with st.form("cm_story_new", border=False):
         photo = st.file_uploader("Photo", type=["jpg", "jpeg", "png", "webp", "heic", "heif"])
         text = st.text_input("Text (optional)", max_chars=140)
+        import gympulse_engage as ge
+        c1, c2 = st.columns(2)
+        stk = c1.selectbox("Sticker", ge.STICKERS, format_func=lambda s: s or "No sticker")
+        frm = c2.toggle("Gym frame", value=True)
         go = st.form_submit_button("Share story", type="primary", use_container_width=True)
     if go:
         if photo is None and not text.strip():
             st.error("Add a photo or some text.")
             return
-        pic = _store_photo(sc, m["gym_id"], _image(photo.getvalue())) if photo is not None else None
+        pic = None
+        if photo is not None:
+            raw = _image(photo.getvalue())
+            if stk or frm:
+                import gympulse_portal as gportal
+                raw = ge.frame_photo(raw, gportal._gym(sc, m["gym_id"])[2], stk, frm)
+            pic = _store_photo(sc, m["gym_id"], raw)
         sc.table("community_stories").insert({"gym_id": m["gym_id"], "member_id": m["id"],
                                               "author_name": gw._text(m.get("full_name"), "Member"),
                                               "photo": pic, "body": text.strip(), **_story_times()}).execute()
@@ -861,6 +894,9 @@ def _profile(sc, m, pid, gym_name):
         people_dialog(sc, m, "Followers", fol)
     if c.button(f"**{len(fing)}** following", key="cm_st_fing", type="tertiary", use_container_width=True):
         people_dialog(sc, m, "Following", fing)
+    import gympulse_engage as ge
+    st.markdown(ge.CSS, unsafe_allow_html=True)
+    ge.profile_extras(sc, m, pid)
     if me:
         x, y = st.container(key="cm_pbtn_me").columns(2)
         if x.button("Edit profile", key="cm_edit", icon=":material/edit:", use_container_width=True):
@@ -992,6 +1028,14 @@ def _person_row(sc, m, p, key):
 
 
 def _search(sc, m, gym_name):
+    import gympulse_engage as ge
+    if ge.ready(sc):
+        tab = st.segmented_control("Find", ["people", "buddies"], default="people", key="cm_find",
+                                   format_func={"people": "People", "buddies": "🤝 Find a buddy"}.get,
+                                   label_visibility="collapsed") or "people"
+        if tab == "buddies":
+            ge.render_buddies(sc, m, gym_name)
+            return
     q = st.text_input("Search members", placeholder="Search members by name", key="cm_q",
                       label_visibility="collapsed", icon=":material/search:")
     pp = people(sc, m["gym_id"])
@@ -1190,6 +1234,11 @@ def render_owner(supabase, gym_id):
                         .eq("gym_id", gym_id).execute()
                     st.rerun()
 
+    import gympulse_engage as ge
+    _eng_ready = ge.ready(supabase)
+    st.markdown('<div class="section-label">CHALLENGES · POLLS · RECOGNITION</div>', unsafe_allow_html=True)
+    ge.render_owner_tabs(supabase, gym_id, gym_name, staff)
+    st.markdown('<div class="section-label">POSTS</div>', unsafe_allow_html=True)
     try:
         reports = supabase.table("community_reports").select("*").eq("gym_id", gym_id).eq("resolved", False) \
             .order("created_at", desc=True).execute().data or []
@@ -1210,6 +1259,9 @@ def render_owner(supabase, gym_id):
                 gw._md('<span class="gp-pill">Hidden from members</span>')
             gw._md(_post_html(p, gym_name))
             st.caption(f"❤️ {len(p['likes'])} · 💬 {len(p['comments'])}")
+            if not p.get("hidden") and _eng_ready:
+                import gympulse_engage as ge
+                ge.coach_reply(supabase, gym_id, p["id"], gym_name, key=f"p_{p['id']}")
             for cm in p["comments"]:
                 x, y = st.columns([6, 1.2], vertical_alignment="center")
                 gw._md(f'<div class="cm-c" style="{"opacity:.45" if cm.get("hidden") else ""}"><b>'

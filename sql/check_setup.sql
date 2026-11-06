@@ -36,6 +36,8 @@ select step, ok from (values
   ('phase22_social     stories, follows, messages', to_regclass('public.community_dms') is not null
                                                        and to_regclass('public.community_stories') is not null),
   ('phase23_notify     community_notifications',      to_regclass('public.community_notifications') is not null),
+  ('phase24_engage     challenges, polls, badges',  to_regclass('public.community_challenges') is not null
+                                                       and to_regclass('public.community_badges') is not null),
   ('security           RLS on every gym table',       not exists (
         select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace
         where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity
@@ -43,5 +45,6 @@ select step, ok from (values
                             'class_bookings','member_imports','gym_staff','billing_invoices','member_feedback',
                             'community_posts','community_comments','community_likes','community_reports','archie_usage',
                             'community_stories','community_follows','community_dms','community_blocks',
-                            'community_notifications')))
+                            'community_notifications','community_challenges','community_challenge_entries',
+                            'community_poll_votes','community_badges')))
 ) as t(step, ok);

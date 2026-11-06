@@ -88,3 +88,23 @@ button when the gym has a Paystack link. As soon as their end date moves forward
 payment confirmed), they're back in, with their posts, followers and messages as they left them. Members with no
 plan yet are asked to see the front desk. Gyms can turn this off in Members → Member community ("Only members with
 an active plan can use it"; stored in the owner's settings as `community.active_only`).
+
+
+## Community engagement (phase 24)
+
+Run `sql/phase24_community_engage.sql` once. Code: `gympulse_engage.py`.
+
+| Feature | Members | Gym |
+|---|---|---|
+| **Check-in posts** | After a real check-in today: "📍 You checked in at 7:12. Let your gym know you're here?" with workout, note, photo and sticker. "N training now" (check-ins in the last 2 hours) with faces, people you follow first | — |
+| **Streaks** | Weeks in a row with a visit (Mon–Sun). One missed week a calendar month is covered by a freeze automatically. "🔥 N-week streak" on the profile | — |
+| **Challenges** | Cards at the top of the feed, Join (posts "I just joined…"), progress bar from real check-ins in the challenge dates, badge when done | Create (name, visits, dates, badge emoji): announced in the feed; finishers get an automatic shout-out post and badge; table of joined and finished |
+| **Buddies** | Search → 🤝 Find a buddy: own buddy profile (goal, usual times, a line), list sorted by matching goal and times, "Train together?" sends a ready-made message (respects message settings and blocks) | — |
+| **Recognition** | Milestone cards (10, 25, 50, 100… visits, only the highest reached), anniversary cards and a monthly recap card (first week of the month): Share to feed, Save image, Not now. Badges on the profile | ⭐ Member of the week: pinned post, optional framed photo, badge and notification. Reply as coach on any post (Coach badge) |
+| **Class feeds** | Feed → Classes: the member's classes (booked or attended, last 14 days and next 7), post a photo and tag classmates (they're notified) | — |
+| **Progress posts** | Create a post → 📈 Progress; add an "after" photo for an automatic before / after | — |
+| **Nudges** | Up to 3 at the top: "N people you follow trained today", streak at risk (from Thursday), challenge visits left | — |
+| **Polls & Q&A** | Vote (results bars after voting); Create a post → ❓ Ask the coach | Post polls (2–4 options); questions listed with "Needs an answer" first; reply as coach |
+| **Stickers & frames** | Stickers ("Leg day", "New PB"…) and the gym's branded frame on posts and stories; framed cards to save for Instagram | Member of the week photos get the frame |
+
+Notifications add: tagged in a class post, badge earned, coach replied (in the app only).
