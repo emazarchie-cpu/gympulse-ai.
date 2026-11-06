@@ -53,10 +53,24 @@ the Follow-ups inbox. Delivered and read ticks are tracked.
    minutes to a day; the table shows each status. Send yourself a test from the same page.
 9. Each gym picks its channel in Grow → Automatic messages.
 
+## Controlling the cost
+
+In **Grow → Automatic messages → How messages go out** each gym chooses:
+- **Which messages can use WhatsApp**: *Renewal reminders only* (default, cheapest: utility messages) or *All automatic
+  messages* (adds marketing messages: we missed you, new members, celebrations, happiness check).
+  Messages that may not use WhatsApp go by email.
+- **Most WhatsApp messages a month** (default 400, 0 = no limit). When the limit is reached, automatic messages go by
+  email until the next month. Renewal reminders are sent first each day, so they get the WhatsApp slots first.
+- The card shows this month's WhatsApp messages and the estimated Meta cost.
+
+**Admin → WhatsApp** shows every gym's messages and estimated cost this month. Estimates use Nigeria rates
+($0.0067 utility, $0.0516 marketing per message, replies counted as utility) and `WHATSAPP_NAIRA_PER_USD`
+(default 1550, set it in Render to update). Meta's actual bill is in WhatsApp Manager.
+
 ## Costs and rules
 
 Meta charges per template message (utility for renewal reminders, marketing for the rest; prices depend on the
-member's country). Replies within 24 hours of a member's message are free-form and not charged as templates.
+member's country). Since 1 October 2026 replies within 24 hours of a member's message are also charged (at the utility rate).
 Only message members who gave their number to the gym; STOP is always honoured.
 
 All gyms currently send from GymPulse AI's number with the gym's name in the message. Connecting each gym's own

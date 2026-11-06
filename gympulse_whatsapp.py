@@ -123,6 +123,65 @@ def gym_mode(profile=None):
     return mode if mode in MODES else "email"
 
 
+SCOPES = {"renewals": "Renewal reminders only (cheapest: about ₦10 each)",
+          "all": "All automatic messages (promotional ones cost about ₦80 each)"}
+DEFAULT_LIMIT = 400
+RATES_USD = {"UTILITY": 0.0067, "MARKETING": 0.0516}     # Meta's Nigeria prices per message (check WhatsApp Manager)
+
+
+def wa_settings(profile=None):
+    """The gym's WhatsApp choices: mode, scope (renewals / all) and monthly limit (0 = no limit)."""
+    p = profile if profile is not None else (st.session_state.get("user_profile") or {})
+    w = dict((p.get("settings") or {}).get("whatsapp") or {})
+    scope = w.get("scope", "renewals")
+    try:
+        limit = max(0, int(w.get("limit", DEFAULT_LIMIT)))
+    except (TypeError, ValueError):
+        limit = DEFAULT_LIMIT
+    return {"mode": gym_mode(p), "scope": scope if scope in SCOPES else "renewals", "limit": limit}
+
+
+def allowed(kind, settings):
+    """May this kind of automatic message go on WhatsApp under the gym's choice?"""
+    return kind == "renewal" or settings.get("scope") == "all"
+
+
+def naira_per_usd():
+    try:
+        return float(_secret("WHATSAPP_NAIRA_PER_USD", "1550") or 1550)
+    except ValueError:
+        return 1550.0
+
+
+def month_usage(supabase, gym_id=None, since=None):
+    """WhatsApp messages sent this month (one gym, or every gym with gym_id=None) and the estimated cost.
+    Returns {"count", "utility", "marketing", "usd", "naira", "by_gym": {gym_id: {...}}}."""
+    since = since or datetime.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    q = supabase.table("messages").select("gym_id, meta").eq("channel", "whatsapp").eq("direction", "out") \
+        .gte("created_at", since.isoformat())
+    if gym_id:
+        q = q.eq("gym_id", gym_id)
+    try:
+        rows = gw.fetch_all(q.order("created_at"))
+    except Exception:
+        rows = []
+    rate = naira_per_usd()
+    by = {}
+    for r in rows:
+        tpl = (r.get("meta") or {}).get("template") if isinstance(r.get("meta"), dict) else None
+        cat = TEMPLATES.get(tpl, {}).get("category", "UTILITY")       # replies are charged as utility
+        g = by.setdefault(r.get("gym_id"), {"count": 0, "utility": 0, "marketing": 0, "usd": 0.0})
+        g["count"] += 1
+        g["marketing" if cat == "MARKETING" else "utility"] += 1
+        g["usd"] += RATES_USD.get(cat, RATES_USD["UTILITY"])
+    for g in by.values():
+        g["naira"] = g["usd"] * rate
+    tot = {k: sum(g[k] for g in by.values()) for k in ("count", "utility", "marketing", "usd")}
+    tot["naira"] = tot["usd"] * rate
+    tot["by_gym"] = by
+    return tot
+
+
 def to_digits(phone):
     d = gw.whatsapp_digits(phone)
     return d if 10 <= len(d) <= 15 else ""
@@ -339,6 +398,7 @@ def render_admin_setup():
     if not ready():
         st.info("WhatsApp is off until WHATSAPP_TOKEN and WHATSAPP_PHONE_ID are set. Email keeps working as normal.")
         return
+    _render_usage()
     statuses = template_statuses()
     st.markdown('<div class="section-label">TEMPLATES</div>', unsafe_allow_html=True)
     gw.table([{"Template": n, "Type": t["category"].title(), "Buttons": ", ".join(t["buttons"] + ([t["url_button"]["text"] + " (link)"] if t.get("url_button") else [])),
@@ -379,20 +439,67 @@ def render_admin_setup():
                     st.error(str(error))
 
 
-def render_gym_setting(supabase, owner_id):
-    """The gym's choice: email only, WhatsApp first, or both."""
-    import gympulse_grow as gg
-    mode = gym_mode()
+def _render_usage():
+    """Founder's view: WhatsApp messages and estimated Meta cost per gym this month."""
+    import gympulse_admin as gadm
+    sc = gadm.service_client()
+    if sc is None:
+        return
+    u = month_usage(sc)
+    st.markdown('<div class="section-label">THIS MONTH</div>', unsafe_allow_html=True)
+    gw.kpi_row([("WhatsApp messages", f"{u['count']:,}", "cyan", f"{u['utility']:,} utility · {u['marketing']:,} marketing"),
+                ("Estimated Meta cost", f"₦{u['naira']:,.0f}", "amber", f"about ${u['usd']:,.2f}"),
+                ("Gyms using WhatsApp", f"{len(u['by_gym']):,}", "lime", "")])
+    if u["by_gym"]:
+        names = {}
+        try:
+            for g in sc.table("gyms").select("id, business_name").in_("id", list(u["by_gym"])).execute().data or []:
+                names[g["id"]] = g.get("business_name") or "Gym"
+        except Exception:
+            pass
+        gw.table([{"Gym": names.get(gid, "Gym"), "Messages": v["count"], "Marketing": v["marketing"],
+                   "Est. cost (₦)": f"{v['naira']:,.0f}"}
+                  for gid, v in sorted(u["by_gym"].items(), key=lambda x: -x[1]["usd"])],
+                 caption=f"Estimated at ${RATES_USD['UTILITY']} (utility) and ${RATES_USD['MARKETING']} (marketing) per "
+                         f"message and ₦{naira_per_usd():,.0f} per dollar (WHATSAPP_NAIRA_PER_USD). Meta's actual bill "
+                         "is in WhatsApp Manager.")
+
+
+def render_gym_setting(supabase, owner_id, gym_id=None):
+    """The gym's choices: channel, which messages may use WhatsApp, and a monthly limit."""
+    cfg = wa_settings()
     with st.container(border=True):
         st.markdown("##### :material/chat: How messages go out")
         if not ready():
             st.caption("WhatsApp sending is coming soon. Until then automatic messages go by email, and you can "
                        "send any message on WhatsApp yourself from Follow-ups.")
             return
-        pick = st.radio("Channel", list(MODES), index=list(MODES).index(mode), format_func=MODES.get,
-                        key="wa_mode", label_visibility="collapsed")
-        st.caption("Members who reply STOP never get WhatsApp messages again. Replies and button taps appear in "
-                   "Follow-ups.")
-        if pick != mode and st.session_state.get("role") != "staff":
-            gg._save_settings(supabase, owner_id, {"whatsapp": {"mode": pick}}, "Message channel saved.")
+        staff = st.session_state.get("role") == "staff"
+        with st.form("wa_settings_form", border=False):
+            mode = st.radio("Channel", list(MODES), index=list(MODES).index(cfg["mode"]), format_func=MODES.get,
+                            key="wa_mode")
+            scope = st.radio("Which messages can use WhatsApp", list(SCOPES), index=list(SCOPES).index(cfg["scope"]),
+                             format_func=SCOPES.get, key="wa_scope",
+                             help="Other messages go by email (free). Renewal reminders bring money in, so they're "
+                                  "the best use of WhatsApp.")
+            limit = st.number_input("Most WhatsApp messages a month (0 = no limit)", 0, 100000, int(cfg["limit"]),
+                                    step=50, key="wa_limit",
+                                    help="When the limit is reached, automatic messages go by email until next month.")
+            save = st.form_submit_button("Save", type="primary", disabled=staff)
+        if save:
+            import gympulse_grow as gg
+            gg._save_settings(supabase, owner_id, {"whatsapp": {"mode": mode, "scope": scope, "limit": int(limit)}},
+                              "WhatsApp settings saved.")
             st.rerun()
+        if gym_id and cfg["mode"] != "email":
+            u = month_usage(supabase, gym_id)
+            line = (f"This month: **{u['count']:,}** WhatsApp messages, about **₦{u['naira']:,.0f}** "
+                    f"({u['utility']:,} at ₦{RATES_USD['UTILITY'] * naira_per_usd():,.0f}, "
+                    f"{u['marketing']:,} at ₦{RATES_USD['MARKETING'] * naira_per_usd():,.0f}).")
+            st.markdown(line)
+            if cfg["limit"]:
+                st.progress(min(1.0, u["count"] / cfg["limit"]),
+                            text=f"{u['count']:,} of {cfg['limit']:,}"
+                                 + (" · limit reached: the rest go by email" if u["count"] >= cfg["limit"] else ""))
+        st.caption("Members who reply STOP never get WhatsApp messages again. Replies and button taps appear in "
+                   "Follow-ups. Costs are estimates; Meta's bill is in WhatsApp Manager.")
