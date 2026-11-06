@@ -39,6 +39,9 @@ select step, ok from (values
   ('phase24_engage     challenges, polls, badges',  to_regclass('public.community_challenges') is not null
                                                        and to_regclass('public.community_badges') is not null),
   ('phase25_media      video stories (meta)',       exists (select 1 from col where c = 'community_stories.meta')),
+  ('phase26_profiles   cover, highlights, pinned posts', exists (select 1 from col where c = 'members.community_cover')
+                                                    and exists (select 1 from col where c = 'community_stories.highlight')
+                                                    and exists (select 1 from col where c = 'community_posts.profile_pinned')),
   ('security           RLS on every gym table',       not exists (
         select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace
         where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity

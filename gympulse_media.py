@@ -75,6 +75,27 @@ input[type=text], textarea { width:100%; background: rgba(255,255,255,.06); colo
 textarea { min-height:84px; resize:vertical; }
 input[type=range] { width:100%; accent-color:#B7F34A; }
 .foot { display:flex; gap:10px; margin-top:14px; } .foot .pill { flex:1; }
+.qk { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+.q { border-radius:18px; padding:14px 6px 12px; text-align:center; cursor:pointer; background: rgba(255,255,255,.06);
+     border:1px solid rgba(255,255,255,.08); font-weight:800; font-size:13.5px; display:flex; flex-direction:column; align-items:center; gap:6px; }
+.q.off { opacity:.45; }
+.qi { width:44px; height:44px; border-radius:14px; display:flex; align-items:center; justify-content:center; font-size:21px; font-weight:900;
+      background: linear-gradient(135deg, rgba(183,243,74,.25), rgba(53,211,232,.25)); }
+.sub { color:#93A0B4; font-size:12.5px; font-weight:700; }
+.libhd { display:flex; justify-content:space-between; align-items:center; margin:16px 2px 4px; } .libhd b { font-size:15px; }
+.tg { font-size:12.5px; font-weight:800; border-radius:999px; padding:7px 12px; background: rgba(255,255,255,.07); cursor:pointer; }
+.tg.on { background:#B7F34A; color:#0A0F1E; }
+.lib { display:flex; flex-direction:column; align-items:center; gap:4px; text-align:center; cursor:pointer; margin-top:6px;
+       border-radius:20px; padding:22px 14px; background: linear-gradient(135deg, rgba(183,243,74,.18), rgba(53,211,232,.18));
+       border:1px dashed rgba(183,243,74,.45); }
+.lib .ic { font-size:30px; } .lib .note { margin:2px 0 0; }
+.th { position:relative; cursor:pointer; } .th img, .th video { width:100%; aspect-ratio:3/4; object-fit:cover; border-radius:8px; display:block; }
+.th span { position:absolute; right:6px; top:4px; font-size:13px; text-shadow:0 1px 4px rgba(0,0,0,.7); }
+.tstage { position:relative; border-radius:18px; overflow:hidden; display:flex; align-items:center; justify-content:center; max-height:62vh; margin:0 auto; width:100%; }
+.tstage textarea { background:transparent; border:none; text-align:center; font-size:30px; font-weight:900; min-height:40%; width:88%; resize:none; }
+.tstage textarea::placeholder { color:inherit; opacity:.55; }
+.tstage .hint { position:absolute; bottom:10px; left:0; right:0; text-align:center; font-size:12px; font-weight:700; opacity:.6; color:#0A0F1E; }
+.sw.on { border-color:#B7F34A; border-width:3px; }
 .err { color:#FF6B6B; font-size:13px; margin-top:8px; }
 .busy { text-align:center; padding:40px 10px; font-weight:800; }
 .dots { display:inline-block; width:46px; text-align:left; }
@@ -126,26 +147,85 @@ export default function(component){
   function drafts(){ try { return JSON.parse(localStorage.getItem(DKEY) || '[]'); } catch(e){ return []; } }
   function saveDrafts(a){ try { localStorage.setItem(DKEY, JSON.stringify(a.slice(0,8))); return true; } catch(e){ return false; } }
 
+  const GRADS = [['#B7F34A','#35D3E8'],['#FF6B6B','#FFB84D'],['#B388FF','#35D3E8'],['#0A0F1E','#2B3A67'],
+                 ['#FFB84D','#B7F34A'],['#35D3E8','#0A0F1E'],['#FF6B9A','#B388FF'],['#F4F7FB','#C9D2E0']];
   function picker(){
     const ds = drafts().filter(d => d.mode === MODE);
-    root.innerHTML = `<div class="hd"><b>${title}</b><span></span></div>
-      <div class="pick">
-        <label class="tile main"><span class="ic">🖼️</span>Choose from your ${MODE==='reel'?'videos':'photos'}
-          <input id="f1" type="file" accept="${accept}" ${MODE==='reel'?'':'multiple'} hidden></label>
-        <label class="tile"><span class="ic">📷</span>${MODE==='reel'?'Record a video':'Take a photo'}
-          <input id="f2" type="file" accept="${MODE==='reel'?'video/*':'image/*'}" capture="environment" hidden></label>
+    if (st.lib === undefined) { st.lib = MODE === 'reel' ? 'video' : MODE === 'post' ? 'image' : 'all'; st.multi = false; }
+    const acc = st.lib === 'video' ? 'video/*' : st.lib === 'image' ? 'image/*' : 'image/*,video/*';
+    const chips = MODE === 'story' ? [['all','All'],['image','Photos'],['video','Videos']] : [];
+    root.innerHTML = `<div class="hd"><b>${title}</b><span class="sub">${MODE==='reel'?'Up to '+D.maxsec+'s':''}</span></div>
+      <div class="qk">
+        <label class="q"><span class="qi">📷</span><span>Camera</span>
+          <input id="f2" type="file" accept="${MODE==='reel'?'video/*':MODE==='post'?'image/*':'image/*,video/*'}" capture="environment" hidden></label>
+        ${MODE==='reel' ? '' : '<div class="q" id="tx"><span class="qi">Aa</span><span>Text</span></div>'}
+        <div class="q ${ds.length?'':'off'}" id="dr"><span class="qi">🗂️</span><span>Drafts${ds.length?' · '+ds.length:''}</span></div>
       </div>
-      <div class="note">Your phone asks for permission and opens its own photo library. GymPulse only gets the
-        ${MODE==='reel'?'video':'photos'} you choose.${MODE!=='post'?' Videos up to 60 seconds.':''}</div>
-      ${ds.length ? `<div class="lbl">Drafts on this phone</div><div class="drafts">${ds.map((d,i)=>
-        `<img src="${d.img}" data-i="${i}" alt="draft">`).join('')}</div>` : ''}
+      <div class="libhd"><b>Library</b>
+        ${MODE==='reel' ? '' : `<span class="tg ${st.multi?'on':''}" id="mu">${st.multi?'✓ ':''}Select multiple</span>`}</div>
+      ${chips.length ? `<div class="chips">${chips.map(([k,l])=>`<span class="chip ${st.lib===k?'on':''}" data-l="${k}">${l}</span>`).join('')}</div>` : ''}
+      <label class="lib"><span class="ic">🖼️</span><b>Open my ${st.lib==='video'?'videos':st.lib==='image'?'photos':'photos & videos'}</b>
+        <span class="note">Your phone opens its own library. GymPulse only gets what you choose.</span>
+        <input id="f1" type="file" accept="${acc}" ${st.multi?'multiple':''} hidden></label>
+      ${st.files.length > 1 ? `<div class="lbl">Chosen · tap one to edit</div>${thumbs()}` : ''}
       ${st.err ? `<div class="err">${st.err}</div>` : ''}`;
     root.querySelector('#f1').onchange = e => chosen([...e.target.files]);
     root.querySelector('#f2').onchange = e => chosen([...e.target.files]);
-    root.querySelectorAll('.drafts img').forEach(el => el.onclick = () => {
-      const d = ds[+el.dataset.i]; const im = new Image();
-      im.onload = () => { st.img = im; st.items = []; st.caption = d.caption || ''; st.fi = 0; st.draftId = d.id; editor(); };
+    const mu = root.querySelector('#mu'); if (mu) mu.onclick = () => { st.multi = !st.multi; picker(); };
+    root.querySelectorAll('.chip[data-l]').forEach(c => c.onclick = () => { st.lib = c.dataset.l; picker(); });
+    const tx = root.querySelector('#tx'); if (tx) tx.onclick = textMode;
+    root.querySelector('#dr').onclick = () => ds.length && draftList(ds);
+    bindThumbs();
+  }
+  function thumbs(){
+    return `<div class="grid">${st.files.map((f,i)=> f.type.startsWith('video') ?
+      `<div class="th" data-i="${i}"><video src="${URL.createObjectURL(f)}" muted playsinline></video><span>▶︎</span></div>` :
+      `<div class="th" data-i="${i}"><img src="${URL.createObjectURL(f)}" alt=""></div>`).join('')}</div>`;
+  }
+  function bindThumbs(){ root.querySelectorAll('.th[data-i]').forEach(el => el.onclick = () => open(st.files[+el.dataset.i])); }
+  function draftList(ds){
+    root.innerHTML = `<div class="hd"><button class="ghost" id="bk">Back</button><b>Drafts</b><span></span></div>
+      <div class="grid">${ds.map((d,i)=>`<div class="th" data-d="${i}"><img src="${d.img}" alt="draft"></div>`).join('')}</div>
+      <div class="note">Drafts stay on this phone only.</div>`;
+    root.querySelector('#bk').onclick = picker;
+    root.querySelectorAll('.th[data-d]').forEach(el => el.onclick = () => {
+      const d = ds[+el.dataset.d]; const im = new Image();
+      im.onload = () => { st.img = im; st.video = null; st.items = []; st.caption = d.caption || ''; st.fi = 0; st.draftId = d.id; editor(); };
       im.src = d.img; });
+  }
+  function gradImage(gi){
+    const c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d');
+    const g = x.createLinearGradient(0, 0, W, H); g.addColorStop(0, GRADS[gi][0]); g.addColorStop(1, GRADS[gi][1]);
+    x.fillStyle = g; x.fillRect(0, 0, W, H); return c.toDataURL('image/jpeg', .9);
+  }
+  function textMode(){
+    st.gi = st.gi || 0;
+    const dark = gi => ['#0A0F1E','#35D3E8'].includes(GRADS[gi][0]) && gi !== 2;
+    function paint(){
+      const g = GRADS[st.gi];
+      root.innerHTML = `<div class="hd"><button class="ghost" id="bk">Back</button><b>Text</b><button class="ghost" id="nx" style="color:#B7F34A">Next</button></div>
+        <div class="tstage" id="ts" style="background:linear-gradient(135deg,${g[0]},${g[1]});aspect-ratio:${W}/${H}">
+          <textarea id="tt" placeholder="Type something…" maxlength="160" style="color:${dark(st.gi)?'#F4F7FB':'#0A0F1E'}">${esc(st.ttext||'')}</textarea>
+          <div class="hint">Swipe for colours</div></div>
+        <div class="chips">${GRADS.map((c,i)=>`<span class="sw ${i===st.gi?'on':''}" data-g="${i}" style="background:linear-gradient(135deg,${c[0]},${c[1]})"></span>`).join('')}</div>`;
+      const ta = root.querySelector('#tt'); ta.oninput = () => st.ttext = ta.value;
+      root.querySelector('#bk').onclick = picker;
+      root.querySelectorAll('.sw[data-g]').forEach(el => el.onclick = () => { st.gi = +el.dataset.g; paint(); });
+      const ts = root.querySelector('#ts'); let x0 = null;
+      ts.addEventListener('touchstart', e => x0 = e.touches[0].clientX, {passive:true});
+      ts.addEventListener('touchend', e => { if (x0 === null) return; const dx = e.changedTouches[0].clientX - x0; x0 = null;
+        if (Math.abs(dx) > 40) { st.gi = (st.gi + (dx < 0 ? 1 : GRADS.length - 1)) % GRADS.length; paint(); } });
+      root.querySelector('#nx').onclick = () => {
+        const t = (st.ttext || '').trim(); if (!t) { ta.focus(); return; }
+        const im = new Image();
+        im.onload = () => { st.img = im; st.video = null; st.fi = 0; st.frame = false; st.caption = '';
+          const lines = t.length > 22 ? t.replace(/(.{1,20})(\s|$)/g, '$1\n').trim() : t;
+          st.items = [{text: lines, x:.5, y:.5, size: t.length > 60 ? 64 : 96, color: dark(st.gi) ? '#FFFFFF' : '#0A0F1E', bg:false}];
+          editor(); };
+        im.src = gradImage(st.gi);
+      };
+    }
+    paint();
   }
 
   function chosen(files){
@@ -155,14 +235,7 @@ export default function(component){
     open(files[0]);
   }
 
-  function grid(){
-    root.innerHTML = `<div class="hd"><button class="ghost" id="bk">Back</button><b>Choose one</b><span></span></div>
-      <div class="grid">${st.files.map((f,i)=> f.type.startsWith('video') ?
-        `<video src="${URL.createObjectURL(f)}" data-i="${i}" muted playsinline></video>` :
-        `<img src="${URL.createObjectURL(f)}" data-i="${i}" alt="">`).join('')}</div>`;
-    root.querySelector('#bk').onclick = picker;
-    root.querySelectorAll('.grid [data-i]').forEach(el => el.onclick = () => open(st.files[+el.dataset.i]));
-  }
+  function grid(){ picker(); }
 
   function open(f){
     st.items = []; st.fi = 0; st.frame = false; st.caption = '';

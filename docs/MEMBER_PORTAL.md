@@ -129,3 +129,23 @@ Run `sql/phase25_community_media.sql` once. Code: `gympulse_media.py` (Streamlit
   appear in the feed.
 - **Music:** not included yet. Real songs need licences (Instagram and TikTok pay record labels for theirs);
   a royalty-free sound library can be added later.
+
+## Profiles, highlights and the new create screen (phase 26)
+
+Run `sql/phase26_community_profiles.sql` once (safe to run again). It adds a cover photo for each
+member, story highlights and pinned posts.
+
+**Profile page** (Community → person icon, or tap any name):
+
+- Cover photo with the profile photo over it. A green ring means they have a live story (tap to watch).
+- Name, @handle, and counts: posts, followers, following, likes. Tap followers or following to see the list.
+- Someone else: **Follow**, **Message** and **⋯** (block or report). You: **Edit profile** (bio, cover
+  photo, who can message you), **Story archive** and **＋** for a new story.
+- Chips for streak, badges and goal.
+- **Highlights**: circles of saved stories. Open Story archive, pick stories, name the highlight.
+- Tabs: posts grid (pinned first), reels, and class posts they were tagged in. Open one of your own posts
+  and tap **Pin to top of profile**.
+
+**Create screen** (posts, stories and reels): **Camera**, **Text** (type on a colour background; swipe for
+colours) and **Drafts** at the top, then the **Library** with All / Photos / Videos and **Select multiple**.
+The phone's own picker opens; GymPulse only gets what the member chooses.
