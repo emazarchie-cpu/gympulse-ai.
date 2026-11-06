@@ -1125,7 +1125,7 @@ def render_brand_settings(supabase, gym_id, save):
 def render_unsubscribe(supabase, token):
     import gympulse_booking as gb
     gb._header()
-    _, col, _ = st.columns([1, 3, 1])
+    col = gw.center("campaign", 720)
     with col:
         if st.session_state.get("unsub_done"):
             st.success(f"You're unsubscribed. {st.session_state['unsub_done']} won't send you any more emails.")

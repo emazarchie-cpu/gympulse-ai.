@@ -269,7 +269,7 @@ def render_router(supabase):
 def render_booking(supabase):
     cfg = config()
     _header()
-    _, col, _ = st.columns([1, 3.2, 1])
+    col = gw.center("booking", 760)
     with col:
         done = st.session_state.get("demo_booked")
         if done:
@@ -373,7 +373,7 @@ def _render_done(b, cfg):
 
 def render_cancel(supabase, token):
     _header()
-    _, col, _ = st.columns([1, 3.2, 1])
+    col = gw.center("booking2", 760)
     with col:
         gw._md('<div class="bk-title">Cancel your demo</div>'
                '<div class="bk-sub">If you cancel, the time is freed for someone else. '

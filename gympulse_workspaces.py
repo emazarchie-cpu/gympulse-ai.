@@ -167,6 +167,17 @@ def _md(markup, target=None):
     flat = " ".join(line.strip() for line in str(markup).splitlines() if line.strip())
     (target if target is not None else st).markdown(flat, unsafe_allow_html=True)
 
+def center(name, max_px=640):
+    """A centred column of at most max_px that is always full width on phones.
+
+    Replaces the old st.columns([1, w, 1]) trick: Safari on iPhone sometimes kept those three columns side by
+    side, which squeezed the middle one into a third of the screen."""
+    key = f"center_{name}"
+    st.markdown(f"<style>.st-key-{key} {{ max-width: {int(max_px)}px; width: 100% !important; margin: 0 auto; }}</style>",
+                unsafe_allow_html=True)
+    return st.container(key=key)
+
+
 def _text(value, default=""):
     if value is None:
         return default

@@ -96,7 +96,7 @@ def render_public(supabase, params):
         score = int(params.get("s", 0))
     except ValueError:
         score = 0
-    _, col, _ = st.columns([1, 3, 1])
+    col = gw.center("happy", 720)
     with col:
         if score not in SCORES:
             st.error("This link isn't complete. Please tap one of the faces in the email again.")

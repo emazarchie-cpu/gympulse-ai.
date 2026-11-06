@@ -782,7 +782,7 @@ def render_return_page(params):
         st.session_state.pop("_cache", None)
         st.session_state.pop("_upgrade_shown", None)
     ok, msg, inv = st.session_state[key]
-    _, col, _ = st.columns([1, 2.2, 1])
+    col = gw.center("billing", 640)
     with col:
         if ok:
             rows = "".join(f'<div class="co-row"><span>{a}</span><b>{gw._esc(b)}</b></div>' for a, b in [
