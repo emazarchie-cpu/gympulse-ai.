@@ -31,9 +31,12 @@ select step, ok from (values
   ('phase18_portal     members.portal_token',         exists (select 1 from col where c = 'members.portal_token')),
   ('phase18_portal     class_bookings',               to_regclass('public.class_bookings') is not null),
   ('phase19_code_login members.portal_code_hash',     exists (select 1 from col where c = 'members.portal_code_hash')),
+  ('phase20_limits     archie_usage',                 to_regclass('public.archie_usage') is not null),
+  ('phase21_community  community_posts',              to_regclass('public.community_posts') is not null),
   ('security           RLS on every gym table',       not exists (
         select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace
         where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity
           and c.relname in ('members','member_activity','checkins','retention_actions','payments','messages',
-                            'class_bookings','member_imports','gym_staff','billing_invoices','member_feedback')))
+                            'class_bookings','member_imports','gym_staff','billing_invoices','member_feedback',
+                            'community_posts','community_comments','community_likes','community_reports','archie_usage')))
 ) as t(step, ok);

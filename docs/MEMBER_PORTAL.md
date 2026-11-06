@@ -24,3 +24,23 @@ code for the front desk, a message for the WhatsApp group, how many members have
 Setup: run `sql/phase18_member_portal.sql` once. For WhatsApp links, submit the `gp_member_portal` template in
 Admin → WhatsApp. Pages are read on the server with `SUPABASE_SERVICE_ROLE_KEY` and only ever for the member the
 link belongs to.
+
+
+## Community (phase 21)
+
+A **Community** tab in the member app: a private feed for each gym. Run `sql/phase21_community.sql` once (tables,
+row-level security and the `community` photo bucket).
+
+- **Members:** accept five short community rules once, then post text and a photo (resized to 1080 px), like ❤️,
+  comment, delete their own posts and comments, and report others. Up to 10 posts a day. Members the gym has
+  stopped can still read.
+- **Gym (Members → Member community):**
+  - switch the community on or off;
+  - post as the gym and pin a post to the top;
+  - see reported posts first;
+  - hide or show posts and comments, or mark a report "Looks fine";
+  - stop or allow a member posting (owner only).
+- Only members of the same gym see the feed. Everything is read on the server, scoped to the member's gym.
+- Photos go to Supabase Storage under random file names (public bucket); if storage isn't set up they're stored
+  small inside the post.
+- Later: one shared community across a brand's branches, and notifications for new comments.
