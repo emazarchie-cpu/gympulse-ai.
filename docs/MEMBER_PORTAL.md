@@ -44,3 +44,23 @@ row-level security and the `community` photo bucket).
 - Photos go to Supabase Storage under random file names (public bucket); if storage isn't set up they're stored
   small inside the post.
 - Later: one shared community across a brand's branches, and notifications for new comments.
+
+
+## Community: stories, profiles, follows and messages (phase 22)
+
+Run `sql/phase22_community_social.sql` once. The Community tab gets a menu: **Feed · Search · Inbox · Me**, and the
+member app now stays on the tab you're using.
+
+- **Stories:** a row of rings at the top of the feed (gym first, unseen first, then people you follow). Add a photo
+  or text story; it shows for 24 hours, then moves to the member's private **Story archive**. Tap a ring to view,
+  with Next / Previous; seen stories get a grey ring. Gyms can post stories and remove any story.
+- **Profiles:** photo, name, bio, and counts for posts, followers and following (tap the counts to see the people),
+  plus a grid of their posts. Tap any name in the feed, search, followers lists or messages to open a profile, then
+  Follow / Unfollow, Message or Block. On your own profile: Edit profile (bio, who can message you) and Story
+  archive.
+- **Feed:** Everyone / Following filter.
+- **Search:** find members by name; with no search, it suggests members to follow.
+- **Messages:** an Inbox with unread counts (also shown on the menu) and chat bubbles. Members choose who can message
+  them (everyone, people they follow, nobody). Blocking stops messages and hides profiles both ways. Members the
+  gym has paused can't message. Limit: 60 messages an hour. The gym does not read members' messages.
+- Everything stays within one gym; all reads are on the server, scoped to the signed-in member's gym.

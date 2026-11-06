@@ -372,7 +372,7 @@ def render_portal(supabase, token):
         flash = st.session_state.pop("mp_flash", None)
         if flash:
             st.success(flash)
-        tabs = st.tabs(["Home", "Community", "Classes", "Messages", "My details"])
+        tabs = st.tabs(["Home", "Community", "Classes", "Messages", "My details"], key="mp_tabs")
         with tabs[0]:
             _home(sc, m, gym_name, prof)
         with tabs[1]:

@@ -143,35 +143,203 @@ def _author(p, gym_name):
 
 
 CSS = """<style>
-.cm-head { display:flex; align-items:center; gap:10px; }
 .cm-name { font-weight:800; color: var(--gp-text, #F4F7FB); font-size:15px; }
 .cm-when { font-size:12px; color: var(--gp-muted, #93A0B4); }
-.cm-body { white-space:pre-wrap; font-size:15px; line-height:1.5; margin:10px 0 6px; color: var(--gp-text, #F4F7FB); }
-.cm-img { width:100%; border-radius:14px; margin:6px 0; display:block; }
+.cm-body { white-space:pre-wrap; font-size:15px; line-height:1.55; margin:8px 0 6px; color: var(--gp-text, #F4F7FB); }
+.cm-img { width:100%; border-radius:16px; margin:6px 0; display:block; }
 .cm-pin { font-size:12px; color:#B7F34A; font-weight:700; margin-bottom:4px; }
-.cm-c { font-size:14px; line-height:1.45; margin:6px 0; }
+.cm-c { font-size:14px; line-height:1.45; margin:4px 0; }
 .cm-c b { color: var(--gp-text, #F4F7FB); }
-[class*="st-key-cm_act_"] [data-testid="stHorizontalBlock"],
-[class*="st-key-cm_crow_"] [data-testid="stHorizontalBlock"] { flex-wrap: nowrap !important; gap: 8px !important; }
-[class*="st-key-cm_act_"] [data-testid="stColumn"] { min-width: 0 !important; width: auto !important; flex: 1 1 0 !important; }
-[class*="st-key-cm_crow_"] [data-testid="stColumn"] { min-width: 0 !important; width: auto !important; flex: 1 1 auto !important; }
-[class*="st-key-cm_crow_"] [data-testid="stColumn"]:last-child { flex: 0 0 auto !important; }
+.cm-ring { width:62px; height:62px; border-radius:50%; padding:3px; margin:0 auto 2px;
+  background: linear-gradient(135deg, #B7F34A, #35D3E8); }
+.cm-ring.seen { background: rgba(147,160,180,.35); }
+.cm-ring.add { background: rgba(147,160,180,.25); position:relative; }
+.cm-ring > div { border:3px solid var(--gp-bg, #070B14); border-radius:50%; overflow:hidden; }
+.cm-plus { position:absolute; right:-2px; bottom:-2px; width:22px; height:22px; border-radius:50%; background:#B7F34A;
+  color:#0A0F1E; font-weight:900; display:flex; align-items:center; justify-content:center; font-size:16px;
+  border:2px solid var(--gp-bg, #070B14); }
+.cm-prof { text-align:center; padding:8px 0 4px; }
+.cm-prof-name { font-size:22px; font-weight:800; color: var(--gp-text, #F4F7FB); margin-top:8px; }
+.cm-prof-bio { color: var(--gp-muted, #93A0B4); font-size:14px; margin:4px auto 0; max-width:420px; white-space:pre-wrap; }
+.cm-stat b { display:block; font-size:20px; font-weight:800; color: var(--gp-text, #F4F7FB); }
+.cm-stat span { font-size:12px; color: var(--gp-muted, #93A0B4); }
+.cm-tile { width:100%; aspect-ratio:1/1; object-fit:cover; border-radius:10px; display:block; }
+.cm-tile-t { width:100%; aspect-ratio:1/1; border-radius:10px; padding:10px; overflow:hidden; font-size:12.5px;
+  line-height:1.35; background: linear-gradient(135deg, rgba(183,243,74,.16), rgba(53,211,232,.16));
+  color: var(--gp-text, #F4F7FB); }
+.cm-bub { border-radius:18px; padding:9px 14px; margin:4px 0; max-width:78%; font-size:14.5px; line-height:1.45;
+  white-space:pre-wrap; word-wrap:break-word; }
+.cm-me { background: linear-gradient(135deg, #B7F34A, #35D3E8); color:#0A0F1E; margin-left:auto; border-bottom-right-radius:6px; }
+.cm-them { background: var(--gp-s2, #172033); color: var(--gp-text, #F4F7FB); border-bottom-left-radius:6px; }
+.cm-story { border-radius:18px; overflow:hidden; background:#000; }
+.cm-story img { width:100%; max-height:70vh; object-fit:contain; display:block; }
+.cm-story-t { padding:28px 18px; font-size:20px; font-weight:700; text-align:center; color:#0A0F1E;
+  background: linear-gradient(135deg, #B7F34A, #35D3E8); min-height:240px; display:flex; align-items:center;
+  justify-content:center; white-space:pre-wrap; }
+.cm-bar { height:3px; border-radius:3px; background: rgba(255,255,255,.18); margin-bottom:10px; display:flex; gap:4px; }
+.cm-bar i { flex:1; border-radius:3px; background: rgba(255,255,255,.25); }
+.cm-bar i.on { background:#B7F34A; }
+[class*="st-key-cm_act_"] [data-testid="stHorizontalBlock"], [class*="st-key-cm_crow_"] [data-testid="stHorizontalBlock"],
+[class*="st-key-cm_hd_"] [data-testid="stHorizontalBlock"], [class*="st-key-cm_row_"] [data-testid="stHorizontalBlock"],
+[class*="st-key-cm_pbtn"] [data-testid="stHorizontalBlock"], [class*="st-key-cm_stats"] [data-testid="stHorizontalBlock"],
+[class*="st-key-cm_grid"] [data-testid="stHorizontalBlock"] { flex-wrap: nowrap !important; gap: 8px !important; }
+[class*="st-key-cm_act_"] [data-testid="stColumn"], [class*="st-key-cm_pbtn"] [data-testid="stColumn"],
+[class*="st-key-cm_stats"] [data-testid="stColumn"], [class*="st-key-cm_grid"] [data-testid="stColumn"] {
+  min-width: 0 !important; width: auto !important; flex: 1 1 0 !important; }
+[class*="st-key-cm_crow_"] [data-testid="stColumn"], [class*="st-key-cm_hd_"] [data-testid="stColumn"],
+[class*="st-key-cm_row_"] [data-testid="stColumn"] { min-width: 0 !important; width: auto !important; flex: 1 1 auto !important; }
+[class*="st-key-cm_crow_"] [data-testid="stColumn"]:last-child, [class*="st-key-cm_row_"] [data-testid="stColumn"]:last-child,
+[class*="st-key-cm_hd_"] [data-testid="stColumn"]:first-child, [class*="st-key-cm_row_"] [data-testid="stColumn"]:first-child {
+  flex: 0 0 auto !important; }
 [class*="st-key-cm_act_"] button { padding: 4px 8px !important; min-height: 38px !important; }
 [class*="st-key-cm_crow_"] button { padding: 0 10px !important; min-height: 30px !important; }
+[class*="st-key-cm_hd_"] button, [class*="st-key-cm_row_"] .stButton:first-of-type button[kind="tertiary"] {
+  padding: 0 !important; min-height: 0 !important; font-weight: 800 !important; font-size: 15px !important;
+  justify-content: flex-start !important; }
+[class*="st-key-cm_stories"] [data-testid="stHorizontalBlock"] { flex-wrap: nowrap !important; overflow-x: auto !important;
+  gap: 10px !important; padding-bottom: 4px; scrollbar-width: none; }
+[class*="st-key-cm_stories"] [data-testid="stColumn"] { flex: 0 0 74px !important; min-width: 74px !important; width: 74px !important; }
+[class*="st-key-cm_stories"] button { padding: 0 2px !important; min-height: 0 !important; font-size: 12px !important;
+  width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+[class*="st-key-cm_stats"] button { flex-direction: column !important; min-height: 56px !important; line-height: 1.2 !important; }
+[class*="st-key-cm_grid"] button { min-height: 0 !important; padding: 2px 4px !important; font-size: 12px !important; }
+[class*="st-key-cm_hd_"] [data-testid="stVerticalBlock"], [class*="st-key-cm_row_"] [data-testid="stVerticalBlock"],
+[class*="st-key-cm_stories"] [data-testid="stVerticalBlock"] { gap: 2px !important; }
+[class*="st-key-cm_stories"] { margin-bottom: -10px; }
+[class*="st-key-cm_hd_"] .cm-when, [class*="st-key-cm_row_"] .cm-when { margin-top: 0 !important; }
+[class*="st-key-cm_chat"] { max-height: 55vh; overflow-y: auto; }
+[class*="st-key-cm_nav_bar"] [data-testid="stButtonGroup"] > div { flex-wrap: nowrap !important; width: 100% !important; }
+[class*="st-key-cm_nav_bar"] button { flex: 1 1 0 !important; min-width: 0 !important; padding: 6px 4px !important;
+  font-size: 13px !important; white-space: nowrap !important; }
+[class*="st-key-cm_scope"] button { padding: 4px 14px !important; }
 </style>"""
 
 
-def _post_html(p, gym_name):
+def _post_html(p, gym_name, header=True):
     name, badge = _author(p, gym_name)
     img = f'<img class="cm-img" src="{gw._esc(p["photo"])}" alt="">' if p.get("photo") else ""
     pin = '<div class="cm-pin">📌 Pinned by the gym</div>' if p.get("pinned") else ""
-    return (pin + '<div class="cm-head">' + gw.avatar_html(p.get("author_name") or gym_name, p.get("avatar"), 40)
+    head = ('<div style="display:flex;align-items:center;gap:10px">'
+            + gw.avatar_html(p.get("author_name") or gym_name, p.get("avatar"), 40)
             + f'<div><div class="cm-name">{name}{badge}</div><div class="cm-when">{_when(p.get("created_at"))}</div>'
-            + '</div></div>'
-            + (f'<div class="cm-body">{gw._esc(p.get("body"))}</div>' if p.get("body") else "") + img)
+            + '</div></div>') if header else ""
+    return (pin + head + (f'<div class="cm-body">{gw._esc(p.get("body"))}</div>' if p.get("body") else "") + img)
+
+
+# ------------------------------------------------------------------ social data (phase 22)
+def social_ready(sc):
+    try:
+        sc.table("community_follows").select("follower_id").limit(1).execute()
+        return True
+    except Exception:
+        return False
+
+
+def people(sc, gym_id):
+    """{member_id: member} for everyone in the community (accepted the rules, not archived)."""
+    def fetch():
+        cols = "id, full_name, photo, community_agreed_at, community_bio, community_dm, community_blocked, archived"
+        try:
+            rows = gw.fetch_all(sc.table("members").select(cols).eq("gym_id", gym_id).order("full_name"))
+        except Exception:
+            rows = gw.fetch_all(sc.table("members").select("id, full_name, photo, community_agreed_at, archived")
+                                .eq("gym_id", gym_id).order("full_name"))
+        return {r["id"]: r for r in rows if r.get("community_agreed_at") and not r.get("archived")}
+    return gw._cached(("cm_people", gym_id), fetch, ttl=20)
+
+
+def _follows(sc, gym_id):
+    def fetch():
+        try:
+            return sc.table("community_follows").select("follower_id, followee_id").eq("gym_id", gym_id) \
+                .execute().data or []
+        except Exception:
+            return []
+    return gw._cached(("cm_follows", gym_id), fetch, ttl=10)
+
+
+def following_of(sc, gym_id, mid):
+    return {f["followee_id"] for f in _follows(sc, gym_id) if f["follower_id"] == mid}
+
+
+def followers_of(sc, gym_id, mid):
+    return {f["follower_id"] for f in _follows(sc, gym_id) if f["followee_id"] == mid}
+
+
+def _blocks(sc, gym_id, mid):
+    """(people I blocked, people who blocked me)."""
+    try:
+        rows = sc.table("community_blocks").select("blocker_id, blocked_id").eq("gym_id", gym_id).execute().data or []
+    except Exception:
+        return set(), set()
+    return ({r["blocked_id"] for r in rows if r["blocker_id"] == mid},
+            {r["blocker_id"] for r in rows if r["blocked_id"] == mid})
+
+
+def _bust(gym_id):
+    cache = st.session_state.get("_cache") or {}
+    for k in [k for k in cache if isinstance(k, tuple) and k[:1] in (("cm_follows",), ("cm_people",))]:
+        cache.pop(k, None)
+
+
+def toggle_follow(sc, m, other_id):
+    if other_id in following_of(sc, m["gym_id"], m["id"]):
+        sc.table("community_follows").delete().eq("follower_id", m["id"]).eq("followee_id", other_id).execute()
+    else:
+        try:
+            sc.table("community_follows").insert({"gym_id": m["gym_id"], "follower_id": m["id"],
+                                                  "followee_id": other_id}).execute()
+        except Exception:
+            pass
+    _bust(m["gym_id"])
+
+
+def can_message(sc, m, other):
+    """(ok, reason) for m sending a direct message to other."""
+    if m.get("community_blocked"):
+        return False, "The gym has paused messaging from your account."
+    mine, theirs = _blocks(sc, m["gym_id"], m["id"])
+    if other["id"] in mine:
+        return False, "You've blocked this member."
+    if other["id"] in theirs:
+        return False, "You can't message this member."
+    pref = other.get("community_dm") or "everyone"
+    if pref == "nobody":
+        return False, f"{_first(other)} isn't taking messages."
+    if pref == "following" and m["id"] not in following_of(sc, m["gym_id"], other["id"]):
+        return False, f"{_first(other)} only takes messages from people they follow."
+    return True, ""
+
+
+def _first(p):
+    return (gw._text(p.get("full_name")).split() or ["Member"])[0]
+
+
+def unread_count(sc, m):
+    try:
+        return len(sc.table("community_dms").select("id").eq("recipient_id", m["id"]).is_("read_at", "null")
+                   .execute().data or [])
+    except Exception:
+        return 0
 
 
 # ------------------------------------------------------------------ member side (inside the member page)
+def _go(view, **kw):
+    st.session_state["cm_view"] = view
+    for k, v in kw.items():
+        st.session_state[k] = v
+
+
+def _open_profile(pid):
+    st.session_state["cm_back"] = st.session_state.get("cm_view", "feed")
+    _go("profile", cm_pid=pid)
+
+
+def _open_chat(pid):
+    st.session_state["cm_back"] = st.session_state.get("cm_view", "feed")
+    _go("chat", cm_chat=pid)
+
+
 def render_member(sc, m, gym_name):
     st.markdown(CSS, unsafe_allow_html=True)
     if not ready(sc):
@@ -182,37 +350,91 @@ def render_member(sc, m, gym_name):
         return
     flash = st.session_state.pop("cm_flash", None)
     if flash:
-        st.success(flash)
+        st.toast(flash)
     if not m.get("community_agreed_at"):
         with st.container(border=True):
             st.markdown(f"#### Welcome to the {gw._esc(gym_name)} community")
-            st.markdown("Share your progress, cheer each other on and see what's happening at the gym. "
-                        "Only members of your gym can see it.")
+            st.markdown("Share your progress, post stories, follow and message other members, and see what's "
+                        "happening at the gym. Only members of your gym can see it.")
             st.markdown("\n".join(f"- {r}" for r in RULES))
             if st.button("I agree, let me in", type="primary", key="cm_agree", use_container_width=True):
                 sc.table("members").update({"community_agreed_at": datetime.now(timezone.utc).isoformat()}) \
                     .eq("id", m["id"]).execute()
+                _bust(m["gym_id"])
                 st.rerun()
         return
+    social = social_ready(sc)
+    view = st.session_state.get("cm_view", "feed")
+    if not social and view not in ("feed",):
+        view = "feed"
+    if view in ("feed", "search", "inbox", "me") and social:
+        unread = unread_count(sc, m)
+        labels = {"feed": ":material/home: Feed", "search": ":material/search: Search",
+                  "inbox": f":material/chat: Inbox{f' ({unread})' if unread else ''}",
+                  "me": ":material/person: Me"}
+        st.session_state["cm_nav_bar"] = view           # the menu always shows the current screen
+
+        def _nav():
+            st.session_state["cm_view"] = st.session_state.get("cm_nav_bar") or view
+        st.segmented_control("Community", list(labels), format_func=labels.get, key="cm_nav_bar",
+                             on_change=_nav, label_visibility="collapsed", width="stretch")
+    if view == "search":
+        _search(sc, m, gym_name)
+    elif view == "inbox":
+        _inbox(sc, m, gym_name)
+    elif view == "chat":
+        _chat(sc, m, st.session_state.get("cm_chat"), gym_name)
+    elif view in ("profile", "me"):
+        _profile(sc, m, m["id"] if view == "me" else st.session_state.get("cm_pid"), gym_name)
+    else:
+        _feed(sc, m, gym_name, social)
+
+
+def _back():
+    if st.button("Back", icon=":material/arrow_back:", key="cm_back_btn", type="tertiary"):
+        st.session_state["cm_view"] = st.session_state.get("cm_back", "feed")
+        if st.session_state["cm_view"] in ("profile", "chat"):
+            st.session_state["cm_view"] = "feed"
+        st.rerun()
+
+
+# ---------------- feed
+def _feed(sc, m, gym_name, social):
+    if social:
+        _stories_bar(sc, m, gym_name)
     if m.get("community_blocked"):
         st.warning(f"{gym_name} has paused posting from your account. You can still read the community.")
     else:
-        _composer(sc, m)
+        with st.expander("Create a post", icon=":material/add_photo_alternate:",
+                         expanded=bool(st.session_state.get("cm_compose_open"))):
+            _composer(sc, m)
+    scope = "all"
+    if social:
+        scope = st.segmented_control("Show", ["all", "following"], default="all", key="cm_scope",
+                                     format_func={"all": "Everyone", "following": "Following"}.get,
+                                     label_visibility="collapsed") or "all"
     limit = st.session_state.get("cm_limit", PAGE)
     posts = load_feed(sc, m["gym_id"], limit)
+    if social:
+        mine, theirs = _blocks(sc, m["gym_id"], m["id"])
+        posts = [p for p in posts if p.get("member_id") not in mine | theirs]
+        if scope == "following":
+            fol = following_of(sc, m["gym_id"], m["id"]) | {m["id"]}
+            posts = [p for p in posts if p.get("member_id") in fol or not p.get("member_id")]
     if not posts:
-        st.caption("No posts yet. Be the first to say hello 👋")
+        st.caption("No posts yet. Be the first to say hello 👋" if scope == "all" else
+                   "Follow members to see their posts here. Try Search.")
     for p in posts:
-        _post_card(sc, m, p, gym_name)
+        _post_card(sc, m, p, gym_name, social)
     if len(posts) >= limit:
         if st.button("Show more", key="cm_more", use_container_width=True):
             st.session_state["cm_limit"] = limit + PAGE
             st.rerun()
 
 
-def _composer(sc, m):
-    with st.form("cm_new", clear_on_submit=True):
-        body = st.text_area("Share something with your gym", max_chars=MAX_BODY,
+def _composer(sc, m, key="cm_new"):
+    with st.form(key, clear_on_submit=True, border=False):
+        body = st.text_area("Share something with your gym", max_chars=MAX_BODY, label_visibility="collapsed",
                             placeholder="New personal best? A class you loved? Say hi 👋")
         photo = st.file_uploader("Photo (optional)", type=["jpg", "jpeg", "png", "webp", "heic", "heif"])
         go = st.form_submit_button("Post", type="primary", use_container_width=True)
@@ -244,13 +466,24 @@ def _composer(sc, m):
     st.rerun()
 
 
-def _post_card(sc, m, p, gym_name):
+def _post_card(sc, m, p, gym_name, social=True):
     mine = p.get("member_id") == m["id"]
     liked = m["id"] in p["likes"]
     with st.container(border=True, key=f"cm_post_{p['id']}"):
-        gw._md(_post_html(p, gym_name))
-        a, b, c = st.container(key=f"cm_act_{p['id']}").columns([1.2, 1.4, 1.4])
-        if a.button(f"{'❤️' if liked else '🤍'} {len(p['likes']) or ''}".strip(), key=f"cm_like_{p['id']}",
+        if p.get("pinned"):
+            gw._md('<div class="cm-pin">📌 Pinned by the gym</div>')
+        a, b = st.container(key=f"cm_hd_{p['id']}").columns([1, 8], vertical_alignment="center")
+        gw._md(gw.avatar_html(p.get("author_name") or gym_name, p.get("avatar"), 40), a)
+        with b:
+            if p.get("member_id") and social:
+                st.button(gw._text(p.get("author_name"), "Member"), key=f"cm_au_{p['id']}", type="tertiary",
+                          on_click=_open_profile, args=(p["member_id"],))
+            else:
+                gw._md(f'<div class="cm-name">{_author(p, gym_name)[0]}{_author(p, gym_name)[1]}</div>')
+            gw._md(f'<div class="cm-when" style="margin-top:-6px">{_when(p.get("created_at"))}</div>')
+        gw._md(_post_html(p, gym_name, header=False).replace('<div class="cm-pin">📌 Pinned by the gym</div>', ""))
+        x, y, z = st.container(key=f"cm_act_{p['id']}").columns([1.2, 1.4, 1.4])
+        if x.button(f"{'❤️' if liked else '🤍'} {len(p['likes']) or ''}".strip(), key=f"cm_like_{p['id']}",
                     use_container_width=True):
             if liked:
                 sc.table("community_likes").delete().eq("post_id", p["id"]).eq("member_id", m["id"]).execute()
@@ -263,15 +496,15 @@ def _post_card(sc, m, p, gym_name):
             st.rerun()
         show_key = f"cm_show_{p['id']}"
         n = len(p["comments"])
-        if b.button(f"💬 {n}" if n else "💬 Comment", key=f"cm_cbtn_{p['id']}", use_container_width=True):
+        if y.button(f"💬 {n}" if n else "💬 Comment", key=f"cm_cbtn_{p['id']}", use_container_width=True):
             st.session_state[show_key] = not st.session_state.get(show_key, False)
             st.rerun()
         if mine:
-            if c.button("Delete", key=f"cm_del_{p['id']}", use_container_width=True):
+            if z.button("Delete", key=f"cm_del_{p['id']}", use_container_width=True):
                 sc.table("community_posts").delete().eq("id", p["id"]).eq("member_id", m["id"]).execute()
                 st.session_state["cm_flash"] = "Post deleted."
                 st.rerun()
-        elif c.button("Report", key=f"cm_rep_{p['id']}", use_container_width=True):
+        elif z.button("Report", key=f"cm_rep_{p['id']}", use_container_width=True):
             sc.table("community_reports").insert({"gym_id": m["gym_id"], "post_id": p["id"], "member_id": m["id"],
                                                   "reason": "Reported from the member app"}).execute()
             st.session_state["cm_flash"] = "Thanks. The gym will take a look."
@@ -279,14 +512,14 @@ def _post_card(sc, m, p, gym_name):
         if st.session_state.get(show_key):
             for cm in p["comments"]:
                 name = gw._esc(cm.get("author_name") or ("Member" if cm.get("member_id") else gym_name))
-                x, y = st.container(key=f"cm_crow_{cm['id']}").columns([6, 1], vertical_alignment="center")
+                c1, c2 = st.container(key=f"cm_crow_{cm['id']}").columns([6, 1], vertical_alignment="center")
                 gw._md(f'<div class="cm-c"><b>{name}</b>{" (gym)" if not cm.get("member_id") else ""} '
-                       f'{gw._esc(cm.get("body"))} <span class="cm-when">· {_when(cm.get("created_at"))}</span></div>', x)
-                if cm.get("member_id") == m["id"] and y.button("✕", key=f"cm_cdel_{cm['id']}", help="Delete"):
+                       f'{gw._esc(cm.get("body"))} <span class="cm-when">· {_when(cm.get("created_at"))}</span></div>', c1)
+                if cm.get("member_id") == m["id"] and c2.button("✕", key=f"cm_cdel_{cm['id']}", help="Delete"):
                     sc.table("community_comments").delete().eq("id", cm["id"]).eq("member_id", m["id"]).execute()
                     st.rerun()
             if not m.get("community_blocked"):
-                with st.form(f"cm_cf_{p['id']}", clear_on_submit=True):
+                with st.form(f"cm_cf_{p['id']}", clear_on_submit=True, border=False):
                     text = st.text_input("Write a comment", max_chars=MAX_COMMENT, label_visibility="collapsed",
                                          placeholder="Write a comment…")
                     if st.form_submit_button("Send") and text.strip():
@@ -295,6 +528,420 @@ def _post_card(sc, m, p, gym_name):
                             "author_name": gw._text(m.get("full_name"), "Member"),
                             "body": text.strip()[:MAX_COMMENT]}).execute()
                         st.rerun()
+
+
+# ---------------- stories
+def active_stories(sc, gym_id):
+    now = datetime.now(timezone.utc).isoformat()
+    try:
+        rows = sc.table("community_stories").select("*").eq("gym_id", gym_id).eq("hidden", False) \
+            .gt("expires_at", now).order("created_at").execute().data or []
+    except Exception:
+        return []
+    return rows
+
+
+def _seen(sc, m, ids):
+    if not ids:
+        return set()
+    try:
+        return {r["story_id"] for r in sc.table("community_story_views").select("story_id")
+                .eq("member_id", m["id"]).in_("story_id", list(ids)).execute().data or []}
+    except Exception:
+        return set()
+
+
+def _stories_bar(sc, m, gym_name):
+    stories = active_stories(sc, m["gym_id"])
+    mine_b, theirs_b = _blocks(sc, m["gym_id"], m["id"])
+    stories = [s for s in stories if s.get("member_id") not in mine_b | theirs_b]
+    groups = {}
+    for s in stories:
+        groups.setdefault(s.get("member_id") or "gym", []).append(s)
+    seen = _seen(sc, m, [s["id"] for s in stories])
+    pp = people(sc, m["gym_id"])
+    fol = following_of(sc, m["gym_id"], m["id"])
+    order = ["gym"] if "gym" in groups else []
+    order += sorted([k for k in groups if k not in ("gym", m["id"])],
+                    key=lambda k: (all(s["id"] in seen for s in groups[k]), k not in fol))
+    cols = st.container(key="cm_stories").columns(len(order) + 1)
+    with cols[0]:
+        mine = groups.get(m["id"])
+        ring = "cm-ring" if mine else "cm-ring add"
+        gw._md(f'<div class="{ring}"><div>{gw.avatar_html(m.get("full_name"), m.get("photo"), 50)}</div>'
+               + ("" if mine else '<span class="cm-plus">+</span>') + "</div>")
+        if st.button("Your story", key="cm_story_me", type="tertiary"):
+            if mine:
+                st.session_state["cm_story_pos"] = [0, 0]
+                story_dialog(sc, m, [m["id"]], groups, gym_name)
+            else:
+                add_story_dialog(sc, m)
+    for i, k in enumerate(order, start=1):
+        with cols[i]:
+            who = pp.get(k, {}) if k != "gym" else {"full_name": gym_name}
+            done = all(s["id"] in seen for s in groups[k])
+            gw._md(f'<div class="cm-ring{" seen" if done else ""}"><div>'
+                   f'{gw.avatar_html(who.get("full_name") or "Member", who.get("photo"), 50)}</div></div>')
+            label = gym_name if k == "gym" else _first(who)
+            if st.button(label, key=f"cm_story_{k}", type="tertiary"):
+                st.session_state["cm_story_pos"] = [0, 0]
+                story_dialog(sc, m, order[i - 1:], groups, gym_name)
+    if mine := groups.get(m["id"]):
+        if st.button("＋ Add to your story", key="cm_story_add", type="tertiary"):
+            add_story_dialog(sc, m)
+
+
+def _story_times():
+    now = datetime.now(timezone.utc)
+    return {"created_at": now.isoformat(), "expires_at": (now + timedelta(hours=24)).isoformat()}
+
+
+@st.dialog("New story")
+def add_story_dialog(sc, m):
+    st.caption("Stories disappear after 24 hours. Only you can see them later, in your story archive.")
+    with st.form("cm_story_new", border=False):
+        photo = st.file_uploader("Photo", type=["jpg", "jpeg", "png", "webp", "heic", "heif"])
+        text = st.text_input("Text (optional)", max_chars=140)
+        go = st.form_submit_button("Share story", type="primary", use_container_width=True)
+    if go:
+        if photo is None and not text.strip():
+            st.error("Add a photo or some text.")
+            return
+        pic = _store_photo(sc, m["gym_id"], _image(photo.getvalue())) if photo is not None else None
+        sc.table("community_stories").insert({"gym_id": m["gym_id"], "member_id": m["id"],
+                                              "author_name": gw._text(m.get("full_name"), "Member"),
+                                              "photo": pic, "body": text.strip(), **_story_times()}).execute()
+        st.session_state["cm_flash"] = "Story shared for 24 hours."
+        st.rerun()
+
+
+@st.dialog("Stories", width="small")
+def story_dialog(sc, m, order, groups, gym_name):
+    pos = st.session_state.get("cm_story_pos") or [0, 0]
+    if pos[0] >= len(order):
+        st.session_state.pop("cm_story_pos", None)
+        st.rerun()
+    k = order[pos[0]]
+    items = groups[k]
+    s = items[min(pos[1], len(items) - 1)]
+    who = gym_name if k == "gym" else gw._text(s.get("author_name"), "Member")
+    try:
+        sc.table("community_story_views").insert({"story_id": s["id"], "gym_id": m["gym_id"],
+                                                  "member_id": m["id"]}).execute()
+    except Exception:
+        pass
+    bars = "".join(f'<i class="{"on" if j <= pos[1] else ""}"></i>' for j in range(len(items)))
+    gw._md(f'<div class="cm-bar">{bars}</div><div class="cm-name">{gw._esc(who)} '
+           f'<span class="cm-when">· {_when(s.get("created_at"))}</span></div>')
+    if s.get("photo"):
+        gw._md(f'<div class="cm-story"><img src="{gw._esc(s["photo"])}" alt=""></div>'
+               + (f'<div class="cm-body" style="text-align:center">{gw._esc(s.get("body"))}</div>' if s.get("body") else ""))
+    else:
+        gw._md(f'<div class="cm-story"><div class="cm-story-t">{gw._esc(s.get("body"))}</div></div>')
+    a, b = st.columns(2)
+    if a.button("Previous", use_container_width=True, disabled=pos == [0, 0], key="cm_st_prev"):
+        st.session_state["cm_story_pos"] = ([pos[0], pos[1] - 1] if pos[1] > 0 else
+                                            [pos[0] - 1, len(groups[order[pos[0] - 1]]) - 1])
+        st.rerun(scope="fragment")
+    last = pos[0] == len(order) - 1 and pos[1] >= len(items) - 1
+    if b.button("Close" if last else "Next", type="primary", use_container_width=True, key="cm_st_next"):
+        if last:
+            st.session_state.pop("cm_story_pos", None)
+            st.rerun()
+        st.session_state["cm_story_pos"] = [pos[0], pos[1] + 1] if pos[1] < len(items) - 1 else [pos[0] + 1, 0]
+        st.rerun(scope="fragment")
+    if s.get("member_id") == m["id"]:
+        if st.button("Delete this story", key="cm_st_del", type="tertiary"):
+            sc.table("community_stories").delete().eq("id", s["id"]).eq("member_id", m["id"]).execute()
+            st.session_state.pop("cm_story_pos", None)
+            st.rerun()
+    elif s.get("member_id") and st.button(f"View {_first({'full_name': who})}'s profile", key="cm_st_prof",
+                                         type="tertiary"):
+        st.session_state.pop("cm_story_pos", None)
+        _open_profile(s["member_id"])
+        st.rerun()
+
+
+# ---------------- profile
+def _profile(sc, m, pid, gym_name):
+    pp = people(sc, m["gym_id"])
+    me = pid == m["id"]
+    if not me:
+        _back()
+    p = pp.get(pid) or ({**m} if me else None)
+    if not p:
+        st.info("This member isn't in the community.")
+        return
+    mine_b, theirs_b = _blocks(sc, m["gym_id"], m["id"])
+    if pid in theirs_b:
+        st.info("This profile isn't available.")
+        return
+    try:
+        posts = sc.table("community_posts").select("*").eq("gym_id", m["gym_id"]).eq("member_id", pid) \
+            .eq("hidden", False).order("created_at", desc=True).limit(60).execute().data or []
+    except Exception:
+        posts = []
+    fol, fing = followers_of(sc, m["gym_id"], pid), following_of(sc, m["gym_id"], pid)
+    gw._md('<div class="cm-prof">' + '<div style="display:flex;justify-content:center">'
+           + gw.avatar_html(p.get("full_name"), p.get("photo"), 92) + "</div>"
+           + f'<div class="cm-prof-name">{gw._esc(p.get("full_name"))}</div>'
+           + (f'<div class="cm-prof-bio">{gw._esc(p.get("community_bio"))}</div>' if p.get("community_bio") else "")
+           + "</div>")
+    a, b, c = st.container(key="cm_stats").columns(3)
+    a.button(f"**{len(posts)}** {'post' if len(posts) == 1 else 'posts'}", key="cm_st_posts", type="tertiary",
+             use_container_width=True)
+    if b.button(f"**{len(fol)}** {'follower' if len(fol) == 1 else 'followers'}", key="cm_st_fol", type="tertiary",
+                use_container_width=True):
+        people_dialog(sc, m, "Followers", fol)
+    if c.button(f"**{len(fing)}** following", key="cm_st_fing", type="tertiary", use_container_width=True):
+        people_dialog(sc, m, "Following", fing)
+    if me:
+        x, y = st.container(key="cm_pbtn_me").columns(2)
+        if x.button("Edit profile", key="cm_edit", icon=":material/edit:", use_container_width=True):
+            edit_profile_dialog(sc, m)
+        if y.button("Story archive", key="cm_arch", icon=":material/history:", use_container_width=True):
+            archive_dialog(sc, m)
+    else:
+        following = pid in following_of(sc, m["gym_id"], m["id"])
+        x, y, z = st.container(key="cm_pbtn_other").columns([1.3, 1.3, 1])
+        if x.button("Following" if following else "Follow", key="cm_follow", use_container_width=True,
+                    type="secondary" if following else "primary"):
+            toggle_follow(sc, m, pid)
+            st.rerun()
+        if y.button("Message", key="cm_msg", icon=":material/chat:", use_container_width=True):
+            _open_chat(pid)
+            st.rerun()
+        if z.button("Unblock" if pid in mine_b else "Block", key="cm_block", use_container_width=True):
+            if pid in mine_b:
+                sc.table("community_blocks").delete().eq("blocker_id", m["id"]).eq("blocked_id", pid).execute()
+                st.session_state["cm_flash"] = "Unblocked."
+            else:
+                sc.table("community_blocks").insert({"gym_id": m["gym_id"], "blocker_id": m["id"],
+                                                     "blocked_id": pid}).execute()
+                sc.table("community_follows").delete().eq("follower_id", m["id"]).eq("followee_id", pid).execute()
+                sc.table("community_follows").delete().eq("follower_id", pid).eq("followee_id", m["id"]).execute()
+                _bust(m["gym_id"])
+                st.session_state["cm_flash"] = "Blocked. They can't message you or see your profile."
+            st.rerun()
+        if pid in mine_b:
+            st.caption("You've blocked this member.")
+            return
+    if not posts:
+        st.caption("No posts yet." if not me else "You haven't posted yet. Share something from the Feed.")
+        return
+    st.markdown('<div class="section-label">POSTS</div>', unsafe_allow_html=True)
+    for i in range(0, len(posts), 3):
+        cols = st.container(key=f"cm_grid_{i}").columns(3)
+        for col, post in zip(cols, posts[i:i + 3]):
+            with col:
+                if post.get("photo"):
+                    gw._md(f'<img class="cm-tile" src="{gw._esc(post["photo"])}" alt="">')
+                else:
+                    gw._md(f'<div class="cm-tile-t">{gw._esc(gw._text(post.get("body"))[:140])}</div>')
+                if st.button("Open", key=f"cm_open_{post['id']}", type="tertiary", use_container_width=True):
+                    post_dialog(sc, m, post["id"], gym_name)
+
+
+@st.dialog("Post")
+def post_dialog(sc, m, post_id, gym_name):
+    feed = [p for p in load_feed(sc, m["gym_id"], 200) if p["id"] == post_id]
+    if not feed:
+        st.info("This post is no longer available.")
+        return
+    _post_card(sc, m, feed[0], gym_name)
+
+
+@st.dialog("People")
+def people_dialog(sc, m, title, ids):
+    st.markdown(f"**{title}**")
+    pp = people(sc, m["gym_id"])
+    rows = [pp[i] for i in ids if i in pp]
+    if not rows:
+        st.caption("Nobody yet.")
+    for p in rows:
+        _person_row(sc, m, p, f"dlg_{title}")
+
+
+@st.dialog("Edit profile")
+def edit_profile_dialog(sc, m):
+    pp = people(sc, m["gym_id"]).get(m["id"], m)
+    opts = {"everyone": "Everyone in my gym", "following": "Only people I follow", "nobody": "Nobody"}
+    with st.form("cm_prof_form", border=False):
+        bio = st.text_area("Bio", value=gw._text(pp.get("community_bio")), max_chars=160,
+                           placeholder="e.g. Morning lifter · training for my first 10k")
+        dm = st.radio("Who can message me", list(opts), format_func=opts.get,
+                      index=list(opts).index(pp.get("community_dm") or "everyone"))
+        st.caption("Your name and photo come from your gym details (My details tab).")
+        if st.form_submit_button("Save", type="primary", use_container_width=True):
+            sc.table("members").update({"community_bio": bio.strip() or None, "community_dm": dm}) \
+                .eq("id", m["id"]).execute()
+            _bust(m["gym_id"])
+            st.session_state["cm_flash"] = "Profile saved."
+            st.rerun()
+
+
+@st.dialog("Story archive")
+def archive_dialog(sc, m):
+    st.caption("Your stories after their 24 hours. Only you can see these.")
+    now = datetime.now(timezone.utc).isoformat()
+    try:
+        rows = sc.table("community_stories").select("*").eq("member_id", m["id"]).lte("expires_at", now) \
+            .order("created_at", desc=True).limit(60).execute().data or []
+    except Exception:
+        rows = []
+    if not rows:
+        st.caption("Nothing here yet.")
+    for i in range(0, len(rows), 3):
+        cols = st.columns(3)
+        for col, s in zip(cols, rows[i:i + 3]):
+            with col:
+                if s.get("photo"):
+                    gw._md(f'<img class="cm-tile" src="{gw._esc(s["photo"])}" alt="">')
+                else:
+                    gw._md(f'<div class="cm-tile-t">{gw._esc(s.get("body"))}</div>')
+                st.caption(pd.to_datetime(s["created_at"]).strftime("%d %b"))
+
+
+# ---------------- search
+def _person_row(sc, m, p, key):
+    a, b, c = st.container(key=f"cm_row_{key}_{p['id']}").columns([1, 5, 2.2], vertical_alignment="center")
+    gw._md(gw.avatar_html(p.get("full_name"), p.get("photo"), 40), a)
+    with b:
+        st.button(gw._text(p.get("full_name"), "Member"), key=f"cm_pr_{key}_{p['id']}", type="tertiary",
+                  on_click=_open_profile, args=(p["id"],))
+        if p.get("community_bio"):
+            gw._md(f'<div class="cm-when" style="margin-top:-6px">{gw._esc(gw._text(p["community_bio"])[:60])}</div>')
+    if p["id"] != m["id"]:
+        f = p["id"] in following_of(sc, m["gym_id"], m["id"])
+        if c.button("Following" if f else "Follow", key=f"cm_pf_{key}_{p['id']}", use_container_width=True,
+                    type="secondary" if f else "primary"):
+            toggle_follow(sc, m, p["id"])
+            st.rerun()
+
+
+def _search(sc, m, gym_name):
+    q = st.text_input("Search members", placeholder="Search members by name", key="cm_q",
+                      label_visibility="collapsed", icon=":material/search:")
+    pp = people(sc, m["gym_id"])
+    mine_b, theirs_b = _blocks(sc, m["gym_id"], m["id"])
+    others = [p for p in pp.values() if p["id"] != m["id"] and p["id"] not in theirs_b]
+    if q.strip():
+        n = q.strip().lower()
+        rows = [p for p in others if n in gw._text(p.get("full_name")).lower()]
+        if not rows:
+            st.caption("No members found.")
+    else:
+        fol = following_of(sc, m["gym_id"], m["id"])
+        counts = {}
+        for f in _follows(sc, m["gym_id"]):
+            counts[f["followee_id"]] = counts.get(f["followee_id"], 0) + 1
+        rows = sorted([p for p in others if p["id"] not in fol], key=lambda p: -counts.get(p["id"], 0))[:15]
+        st.markdown('<div class="section-label">MEMBERS TO FOLLOW</div>', unsafe_allow_html=True)
+        if not rows:
+            st.caption(f"You follow everyone in the {gym_name} community 🎉")
+    for p in rows[:40]:
+        _person_row(sc, m, p, "s")
+
+
+# ---------------- messages
+def _threads(sc, m):
+    try:
+        rows = sc.table("community_dms").select("*").eq("gym_id", m["gym_id"]) \
+            .or_(f"sender_id.eq.{m['id']},recipient_id.eq.{m['id']}").order("created_at", desc=True) \
+            .limit(500).execute().data or []
+    except Exception:
+        try:
+            a = sc.table("community_dms").select("*").eq("sender_id", m["id"]).execute().data or []
+            b = sc.table("community_dms").select("*").eq("recipient_id", m["id"]).execute().data or []
+            rows = sorted(a + b, key=lambda r: str(r.get("created_at")), reverse=True)
+        except Exception:
+            rows = []
+    out = {}
+    for r in rows:
+        other = r["recipient_id"] if r["sender_id"] == m["id"] else r["sender_id"]
+        t = out.setdefault(other, {"last": r, "unread": 0})
+        if r["recipient_id"] == m["id"] and not r.get("read_at"):
+            t["unread"] += 1
+    return out
+
+
+def _inbox(sc, m, gym_name):
+    threads = _threads(sc, m)
+    pp = people(sc, m["gym_id"])
+    if not threads:
+        st.caption("No messages yet. Open a member's profile and tap Message, or find people in Search.")
+        return
+    for other, t in threads.items():
+        p = pp.get(other)
+        if not p:
+            continue
+        r = t["last"]
+        a, b, c = st.container(key=f"cm_row_in_{other}").columns([1, 5, 1.2], vertical_alignment="center")
+        gw._md(gw.avatar_html(p.get("full_name"), p.get("photo"), 44), a)
+        with b:
+            st.button(gw._text(p.get("full_name"), "Member"), key=f"cm_th_{other}", type="tertiary",
+                      on_click=_open_chat, args=(other,))
+            prefix = "You: " if r["sender_id"] == m["id"] else ""
+            gw._md(f'<div class="cm-when" style="margin-top:-6px;{"font-weight:700;color:#F4F7FB" if t["unread"] else ""}">'
+                   f'{gw._esc(prefix + gw._text(r.get("body"))[:60])} · {_when(r.get("created_at"))}</div>')
+        if t["unread"]:
+            gw._md(f'<span class="gp-pill gp-pill-lime">{t["unread"]}</span>', c)
+
+
+def _chat(sc, m, other_id, gym_name):
+    _back()
+    pp = people(sc, m["gym_id"])
+    other = pp.get(other_id)
+    if not other:
+        st.info("This member isn't in the community.")
+        return
+    a, b = st.container(key="cm_hd_chat").columns([1, 8], vertical_alignment="center")
+    gw._md(gw.avatar_html(other.get("full_name"), other.get("photo"), 40), a)
+    b.button(gw._text(other.get("full_name"), "Member"), key="cm_chat_prof", type="tertiary",
+             on_click=_open_profile, args=(other_id,))
+    try:
+        rows = sc.table("community_dms").select("*").eq("gym_id", m["gym_id"]) \
+            .in_("sender_id", [m["id"], other_id]).in_("recipient_id", [m["id"], other_id]) \
+            .order("created_at").limit(300).execute().data or []
+    except Exception:
+        rows = []
+    rows = [r for r in rows if {r["sender_id"], r["recipient_id"]} == {m["id"], other_id}]
+    unread = [r["id"] for r in rows if r["recipient_id"] == m["id"] and not r.get("read_at")]
+    if unread:
+        try:
+            sc.table("community_dms").update({"read_at": datetime.now(timezone.utc).isoformat()}) \
+                .in_("id", unread).execute()
+        except Exception:
+            pass
+    with st.container(key="cm_chat"):
+        if not rows:
+            st.caption(f"Say hi to {_first(other)} 👋")
+        for r in rows:
+            me = r["sender_id"] == m["id"]
+            gw._md(f'<div class="cm-bub {"cm-me" if me else "cm-them"}">{gw._esc(r.get("body"))}</div>'
+                   f'<div class="cm-when" style="text-align:{"right" if me else "left"};margin:-2px 4px 4px">'
+                   f'{_when(r.get("created_at"))}</div>')
+    ok, why = can_message(sc, m, other)
+    if not ok:
+        st.caption(why)
+        return
+    with st.form("cm_dm", clear_on_submit=True, border=False):
+        x, y = st.columns([5, 1.3], vertical_alignment="bottom")
+        text = x.text_input("Message", max_chars=1000, label_visibility="collapsed", placeholder="Message…")
+        send = y.form_submit_button("Send", type="primary", use_container_width=True)
+    if send and text.strip():
+        since = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+        try:
+            recent = sc.table("community_dms").select("id").eq("sender_id", m["id"]).gte("created_at", since) \
+                .execute().data or []
+        except Exception:
+            recent = []
+        if len(recent) >= 60:
+            st.error("You're sending a lot of messages. Please wait a little.")
+            return
+        sc.table("community_dms").insert({"gym_id": m["gym_id"], "sender_id": m["id"], "recipient_id": other_id,
+                                          "body": text.strip()[:1000]}).execute()
+        st.rerun()
 
 
 # ------------------------------------------------------------------ gym side (owner and staff)
@@ -333,6 +980,30 @@ def render_owner(supabase, gym_id):
                                                   "pinned": bool(pin)}).execute()
         st.session_state["cmo_flash"] = "Posted to your members."
         st.rerun()
+
+    if social_ready(supabase):
+        with st.expander("Stories (24 hours)", icon=":material/amp_stories:"):
+            with st.form("cmo_story", clear_on_submit=True, border=False):
+                sp = st.file_uploader("Story photo", type=["jpg", "jpeg", "png", "webp", "heic", "heif"], key="cmo_sp")
+                stx = st.text_input("Story text (optional)", max_chars=140)
+                if st.form_submit_button("Share a gym story", type="primary") and (sp is not None or stx.strip()):
+                    pic = _store_photo(supabase, gym_id, _image(sp.getvalue())) if sp is not None else None
+                    supabase.table("community_stories").insert({"gym_id": gym_id, "member_id": None,
+                                                                "author_name": gym_name, "photo": pic,
+                                                                "body": stx.strip(), **_story_times()}).execute()
+                    st.session_state["cmo_flash"] = "Story shared with your members for 24 hours."
+                    st.rerun()
+            live = active_stories(supabase, gym_id)
+            if not live:
+                st.caption("No stories right now.")
+            for sto in live:
+                a, b = st.columns([5, 1], vertical_alignment="center")
+                a.markdown(f"**{gw._esc(sto.get('author_name'))}** · {gw._esc(gw._text(sto.get('body'))[:60]) or 'photo'}"
+                           f" · {_when(sto.get('created_at'))}")
+                if b.button("Remove", key=f"cmo_srm_{sto['id']}"):
+                    supabase.table("community_stories").update({"hidden": True}).eq("id", sto["id"]) \
+                        .eq("gym_id", gym_id).execute()
+                    st.rerun()
 
     try:
         reports = supabase.table("community_reports").select("*").eq("gym_id", gym_id).eq("resolved", False) \
