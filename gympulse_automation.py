@@ -237,12 +237,17 @@ def render_assign_control(supabase, a, prefix):
         return
     current = assigned_to(a)
     options = [""] + staff
-    pick = st.selectbox("Assigned to", options, index=options.index(current) if current in options else 0,
-                        format_func=lambda n: n or "Unassigned", key=f"{prefix}_as_{a['id']}")
-    if pick != current:
-        assign(supabase, a["id"], pick, gw._text(a.get("note")))
-        gw.bump_data_version()
-        st.rerun()
+    key = f"{prefix}_as_{a['id']}"
+    # Always show what's saved. The picker only writes when a person changes it (on_change): comparing the
+    # remembered picker value with the database used to undo assignments made elsewhere (Share between staff).
+    st.session_state[key] = current if current in options else ""
+    st.selectbox("Assigned to", options, format_func=lambda n: n or "Unassigned", key=key,
+                 on_change=_assign_changed, args=(supabase, a["id"], key, gw._text(a.get("note"))))
+
+
+def _assign_changed(supabase, action_id, key, note):
+    assign(supabase, action_id, st.session_state.get(key) or "", note)
+    gw.bump_data_version()
 
 
 # ------------------------------------------------------------------ settings UI

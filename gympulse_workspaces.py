@@ -3709,6 +3709,21 @@ def _pillars_panel(supabase, gym_id, roster, actions):
                                 "Open its card on the board and tap Do this play.")
                 st.rerun()
 
+def _my_staff_name(staff):
+    """The automation staff name that belongs to the signed-in staff login (e.g. login "Riley Johnson" ->
+    "Coach Riley"), or None for the owner or when no name matches."""
+    if st.session_state.get("role") != "staff":
+        return None
+    me = _text((st.session_state.get("staff") or {}).get("full_name")).lower().split()
+    if not me:
+        return None
+    for name in staff:
+        words = name.lower().replace(":", " ").split()
+        if " ".join(me) == name.lower() or (me[0] in words):
+            return name
+    return None
+
+
 def render_action_centre(supabase, gym_id, assess_fn):
     page_header("Retention Action Centre",
                 "Turn risk into follow-ups, track them, and learn what works.",
@@ -3843,8 +3858,13 @@ def render_action_centre(supabase, gym_id, assess_fn):
         mode = st.radio("Board view", ["Board", "List"], horizontal=True,
                         key="ac_view", label_visibility="collapsed")
     if staff:
+        if "ac_staff" not in st.session_state:
+            mine = _my_staff_name(staff)                     # a staff login opens on their own plays
+            if mine:
+                st.session_state["ac_staff"] = mine
         who = v2.selectbox("Show plays for", ["Everyone"] + staff + ["Unassigned"],
-                           key="ac_staff", label_visibility="collapsed")
+                           key="ac_staff", label_visibility="collapsed",
+                           format_func=lambda n: f"{n} (me)" if n == _my_staff_name(staff) else n)
         if who != "Everyone":
             want = "" if who == "Unassigned" else who
             visible_actions = visible_actions[[ga.assigned_to(a) == want
