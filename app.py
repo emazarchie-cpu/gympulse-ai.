@@ -42,9 +42,10 @@ st.set_page_config(
 
 # Switching workspace: hide the previous page's leftovers straight away, so the new page never shows
 # old content while it loads. Always the same element here, so ordinary taps don't hide anything.
+_rp = st.session_state.get("_rendered_page")
 _nav_new = bool(st.session_state.get("navigate_to")) or (
-    st.session_state.get("_rendered_page") is not None
-    and st.session_state.get("current_page") != st.session_state.get("_rendered_page"))
+    _rp is not None and st.session_state.get("current_page") != _rp
+    and (_rp != "__landing__" or bool(st.session_state.get("auth_user"))))   # landing -> app after sign-in
 st.markdown('<style>[data-testid="stElementContainer"][data-stale="true"]{display:none !important}</style>'
             if _nav_new else '<style></style>', unsafe_allow_html=True)
 
@@ -1076,6 +1077,13 @@ if st.query_params.get("join"):
     gsign.render_public(supabase, st.query_params.get("join"))
     st.stop()
 
+# Public HMO check-in page (the gym's HMO QR code, or a member's one-tap link, no sign-in)
+if st.query_params.get("hmo"):
+    import gympulse_hmo as ghmo
+    gd.apply()
+    ghmo.render_public(supabase, st.query_params.get("hmo"), st.query_params.get("t"))
+    st.stop()
+
 # Public happiness check answer page (one tap from the member's email, no sign-in)
 if st.query_params.get("fb"):
     import gympulse_happy as ghappy
@@ -1586,6 +1594,7 @@ if st.session_state.auth_user is None:
     except Exception as _price_error:
         gmon.capture(_price_error, "landing pricing")
     html(_sections[_cut:])
+    st.session_state["_rendered_page"] = "__landing__"
     st.stop()
 
 # =========================================================

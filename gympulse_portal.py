@@ -431,6 +431,8 @@ def render_portal(supabase, token):
         tabs = st.tabs(["Home", "Community", "Classes", "Messages", "My details"], key="mp_tabs")
         with tabs[0]:
             _home(sc, m, gym_name, prof)
+            import gympulse_referrals as gref
+            gref.render_member_card(sc, m, gym_name, prof)
         with tabs[1]:
             import gympulse_community as gcom
             gcom.render_member(sc, m, gym_name, prof)

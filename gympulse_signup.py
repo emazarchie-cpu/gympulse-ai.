@@ -101,6 +101,10 @@ def render_public(supabase, code):
                     st.error("Sorry, your details couldn't be saved. Please try again, or ask the front desk."
                              + (f" (Details for the gym: {problem[:160]})" if problem else ""))
                 else:
+                    if r.get("status") == "created" and st.query_params.get("ref"):
+                        import gympulse_referrals as gref          # invited by a member: credit them
+                        gref.record_from_signup(supabase, code, st.query_params.get("ref"), name.strip(),
+                                                phone.strip(), email.strip())
                     st.session_state["join_done"] = r["status"]
                     st.session_state["join_done_code"] = str(code)
                     st.rerun()

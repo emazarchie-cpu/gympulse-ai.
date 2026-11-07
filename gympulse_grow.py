@@ -24,11 +24,11 @@ GROUPS = {
     "Renewals & messages": ["Collect renewals", "Automatic messages", "Gym updates"],
     "Engagement": ["Happiness", "Celebrate", "Loyalty", "Challenges", "Progress", "Class invites"],
     "New & leaving": ["New members", "Freeze", "Why they left"],
-    "Growth": ["Referrals", "Corporate", "Season planner"],
+    "Growth": ["Referrals", "HMO", "Corporate", "Season planner"],
     "Team & reports": ["Team", "Monthly report"],
 }
 SECTIONS = ["Collect renewals", "Automatic messages", "Gym updates", "Happiness", "Celebrate", "Loyalty", "New members", "Class invites", "Freeze", "Why they left", "Progress",
-            "Referrals", "Challenges", "Corporate", "Team", "Season planner", "Monthly report"]
+            "Referrals", "HMO", "Challenges", "Corporate", "Team", "Season planner", "Monthly report"]
 
 
 # ================================================================== helpers
@@ -1062,7 +1062,9 @@ def render_referrals(supabase, gym_id, owner_id):
                 ("Conversion", f"{len(joined) / len(rows):.0%}" if rows else "–", "grey", "Invites that joined")])
 
     biz, owner = _biz()
-    with st.expander("Ask a member to bring a friend"):
+    import gympulse_referrals as gref
+    gref.render_owner_auto(supabase, gym_id, rows, df, names, reward, biz)
+    with st.expander("Ask one member to bring a friend"):
         mid = st.selectbox("Member", list(names), format_func=names.get, key="grow_ref_ask")
         m = by_id[mid]
         text = _message_box(f"Hi {_first(m['full_name'])}! 🙌 Training is better with a friend. Bring someone to {biz} this "
@@ -1777,6 +1779,9 @@ def render_grow(supabase, gym_id, assess_fn, owner_id):
         render_referrals(supabase, gym_id, owner_id)
     elif section == "Challenges":
         render_challenges(supabase, gym_id)
+    elif section == "HMO":
+        import gympulse_hmo as ghmo
+        ghmo.render_owner(supabase, gym_id)
     elif section == "Corporate":
         render_corporate(supabase, gym_id)
     elif section == "Team":
