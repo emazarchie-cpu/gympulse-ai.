@@ -1345,7 +1345,7 @@ cached = _cached
 # for every tab at once.
 import threading as _threading
 _SHARED, _SHARED_LOCK, _GYM_VERSION = {}, _threading.Lock(), {}
-SHARED_TTL = 300
+SHARED_TTL = 900                                     # writes clear it at once; this is only a safety net
 
 
 def _account():
@@ -3550,6 +3550,9 @@ def _with_stage(actions):
         return actions.assign(stage=pd.Series(dtype=str))
     return actions.assign(stage=[action_stage(r) for r in actions.to_dict("records")])
 
+PAGE_CARDS = 8                                        # cards per board column before "Show more"
+
+
 def _kanban(supabase, actions, names, photos):
     actions = _with_stage(actions)
     cols = st.columns(len(BOARD_COLUMNS))
@@ -3566,11 +3569,17 @@ def _kanban(supabase, actions, names, photos):
                 + (f'<div class="kb-empty" style="color:#FF6B6B">{due_n} follow-up(s) due</div>' if due_n else ""))
             if sub.empty:
                 _md('<div class="kb-empty">Nothing here yet</div>')
-            shown = sub.head(10) if "Done" in title else sub
-            for _, a in shown.iterrows():
+            more_key = f"kb_more_{title}"
+            limit = 10 if "Done" in title else st.session_state.get(more_key, PAGE_CARDS)
+            for _, a in sub.head(limit).iterrows():
                 _action_card(supabase, a, names, photos, a["status"], "kb")
-            if "Done" in title and len(sub) > 10:
-                st.caption(f"+{len(sub) - 10} older ones in the List view.")
+            if len(sub) > limit:
+                if "Done" in title:
+                    st.caption(f"+{len(sub) - limit} older ones in the List view.")
+                elif st.button(f"Show {min(PAGE_CARDS, len(sub) - limit)} more of {len(sub) - limit}",
+                               key=f"kb_btn_{title}", use_container_width=True):
+                    st.session_state[more_key] = limit + PAGE_CARDS
+                    st.rerun()
 
 def _list_board(supabase, actions, names, photos):
     actions = _with_stage(actions)
@@ -3581,8 +3590,15 @@ def _list_board(supabase, actions, names, photos):
             sub = actions[actions["stage"].isin(stages)]
             if sub.empty:
                 st.caption("Nothing here.")
-            for _, a in sub.iterrows():
+            more_key = f"ls_more_{title}"
+            limit = st.session_state.get(more_key, PAGE_CARDS)
+            for _, a in sub.head(limit).iterrows():
                 _action_card(supabase, a, names, photos, a["status"], "ls")
+            if len(sub) > limit and st.button(f"Show {min(PAGE_CARDS, len(sub) - limit)} more of "
+                                              f"{len(sub) - limit}", key=f"ls_btn_{title}",
+                                              use_container_width=True):
+                st.session_state[more_key] = limit + PAGE_CARDS
+                st.rerun()
 
 
 def _pick_play(pillar, play):
@@ -3788,10 +3804,22 @@ def render_action_centre(supabase, gym_id, assess_fn):
                         _create_action(supabase, gym_id, r["id"], r["suggested_action"],
                                        r["renewal_due_days"], note=story_text(r))
                         st.rerun()
-        if len(todo) > 1 and st.button("Start plays for all top 5", use_container_width=True):
-            for _, r in top.iterrows():
-                _create_action(supabase, gym_id, r["id"], r["suggested_action"],
-                               r["renewal_due_days"], note=story_text(r))
+        if len(todo) > len(top):
+            st.caption(f"Showing the top {len(top)} of {len(todo)} members who need a follow-up.")
+        if len(todo) > 1 and st.button(f"Start plays for all {len(todo)}", type="primary",
+                                       icon=":material/playlist_add_check:", key="start_all",
+                                       use_container_width=True):
+            bar = st.progress(0.0, text="Adding plays…")
+            for i, (_, r) in enumerate(todo.iterrows(), 1):
+                try:
+                    _create_action(supabase, gym_id, r["id"], r["suggested_action"],
+                                   r["renewal_due_days"], note=story_text(r))
+                except Exception:
+                    pass
+                bar.progress(i / len(todo), text=f"Adding plays… {i} of {len(todo)}")
+            bump_data_version()
+            st.session_state["ac_flash"] = (f"Added {_plural(len(todo), 'play')} to the board. "
+                                            "Tap Send all below to message them in one go.")
             st.rerun()
 
     _pillars_panel(supabase, gym_id, roster, actions_all)
@@ -3807,6 +3835,8 @@ def render_action_centre(supabase, gym_id, assess_fn):
     if visible_actions.empty:
         st.info("No actions yet. Add one from the suggestions above.")
         return
+    import gympulse_bulk as gb
+    gb.render_bar(supabase, gym_id, visible_actions)
     staff = ga.staff_list()
     v1, v2 = st.columns([1, 1.4])
     with v1:
@@ -4586,7 +4616,7 @@ def _fetch_checkins(supabase, gym_id, days=90):
     return out
 
 
-CHECKIN_BASE_DAYS = 120
+CHECKIN_BASE_DAYS = 90
 
 
 def checkins_window(supabase, gym_id, days=90):
