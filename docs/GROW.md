@@ -89,3 +89,31 @@ membership then ends) and does nothing, a person should follow up.
 
 The daily automatic-messages job adds and closes calls every morning, and opening Follow-ups does the same.
 Calls are ordinary Action Centre plays, so staff workload and outcome reports include them. No SQL needed.
+
+## Bring a friend runs by itself (phase 28)
+
+Run `sql/phase28_referrals_hmo.sql` once (safe to run again).
+
+- **Every member has their own invite link** in their member app, with a **Share on WhatsApp** button. It's the
+  gym's sign-up link plus their member code (`?join=<code>&ref=<member code>`).
+- **A friend who signs up with it is recorded automatically** against the member who invited them (status
+  "joined"). Nobody types it in.
+- **Approve rewards in one tap**: Grow → Referrals → *Approve N rewards*. When the reward is free time ("1 free
+  week", "10 free days", "1 free month"), the days are added to the member's membership and they're thanked by
+  email.
+- **Ask everyone**: *Ask N members to bring a friend* emails active members their own link, 100 per tap, never
+  the same member twice in a month.
+- The sign-up link must be switched on (Member Management). Making a new sign-up link changes everyone's invite
+  links and the HMO QR code.
+
+## HMO members (phase 28)
+
+For members whose gym access is paid by their HMO or company (Reliance, Hygeia, AXA Mansard, Leadway…).
+
+- **HMO QR code** (Grow → HMO): print it for the front desk. Members scan it and type their HMO ID or phone once;
+  they're checked in (saved as "HMO QR") and get a personal **one-tap check-in link** for their home screen.
+  A second scan within 3 hours doesn't count twice. Expired cover or unknown members are sent to the front desk.
+- **Add HMO list**: drop the HMO's CSV or Excel list (name, phone or email, HMO ID, and if you have them HMO name,
+  employer, cover end). Existing members are matched by HMO ID, phone or email; others are created.
+- **Visits report**: pick a month and download visits per HMO (one per member per day, with dates) for claims.
+- **Members**: everyone on an HMO, with covers ending in the next 30 days.

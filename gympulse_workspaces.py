@@ -4769,7 +4769,7 @@ def class_suggestion(mid, ck, classes):
 #   gym_id, member_id, checked_in_at, source, event_id (+ class_id, location_id)
 # event_id is unique per gym, so the same visit can never be counted twice.
 CHECKIN_SOURCES = {
-    "front_desk": "Front desk", "scan": "QR or card scan", "kiosk": "Kiosk",
+    "front_desk": "Front desk", "scan": "QR or card scan", "kiosk": "Kiosk", "hmo": "HMO QR",
     "device": "Check-in device", "import": "Imported", "unknown": "Earlier check-in",
 }
 DUPLICATE_WINDOW_MINUTES = 10
