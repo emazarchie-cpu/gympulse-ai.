@@ -115,7 +115,7 @@ def render_member(sc, m, gym_name, prof):
     elif view == "Body":
         _body(sc, m)
     elif view == "Gym now":
-        _busy(sc, m)
+        _busy(sc, m, prof)
     else:
         _tools()
 
@@ -302,53 +302,135 @@ def _progress(sc, m):
         st.success(f"Up {diff:g} kg on {ex} since {first['day']:%d %b} 💪")
 
 
-def busy_data(sc, gym_id):
-    """[(hour, usual)] for today's weekday and check-ins in the last 90 minutes."""
+DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]   # Postgres dow order
+DEFAULT_VISIT = 75
+
+
+def traffic_cfg(profile):
+    c = dict(((profile or {}).get("settings") or {}).get("traffic") or {})
+    return {"visit": int(c.get("visit") or DEFAULT_VISIT), "open": c.get("open"), "close": c.get("close")}
+
+
+def _slot_label(slot, end=False):
+    h, mnt = divmod(int(slot) * 30 + (30 if end else 0), 60)
+    h %= 24
+    return f"{h % 12 or 12}{':30' if mnt else ''}{'am' if h < 12 else 'pm'}"
+
+
+def traffic(sc, gym_id, visit):
+    """{dow: {"days": n, "slots": {slot: avg people}}} from gp_gym_traffic, or None before phase 31."""
+    def load():
+        try:
+            rows = sc.rpc("gp_gym_traffic", {"p_gym": gym_id, "p_minutes": int(visit)}).execute().data or []
+        except Exception:
+            return None
+        out = {}
+        for r in rows:
+            d = out.setdefault(int(r["dow"]), {"days": int(r["days"]), "slots": {}})
+            d["slots"][int(r["slot"])] = float(r["avg_people"])
+        return out
+    return gw._cached(("traffic", gym_id, int(visit)), load, ttl=600)
+
+
+def inside_now(sc, gym_id, visit):
+    """People who checked in within the last visit length (each member once)."""
+    since = (datetime.now(timezone.utc) - timedelta(minutes=int(visit))).isoformat()
     try:
-        rows = sc.rpc("gp_gym_busy", {"p_gym": gym_id}).execute().data or []
-        if rows:
-            return [(int(r["hour"]), float(r["usual"])) for r in rows], int(rows[0]["now_visits"])
+        rows = sc.table("checkins").select("member_id").eq("gym_id", gym_id).gte("checked_in_at", since) \
+            .limit(5000).execute().data or []
+        return len({r["member_id"] for r in rows if r.get("member_id")})
     except Exception:
-        pass
-    return None, None
+        return None
 
 
-def _busy(sc, m):
-    hours, now_n = busy_data(sc, m["gym_id"])
-    if hours is None:
+def open_slots(day, cfg):
+    """Half hours the gym is open on that weekday: the owner's opening hours, else every half hour that
+    had people in it."""
+    if cfg.get("open") is not None and cfg.get("close") is not None:
+        return list(range(int(cfg["open"]) * 2, int(cfg["close"]) * 2))
+    return sorted(s for s, v in day["slots"].items() if v > 0)
+
+
+def level(now_n, peak):
+    if peak <= 0:
+        return ("Quiet", "#B7F34A") if now_n <= 2 else ("Busy", "#FF6B6B")
+    r = now_n / peak
+    if r < 0.4:
+        return "Quiet", "#B7F34A"
+    if r < 0.75:
+        return "Moderate", "#FFC44D"
+    return "Busy", "#FF6B6B"
+
+
+def _busy(sc, m, profile=None):
+    cfg = traffic_cfg(profile or st.session_state.get("_tr_prof"))
+    data = traffic(sc, m["gym_id"], cfg["visit"])
+    if data is None:
         st.info("Gym busyness will show here soon.")
         return
-    hour = datetime.now(gw.APP_TZ).hour
-    usual_now = next((u for h, u in hours if h == hour), 0)
-    peak = max((u for _, u in hours), default=0)
-    if now_n <= max(1, usual_now * 0.6):
-        level, tone, note = "Quiet", "#B7F34A", "Great time to train: machines should be free."
-    elif now_n <= usual_now * 1.3 + 1:
-        level, tone, note = "Normal", "#FFC44D", "About as busy as usual for this time."
-    else:
-        level, tone, note = "Busy", "#FF6B6B", "Busier than usual right now."
-    gw._md(f'<div class="mp-card"><div style="font-size:13px;color:#93A0B4">Right now</div>'
-           f'<div style="font-size:30px;font-weight:900;color:{tone}">{level}</div>'
-           f'<div>{now_n} check-in{"s" if now_n != 1 else ""} in the last 90 minutes. {note}</div></div>')
-    open_hours = [(h, u) for h, u in hours if h >= hour]
-    if open_hours and peak > 0:
-        quiet = min(open_hours, key=lambda x: x[1])
-        st.caption(f"Usually quietest later today around {quiet[0] % 12 or 12}{'am' if quiet[0] < 12 else 'pm'}.")
-    df = pd.DataFrame(hours, columns=["hour", "usual"])
-    df["label"] = [f"{h % 12 or 12}{'a' if h < 12 else 'p'}" for h in df["hour"]]
-    df["now"] = ["Now" if h == hour else "Usual" for h in df["hour"]]
+    render_traffic(data, inside_now(sc, m["gym_id"], cfg["visit"]), cfg, key="tr_tf")
+
+
+def render_traffic(data, now_n, cfg, key):
+    nowt = datetime.now(gw.APP_TZ)
+    dow = (nowt.weekday() + 1) % 7
+    slot = nowt.hour * 2 + nowt.minute // 30
+    today = data.get(dow) or {"days": 0, "slots": {}}
+    opens = open_slots(today, cfg)
+    peak = max([today["slots"].get(x, 0) for x in opens] or [0])
+    usual = today["slots"].get(slot, 0.0)
+    closed = bool(opens) and (slot < opens[0] or slot > opens[-1]) and not now_n
+    lvl, tone = ("Closed", "#93A0B4") if closed else level(now_n or 0, peak)
+    who = "Nobody checked in" if not now_n else f"About {now_n} {'person' if now_n == 1 else 'people'}"
+    gw._md(f'<div class="mp-card"><div style="font-size:13px;color:#93A0B4">Right now · {nowt:%I:%M %p}</div>'
+           f'<div style="font-size:30px;font-weight:900;color:{tone}">{lvl}</div>'
+           f'<div style="font-size:17px;font-weight:700">{who} in the gym</div>'
+           + (f'<div class="tr-sub">Usually about {usual:.0f} at this time on {DAYS[dow]}s'
+              + ("" if closed else " · quieter than usual" if (now_n or 0) < usual * 0.8 else
+                 " · busier than usual" if (now_n or 0) > usual * 1.2 + 1 else " · about the usual")
+              + '</div>' if today["days"] and usual >= 0.5 else "")
+           + '</div>')
+    ahead = [x for x in opens if x > slot]
+    if today["days"] and ahead:
+        q = min(ahead, key=lambda x: (today["slots"].get(x, 0), x))
+        st.markdown(f"**Quietest later today:** {_slot_label(q)}–{_slot_label(q, end=True)} · usually about "
+                    f"{today['slots'].get(q, 0):.0f} {'person' if round(today['slots'].get(q, 0)) == 1 else 'people'}")
+    # pick a day to plan ahead
+    order = [(dow + i) % 7 for i in range(7)]
+    pick = st.segmented_control("Day", order, default=dow, key=f"{key}_day", label_visibility="collapsed",
+                                format_func=lambda d: "Today" if d == dow else DAYS[d][:3]) or dow
+    day = data.get(pick) or {"days": 0, "slots": {}}
+    slots = open_slots(day, cfg)
+    if not day["days"] or not slots:
+        st.info(f"Not enough check-ins on {DAYS[pick]}s yet. This gets more accurate every week members check in.")
+        return
+    df = pd.DataFrame([{"slot": x, "people": round(day["slots"].get(x, 0), 1), "time": _slot_label(x),
+                        "range": f"{_slot_label(x)}–{_slot_label(x, end=True)}",
+                        "kind": "Now" if (pick == dow and x == slot) else "Usual"} for x in slots])
     try:
         import altair as alt
-        chart = alt.Chart(df).mark_bar(cornerRadiusTopLeft=4, cornerRadiusTopRight=4).encode(
-            x=alt.X("label:N", sort=list(df["label"]), title=None, axis=alt.Axis(labelColor="#93A0B4", labelAngle=0)),
-            y=alt.Y("usual:Q", title=None, axis=None),
-            color=alt.Color("now:N", scale=alt.Scale(domain=["Now", "Usual"], range=["#B7F34A", "#35506B"]), legend=None),
-            tooltip=[alt.Tooltip("label:N", title="Hour"), alt.Tooltip("usual:Q", title="Usual check-ins", format=".1f")])
-        st.markdown(f"**Usually on {datetime.now(gw.APP_TZ):%A}s**")
-        st.altair_chart(chart.properties(height=180).configure(background="rgba(0,0,0,0)").configure_view(strokeWidth=0),
+        chart = alt.Chart(df).mark_bar(cornerRadiusTopLeft=3, cornerRadiusTopRight=3).encode(
+            x=alt.X("time:N", sort=list(df["time"]), title=None,
+                    axis=alt.Axis(labelColor="#93A0B4", labelAngle=0, labelOverlap=True)),
+            y=alt.Y("people:Q", title="People inside", axis=alt.Axis(labelColor="#93A0B4", titleColor="#93A0B4",
+                                                                      tickMinStep=1, format="d")),
+            color=alt.Color("kind:N", scale=alt.Scale(domain=["Now", "Usual"], range=["#B7F34A", "#35506B"]),
+                            legend=None),
+            tooltip=[alt.Tooltip("range:N", title="Time"), alt.Tooltip("people:Q", title="Usually inside")])
+        st.markdown(f"**Usually on {DAYS[pick]}s** · people in the gym each half hour")
+        st.altair_chart(chart.properties(height=200).configure(background="rgba(0,0,0,0)")
+                        .configure_view(strokeWidth=0).configure_axis(gridColor="rgba(255,255,255,0.07)"),
                         use_container_width=True)
     except Exception:
-        st.bar_chart(df.set_index("label")["usual"])
+        st.bar_chart(df.set_index("time")["people"])
+    busiest = df.loc[df["people"].idxmax()]
+    quietest = df.loc[df["people"].idxmin()]
+    st.caption(f"Busiest {busiest['range']} (about {busiest['people']:.0f}) · quietest {quietest['range']} "
+               f"(about {quietest['people']:.0f}).")
+    n = day["days"]
+    st.caption(f"Based on {n} {DAYS[pick]}{'s' if n != 1 else ''} of check-ins in the last 8 weeks"
+               + (" · early estimate, it sharpens every week." if n < 3 else ".")
+               + f" Each visit counts as about {cfg['visit']} minutes.")
 
 
 def plates_for(target, bar=20.0):
@@ -762,7 +844,7 @@ def render_owner(supabase, gym_id):
     gw.kpi_row([("Members logging", str(len({s['member_id'] for s in sets})), "lime", "last 7 days"),
                 ("Sets logged", f"{len(sets):,}", "cyan", "last 7 days"),
                 ("Kg lifted", f"{sum(float(s['weight_kg']) * int(s['reps']) for s in sets):,.0f}", "amber", "last 7 days")])
-    t1, t2, t3, t4 = st.tabs(["Today's workout", "Machine guides", "Challenges", "Insights"])
+    t1, t2, t3, t4, t5 = st.tabs(["Today's workout", "Machine guides", "Challenges", "Gym now", "Insights"])
     with t1:
         _owner_wod(supabase, gym_id)
     with t2:
@@ -770,7 +852,44 @@ def render_owner(supabase, gym_id):
     with t3:
         _owner_challenges(supabase, gym_id)
     with t4:
+        _owner_traffic(supabase, gym_id)
+    with t5:
         _owner_insights(supabase, gym_id)
+
+
+def _owner_traffic(supabase, gym_id):
+    import gympulse_admin as gadm
+    prof = st.session_state.get("user_profile") or {}
+    cfg = traffic_cfg(prof)
+    st.caption("What members see in Train → Gym now: people inside right now, the usual for every half hour and "
+               "the quietest times. It's only as accurate as your check-ins, so make sure every member checks in.")
+    sc = gadm.service_client() or supabase
+    data = traffic(sc, gym_id, cfg["visit"])
+    if data is None:
+        st.info("Run sql/phase31_gym_traffic.sql in Supabase to switch on accurate gym busyness.")
+    else:
+        render_traffic(data, inside_now(sc, gym_id, cfg["visit"]), cfg, key="trow_tf")
+    if st.session_state.get("role") == "staff":
+        return
+    with st.form("tr_traffic_cfg"):
+        st.markdown("**Settings**")
+        visit = st.slider("Average visit length (minutes)", 30, 180, cfg["visit"], 5,
+                          help="How long a typical member trains. Each check-in counts as inside the gym this long.")
+        c1, c2, c3 = st.columns(3)
+        use = c1.toggle("Set opening hours", value=cfg["open"] is not None,
+                        help="Otherwise GymPulse works out your hours from when members check in.")
+        o = c2.selectbox("Opens", list(range(0, 24)), index=int(cfg["open"] if cfg["open"] is not None else 6),
+                         format_func=lambda h: _slot_label(h * 2))
+        cl = c3.selectbox("Closes", list(range(1, 25)), index=int(cfg["close"] if cfg["close"] is not None else 22) - 1,
+                          format_func=lambda h: _slot_label((h % 24) * 2))
+        if st.form_submit_button("Save", type="primary"):
+            import gympulse_grow as gg
+            val = {"visit": int(visit)}
+            if use and cl > o:
+                val.update({"open": int(o), "close": int(cl)})
+            gg._save_settings(supabase, prof.get("id"), {"traffic": val}, "Gym now settings saved.")
+            st.session_state["cmo_flash"] = "Gym now settings saved."
+            st.rerun()
 
 
 def _owner_challenges(sc, gym_id):
