@@ -25,14 +25,31 @@ INK, MUTED, LINE, ZEBRA = "#111827", "#5B6678", "#E3E8EF", "#F5F7FA"
 
 # ------------------------------------------------------------------ download links
 def download_link(label, data, filename, mime, key, primary=False):
-    """A download button that carries the file inside the page itself."""
+    """A download button that works on every phone. The file is served by the app with a proper download
+    response, so iPhone Safari opens or saves it (the old link carried the file inside the page, which
+    Safari on iPhone refuses to open)."""
     if isinstance(data, str):
         data = data.encode("utf-8")
-    b64 = base64.b64encode(data).decode()
-    cls = "gp-dl gp-dl-primary" if primary else "gp-dl"
-    gw._md(f'<a class="{cls}" id="dl_{key}" download="{gw._esc(filename)}" '
-           f'href="data:{mime};base64,{b64}">'
-           f'<span class="gp-dl-ic">⬇</span>{gw._esc(label)}</a>')
+    base = f"dl_{key}"
+    used = st.session_state.setdefault("_dl_keys_run", {})
+    run = _run_id()
+    if used.get("run") != run:
+        used.clear()
+        used["run"] = run
+    n = used.get(base, 0)                         # the same button twice on one page: give it its own key
+    used[base] = n + 1
+    st.download_button(label, data=data, file_name=filename, mime=mime, key=base if not n else f"{base}_{n}",
+                       type="primary" if primary else "secondary", icon=":material/download:",
+                       use_container_width=True, on_click="ignore")
+
+
+def _run_id():
+    try:
+        from streamlit.runtime.scriptrunner import get_script_run_ctx
+        ctx = get_script_run_ctx()
+        return id(ctx.cursors) if ctx is not None else 0
+    except Exception:
+        return 0
 
 
 DOWNLOAD_CSS = """
