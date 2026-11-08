@@ -45,15 +45,7 @@ CSS = """
 .mp-when { font-size: 11px; color: var(--gp-muted, #93A0B4); margin-top: 4px; }
 .st-key-mp_wrap { max-width: 620px; margin: 0 auto; width: 100%; }
 /* ---------- 2026 look: app-style tabs, soft glass cards ---------- */
-.st-key-mp_tabs [role="tablist"] { gap: 4px !important; background: rgba(255,255,255,.05); padding: 5px !important;
-  border-radius: 999px; border: 1px solid rgba(255,255,255,.07); overflow-x: auto; scrollbar-width: none; }
-.st-key-mp_tabs [role="tablist"]::after, .st-key-mp_tabs [role="tablist"] > :not([role="tab"]) { display: none !important; }
-.st-key-mp_tabs [role="tab"] { border-radius: 999px !important; padding: 8px 14px !important; white-space: nowrap;
-  border: none !important; }
-.st-key-mp_tabs [role="tab"] p { font-weight: 700 !important; }
-.st-key-mp_tabs [role="tab"][aria-selected="true"] { background: linear-gradient(135deg,#B7F34A,#35D3E8) !important; }
-.st-key-mp_tabs [role="tab"][aria-selected="true"] p { color: #0A0F1E !important; }
-.st-key-mp_tabs [role="tab"]::after, .st-key-mp_tabs [role="tab"]::before { display: none !important; }
+.st-key-mp_tabs [role="tab"] { padding: 7px 8px !important; }   /* five tabs fit a phone */
 .st-key-mp_wrap [data-testid="stLayoutWrapper"] > div[class*="st-key"] { border-radius: 24px !important; }
 .st-key-mp_wrap [data-testid="stVerticalBlock"][class*="emotion"] { }
 .mp-card { border: none !important; border-radius: 28px !important;
@@ -428,7 +420,7 @@ def render_portal(supabase, token):
         flash = st.session_state.pop("mp_flash", None)
         if flash:
             st.success(flash)
-        tabs = st.tabs(["Home", "Train", "Classes", "Messages", "My details"], key="mp_tabs")
+        tabs = st.tabs(["Home", "Train", "Classes", "Inbox", "Me"], key="mp_tabs")
         with tabs[0]:
             _home(sc, m, gym_name, prof)
             import gympulse_referrals as gref

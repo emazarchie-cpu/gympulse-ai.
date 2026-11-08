@@ -410,6 +410,61 @@ html body .gp-tbl { margin: 0 !important; border: 0 !important; }
 /* Streamlit's own grids (data editors): match the tables */
 html body [data-testid="stDataFrame"], html body [data-testid="stDataEditor"] { border-radius: 14px; overflow: hidden;
     border: 1px solid var(--gp-line); }
+
+/* ===================== 2026 controls: tabs and option rows (all pages) =====================
+   One look everywhere: a soft rounded track, the chosen item is a raised pill. No underline, never wraps:
+   extra items scroll sideways. */
+html body .stApp [data-testid="stTabs"] [role="tablist"] {
+    display: flex !important; gap: 4px !important; padding: 4px !important; border: 0 !important;
+    background: rgba(255,255,255,0.05) !important; border-radius: 16px !important;
+    overflow-x: auto !important; scrollbar-width: none !important; box-shadow: none !important; }
+html body .stApp [data-testid="stTabs"] [role="tablist"]::-webkit-scrollbar { display: none !important; }
+html body .stApp [data-testid="stTabs"] [role="tablist"]::after,
+html body .stApp [data-testid="stTabs"] [role="tablist"]::before { display: none !important; }
+html body .stApp [data-testid="stTabs"] [role="tab"] {
+    flex: 1 0 auto !important; justify-content: center !important; min-height: 38px !important;
+    padding: 7px 14px !important; margin: 0 !important; border: 0 !important; border-radius: 12px !important;
+    background: transparent !important; white-space: nowrap !important; transition: background .15s ease; }
+html body .stApp [data-testid="stTabs"] [role="tab"] > div:not([data-testid]),
+html body .stApp [data-testid="stTabs"] [role="tab"]::after,
+html body .stApp [data-testid="stTabs"] [role="tab"]::before,
+html body .stApp [data-baseweb="tab-highlight"], html body .stApp [data-baseweb="tab-border"] {
+    display: none !important; }
+html body .stApp [data-testid="stTabs"] [role="tab"] p {
+    font-weight: 700 !important; font-size: 14.5px !important; color: #93A0B4 !important; }
+html body .stApp [data-testid="stTabs"] [role="tab"][aria-selected="true"] {
+    background: #26324A !important; box-shadow: 0 1px 3px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(255,255,255,0.06) !important; }
+html body .stApp [data-testid="stTabs"] [role="tab"][aria-selected="true"] p { color: #F4F7FB !important; }
+html body .stApp [data-testid="stTabs"] [role="tab"]:hover:not([aria-selected="true"]) {
+    background: rgba(255,255,255,0.05) !important; }
+html body .stApp [data-testid^="stTabsScroll"],
+html body .stApp [data-testid="stTabs"] > div > button { display: none !important; }   /* the › scroll arrows */
+
+html body .stApp [data-testid="stButtonGroup"] [role="radiogroup"] {
+    display: flex !important; flex-wrap: nowrap !important; gap: 4px !important; padding: 4px !important;
+    background: rgba(255,255,255,0.05) !important; border-radius: 16px !important; width: 100% !important;
+    overflow-x: auto !important; scrollbar-width: none !important; }
+html body .stApp [data-testid="stButtonGroup"] [role="radiogroup"]::-webkit-scrollbar { display: none !important; }
+html body .stApp.stApp button[data-variant="segmented_control"] {
+    flex: 1 0 auto !important; min-height: 38px !important; padding: 7px 14px !important; margin: 0 !important;
+    border: 0 !important; border-radius: 12px !important; background: transparent !important;
+    box-shadow: none !important; white-space: nowrap !important; }
+html body .stApp.stApp button[data-variant="segmented_control"] p {
+    font-weight: 700 !important; font-size: 14.5px !important; color: #93A0B4 !important; }
+html body .stApp.stApp.stApp button[data-variant="segmented_control"][aria-checked="true"] {
+    background: #26324A !important; border: 0 !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(255,255,255,0.06) !important; }
+html body .stApp.stApp.stApp button[data-variant="segmented_control"][aria-checked="true"] p { color: #F4F7FB !important; }
+html body .stApp.stApp button[data-variant="segmented_control"]:hover:not([aria-checked="true"]) {
+    background: rgba(255,255,255,0.05) !important; }
+@media (max-width: 640px) {
+    html body .stApp.stApp.stApp button[data-variant="segmented_control"],
+    html body .stApp [data-testid="stTabs"] [role="tab"] { padding: 7px 8px !important; min-height: 36px !important; }
+    html body .stApp.stApp.stApp button[data-variant="segmented_control"] p,
+    html body .stApp [data-testid="stTabs"] [role="tab"] p { font-size: 13.5px !important; }
+    html body .stApp [data-testid="stButtonGroup"] [role="radiogroup"],
+    html body .stApp [data-testid="stTabs"] [role="tablist"] { gap: 2px !important; padding: 3px !important; }
+}
 """
 
 
@@ -775,6 +830,21 @@ html body .stApp.stApp.stApp .gp-tag.est { color: #B45309 !important; background
 html body .stApp.stApp hr, html body .stApp.stApp [data-testid="stDivider"] { border-color: rgba(15,23,42,0.1) !important; }
 html body .stApp.stApp .cc-pulse { opacity: .55; }
 html body ::selection { background: rgba(183,243,74,0.45); color: #0F172A; }
+
+/* 2026 controls, light mode */
+html body .stApp.stApp [data-testid="stTabs"] [role="tablist"],
+html body .stApp.stApp [data-testid="stButtonGroup"] [role="radiogroup"] { background: #E6EBF1 !important; }
+html body .stApp.stApp.stApp.stApp button[data-variant="segmented_control"]:not([aria-checked="true"]) {
+    background: transparent !important; background-color: transparent !important; border: 0 !important;
+    box-shadow: none !important; }
+html body .stApp.stApp [data-testid="stTabs"] [role="tab"] p,
+html body .stApp.stApp.stApp.stApp button[data-variant="segmented_control"] p { color: #64748B !important; }
+html body .stApp.stApp.stApp [data-testid="stTabs"] [role="tab"][aria-selected="true"],
+html body .stApp.stApp.stApp.stApp.stApp button[data-variant="segmented_control"][aria-checked="true"] {
+    background: #FFFFFF !important; border: 0 !important; box-shadow: 0 1px 3px rgba(15,23,42,0.12) !important; }
+html body .stApp.stApp.stApp [data-testid="stTabs"] [role="tab"][aria-selected="true"] p,
+html body .stApp.stApp.stApp.stApp.stApp button[data-variant="segmented_control"][aria-checked="true"] p {
+    color: #0F172A !important; }
 """
 
 

@@ -1157,7 +1157,7 @@ html body [class*="st-key-pm_item"] button {
     justify-content: flex-start !important; background: transparent !important;
     border-color: transparent !important; min-height: 42px; padding: 0 10px !important; }
 html body [class*="st-key-pm_item"] button:hover { background: rgba(255,255,255,0.07) !important; }
-html body [data-testid="stButtonGroup"] { flex-wrap: wrap; }
+html body [data-testid="stButtonGroup"] { flex-wrap: nowrap; }
 
 /* ---------- 4e. Top bar: brand | pages | actions ---------- */
 html body .st-key-top_nav [data-testid="stHorizontalBlock"] {
