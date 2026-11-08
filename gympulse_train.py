@@ -306,9 +306,37 @@ DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Satur
 DEFAULT_VISIT = 75
 
 
+GROUPS = {"wk": "Monday to Friday", "sat": "Saturday", "sun": "Sunday"}
+OPEN_TIMES = list(range(0, 1440, 5))                  # minutes after midnight, every 5 minutes
+CLOSE_TIMES = list(range(5, 1441, 5))                 # 1440 = midnight
+
+
+def _group(dow):
+    return "sun" if dow == 0 else "sat" if dow == 6 else "wk"
+
+
 def traffic_cfg(profile):
+    """{"visit": minutes, "hours": None or {"wk"|"sat"|"sun": [open_min, close_min] or None (closed)}}.
+    Times are minutes after midnight; a close of 1440 is midnight."""
     c = dict(((profile or {}).get("settings") or {}).get("traffic") or {})
-    return {"visit": int(c.get("visit") or DEFAULT_VISIT), "open": c.get("open"), "close": c.get("close")}
+    hours = c.get("hours")
+    if not hours and c.get("open") is not None and c.get("close") is not None:     # older whole-hour setting
+        span = [int(c["open"]) * 60, int(c["close"]) * 60]
+        hours = {"wk": span, "sat": span, "sun": span}
+    return {"visit": int(c.get("visit") or DEFAULT_VISIT), "hours": hours or None}
+
+
+def hours_for(cfg, dow):
+    """(open_min, close_min) for that weekday, None if closed, or False if the owner hasn't set hours."""
+    if not cfg.get("hours"):
+        return False
+    h = cfg["hours"].get(_group(dow))
+    return tuple(h) if h else None
+
+
+def clock(minutes):
+    h, m = divmod(int(minutes) % 1440, 60)
+    return f"{h % 12 or 12}{f':{m:02d}' if m else ''}{'am' if h < 12 else 'pm'}"
 
 
 def _slot_label(slot, end=False):
@@ -343,12 +371,25 @@ def inside_now(sc, gym_id, visit):
         return None
 
 
-def open_slots(day, cfg):
-    """Half hours the gym is open on that weekday: the owner's opening hours, else every half hour that
-    had people in it."""
-    if cfg.get("open") is not None and cfg.get("close") is not None:
-        return list(range(int(cfg["open"]) * 2, int(cfg["close"]) * 2))
+def open_slots(day, cfg, dow=None):
+    """Half hours the gym is open on that weekday: any half hour that overlaps the owner's opening hours
+    (5:30–10:45pm keeps the 10:30 slot), else every half hour that had people in it."""
+    h = hours_for(cfg, dow) if dow is not None else False
+    if h is None:
+        return []
+    if h:
+        o, c = h
+        return [x for x in range(48) if x * 30 < c and x * 30 + 30 > o]
     return sorted(s for s, v in day["slots"].items() if v > 0)
+
+
+def slot_range(x, cfg, dow):
+    """'5:30am–6am', trimmed to opening hours (opens 5:45 -> '5:45am–6am')."""
+    a, b = x * 30, x * 30 + 30
+    h = hours_for(cfg, dow)
+    if h:
+        a, b = max(a, h[0]), min(b, h[1])
+    return f"{clock(a)}–{clock(b)}"
 
 
 def level(now_n, peak):
@@ -376,13 +417,22 @@ def render_traffic(data, now_n, cfg, key):
     dow = (nowt.weekday() + 1) % 7
     slot = nowt.hour * 2 + nowt.minute // 30
     today = data.get(dow) or {"days": 0, "slots": {}}
-    opens = open_slots(today, cfg)
+    opens = open_slots(today, cfg, dow)
     peak = max([today["slots"].get(x, 0) for x in opens] or [0])
     usual = today["slots"].get(slot, 0.0)
-    closed = bool(opens) and (slot < opens[0] or slot > opens[-1]) and not now_n
+    h = hours_for(cfg, dow)
+    mins = nowt.hour * 60 + nowt.minute
+    if h is None:
+        closed = True
+    elif h:
+        closed = not (h[0] <= mins < h[1])
+    else:
+        closed = bool(opens) and (slot < opens[0] or slot > opens[-1]) and not now_n
     lvl, tone = ("Closed", "#93A0B4") if closed else level(now_n or 0, peak)
     who = "Nobody checked in" if not now_n else f"About {now_n} {'person' if now_n == 1 else 'people'}"
-    gw._md(f'<div class="mp-card"><div style="font-size:13px;color:#93A0B4">Right now · {nowt:%I:%M %p}</div>'
+    hrs = ("Closed today" if h is None else f"Open {clock(h[0])}–{clock(h[1])} today" if h else "")
+    gw._md(f'<div class="mp-card"><div style="font-size:13px;color:#93A0B4">Right now · {nowt:%I:%M %p}'
+           f'{" · " + hrs if hrs else ""}</div>'
            f'<div style="font-size:30px;font-weight:900;color:{tone}">{lvl}</div>'
            f'<div style="font-size:17px;font-weight:700">{who} in the gym</div>'
            + (f'<div class="tr-sub">Usually about {usual:.0f} at this time on {DAYS[dow]}s'
@@ -393,19 +443,25 @@ def render_traffic(data, now_n, cfg, key):
     ahead = [x for x in opens if x > slot]
     if today["days"] and ahead:
         q = min(ahead, key=lambda x: (today["slots"].get(x, 0), x))
-        st.markdown(f"**Quietest later today:** {_slot_label(q)}–{_slot_label(q, end=True)} · usually about "
+        st.markdown(f"**Quietest later today:** {slot_range(q, cfg, dow)} · usually about "
                     f"{today['slots'].get(q, 0):.0f} {'person' if round(today['slots'].get(q, 0)) == 1 else 'people'}")
     # pick a day to plan ahead
     order = [(dow + i) % 7 for i in range(7)]
     pick = st.segmented_control("Day", order, default=dow, key=f"{key}_day", label_visibility="collapsed",
                                 format_func=lambda d: "Today" if d == dow else DAYS[d][:3]) or dow
     day = data.get(pick) or {"days": 0, "slots": {}}
-    slots = open_slots(day, cfg)
+    slots = open_slots(day, cfg, pick)
+    ph = hours_for(cfg, pick)
+    if ph is None:
+        st.info(f"Closed on {DAYS[pick]}s.")
+        return
+    if ph:
+        st.caption(f"Open {clock(ph[0])}–{clock(ph[1])} on {DAYS[pick]}s.")
     if not day["days"] or not slots:
         st.info(f"Not enough check-ins on {DAYS[pick]}s yet. This gets more accurate every week members check in.")
         return
     df = pd.DataFrame([{"slot": x, "people": round(day["slots"].get(x, 0), 1), "time": _slot_label(x),
-                        "range": f"{_slot_label(x)}–{_slot_label(x, end=True)}",
+                        "range": slot_range(x, cfg, pick),
                         "kind": "Now" if (pick == dow and x == slot) else "Usual"} for x in slots])
     try:
         import altair as alt
@@ -875,21 +931,33 @@ def _owner_traffic(supabase, gym_id):
         st.markdown("**Settings**")
         visit = st.slider("Average visit length (minutes)", 30, 180, cfg["visit"], 5,
                           help="How long a typical member trains. Each check-in counts as inside the gym this long.")
-        c1, c2, c3 = st.columns(3)
-        use = c1.toggle("Set opening hours", value=cfg["open"] is not None,
+        use = st.toggle("Set opening hours", value=bool(cfg["hours"]),
                         help="Otherwise GymPulse works out your hours from when members check in.")
-        o = c2.selectbox("Opens", list(range(0, 24)), index=int(cfg["open"] if cfg["open"] is not None else 6),
-                         format_func=lambda h: _slot_label(h * 2))
-        cl = c3.selectbox("Closes", list(range(1, 25)), index=int(cfg["close"] if cfg["close"] is not None else 22) - 1,
-                          format_func=lambda h: _slot_label((h % 24) * 2))
+        st.caption("Pick the exact time, to the minute in 5s: tap the box and type, e.g. 5:30 or 10:45.")
+        cur = cfg["hours"] or {}
+        default = {"wk": [330, 1320], "sat": [420, 1200], "sun": [480, 1080]}
+        picked = {}
+        for g, label in GROUPS.items():
+            span = cur.get(g, default[g]) if g in cur or not cur else None
+            st.markdown(f"**{label}**")
+            c1, c2, c3 = st.columns([1, 1, 1], vertical_alignment="bottom")
+            shut = c3.checkbox("Closed", value=bool(cur) and span is None, key=f"tr_h_{g}_x")
+            span = span or default[g]
+            o = c1.selectbox("Opens", OPEN_TIMES, index=OPEN_TIMES.index(span[0] - span[0] % 5),
+                             format_func=clock, key=f"tr_h_{g}_o")
+            cl = c2.selectbox("Closes", CLOSE_TIMES, index=CLOSE_TIMES.index(max(5, span[1] - span[1] % 5)),
+                              format_func=lambda x: "Midnight" if x == 1440 else clock(x), key=f"tr_h_{g}_c")
+            picked[g] = None if shut else [int(o), int(cl)]
         if st.form_submit_button("Save", type="primary"):
-            import gympulse_grow as gg
-            val = {"visit": int(visit)}
-            if use and cl > o:
-                val.update({"open": int(o), "close": int(cl)})
-            gg._save_settings(supabase, prof.get("id"), {"traffic": val}, "Gym now settings saved.")
-            st.session_state["cmo_flash"] = "Gym now settings saved."
-            st.rerun()
+            bad = [GROUPS[g] for g, v in picked.items() if v and v[1] <= v[0]]
+            if use and bad:
+                st.error("Closing time must be after opening time: " + ", ".join(bad) + ".")
+            else:
+                import gympulse_grow as gg
+                val = {"visit": int(visit), "hours": picked if use else None}
+                gg._save_settings(supabase, prof.get("id"), {"traffic": val}, "Gym now settings saved.")
+                st.session_state["cmo_flash"] = "Gym now settings saved."
+                st.rerun()
 
 
 def _owner_challenges(sc, gym_id):

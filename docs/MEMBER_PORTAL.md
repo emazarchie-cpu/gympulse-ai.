@@ -207,3 +207,7 @@ the gym", the usual for this time and whether it's quieter or busier than usual,
 today, and a half-hour chart for any day of the week with its busiest and quietest times and how many days
 of data it's based on. Owners: Train → Gym now shows the same view plus settings (average visit length and,
 optionally, opening hours). Accuracy depends on every member checking in.
+
+Opening hours are set to the exact 5 minutes (e.g. 5:30am–10:45pm), separately for Monday to Friday, Saturday
+and Sunday, and any of them can be marked Closed. Members then see "Open 5:30am–10:45pm today" or "Closed",
+and quiet times are trimmed to the real opening hours.
