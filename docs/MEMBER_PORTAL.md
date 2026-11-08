@@ -176,3 +176,21 @@ even when nobody else is posting:
 **Machine guides** (Community → Train → Machine guides): add a machine with a video (upload up to 45 MB, or a
 YouTube/Instagram link) and tips, download its QR code and stick it on the machine. Scanning opens a public
 guide page (`?guide=<id>`): no login.
+
+## Community removed, Train expanded (phase 30)
+
+The social community (feed, stories, reels, DMs, profiles, follows, notifications) has been removed from the
+member app and the owner app. Its tables are left in the database so nothing is lost; the app no longer uses
+them. The owner's **Community** page is now **Train**.
+
+Run `sql/phase30_train_more.sql` once (safe to run again). The member Train tab now has:
+
+- **Today**: the coach's workout, a weekly goal ring (workouts logged or gym check-ins) with a week streak and
+  "change my goal", **My workouts** (repeat last workout, or save named workouts and start them: the logger
+  then shows the exercises with ✓ as they're done), visit **challenges** to join, and **achievements**
+  (first workout, 10/25/50/100 workouts, PRs, tonnes lifted, streaks, weekly goal, body tracking).
+- **Log**, **Progress** (now with an 8-week training calendar), **Body** (weight, waist, body fat with charts,
+  private to the member), **Gym now** and **Tools**.
+
+Owner **Train** page: today's workout, machine guides with QR codes, **challenges** (no posts) and
+**insights** (most-trained exercises and most consistent members, last 30 days).

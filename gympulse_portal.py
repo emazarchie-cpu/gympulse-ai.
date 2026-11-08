@@ -428,7 +428,7 @@ def render_portal(supabase, token):
         flash = st.session_state.pop("mp_flash", None)
         if flash:
             st.success(flash)
-        tabs = st.tabs(["Home", "Train", "Community", "Classes", "Messages", "My details"], key="mp_tabs")
+        tabs = st.tabs(["Home", "Train", "Classes", "Messages", "My details"], key="mp_tabs")
         with tabs[0]:
             _home(sc, m, gym_name, prof)
             import gympulse_referrals as gref
@@ -437,8 +437,7 @@ def render_portal(supabase, token):
             import gympulse_train as gtr
             gtr.render_member(sc, m, gym_name, prof)
         with tabs[2]:
-            import gympulse_community as gcom
-            gcom.render_member(sc, m, gym_name, prof)
+            _classes(sc, m)
         with tabs[3]:
             _classes(sc, m)
         with tabs[4]:
