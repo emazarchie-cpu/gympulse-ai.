@@ -49,6 +49,9 @@ select step, ok from (values
   ('phase29_train      workout log, coach posts, guides', to_regclass('public.workout_sets') is not null
                                                     and to_regclass('public.machine_guides') is not null
                                                     and exists (select 1 from fn where proname = 'gp_gym_busy')),
+  ('phase30_train      routines, body tracking, goals', to_regclass('public.workout_routines') is not null
+                                                    and to_regclass('public.body_logs') is not null
+                                                    and exists (select 1 from col where c = 'members.train_week_goal')),
   ('security           RLS on every gym table',       not exists (
         select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace
         where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity

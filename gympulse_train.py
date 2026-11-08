@@ -1,15 +1,17 @@
-"""GymPulse AI · Train: what members use while they're at the gym.
+"""GymPulse AI · Train: what members use while they're at the gym. Works for one member on their own:
+nothing depends on other members posting.
 
 Member app → Train
-  * Today's workout from the coach (one post a day by the gym).
-  * Log: pick an exercise, see "last time: 60 kg × 8", log sets in two taps. Beating your best is a PR 🎉,
-    which can be shared to the gym feed.
-  * Progress: personal records and a chart per exercise.
+  * Today: the coach's workout, this week's goal and streak, my workouts (routines), challenges, achievements.
+  * Log: pick an exercise (or a routine), see "last time: 60 kg × 8", log sets in two taps. Beating your best
+    is a personal record (PR).
+  * Progress: records, estimated 1-rep max, a chart per exercise, and a calendar of training days.
+  * Body: weight, waist and body fat over time.
   * Gym now: how busy it is right now and the usual pattern for today, from check-ins.
   * Tools: rest timer and plate calculator.
-Owner (Community → Train): post today's workout; machine guides (video + tips) each with a QR code for the
-machine. Scanning it opens a public guide page (?guide=<id>).
-Database: sql/phase29_train.sql.
+Owner (Train page): today's workout, machine guides with QR codes (public ?guide=<id> page), visit
+challenges and training insights.
+Database: sql/phase29_train.sql, sql/phase30_train_more.sql (challenges: phase 24 tables).
 """
 import io
 import uuid
@@ -29,6 +31,23 @@ EXERCISES = ["Squat", "Bench press", "Deadlift", "Overhead press", "Barbell row"
              "Bicep curl", "Hammer curl", "Tricep pushdown", "Skull crusher", "Lateral raise", "Face pull",
              "Shrug", "Kettlebell swing", "Goblet squat", "Plank", "Crunch", "Cable crunch"]
 OTHER = "Other…"
+BUCKET = "community"                                  # Supabase storage bucket for guide videos
+ACHIEVEMENTS = [  # (key, emoji, title, test)
+    ("first", "🎯", "First workout logged", lambda a: a["days"] >= 1),
+    ("w10", "💪", "10 workouts", lambda a: a["days"] >= 10),
+    ("w25", "🏅", "25 workouts", lambda a: a["days"] >= 25),
+    ("w50", "🏆", "50 workouts", lambda a: a["days"] >= 50),
+    ("w100", "👑", "100 workouts", lambda a: a["days"] >= 100),
+    ("pr1", "⚡", "First PR", lambda a: a["prs"] >= 1),
+    ("pr10", "🚀", "10 PRs", lambda a: a["prs"] >= 10),
+    ("t1", "🧱", "1 tonne lifted", lambda a: a["volume"] >= 1000),
+    ("t10", "🏗️", "10 tonnes lifted", lambda a: a["volume"] >= 10000),
+    ("t100", "🦍", "100 tonnes lifted", lambda a: a["volume"] >= 100000),
+    ("s4", "🔥", "4-week streak", lambda a: a["streak"] >= 4),
+    ("s12", "☄️", "12-week streak", lambda a: a["streak"] >= 12),
+    ("goal", "✅", "Hit your weekly goal", lambda a: a["goal_weeks"] >= 1),
+    ("body", "📏", "Started tracking your body", lambda a: a["body"] >= 1),
+]
 PLATES = [25, 20, 15, 10, 5, 2.5, 1.25]
 
 
@@ -82,17 +101,41 @@ def render_member(sc, m, gym_name, prof):
     if not ready(sc):
         st.info("Training tools are coming soon to this gym.")
         return
-    _coach_card(sc, m)
-    view = st.segmented_control("Train", ["Log", "Progress", "Gym now", "Tools"], default="Log", key="tr_view",
-                                label_visibility="collapsed") or "Log"
-    if view == "Log":
+    st.markdown(CSS, unsafe_allow_html=True)
+    views = ["Today", "Log", "Progress", "Body", "Gym now", "Tools"]
+    if st.session_state.get("tr_view") not in views:
+        st.session_state["tr_view"] = "Today"
+    view = st.segmented_control("Train", views, key="tr_view", label_visibility="collapsed") or "Today"
+    if view == "Today":
+        _home(sc, m, gym_name)
+    elif view == "Log":
         _log(sc, m, gym_name)
     elif view == "Progress":
         _progress(sc, m)
+    elif view == "Body":
+        _body(sc, m)
     elif view == "Gym now":
         _busy(sc, m)
     else:
         _tools()
+
+
+CSS = """<style>
+.tr-ring { display:flex; align-items:center; gap:16px; }
+.tr-ring svg { flex:0 0 auto; }
+.tr-big { font-size:26px; font-weight:900; line-height:1.1; }
+.tr-sub { color:#93A0B4; font-size:14px; }
+.tr-ach { display:grid; grid-template-columns:repeat(auto-fill,minmax(96px,1fr)); gap:8px; }
+.tr-ach div { border-radius:14px; padding:10px 6px; text-align:center; background:rgba(255,255,255,.05);
+              border:1px solid rgba(255,255,255,.08); font-size:12px; font-weight:700; line-height:1.3; }
+.tr-ach div b { display:block; font-size:24px; }
+.tr-ach .off { opacity:.35; filter:grayscale(1); }
+.tr-cal { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
+.tr-cal i { aspect-ratio:1; border-radius:6px; background:rgba(255,255,255,.06); display:block; }
+.tr-cal i.on { background:linear-gradient(135deg,#B7F34A,#35D3E8); }
+.tr-cal i.gym { background:rgba(53,211,232,.35); }
+.tr-cal i.today { outline:2px solid #F4F7FB; }
+</style>"""
 
 
 def _coach_card(sc, m):
@@ -135,9 +178,7 @@ def _log(sc, m, gym_name):
                    f'<div style="font-size:22px;font-weight:900">{gw._esc(flash[1])}</div></div>')
         else:
             (st.success if flash[0] == "ok" else st.info)(flash[1])
-    pr = st.session_state.get("tr_pr")
-    if pr:
-        _share_pr(sc, m, gym_name, pr)
+    _routine_bar(sc, m)
     rows = _sets(sc, m)
     mine = []
     for r in rows:
@@ -186,7 +227,6 @@ def _log(sc, m, gym_name):
         prev = before + done
         if is_pr(prev, w, r):
             st.session_state["tr_flash"] = ("pr", f"New PR: {ex} {_fmt(w)} kg × {int(r)} 🎉")
-            st.session_state["tr_pr"] = {"ex": ex, "w": float(w), "r": int(r)}
         else:
             st.session_state["tr_flash"] = ("ok", f"Set {len(done) + 1} saved: {_fmt(w)} kg × {int(r)}")
         st.rerun()
@@ -214,31 +254,6 @@ def _today(sc, m, rows):
                     st.rerun()
 
 
-def _share_pr(sc, m, gym_name, pr):
-    import gympulse_community as gcom
-    try:
-        on = gcom.enabled(sc, m["gym_id"]) and m.get("community_agreed_at")
-    except Exception:
-        on = False
-    if not on:
-        st.session_state.pop("tr_pr", None)
-        return
-    a, b = st.columns(2)
-    if a.button("Share my PR with the gym", icon=":material/emoji_events:", key="tr_share", use_container_width=True):
-        try:
-            sc.table("community_posts").insert({
-                "gym_id": m["gym_id"], "member_id": m["id"], "author_name": gw._text(m.get("full_name"), "Member"),
-                "body": f"🏆 New PR: {pr['ex']} {_fmt(pr['w'])} kg × {pr['r']}"}).execute()
-            st.session_state["tr_flash"] = ("ok", "Shared with the gym 💪")
-        except Exception:
-            st.session_state["tr_flash"] = ("info", "Couldn't share right now.")
-        st.session_state.pop("tr_pr", None)
-        st.rerun()
-    if b.button("Keep it private", key="tr_keep", use_container_width=True):
-        st.session_state.pop("tr_pr", None)
-        st.rerun()
-
-
 def _progress(sc, m):
     rows = _sets(sc, m)
     if not rows:
@@ -253,6 +268,7 @@ def _progress(sc, m):
     gw.kpi_row([("Workouts logged", str(days), "cyan", "days with sets"),
                 ("This week", str(this_week), "lime", "workouts"),
                 ("Exercises", str(df["exercise"].nunique()), "amber", "tracked")])
+    _calendar(sc, m, rows)
     st.markdown('<div class="section-label">PERSONAL RECORDS</div>', unsafe_allow_html=True)
     recs = []
     for ex, g in df.groupby("exercise"):
@@ -388,6 +404,317 @@ timer=setInterval(()=>{left--;show();if(left<=0){stop();beep();left=total;v.text
 """
 
 
+# ------------------------------------------------------------------ member: training days, goal, streak
+def training_days(sc, m, rows=None, days=200):
+    """Dates the member trained: logged sets or a gym check-in."""
+    rows = rows if rows is not None else _sets(sc, m, days=days)
+    logged = {pd.Timestamp(str(r["performed_on"])).date() for r in rows}
+    since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    try:
+        cks = sc.table("checkins").select("checked_in_at").eq("member_id", m["id"]).gte("checked_in_at", since) \
+            .limit(2000).execute().data or []
+    except Exception:
+        cks = []
+    gym = {pd.to_datetime(c["checked_in_at"], utc=True).tz_convert(gw.APP_TZ).date() for c in cks
+           if c.get("checked_in_at")}
+    return logged, gym
+
+
+def week_streak(days, goal=1, today=None):
+    """Weeks in a row (Mon–Sun) with at least `goal` training days. This week counts once it's reached."""
+    today = today or gw.today_local()
+    wk = today - timedelta(days=today.weekday())
+    per = {}
+    for d in days:
+        k = d - timedelta(days=d.weekday())
+        per[k] = per.get(k, 0) + 1
+    n = 0
+    if per.get(wk, 0) >= goal:
+        n = 1
+    w = wk - timedelta(days=7)
+    while per.get(w, 0) >= goal:
+        n += 1
+        w -= timedelta(days=7)
+    return n, per.get(wk, 0), sum(1 for k, v in per.items() if v >= goal and k < wk)
+
+
+def _ring(done, goal, size=86):
+    pct = min(1.0, done / max(goal, 1))
+    r, c = 34, 2 * 3.14159 * 34
+    return (f'<svg width="{size}" height="{size}" viewBox="0 0 86 86"><circle cx="43" cy="43" r="{r}" fill="none" '
+            f'stroke="rgba(255,255,255,.08)" stroke-width="10"/><circle cx="43" cy="43" r="{r}" fill="none" '
+            f'stroke="#B7F34A" stroke-width="10" stroke-linecap="round" stroke-dasharray="{c * pct:.1f} {c:.1f}" '
+            f'transform="rotate(-90 43 43)"/><text x="43" y="50" text-anchor="middle" font-size="20" font-weight="900" '
+            f'fill="#F4F7FB" font-family="Inter,sans-serif">{done}/{goal}</text></svg>')
+
+
+def _home(sc, m, gym_name):
+    flash = st.session_state.pop("tr_home_flash", None)
+    if flash:
+        st.success(flash)
+    _coach_card(sc, m)
+    rows = _sets(sc, m)
+    logged, gym = training_days(sc, m, rows)
+    days = logged | gym
+    goal = int(m.get("train_week_goal") or 3)
+    streak, this_week, _ = week_streak(days, goal)
+    left = max(0, goal - this_week)
+    msg = ("Goal reached this week 🎉" if not left else
+           f"{left} more workout{'s' if left != 1 else ''} to hit your goal this week")
+    with st.container(border=True, key="tr_goal"):
+        gw._md(f'<div class="tr-ring">{_ring(this_week, goal)}<div><div class="tr-big">'
+               f'{"🔥 " + str(streak) + "-week streak" if streak else "This week"}</div>'
+               f'<div class="tr-sub">{msg}. Gym check-ins count too.</div></div></div>')
+        with st.popover("Change my weekly goal", use_container_width=True):
+            g = st.select_slider("Workouts a week", options=list(range(1, 8)), value=goal, key="tr_goal_pick")
+            if st.button("Save goal", key="tr_goal_save", type="primary"):
+                try:
+                    sc.table("members").update({"train_week_goal": int(g)}).eq("id", m["id"]).execute()
+                    m["train_week_goal"] = int(g)
+                    st.session_state["tr_home_flash"] = f"Goal set: {g} workout{'s' if g != 1 else ''} a week."
+                except Exception:
+                    st.session_state["tr_home_flash"] = "Goals need a quick update from your gym."
+                st.rerun()
+    _routines(sc, m, rows)
+    _challenges(sc, m, gym)
+    st.markdown('<div class="section-label">ACHIEVEMENTS</div>', unsafe_allow_html=True)
+    _achievements(sc, m, rows, days, goal)
+
+
+# ------------------------------------------------------------------ member: routines
+def _my_routines(sc, m):
+    try:
+        return sc.table("workout_routines").select("*").eq("member_id", m["id"]).order("created_at", desc=True) \
+            .limit(20).execute().data or []
+    except Exception:
+        return None
+
+
+def _start(name, exercises):
+    exercises = [e for e in exercises if e]
+    if not exercises:
+        return
+    st.session_state["tr_routine"] = {"name": name, "exercises": exercises}
+    st.session_state["tr_ex"] = exercises[0]
+    st.session_state["tr_view"] = "Log"
+
+
+def _routines(sc, m, rows):
+    st.markdown('<div class="section-label">MY WORKOUTS</div>', unsafe_allow_html=True)
+    saved = _my_routines(sc, m)
+    days = sorted({str(r["performed_on"]) for r in rows}, reverse=True)
+    last_day = days[0] if days else None
+    last_ex = []
+    for r in sorted([r for r in rows if str(r["performed_on"]) == last_day], key=lambda r: r["created_at"]):
+        if r["exercise"] not in last_ex:
+            last_ex.append(r["exercise"])
+    if last_ex:
+        st.button(f"Repeat last workout ({pd.Timestamp(last_day):%a %d %b}): {', '.join(last_ex[:3])}"
+                  + ("…" if len(last_ex) > 3 else ""), key="tr_repeat", icon=":material/replay:", type="primary",
+                  use_container_width=True, on_click=_start, args=("Last workout", last_ex))
+    if saved is None:
+        return
+    for rt in saved:
+        a, b = st.columns([5, 1], vertical_alignment="center")
+        a.button(f"{rt['name']} · {len(rt['exercises'])} exercises", key=f"tr_rt_{rt['id']}",
+                 icon=":material/play_arrow:", use_container_width=True, on_click=_start,
+                 args=(rt["name"], rt["exercises"]))
+        if b.button("✕", key=f"tr_rtdel_{rt['id']}", help="Delete this workout"):
+            sc.table("workout_routines").delete().eq("id", rt["id"]).eq("member_id", m["id"]).execute()
+            st.rerun()
+    with st.expander("Create a workout", icon=":material/add:"):
+        with st.form("tr_rt_new", clear_on_submit=True):
+            name = st.text_input("Name", max_chars=60, placeholder="e.g. Push day, Leg day")
+            mine = list(dict.fromkeys(r["exercise"] for r in rows))
+            picks = st.multiselect("Exercises, in order", list(dict.fromkeys(mine + EXERCISES)), max_selections=12)
+            if st.form_submit_button("Save workout", type="primary"):
+                if not name.strip() or not picks:
+                    st.error("Give it a name and pick at least one exercise.")
+                else:
+                    sc.table("workout_routines").insert({"gym_id": m["gym_id"], "member_id": m["id"],
+                                                         "name": name.strip(), "exercises": picks}).execute()
+                    st.session_state["tr_home_flash"] = f"Saved: {name.strip()}. Tap it to start."
+                    st.rerun()
+
+
+def _routine_bar(sc, m):
+    rt = st.session_state.get("tr_routine")
+    if not rt:
+        return
+    today = gw.today_local().isoformat()
+    try:
+        done = {r["exercise"] for r in sc.table("workout_sets").select("exercise").eq("member_id", m["id"])
+                .eq("performed_on", today).execute().data or []}
+    except Exception:
+        done = set()
+    n = sum(1 for e in rt["exercises"] if e in done)
+    with st.container(border=True, key="tr_rt_bar"):
+        st.markdown(f"**{rt['name']}** · {n} of {len(rt['exercises'])} done")
+        st.progress(n / len(rt["exercises"]))
+        cols = st.columns(min(3, len(rt["exercises"])))
+        for i, e in enumerate(rt["exercises"]):
+            cols[i % len(cols)].button(("✓ " if e in done else "") + e, key=f"tr_rtx_{i}", on_click=_pick, args=(e,),
+                                       use_container_width=True, type="primary" if e == st.session_state.get("tr_ex") else "secondary")
+        if st.button("Finish workout" if n else "Close", key="tr_rt_end", type="tertiary"):
+            st.session_state.pop("tr_routine", None)
+            if n:
+                st.session_state["tr_home_flash"] = f"Workout done: {n} exercise{'s' if n != 1 else ''} 💪"
+                st.session_state["tr_view"] = "Today"
+            st.rerun()
+
+
+# ------------------------------------------------------------------ member: achievements
+def achievement_stats(rows, days, goal, body_n, today=None):
+    df = sorted(rows, key=lambda r: (str(r["performed_on"]), str(r.get("created_at"))))
+    best, prs = {}, 0
+    for r in df:
+        k = r["exercise"]
+        w, n = float(r["weight_kg"]), int(r["reps"])
+        if k in best and (w > best[k][0] or (w == best[k][0] and n > best[k][1])):
+            prs += 1
+        if k not in best or (w, n) > best[k]:
+            best[k] = (w, n)
+    streak, _, goal_weeks = week_streak(days, goal, today)
+    return {"days": len({str(r["performed_on"]) for r in rows}), "prs": prs,
+            "volume": sum(float(r["weight_kg"]) * int(r["reps"]) for r in rows),
+            "streak": streak, "goal_weeks": goal_weeks + (1 if week_streak(days, goal, today)[1] >= goal else 0),
+            "body": body_n}
+
+
+def _achievements(sc, m, rows, days, goal):
+    try:
+        body_n = len(sc.table("body_logs").select("id").eq("member_id", m["id"]).limit(5).execute().data or [])
+    except Exception:
+        body_n = 0
+    a = achievement_stats(_sets(sc, m, days=3000) if rows else [], days, goal, body_n)
+    got = [x for x in ACHIEVEMENTS if x[3](a)]
+    gw._md(f'<div class="tr-sub" style="margin-bottom:8px">{len(got)} of {len(ACHIEVEMENTS)} unlocked</div>'
+           '<div class="tr-ach">' + "".join(
+               f'<div class="{"" if x[3](a) else "off"}"><b>{x[1]}</b>{gw._esc(x[2])}</div>' for x in ACHIEVEMENTS)
+           + '</div>')
+
+
+# ------------------------------------------------------------------ member: challenges (visits)
+def _challenges(sc, m, gym_days):
+    today = gw.today_local()
+    try:
+        chs = sc.table("community_challenges").select("*").eq("gym_id", m["gym_id"]) \
+            .gte("ends_on", today.isoformat()).lte("starts_on", (today + timedelta(days=30)).isoformat()) \
+            .order("ends_on").limit(5).execute().data or []
+    except Exception:
+        return
+    if not chs:
+        return
+    try:
+        ents = sc.table("community_challenge_entries").select("*").in_("challenge_id", [c["id"] for c in chs]) \
+            .execute().data or []
+    except Exception:
+        ents = []
+    st.markdown('<div class="section-label">CHALLENGES</div>', unsafe_allow_html=True)
+    for ch in chs:
+        mine = next((e for e in ents if e["challenge_id"] == ch["id"] and e["member_id"] == m["id"]), None)
+        s, e = (pd.Timestamp(str(ch["starts_on"])).date(), pd.Timestamp(str(ch["ends_on"])).date())
+        n = len({d for d in gym_days if s <= d <= e})
+        goal = int(ch["goal_visits"])
+        joined = sum(1 for x in ents if x["challenge_id"] == ch["id"])
+        with st.container(border=True, key=f"tr_ch_{ch['id']}"):
+            st.markdown(f"**{ch.get('badge') or '🏆'} {ch['title']}**")
+            st.caption(f"{goal} gym visits · {s:%d %b} – {e:%d %b} · {joined} joined")
+            if mine:
+                st.progress(min(n, goal) / goal, text="Completed! 🎉" if n >= goal else f"{n} of {goal} visits")
+                if n >= goal and not mine.get("completed_at"):
+                    try:
+                        sc.table("community_challenge_entries").update(
+                            {"completed_at": datetime.now(timezone.utc).isoformat()}) \
+                            .eq("challenge_id", ch["id"]).eq("member_id", m["id"]).execute()
+                    except Exception:
+                        pass
+            elif s > today:
+                st.caption(f"Starts {s:%a %d %b}.")
+            elif st.button("Join", key=f"tr_join_{ch['id']}", type="primary", use_container_width=True):
+                try:
+                    sc.table("community_challenge_entries").insert({"challenge_id": ch["id"], "gym_id": m["gym_id"],
+                                                                    "member_id": m["id"]}).execute()
+                    st.session_state["tr_home_flash"] = "You're in. Every gym visit counts!"
+                except Exception:
+                    st.session_state["tr_home_flash"] = "You're already in this challenge."
+                st.rerun()
+
+
+# ------------------------------------------------------------------ member: body
+def _body(sc, m):
+    try:
+        rows = sc.table("body_logs").select("*").eq("member_id", m["id"]).order("logged_on").limit(500).execute().data
+    except Exception:
+        st.info("Body tracking is coming soon to this gym.")
+        return
+    rows = rows or []
+    flash = st.session_state.pop("tr_body_flash", None)
+    if flash:
+        st.success(flash)
+    last = rows[-1] if rows else {}
+    with st.form("tr_body", clear_on_submit=False):
+        st.markdown("**Log today**")
+        c1, c2, c3 = st.columns(3)
+        w = c1.number_input("Weight (kg)", 0.0, 400.0, float(last.get("weight_kg") or 0), 0.1, key="tr_bw")
+        waist = c2.number_input("Waist (cm)", 0.0, 250.0, float(last.get("waist_cm") or 0), 0.5, key="tr_bwaist")
+        fat = c3.number_input("Body fat %", 0.0, 70.0, float(last.get("body_fat") or 0), 0.1, key="tr_bfat")
+        if st.form_submit_button("Save", type="primary", use_container_width=True):
+            row = {"gym_id": m["gym_id"], "member_id": m["id"], "logged_on": gw.today_local().isoformat(),
+                   "weight_kg": w if w >= 20 else None, "waist_cm": waist if waist >= 30 else None,
+                   "body_fat": fat if fat >= 2 else None}
+            if not any(row[k] for k in ("weight_kg", "waist_cm", "body_fat")):
+                st.error("Enter at least one number.")
+            else:
+                try:
+                    sc.table("body_logs").upsert(row, on_conflict="member_id,logged_on").execute()
+                    st.session_state["tr_body_flash"] = "Saved. Weigh in at the same time of day for the fairest trend."
+                except Exception:
+                    st.session_state["tr_body_flash"] = "Couldn't save that. Please try again."
+                st.rerun()
+    if not rows:
+        st.caption("Log your weight once a week to see your trend here. Only you can see it.")
+        return
+    df = pd.DataFrame(rows)
+    df["day"] = pd.to_datetime(df["logged_on"])
+    for col, label, unit in (("weight_kg", "Weight", "kg"), ("waist_cm", "Waist", "cm"), ("body_fat", "Body fat", "%")):
+        d = df[pd.to_numeric(df[col], errors="coerce").notna()][["day", col]].copy()
+        if d.empty:
+            continue
+        d[col] = d[col].astype(float)
+        change = d[col].iloc[-1] - d[col].iloc[0]
+        st.markdown(f"**{label}: {d[col].iloc[-1]:g} {unit}**"
+                    + (f" · {'+' if change > 0 else ''}{change:.1f} {unit} since {d['day'].iloc[0]:%d %b}" if len(d) > 1 else ""))
+        if len(d) > 1:
+            try:
+                import altair as alt
+                st.altair_chart(alt.Chart(d).mark_line(color="#35D3E8", strokeWidth=3, point=True)
+                                .encode(x=alt.X("day:T", title=None, axis=alt.Axis(format="%d %b", labelColor="#93A0B4")),
+                                        y=alt.Y(f"{col}:Q", title=None, scale=alt.Scale(zero=False),
+                                                axis=alt.Axis(labelColor="#93A0B4")))
+                                .properties(height=170).configure(background="rgba(0,0,0,0)").configure_view(strokeWidth=0)
+                                .configure_axis(gridColor="rgba(255,255,255,0.07)"), use_container_width=True)
+            except Exception:
+                st.line_chart(d.set_index("day")[col])
+
+
+def _calendar(sc, m, rows):
+    logged, gym = training_days(sc, m, rows, days=60)
+    today = gw.today_local()
+    start = today - timedelta(days=today.weekday() + 7 * 7)
+    cells = []
+    for i in range(8 * 7):
+        d = start + timedelta(days=i)
+        cls = "on" if d in logged else ("gym" if d in gym else "")
+        if d == today:
+            cls += " today"
+        cells.append(f'<i class="{cls}" title="{d:%a %d %b}"></i>' if d <= today else '<i style="opacity:.2"></i>')
+    st.markdown('<div class="section-label">LAST 8 WEEKS</div>', unsafe_allow_html=True)
+    gw._md('<div class="tr-cal">' + "".join(cells) + '</div><div class="tr-sub" style="margin-top:6px">'
+           'Green: workout logged · Blue: gym check-in</div>')
+
+
+
 # ------------------------------------------------------------------ public machine guide page (QR on a machine)
 def guide_link(gid):
     return f"{gw.APP_URL}/?guide={gid}"
@@ -415,11 +742,16 @@ def render_guide(supabase, gid):
         st.caption("Log your sets in the Train tab of your member app.")
 
 
-# ------------------------------------------------------------------ owner: Community → Train
+# ------------------------------------------------------------------ owner: the Train page
 def render_owner(supabase, gym_id):
+    gw.page_header("Train", "What your members use at the gym: workouts, records, challenges and machine guides.",
+                   "Member app")
     if not ready(supabase):
         st.info(SQL_HINT)
         return
+    flash = st.session_state.pop("cmo_flash", None)
+    if flash:
+        st.success(flash)
     gym_name = gw._text((st.session_state.get("user_profile") or {}).get("business_name"), "Your gym")
     week = (gw.today_local() - timedelta(days=7)).isoformat()
     try:
@@ -430,11 +762,77 @@ def render_owner(supabase, gym_id):
     gw.kpi_row([("Members logging", str(len({s['member_id'] for s in sets})), "lime", "last 7 days"),
                 ("Sets logged", f"{len(sets):,}", "cyan", "last 7 days"),
                 ("Kg lifted", f"{sum(float(s['weight_kg']) * int(s['reps']) for s in sets):,.0f}", "amber", "last 7 days")])
-    t1, t2 = st.tabs(["Today's workout", "Machine guides"])
+    t1, t2, t3, t4 = st.tabs(["Today's workout", "Machine guides", "Challenges", "Insights"])
     with t1:
         _owner_wod(supabase, gym_id)
     with t2:
         _owner_guides(supabase, gym_id, gym_name)
+    with t3:
+        _owner_challenges(supabase, gym_id)
+    with t4:
+        _owner_insights(supabase, gym_id)
+
+
+def _owner_challenges(sc, gym_id):
+    st.caption("A visit challenge members join from the Train tab, e.g. 12 visits in a month. Every gym check-in "
+               "counts, and members see their progress.")
+    with st.form("tr_new_ch", clear_on_submit=True):
+        a, b = st.columns([3, 1])
+        title = a.text_input("Name", placeholder=f"e.g. 12 visits in {gw.today_local():%B}")
+        badge = b.selectbox("Badge", ["🏆", "🔥", "💪", "⭐", "🥇", "🏃", "🧘"])
+        c, d, e = st.columns(3)
+        goal = c.number_input("Visits to finish", 1, 100, 12)
+        start = d.date_input("Starts", value=gw.today_local())
+        end = e.date_input("Ends", value=gw.today_local() + timedelta(days=30))
+        if st.form_submit_button("Start challenge", type="primary"):
+            if not title.strip() or end < start:
+                st.error("Give it a name, and an end date after the start.")
+            else:
+                try:
+                    sc.table("community_challenges").insert({"gym_id": gym_id, "title": title.strip()[:80],
+                                                             "goal_visits": int(goal), "starts_on": start.isoformat(),
+                                                             "ends_on": end.isoformat(), "badge": badge}).execute()
+                    st.session_state["cmo_flash"] = "Challenge started: members see it in their Train tab."
+                except Exception:
+                    st.session_state["cmo_flash"] = ("Challenges need a one-time setup: run "
+                                                     "sql/phase24_community_engage.sql in Supabase.")
+                st.rerun()
+    try:
+        chs = sc.table("community_challenges").select("*").eq("gym_id", gym_id).order("ends_on", desc=True) \
+            .limit(10).execute().data or []
+        ents = sc.table("community_challenge_entries").select("*").in_("challenge_id", [c["id"] for c in chs]) \
+            .execute().data or [] if chs else []
+    except Exception:
+        chs, ents = [], []
+    gw.table([{"Challenge": f"{c.get('badge') or ''} {c['title']}", "Goal": f"{c['goal_visits']} visits",
+               "Dates": f"{pd.Timestamp(str(c['starts_on'])):%d %b} – {pd.Timestamp(str(c['ends_on'])):%d %b}",
+               "Joined": sum(1 for e in ents if e["challenge_id"] == c["id"]),
+               "Finished": sum(1 for e in ents if e["challenge_id"] == c["id"] and e.get("completed_at"))}
+              for c in chs], empty="No challenges yet.")
+
+
+def _owner_insights(sc, gym_id):
+    since = (gw.today_local() - timedelta(days=30)).isoformat()
+    try:
+        sets = gw.fetch_all(sc.table("workout_sets").select("member_id, exercise, weight_kg, reps, performed_on")
+                            .eq("gym_id", gym_id).gte("performed_on", since).order("id"))
+    except Exception:
+        sets = []
+    if not sets:
+        st.info("When members log workouts in their Train tab, you'll see what they train and who's most "
+                "consistent here.")
+        return
+    df = pd.DataFrame(sets)
+    members, _ = gw.fetch_members(sc, gym_id, archived=False, include_photo=False)
+    names = dict(zip(members["id"], members["full_name"])) if not members.empty else {}
+    top = df.groupby("exercise").agg(Sets=("exercise", "size"), Members=("member_id", "nunique")) \
+        .sort_values("Sets", ascending=False).head(10).reset_index().rename(columns={"exercise": "Exercise"})
+    st.markdown("**Most-trained exercises · last 30 days**")
+    gw.table(top.to_dict("records"))
+    days = df.groupby("member_id")["performed_on"].nunique().sort_values(ascending=False).head(10)
+    st.markdown("**Most consistent members · last 30 days**")
+    st.caption("Only you see this. Great people to thank, or to ask for a review.")
+    gw.table([{"Member": names.get(mid, "Member"), "Workouts logged": int(n)} for mid, n in days.items()])
 
 
 def _owner_wod(supabase, gym_id):
@@ -516,11 +914,10 @@ def _owner_guides(supabase, gym_id, gym_name):
 
 
 def _upload_video(supabase, gym_id, f):
-    import gympulse_community as gcom
     ext = (f.name.rsplit(".", 1)[-1] or "mp4").lower()
     path = f"{gym_id}/guide_{uuid.uuid4().hex}.{ext}"
     try:
-        store = supabase.storage.from_(gcom.BUCKET)
+        store = supabase.storage.from_(BUCKET)
         store.upload(path, f.getvalue(), {"content-type": f.type or "video/mp4"})
         url = store.get_public_url(path)
         if isinstance(url, dict):
