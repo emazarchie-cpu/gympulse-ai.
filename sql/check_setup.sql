@@ -46,6 +46,9 @@ select step, ok from (values
   ('phase28_hmo        HMO check-in, invite links',  exists (select 1 from col where c = 'members.hmo_provider')
                                                     and exists (select 1 from fn where proname = 'gp_hmo_checkin')
                                                     and exists (select 1 from fn where proname = 'gp_referral_link')),
+  ('phase29_train      workout log, coach posts, guides', to_regclass('public.workout_sets') is not null
+                                                    and to_regclass('public.machine_guides') is not null
+                                                    and exists (select 1 from fn where proname = 'gp_gym_busy')),
   ('security           RLS on every gym table',       not exists (
         select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace
         where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity

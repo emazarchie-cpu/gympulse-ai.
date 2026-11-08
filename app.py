@@ -1077,6 +1077,13 @@ if st.query_params.get("join"):
     gsign.render_public(supabase, st.query_params.get("join"))
     st.stop()
 
+# Public machine guide page (QR code on a machine, no sign-in)
+if st.query_params.get("guide"):
+    import gympulse_train as gtr
+    gd.apply()
+    gtr.render_guide(supabase, st.query_params.get("guide"))
+    st.stop()
+
 # Public HMO check-in page (the gym's HMO QR code, or a member's one-tap link, no sign-in)
 if st.query_params.get("hmo"):
     import gympulse_hmo as ghmo

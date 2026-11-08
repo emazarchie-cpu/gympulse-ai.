@@ -158,3 +158,21 @@ Run `sql/phase27_training_now_privacy.sql` once (safe to run again).
   other members see after a check-in.
 - **Owner:** Community → Settings → "Show members who's training now". Turn it off to hide the strip for
   everyone (good for gyms whose members prefer privacy). No SQL needed for this switch.
+
+## Train tab (phase 29)
+
+Run `sql/phase29_train.sql` once (safe to run again). The member app gets a **Train** tab, for use at the gym
+even when nobody else is posting:
+
+- **Today's workout** from the coach at the top (Community → Train → Today's workout, one per day). Exercises
+  in it become buttons that open them in the logger.
+- **Log**: pick an exercise, see "last time" and "best", log sets in two taps. Beating your best weight (or
+  more reps at it) is a **PR** with a "Share my PR with the gym" button (only if the feed is on and they joined).
+- **Progress**: workouts this week, personal records with estimated 1-rep max, and a chart per exercise.
+- **Gym now**: Quiet / Normal / Busy from check-ins in the last 90 minutes compared with the usual for this hour
+  (8-week average for today's weekday), the quietest time later today, and a bar chart.
+- **Tools**: rest timer (1, 1½, 2, 3 min, beeps and vibrates) and a plate calculator.
+
+**Machine guides** (Community → Train → Machine guides): add a machine with a video (upload up to 45 MB, or a
+YouTube/Instagram link) and tips, download its QR code and stick it on the machine. Scanning opens a public
+guide page (`?guide=<id>`): no login.

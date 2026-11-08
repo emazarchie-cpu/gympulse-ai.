@@ -1335,8 +1335,11 @@ def render_owner(supabase, gym_id):
     gym_name = gw._text((st.session_state.get("user_profile") or {}).get("business_name"), "Your gym")
     _owner_stats(supabase, gym_id)
     _eng_ready = ge.ready(supabase)
-    names = ["Feed", "Stories", "Challenges", "Polls & Q&A", "Recognition", "Insights", "Settings"]
+    names = ["Feed", "Stories", "Challenges", "Polls & Q&A", "Recognition", "Insights", "Settings", "Train"]
     tabs = st.tabs(names, key="cmo_tabs")
+    with tabs[7]:
+        import gympulse_train as gtr
+        gtr.render_owner(supabase, gym_id)
     with tabs[0]:
         with st.form("cmo_new", clear_on_submit=True):
             body = st.text_area(f"Post as {gym_name}", max_chars=MAX_BODY,
