@@ -194,3 +194,16 @@ Run `sql/phase30_train_more.sql` once (safe to run again). The member Train tab 
 
 Owner **Train** page: today's workout, machine guides with QR codes, **challenges** (no posts) and
 **insights** (most-trained exercises and most consistent members, last 30 days).
+
+## Accurate Gym now (phase 31)
+
+Run `sql/phase31_gym_traffic.sql` once (safe to run again). Gym now counts **people inside**, not arrivals:
+each check-in counts as present for the average visit length (75 minutes unless you change it). For every
+weekday and half hour it averages only the days that had check-ins (last 8 weeks, today excluded; repeat
+scans count once).
+
+Members see: Quiet / Moderate / Busy (people inside now compared with today's usual peak), "about N people in
+the gym", the usual for this time and whether it's quieter or busier than usual, the quietest half hour later
+today, and a half-hour chart for any day of the week with its busiest and quietest times and how many days
+of data it's based on. Owners: Train → Gym now shows the same view plus settings (average visit length and,
+optionally, opening hours). Accuracy depends on every member checking in.
