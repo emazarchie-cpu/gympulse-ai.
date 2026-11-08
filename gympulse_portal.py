@@ -439,8 +439,10 @@ def render_portal(supabase, token):
         with tabs[2]:
             _classes(sc, m)
         with tabs[3]:
-            _messages(sc, m, gym_name)
+            _classes(sc, m)
         with tabs[4]:
+            _messages(sc, m, gym_name)
+        with tabs[5]:
             _details(sc, m, gym_name)
 
 
