@@ -27,6 +27,11 @@ CSS = (
     '<meta name="theme-color" content="#0B1020">'
 )
 BRAND = "GymPulse AI"
+# Site ownership tags read by crawlers in the page <head> (raw HTML, before any script runs).
+# Meta domain verification for usegympulseai.com (Business settings -> Brand safety -> Domains).
+# Can be overridden without a code change with the env var FB_DOMAIN_VERIFICATION.
+FB_DOMAIN_VERIFICATION = os.environ.get("FB_DOMAIN_VERIFICATION", "").strip() or "ihoguxqqe8vfas2adyy06brasy5ffq"
+HEAD_MARK = "gp-site-verification"
 TEXT = [  # (framework wording, GymPulse wording) in the page and its script files
     ("Streamlit server is not responding. Are you connected to the internet?",
      "GymPulse AI isn't responding. Check your internet connection, then refresh the page."),
@@ -55,6 +60,11 @@ def apply(quiet=False):
         if MARK not in new:
             new = new.replace("</head>", CSS + "</head>", 1)
         new = new.replace("<title>Streamlit</title>", f"<title>{BRAND}</title>")
+        import re as _re
+        new = _re.sub(r'<meta name="facebook-domain-verification"[^>]*>\s*', "", new)   # replace an old code
+        if FB_DOMAIN_VERIFICATION and not FB_DOMAIN_VERIFICATION.startswith("__"):
+            new = new.replace("<head>", '<head>\n    <meta name="facebook-domain-verification" '
+                                        f'content="{FB_DOMAIN_VERIFICATION}" />', 1)
         for old, rep in TEXT:
             new = new.replace(old, rep)
         if new != html:
