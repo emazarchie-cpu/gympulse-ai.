@@ -4,7 +4,7 @@
 
 This agreement forms part of the GymPulse AI Terms of Service between:
 - **the gym** (the data controller), and
-- **GymPulse AI**, [registered company name, RC number, address] (the data processor).
+- **GymPulse AI**, GYMPULSE AI LTD (RC 9996401), 37, TTC Road, Ikot Ansa, Calabar, Cross River State, Nigeria (the data processor).
 
 It covers the personal data of the gym's members, staff and prospects that the gym puts into GymPulse AI ("member data"). It is written to meet the Nigeria Data Protection Act 2023 (the "NDPA"), in particular section 29 (processors).
 

@@ -181,9 +181,10 @@ def receipt_pdf(inv, paid=True):
 
     # from / bill to
     y -= 6 * mm
-    text(L, y, "GymPulse AI", 10, True)
+    text(L, y, "GYMPULSE AI LTD", 10, True)
     text(L + 88 * mm, y, "Bill to", 10, True)
-    seller = ["Lagos", "Nigeria", "usegympulseai.com", "emmanuel@usegympulseai.com"]
+    seller = ["RC 9996401 · TIN 2620985193625", "37, TTC Road, Ikot Ansa", "Calabar, Cross River State, Nigeria",
+              "usegympulseai.com", "emmanuel@usegympulseai.com"]
     buyer = [inv.get("business_name"), inv.get("billing_name"), inv.get("address"),
              " ".join(x for x in (inv.get("city"), inv.get("state")) if x) or None, "Nigeria",
              inv.get("billing_email"), inv.get("billing_phone")]
@@ -269,7 +270,8 @@ def receipt_pdf(inv, paid=True):
     c.setStrokeColor(soft)
     c.setLineWidth(0.6)
     c.line(L, 22 * mm, R, 22 * mm)
-    text(L, 16 * mm, "GymPulse AI · usegympulseai.com · Questions: emmanuel@usegympulseai.com", 8.5, color=muted)
+    text(L, 16 * mm, "GYMPULSE AI LTD · RC 9996401 · usegympulseai.com · Questions: emmanuel@usegympulseai.com",
+         8.5, color=muted)
     text(R, 16 * mm, "Page 1 of 1", 8.5, color=muted, right=True)
     c.showPage()
     c.save()

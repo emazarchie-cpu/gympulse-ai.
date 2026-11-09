@@ -2,7 +2,7 @@
 
 # Terms of Service
 
-These terms are an agreement between GymPulse AI, [registered company name, RC number, address] ("we"), and the business that creates an account ("you", "the gym"). By creating an account or using GymPulse AI, you agree to these terms, the Privacy Policy and the Data Processing Agreement.
+These terms are an agreement between GymPulse AI, GYMPULSE AI LTD (RC 9996401), 37, TTC Road, Ikot Ansa, Calabar, Cross River State, Nigeria ("we"), and the business that creates an account ("you", "the gym"). By creating an account or using GymPulse AI, you agree to these terms, the Privacy Policy and the Data Processing Agreement.
 
 ## 1. The service
 GymPulse AI helps gyms keep members. It records members and check-ins, estimates which members may stop attending, suggests and drafts messages, sends emails on the gym's behalf, runs loyalty points and reports, and offers related tools.
