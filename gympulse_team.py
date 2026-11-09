@@ -20,7 +20,7 @@ import gympulse_workspaces as gw
 
 SQL_HINT = ("Staff logins need a one-time setup: open Supabase, go to SQL Editor, paste in the file "
             "sql/phase13_staff.sql and press Run.")
-OWNER_ONLY = {"Owner", "Business Insights", "Archie", "Subscription", "Model Insights", "About the Model", "Admin"}
+OWNER_ONLY = {"Owner", "Prediction check", "Business Insights", "Archie", "Subscription", "Model Insights", "About the Model", "Admin"}
 OWNER_ONLY_GROW = {"Monthly report", "Team"}
 STAFF_CAN = ["Dashboard: today's priorities and follow-ups (no revenue figures)",
              "Members, member profiles and check-in", "Payments & Renewals: record payments and renewals",
