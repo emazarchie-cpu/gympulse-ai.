@@ -19,12 +19,16 @@ CONSENT_TEXT = ("I have my members' permission to store their details in GymPuls
                 "and I'll tell my members that my gym uses GymPulse AI.")
 
 
+COMPANY = "GYMPULSE AI LTD · RC 9996401 · 37, TTC Road, Ikot Ansa, Calabar, Cross River State, Nigeria"
+
+
 def read(kind):
     try:
         with open(os.path.join(HERE, "docs", "legal", DOCS[kind]), encoding="utf-8") as f:
             text = f.read()
         lines = text.split("\n")
-        return "\n".join(l for l in lines if not l.startswith("# "))     # the dialog has its own title
+        body = "\n".join(l for l in lines if not l.startswith("# "))     # the dialog has its own title
+        return body + f"\n\n---\n*{COMPANY}*"
     except Exception:
         return f"The {TITLES[kind]} is being updated. Email hello@usegympulseai.com for a copy."
 

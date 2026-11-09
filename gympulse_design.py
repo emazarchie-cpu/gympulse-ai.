@@ -657,7 +657,7 @@ def landing_sections(icon, bot_svg):
         <a class="lx-btn" href="?demo=book" target="_self">Book a 15-minute demo</a>
       </div>
     </div>
-    <div class="lx-foot"><span>© GymPulse AI</span><span>Smarter insights. Stronger member retention.</span></div>
+    <div class="lx-foot"><span>© 2026 GYMPULSE AI LTD · RC 9996401 · Registered in Nigeria</span><span>37, TTC Road, Ikot Ansa, Calabar, Cross River State · hello@usegympulseai.com</span></div>
     """
 
 
