@@ -29,7 +29,7 @@ DESCRIPTION = ("GymPulse AI shows Nigerian gym owners which members are about to
                "Check-ins, payments and a member app included. 30-day free trial.")
 COMPANY = {"legal": "GYMPULSE AI LTD", "rc": "RC 9996401", "street": "37, TTC Road, Ikot Ansa",
            "city": "Calabar", "state": "Cross River State", "postcode": "540211",
-           "email": "hello@usegympulseai.com"}
+           "email": "hello@usegympulseai.com", "founder_email": "emmanuel@usegympulseai.com"}
 START = "<!--gp-seo-start-->"
 END = "<!--gp-seo-end-->"
 ROOT_START = "<!--gp-pre-start-->"
@@ -149,6 +149,11 @@ def _ld_json():
         "@context": "https://schema.org", "@type": "Organization", "name": NAME,
         "legalName": COMPANY["legal"], "url": SITE + "/", "logo": SITE + "/apple-touch-icon.png",
         "email": COMPANY["email"], "identifier": COMPANY["rc"],
+        "founder": {"@type": "Person", "name": "Emmanuel Archibong", "email": COMPANY["founder_email"]},
+        "contactPoint": [{"@type": "ContactPoint", "contactType": "customer support", "email": COMPANY["email"],
+                          "areaServed": "NG", "availableLanguage": "English"},
+                         {"@type": "ContactPoint", "contactType": "sales", "email": COMPANY["founder_email"],
+                          "areaServed": "NG", "availableLanguage": "English"}],
         "address": {"@type": "PostalAddress", "streetAddress": COMPANY["street"],
                     "addressLocality": COMPANY["city"], "addressRegion": COMPANY["state"],
                     "postalCode": COMPANY["postcode"], "addressCountry": "NG"},
@@ -218,7 +223,8 @@ def _foot():
     c = COMPANY
     return (f'<div class="foot">{_links()}<p>© {date.today().year} {c["legal"]} · {c["rc"]} · Registered in '
             f'Nigeria · {c["street"]}, {c["city"]}, {c["state"]} · '
-            f'<a href="mailto:{c["email"]}">{c["email"]}</a></p></div>')
+            f'<a href="mailto:{c["email"]}">{c["email"]}</a> · Founder: '
+            f'<a href="mailto:{c["founder_email"]}">{c["founder_email"]}</a></p></div>')
 
 
 def _sections(sections):
