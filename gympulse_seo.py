@@ -246,7 +246,7 @@ def page_html(p):
 <meta property="og:type" content="article"><meta property="og:title" content="{e(p['title'])}">
 <meta property="og:description" content="{e(p['description'])}"><meta property="og:url" content="{url}">
 <meta property="og:image" content="{SITE}/apple-touch-icon.png"><meta name="theme-color" content="#0B1020">
-<link rel="icon" href="/favicon.png"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="icon" href="/favicon.ico" sizes="48x48"><link rel="icon" type="image/png" sizes="192x192" href="/gympulse-icon-v4-192.png"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <style>{CSS}</style></head><body><div class="w">{_nav()}
 <h1>{e(p['h1'])}</h1><p class="lead">{e(p['lead'])}</p>{_sections(p['sections'])}{_cta()}{_foot()}
 </div></body></html>"""
