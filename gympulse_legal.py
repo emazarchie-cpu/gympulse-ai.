@@ -19,7 +19,7 @@ CONSENT_TEXT = ("I have my members' permission to store their details in GymPuls
                 "and I'll tell my members that my gym uses GymPulse AI.")
 
 
-COMPANY = "GYMPULSE AI LTD · RC 9996401 · 37, TTC Road, Ikot Ansa, Calabar, Cross River State, Nigeria"
+COMPANY = "GYMPULSE AI LTD · RC 9996401 · Calabar, Cross River State, Nigeria"
 
 
 def read(kind):

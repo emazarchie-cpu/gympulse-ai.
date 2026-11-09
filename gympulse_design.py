@@ -640,9 +640,8 @@ def landing_sections(icon, bot_svg):
         anyone noticing. You deal with a real person, not a call centre.</div>
       <div class="lx-principles">
         <div class="lx-card"><div class="lx-ic">{icon('chat')}</div><h4>Help when you need it</h4>
-          <p>Email <a href="mailto:hello@usegympulseai.com"><b>hello@usegympulseai.com</b></a> for help, or reach the founder directly at
-          <a href="mailto:emmanuel@usegympulseai.com"><b>emmanuel@usegympulseai.com</b></a>. Or book a 15-minute demo and we set it up with your real
-          members, at your gym or online.</p></div>
+          <p>Email <a href="mailto:hello@usegympulseai.com"><b>hello@usegympulseai.com</b></a> or
+          <a href="mailto:emmanuel@usegympulseai.com"><b>emmanuel@usegympulseai.com</b></a> for help.</p></div>
         <div class="lx-card"><div class="lx-ic">{icon('shield')}</div><h4>Your members' data stays yours</h4>
           <p>Each gym sees only its own members. We use the data only to run your account, and members can
           stop messages at any time. See our Privacy Policy and Data Processing Agreement.</p></div>
@@ -661,7 +660,7 @@ def landing_sections(icon, bot_svg):
       </div>
     </div>
     <div class="lx-foot"><span><a href="/gym-management-software-nigeria.html" target="_self">Gym software Nigeria</a> · <a href="/gym-member-retention.html" target="_self">Member retention</a> · <a href="/gym-whatsapp-renewal-reminders.html" target="_self">WhatsApp reminders</a> · <a href="/switch-from-gymmaster-or-excel.html" target="_self">Moving from GymMaster or Excel</a></span></div>
-    <div class="lx-foot"><span>© 2026 GYMPULSE AI LTD · RC 9996401 · Registered in Nigeria</span><span>37, TTC Road, Ikot Ansa, Calabar, Cross River State · <a href="mailto:hello@usegympulseai.com">hello@usegympulseai.com</a> · <a href="mailto:emmanuel@usegympulseai.com">emmanuel@usegympulseai.com</a></span></div>
+    <div class="lx-foot"><span>© 2026 GYMPULSE AI LTD · RC 9996401 · Registered in Nigeria</span><span>Calabar, Cross River State · <a href="mailto:hello@usegympulseai.com">hello@usegympulseai.com</a> · <a href="mailto:emmanuel@usegympulseai.com">emmanuel@usegympulseai.com</a></span></div>
     """
 
 

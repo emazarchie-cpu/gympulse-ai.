@@ -183,7 +183,7 @@ def receipt_pdf(inv, paid=True):
     y -= 6 * mm
     text(L, y, "GYMPULSE AI LTD", 10, True)
     text(L + 88 * mm, y, "Bill to", 10, True)
-    seller = ["RC 9996401 · TIN 2620985193625", "37, TTC Road, Ikot Ansa", "Calabar, Cross River State, Nigeria",
+    seller = ["RC 9996401 · TIN 2620985193625", "Calabar, Cross River State, Nigeria",
               "usegympulseai.com", "emmanuel@usegympulseai.com"]
     buyer = [inv.get("business_name"), inv.get("billing_name"), inv.get("address"),
              " ".join(x for x in (inv.get("city"), inv.get("state")) if x) or None, "Nigeria",

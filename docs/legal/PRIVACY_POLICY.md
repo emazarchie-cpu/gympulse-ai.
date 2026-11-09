@@ -4,7 +4,7 @@
 
 This policy explains how GymPulse AI ("we", "us") handles personal data. It is written to meet the Nigeria Data Protection Act 2023 (the "NDPA") and the rules of the Nigeria Data Protection Commission (NDPC).
 
-**Who we are.** GymPulse AI, GYMPULSE AI LTD (RC 9996401), 37, TTC Road, Ikot Ansa, Calabar, Cross River State, Nigeria. Contact for privacy matters: hello@usegympulseai.com. Our Data Protection Officer is Emmanuel Archibong (director), emmanuel@usegympulseai.com.
+**Who we are.** GymPulse AI, GYMPULSE AI LTD (RC 9996401), Calabar, Cross River State, Nigeria. Contact for privacy matters: hello@usegympulseai.com. Our Data Protection Officer is Emmanuel Archibong (director), emmanuel@usegympulseai.com.
 
 ## 1. Two kinds of data, two roles
 
