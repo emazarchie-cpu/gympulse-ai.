@@ -1927,6 +1927,7 @@ MAIN_PAGES = [
 
 MORE_PAGES = [
     "Follow-ups",
+    "Prediction check",
     "Subscription",
     "FAQs",
 ]
@@ -2681,6 +2682,11 @@ if page == "Dashboard":
         gg.render_month_banner(supabase, st.session_state.get("gym_id"), assess_members, owner_id)
     except Exception:
         pass
+    try:                                   # this month's prediction check starts by itself
+        import gympulse_predcheck as gpc
+        gpc.ensure_monthly(supabase, st.session_state.get("gym_id"), assess_members)
+    except Exception:
+        pass
     st.markdown('<div style="height:6px"></div>', unsafe_allow_html=True)
     gc.render_command_centre(
         supabase,
@@ -2696,6 +2702,9 @@ if page == "Dashboard":
 # =========================================================
 elif page == "Risk Radar":
     gw.render_risk_radar(supabase, st.session_state.gym_id, assess_members)
+elif page == "Prediction check":
+    import gympulse_predcheck as gpc
+    gpc.render(supabase, st.session_state.gym_id, assess_members)
 elif page == "Action Centre":
     gw.render_action_centre(supabase, st.session_state.gym_id, assess_members)
 elif page == "Owner":

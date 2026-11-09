@@ -2943,6 +2943,10 @@ def render_risk_radar(supabase, gym_id, assess_fn):
         st.rerun()
     st.caption("Estimates come from a model trained on synthetic data. Use them "
                "to prioritise conversations, not to make decisions about members.")
+    import gympulse_team as _gteam
+    if not _gteam.is_staff():
+        st.button("How accurate is this for my gym? Open Prediction check", key="radar_predcheck",
+                  on_click=_go, args=("Prediction check",), icon=":material/fact_check:")
 
 # ------------------------------------------------- trainers & plays
 TRAINER_PLAYS = {"Free PT session", "Trainer intro", "Goal review"}
