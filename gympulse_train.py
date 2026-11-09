@@ -412,14 +412,61 @@ def _busy(sc, m, profile=None):
     render_traffic(data, inside_now(sc, m["gym_id"], cfg["visit"]), cfg, key="tr_tf")
 
 
+# Typical busyness of a Lagos gym (0–1 per half hour), used until a gym has enough of its own check-ins:
+# weekdays peak before work and after work, quiet late morning to mid afternoon; Saturdays peak mid morning;
+# Sundays are lighter. Keys are "H:MM".
+_TYPICAL = {
+    "wk": {"5:00": .25, "5:30": .5, "6:00": .8, "6:30": .95, "7:00": .9, "7:30": .7, "8:00": .5, "8:30": .35,
+           "9:00": .25, "9:30": .2, "10:00": .17, "10:30": .15, "11:00": .15, "11:30": .18, "12:00": .25,
+           "12:30": .3, "13:00": .28, "13:30": .2, "14:00": .13, "14:30": .12, "15:00": .12, "15:30": .15,
+           "16:00": .25, "16:30": .45, "17:00": .7, "17:30": .9, "18:00": 1, "18:30": 1, "19:00": .9,
+           "19:30": .75, "20:00": .55, "20:30": .4, "21:00": .25, "21:30": .15, "22:00": .08, "22:30": .05},
+    "sat": {"6:00": .2, "6:30": .35, "7:00": .55, "7:30": .7, "8:00": .85, "8:30": .95, "9:00": 1, "9:30": 1,
+            "10:00": .9, "10:30": .8, "11:00": .65, "11:30": .55, "12:00": .45, "12:30": .38, "13:00": .3,
+            "13:30": .25, "14:00": .22, "14:30": .22, "15:00": .25, "15:30": .3, "16:00": .35, "16:30": .4,
+            "17:00": .42, "17:30": .4, "18:00": .35, "18:30": .28, "19:00": .2, "19:30": .12, "20:00": .08},
+    "sun": {"7:00": .25, "7:30": .35, "8:00": .45, "8:30": .55, "9:00": .6, "9:30": .6, "10:00": .55,
+            "10:30": .45, "11:00": .35, "11:30": .3, "12:00": .25, "12:30": .2, "13:00": .15, "13:30": .15,
+            "14:00": .15, "14:30": .18, "15:00": .22, "15:30": .3, "16:00": .38, "16:30": .45, "17:00": .52,
+            "17:30": .55, "18:00": .55, "18:30": .5, "19:00": .42, "19:30": .32, "20:00": .2, "20:30": .1},
+}
+TYPICAL = {g: {int(k.split(":")[0]) * 2 + int(k.split(":")[1]) // 30: v for k, v in d.items()}
+           for g, d in _TYPICAL.items()}
+
+
+def busyness(day, dow, cfg):
+    """(slots, {slot: 0–1 busyness}, weight of own data 0–1, peak people in own data).
+    Own check-ins take over from the typical pattern as days and visitors build up."""
+    typical = TYPICAL[_group(dow)]
+    own = day.get("slots") or {}
+    peak = max(own.values(), default=0)
+    days = int(day.get("days") or 0)
+    w = (days / (days + 3)) * min(1.0, peak / 5) if peak else 0.0
+    h = hours_for(cfg, dow)
+    if h is None:
+        return [], {}, w, peak
+    if h:
+        slots = [x for x in range(48) if x * 30 < h[1] and x * 30 + 30 > h[0]]
+    else:
+        extra = {x for x, v in own.items() if peak and v / peak >= 0.15 and days >= 3}   # e.g. a 24-hour gym
+        slots = sorted(set(typical) | extra)
+    out = {}
+    for x in slots:
+        mine = own.get(x, 0) / peak if peak else 0
+        out[x] = w * mine + (1 - w) * typical.get(x, 0.05)
+    return slots, out, w, peak
+
+
+def _lvl(b):
+    return ("Quiet", "#B7F34A") if b < 0.35 else ("Moderate", "#FFC44D") if b < 0.7 else ("Busy", "#FF6B6B")
+
+
 def render_traffic(data, now_n, cfg, key):
     nowt = datetime.now(gw.APP_TZ)
     dow = (nowt.weekday() + 1) % 7
     slot = nowt.hour * 2 + nowt.minute // 30
     today = data.get(dow) or {"days": 0, "slots": {}}
-    opens = open_slots(today, cfg, dow)
-    peak = max([today["slots"].get(x, 0) for x in opens] or [0])
-    usual = today["slots"].get(slot, 0.0)
+    slots, busy, w, peak = busyness(today, dow, cfg)
     h = hours_for(cfg, dow)
     mins = nowt.hour * 60 + nowt.minute
     if h is None:
@@ -427,66 +474,82 @@ def render_traffic(data, now_n, cfg, key):
     elif h:
         closed = not (h[0] <= mins < h[1])
     else:
-        closed = bool(opens) and (slot < opens[0] or slot > opens[-1]) and not now_n
-    lvl, tone = ("Closed", "#93A0B4") if closed else level(now_n or 0, peak)
-    who = "Nobody checked in" if not now_n else f"About {now_n} {'person' if now_n == 1 else 'people'}"
+        closed = not slots or slot < slots[0] or slot > slots[-1]
+    usual_b = busy.get(slot, 0)
+    reliable = w >= 0.5 and peak >= 3
+    if closed:
+        lvl, tone = "Closed", "#93A0B4"
+    elif reliable:                                   # enough data: judge by the people inside right now
+        lvl, tone = _lvl((now_n or 0) / peak)
+    else:                                            # not enough data yet: the usual for this time
+        lvl, tone = _lvl(usual_b)
     hrs = ("Closed today" if h is None else f"Open {clock(h[0])}–{clock(h[1])} today" if h else "")
+    n = now_n or 0
+    live = (f"{n} {'person' if n == 1 else 'people'} checked in during the last {cfg['visit']} minutes"
+            if n else f"No check-ins in the last {cfg['visit']} minutes")
+    sub = ""
+    if not closed:
+        sub = (f"Usually about {today['slots'].get(slot, 0):.0f} people at this time on {DAYS[dow]}s"
+               if reliable else f"Usually {_lvl(usual_b)[0].lower()} at this time on {DAYS[dow]}s")
     gw._md(f'<div class="mp-card"><div style="font-size:13px;color:#93A0B4">Right now · {nowt:%I:%M %p}'
            f'{" · " + hrs if hrs else ""}</div>'
            f'<div style="font-size:30px;font-weight:900;color:{tone}">{lvl}</div>'
-           f'<div style="font-size:17px;font-weight:700">{who} in the gym</div>'
-           + (f'<div class="tr-sub">Usually about {usual:.0f} at this time on {DAYS[dow]}s'
-              + ("" if closed else " · quieter than usual" if (now_n or 0) < usual * 0.8 else
-                 " · busier than usual" if (now_n or 0) > usual * 1.2 + 1 else " · about the usual")
-              + '</div>' if today["days"] and usual >= 0.5 else "")
-           + '</div>')
-    ahead = [x for x in opens if x > slot]
-    if today["days"] and ahead:
-        q = min(ahead, key=lambda x: (today["slots"].get(x, 0), x))
-        st.markdown(f"**Quietest later today:** {slot_range(q, cfg, dow)} · usually about "
-                    f"{today['slots'].get(q, 0):.0f} {'person' if round(today['slots'].get(q, 0)) == 1 else 'people'}")
-    # pick a day to plan ahead
+           f'<div style="font-size:16px;font-weight:700">{live}</div>'
+           + (f'<div class="tr-sub">{sub}</div>' if sub else "") + '</div>')
+    ahead = [x for x in slots if x > slot]
+    if ahead and not (h is None):
+        q = min(ahead, key=lambda x: (busy[x], x))
+        st.markdown(f"**Quietest later today:** {slot_range(q, cfg, dow)} · usually {_lvl(busy[q])[0].lower()}")
     order = [(dow + i) % 7 for i in range(7)]
     pick = st.segmented_control("Day", order, default=dow, key=f"{key}_day", label_visibility="collapsed",
                                 format_func=lambda d: "Today" if d == dow else DAYS[d][:3]) or dow
     day = data.get(pick) or {"days": 0, "slots": {}}
-    slots = open_slots(day, cfg, pick)
     ph = hours_for(cfg, pick)
     if ph is None:
         st.info(f"Closed on {DAYS[pick]}s.")
         return
+    pslots, pbusy, pw, ppeak = busyness(day, pick, cfg)
     if ph:
         st.caption(f"Open {clock(ph[0])}–{clock(ph[1])} on {DAYS[pick]}s.")
-    if not day["days"] or not slots:
-        st.info(f"Not enough check-ins on {DAYS[pick]}s yet. This gets more accurate every week members check in.")
+    if not pslots:
+        st.info(f"No opening hours on {DAYS[pick]}s.")
         return
-    df = pd.DataFrame([{"slot": x, "people": round(day["slots"].get(x, 0), 1), "time": _slot_label(x),
-                        "range": slot_range(x, cfg, pick),
-                        "kind": "Now" if (pick == dow and x == slot) else "Usual"} for x in slots])
+    preliable = pw >= 0.5 and ppeak >= 3
+    df = pd.DataFrame([{"slot": x, "busy": round(pbusy[x] * 100), "time": _slot_label(x),
+                        "range": slot_range(x, cfg, pick), "level": _lvl(pbusy[x])[0],
+                        "people": round(day["slots"].get(x, 0)) if preliable else None,
+                        "kind": "Now" if (pick == dow and x == slot) else _lvl(pbusy[x])[0]} for x in pslots])
     try:
         import altair as alt
+        tips = [alt.Tooltip("range:N", title="Time"), alt.Tooltip("level:N", title="Usually")]
+        if preliable:
+            tips.append(alt.Tooltip("people:Q", title="People inside"))
         chart = alt.Chart(df).mark_bar(cornerRadiusTopLeft=3, cornerRadiusTopRight=3).encode(
             x=alt.X("time:N", sort=list(df["time"]), title=None,
                     axis=alt.Axis(labelColor="#93A0B4", labelAngle=0, labelOverlap=True)),
-            y=alt.Y("people:Q", title="People inside", axis=alt.Axis(labelColor="#93A0B4", titleColor="#93A0B4",
-                                                                      tickMinStep=1, format="d")),
-            color=alt.Color("kind:N", scale=alt.Scale(domain=["Now", "Usual"], range=["#B7F34A", "#35506B"]),
-                            legend=None),
-            tooltip=[alt.Tooltip("range:N", title="Time"), alt.Tooltip("people:Q", title="Usually inside")])
-        st.markdown(f"**Usually on {DAYS[pick]}s** · people in the gym each half hour")
-        st.altair_chart(chart.properties(height=200).configure(background="rgba(0,0,0,0)")
-                        .configure_view(strokeWidth=0).configure_axis(gridColor="rgba(255,255,255,0.07)"),
-                        use_container_width=True)
+            y=alt.Y("busy:Q", title=None, scale=alt.Scale(domain=[0, 100]), axis=None),
+            color=alt.Color("kind:N", legend=None, scale=alt.Scale(
+                domain=["Now", "Busy", "Moderate", "Quiet"], range=["#F4F7FB", "#FF6B6B", "#FFC44D", "#5B7A3A"])),
+            tooltip=tips)
+        st.markdown(f"**Usually on {DAYS[pick]}s**")
+        st.altair_chart(chart.properties(height=190).configure(background="rgba(0,0,0,0)")
+                        .configure_view(strokeWidth=0), use_container_width=True)
     except Exception:
-        st.bar_chart(df.set_index("time")["people"])
-    busiest = df.loc[df["people"].idxmax()]
-    quietest = df.loc[df["people"].idxmin()]
-    st.caption(f"Busiest {busiest['range']} (about {busiest['people']:.0f}) · quietest {quietest['range']} "
-               f"(about {quietest['people']:.0f}).")
-    n = day["days"]
-    st.caption(f"Based on {n} {DAYS[pick]}{'s' if n != 1 else ''} of check-ins in the last 8 weeks"
-               + (" · early estimate, it sharpens every week." if n < 3 else ".")
-               + f" Each visit counts as about {cfg['visit']} minutes.")
+        st.bar_chart(df.set_index("time")["busy"])
+    gw._md('<div class="tr-sub" style="display:flex;gap:14px;flex-wrap:wrap">'
+           '<span>🟥 Busy</span><span>🟨 Moderate</span><span>🟩 Quiet</span>'
+           + ('<span>⬜ Now</span>' if pick == dow else '') + '</div>')
+    busiest = max(pslots, key=lambda x: pbusy[x])
+    quiet = [x for x in pslots if pbusy[x] < 0.35]
+    st.caption(f"Busiest around {slot_range(busiest, cfg, pick)}"
+               + (f" · quiet from {clock(quiet[0] * 30)}" if quiet else "") + ".")
+    nd = int(day.get("days") or 0)
+    if pw < 0.5:
+        st.caption(f"Based on typical Lagos gym times for now, plus {nd} {DAYS[pick]}{'s' if nd != 1 else ''} of "
+                   "your gym's check-ins. It switches to your gym's own pattern as more members check in.")
+    else:
+        st.caption(f"Based on {nd} {DAYS[pick]}s of your gym's check-ins in the last 8 weeks. "
+                   f"Each visit counts as about {cfg['visit']} minutes.")
 
 
 def plates_for(target, bar=20.0):
