@@ -27,8 +27,8 @@ TITLE = "GymPulse AI · Gym member retention software for Nigeria"
 DESCRIPTION = ("GymPulse AI shows Nigerian gym owners which members are about to stop coming, then "
                "brings them back with WhatsApp and email renewals, follow-up calls and referrals. "
                "Check-ins, payments and a member app included. 30-day free trial.")
-COMPANY = {"legal": "GYMPULSE AI LTD", "rc": "RC 9996401", "street": "37, TTC Road, Ikot Ansa",
-           "city": "Calabar", "state": "Cross River State", "postcode": "540211",
+COMPANY = {"legal": "GYMPULSE AI LTD", "rc": "RC 9996401",
+           "city": "Calabar", "state": "Cross River State",
            "email": "hello@usegympulseai.com", "founder_email": "emmanuel@usegympulseai.com"}
 START = "<!--gp-seo-start-->"
 END = "<!--gp-seo-end-->"
@@ -154,9 +154,8 @@ def _ld_json():
                           "areaServed": "NG", "availableLanguage": "English"},
                          {"@type": "ContactPoint", "contactType": "sales", "email": COMPANY["founder_email"],
                           "areaServed": "NG", "availableLanguage": "English"}],
-        "address": {"@type": "PostalAddress", "streetAddress": COMPANY["street"],
-                    "addressLocality": COMPANY["city"], "addressRegion": COMPANY["state"],
-                    "postalCode": COMPANY["postcode"], "addressCountry": "NG"},
+        "address": {"@type": "PostalAddress", "addressLocality": COMPANY["city"],     # city only: no street
+                    "addressRegion": COMPANY["state"], "addressCountry": "NG"},
     }
     app = {
         "@context": "https://schema.org", "@type": "SoftwareApplication", "name": NAME,
@@ -222,7 +221,7 @@ def _links(skip=None):
 def _foot():
     c = COMPANY
     return (f'<div class="foot">{_links()}<p>© {date.today().year} {c["legal"]} · {c["rc"]} · Registered in '
-            f'Nigeria · {c["street"]}, {c["city"]}, {c["state"]} · '
+            f'Nigeria · {c["city"]}, {c["state"]} · '
             f'<a href="mailto:{c["email"]}">{c["email"]}</a> · Founder: '
             f'<a href="mailto:{c["founder_email"]}">{c["founder_email"]}</a></p></div>')
 
