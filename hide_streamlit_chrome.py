@@ -8,6 +8,8 @@ command doesn't run it. Safe to run any number of times.
 * Renames the page title and replaces the framework's own messages (connecting, "server is not
   responding", "cannot load frontend code"…) with GymPulse AI wording.
 * Installs the GymPulse favicon and phone icon.
+* Search engines: page description, structured data, readable homepage text, robots.txt, sitemap.xml
+  and topic pages (gympulse_seo.py).
 """
 import glob
 import os
@@ -67,6 +69,14 @@ def apply(quiet=False):
                                         f'content="{FB_DOMAIN_VERIFICATION}" />', 1)
         for old, rep in TEXT:
             new = new.replace(old, rep)
+        try:                                       # search engines: description, structured data,
+            sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))   # readable homepage
+            import gympulse_seo
+            new = gympulse_seo.apply_index(new)
+            changed += gympulse_seo.write_static(static)
+        except Exception as error:
+            if not quiet:
+                print(f"[white-label] SEO skipped: {error}")
         if new != html:
             with open(path, "w", encoding="utf-8") as f:
                 f.write(new)
