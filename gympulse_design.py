@@ -312,6 +312,8 @@ html body .chip { border-radius: 999px; }
     background: radial-gradient(600px 240px at 50% 0%, rgba(183,243,74,0.16), transparent 70%), var(--gp-s1); }
 .lx-cta h3 { font-family: var(--gp-display); font-size: 38px; letter-spacing: -1.2px; margin: 0 0 10px; color: var(--gp-text); line-height: 1.1; }
 .lx-cta p { color: var(--gp-muted); margin: 0; font-size: 15px; }
+.lx-foot a, .lx-card p a { color: #B6F23A !important; text-decoration: none; border-bottom: 1px solid rgba(182,242,58,.35); }
+.lx-foot a:hover, .lx-card p a:hover { border-bottom-color: #B6F23A; }
 .lx-foot { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; color: var(--gp-dim); font-size: 12.5px;
     border-top: 1px solid var(--gp-line); padding: 18px 0 8px; margin-top: 18px; }
 
@@ -638,7 +640,8 @@ def landing_sections(icon, bot_svg):
         anyone noticing. You deal with a real person, not a call centre.</div>
       <div class="lx-principles">
         <div class="lx-card"><div class="lx-ic">{icon('chat')}</div><h4>Help when you need it</h4>
-          <p>Email <b>emmanuel@usegympulseai.com</b>, or book a 15-minute demo and we set it up with your real
+          <p>Email <a href="mailto:hello@usegympulseai.com"><b>hello@usegympulseai.com</b></a> for help, or reach the founder directly at
+          <a href="mailto:emmanuel@usegympulseai.com"><b>emmanuel@usegympulseai.com</b></a>. Or book a 15-minute demo and we set it up with your real
           members, at your gym or online.</p></div>
         <div class="lx-card"><div class="lx-ic">{icon('shield')}</div><h4>Your members' data stays yours</h4>
           <p>Each gym sees only its own members. We use the data only to run your account, and members can
@@ -658,7 +661,7 @@ def landing_sections(icon, bot_svg):
       </div>
     </div>
     <div class="lx-foot"><span><a href="/gym-management-software-nigeria.html" target="_self">Gym software Nigeria</a> · <a href="/gym-member-retention.html" target="_self">Member retention</a> · <a href="/gym-whatsapp-renewal-reminders.html" target="_self">WhatsApp reminders</a> · <a href="/switch-from-gymmaster-or-excel.html" target="_self">Moving from GymMaster or Excel</a></span></div>
-    <div class="lx-foot"><span>© 2026 GYMPULSE AI LTD · RC 9996401 · Registered in Nigeria</span><span>37, TTC Road, Ikot Ansa, Calabar, Cross River State · hello@usegympulseai.com</span></div>
+    <div class="lx-foot"><span>© 2026 GYMPULSE AI LTD · RC 9996401 · Registered in Nigeria</span><span>37, TTC Road, Ikot Ansa, Calabar, Cross River State · <a href="mailto:hello@usegympulseai.com">hello@usegympulseai.com</a> · <a href="mailto:emmanuel@usegympulseai.com">emmanuel@usegympulseai.com</a></span></div>
     """
 
 

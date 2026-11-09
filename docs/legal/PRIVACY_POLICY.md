@@ -4,7 +4,7 @@
 
 This policy explains how GymPulse AI ("we", "us") handles personal data. It is written to meet the Nigeria Data Protection Act 2023 (the "NDPA") and the rules of the Nigeria Data Protection Commission (NDPC).
 
-**Who we are.** GymPulse AI, GYMPULSE AI LTD (RC 9996401), 37, TTC Road, Ikot Ansa, Calabar, Cross River State, Nigeria. Contact for privacy matters: privacy@usegympulseai.com. Our Data Protection Officer is Emmanuel Archibong (director), dpo@usegympulseai.com.
+**Who we are.** GymPulse AI, GYMPULSE AI LTD (RC 9996401), 37, TTC Road, Ikot Ansa, Calabar, Cross River State, Nigeria. Contact for privacy matters: hello@usegympulseai.com. Our Data Protection Officer is Emmanuel Archibong (director), emmanuel@usegympulseai.com.
 
 ## 1. Two kinds of data, two roles
 
@@ -62,7 +62,7 @@ Encrypted connections (HTTPS) and encryption at rest by our database provider; e
 If a breach is likely to put people's rights at risk, we will tell the affected gym without undue delay and in any case within 48 hours of becoming aware, so the gym can meet its 72-hour duty to notify the NDPC. We will notify the NDPC directly where we are the controller.
 
 ## 10. Your rights (NDPA sections 34–38)
-You can ask to access, correct or delete your data, restrict or object to its use, move it to another provider, or withdraw consent. Email privacy@usegympulseai.com. We reply within 30 days. Members should contact their gym, and we will help the gym respond. You can also complain to the Nigeria Data Protection Commission (ndpc.gov.ng).
+You can ask to access, correct or delete your data, restrict or object to its use, move it to another provider, or withdraw consent. Email hello@usegympulseai.com or our Data Protection Officer at emmanuel@usegympulseai.com. We reply within 30 days. Members should contact their gym, and we will help the gym respond. You can also complain to the Nigeria Data Protection Commission (ndpc.gov.ng).
 
 ## 11. Emails to members
 Every email a gym sends through GymPulse AI includes an unsubscribe link. Members who unsubscribe are never emailed again through GymPulse AI.
