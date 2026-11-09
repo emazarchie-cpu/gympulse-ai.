@@ -30,7 +30,7 @@ BRAND = "GymPulse AI"
 # Site ownership tags read by crawlers in the page <head> (raw HTML, before any script runs).
 # Meta domain verification for usegympulseai.com (Business settings -> Brand safety -> Domains).
 # Can be overridden without a code change with the env var FB_DOMAIN_VERIFICATION.
-FB_DOMAIN_VERIFICATION = os.environ.get("FB_DOMAIN_VERIFICATION", "").strip() or "__FB_CODE__"
+FB_DOMAIN_VERIFICATION = os.environ.get("FB_DOMAIN_VERIFICATION", "").strip() or "ihoguxqqe8vfas2adyy06brasy5ffq"
 HEAD_MARK = "gp-site-verification"
 TEXT = [  # (framework wording, GymPulse wording) in the page and its script files
     ("Streamlit server is not responding. Are you connected to the internet?",
