@@ -657,6 +657,7 @@ def landing_sections(icon, bot_svg):
         <a class="lx-btn" href="?demo=book" target="_self">Book a 15-minute demo</a>
       </div>
     </div>
+    <div class="lx-foot"><span><a href="/gym-management-software-nigeria.html" target="_self">Gym software Nigeria</a> · <a href="/gym-member-retention.html" target="_self">Member retention</a> · <a href="/gym-whatsapp-renewal-reminders.html" target="_self">WhatsApp reminders</a> · <a href="/switch-from-gymmaster-or-excel.html" target="_self">Moving from GymMaster or Excel</a></span></div>
     <div class="lx-foot"><span>© 2026 GYMPULSE AI LTD · RC 9996401 · Registered in Nigeria</span><span>37, TTC Road, Ikot Ansa, Calabar, Cross River State · hello@usegympulseai.com</span></div>
     """
 
