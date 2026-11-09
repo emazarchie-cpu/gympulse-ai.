@@ -1,4 +1,11 @@
 import gympulse_monitoring as gmon
+try:                                        # white-label the page shell once per server (no framework branding)
+    import hide_streamlit_chrome as _wl
+    if not getattr(_wl, "_done", False):
+        _wl.apply(quiet=True)
+        _wl._done = True
+except Exception:
+    pass
 gmon.init("app")
 import gympulse_workspaces as gw
 import gympulse_followups as fu
