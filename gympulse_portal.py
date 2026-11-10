@@ -362,7 +362,8 @@ def _one_per_gym(members):
 
 
 def _enter(m):
-    for k in ("mp_step", "mp_email", "mp_choices", "mp_code_tries", "mp_pw_tries", "mp_verified", "mp_mode"):
+    for k in ("mp_step", "mp_email", "mp_choices", "mp_code_tries", "mp_pw_tries", "mp_verified", "mp_mode",
+              "mp_first_hint"):
         st.session_state.pop(k, None)
     st.query_params.clear()
     st.query_params["me"] = str(m["portal_token"])
@@ -378,6 +379,19 @@ def _open(members):
         st.session_state["mp_choices"] = [m["id"] for m in ok]
         st.session_state["mp_step"] = "pick"
         st.rerun()
+
+
+def email_has_password(sc, email):
+    """True when this email already has a password. False for first-timers AND for emails that aren't
+    members, so the answer never tells anyone who is a member."""
+    try:
+        for f in _find(sc, email)[:5]:
+            m = _member(sc, f["member_id"])
+            if m and gw._text(m.get("email")).strip().lower() == email and has_password(sc, m["id"]):
+                return True
+    except Exception:
+        pass
+    return False
 
 
 def _send(sc, e, mode):
@@ -420,6 +434,7 @@ def render_code_login(supabase, embedded=False):
                 st.rerun()
 
         def go(to):
+            st.session_state.pop("mp_first_hint", None)
             st.session_state["mp_email"] = st.session_state.get("mp_login_email", "").strip().lower() or e
             st.session_state["mp_step"] = to
 
@@ -432,6 +447,7 @@ def render_code_login(supabase, embedded=False):
                 submit = st.form_submit_button("Sign in with email", type="primary", use_container_width=True)
             st.button("Forgot password?", key="mp_to_forgot", on_click=go, args=("forgot",))
             if submit:
+                st.session_state.pop("mp_first_hint", None)
                 e = email.strip().lower()
                 tries = st.session_state.get("mp_pw_tries", 0)
                 if "@" not in e or not pw:
@@ -449,9 +465,17 @@ def render_code_login(supabase, embedded=False):
                     elif state == "locked":
                         st.error(f"Too many wrong passwords. Try again in {PW_LOCK_MINUTES} minutes, or tap "
                                  "“Forgot password?”.")
+                    elif not email_has_password(sc, e):
+                        st.session_state["mp_first_hint"] = e      # first time: no password created yet
                     else:
-                        st.error("That email and password don't match. First time here? Tap “Set up your "
-                                 "account” above.")
+                        st.error("That password isn't right. Try again, or tap “Forgot password?”.")
+            hint = st.session_state.get("mp_first_hint")
+            if hint:
+                st.info(f"Looks like it's your first time: there's no password for {hint.replace('@', '&#64;')} "
+                        "yet. Set up your account first: we'll email you a code, then you create your password.")
+                if st.button("Set up my account", key="mp_hint_setup", type="primary", use_container_width=True):
+                    st.session_state.pop("mp_first_hint", None)
+                    _send(sc, hint, "setup")
             st.markdown('<div class="auth-secure">Secure sign-in. Your password is never stored in plain text.'
                         '</div>', unsafe_allow_html=True)
         elif step in ("setup", "forgot"):
