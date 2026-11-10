@@ -34,7 +34,7 @@ def install(static_dir):
         for name in (icon_name, "favicon.png"):
             shutil.copyfile(FAVICON, os.path.join(static_dir, name))
     if os.path.exists(TOUCH):
-        for name in (touch_name, "apple-touch-icon.png"):
+        for name in (touch_name, "apple-touch-icon.png", "apple-touch-icon-precomposed.png"):
             shutil.copyfile(TOUCH, os.path.join(static_dir, name))
     sized = _write_sizes(static_dir)
     with open(index, encoding="utf-8") as f:

@@ -251,7 +251,7 @@ def page_html(p):
 <meta property="og:type" content="article"><meta property="og:title" content="{e(p['title'])}">
 <meta property="og:description" content="{e(p['description'])}"><meta property="og:url" content="{url}">
 <meta property="og:image" content="{SITE}/apple-touch-icon.png"><meta name="theme-color" content="#0B1020">
-<link rel="icon" href="/favicon.ico" sizes="48x48"><link rel="icon" type="image/png" sizes="192x192" href="/gympulse-icon-v4-192.png"><link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="icon" href="/favicon.ico" sizes="48x48"><link rel="icon" type="image/png" sizes="192x192" href="/gympulse-icon-v4-192.png"><link rel="apple-touch-icon" sizes="180x180" href="/gympulse-touch-v4.png">
 <style>{CSS}</style></head><body><div class="w">{_nav()}
 <h1>{e(p['h1'])}</h1><p class="lead">{e(p['lead'])}</p>{_sections(p['sections'])}{_cta()}{_foot()}
 </div></body></html>"""
@@ -282,7 +282,10 @@ def prerender():
             f'<div class="w">{_nav()}<h1>Keep more gym members. Keep more revenue.</h1>'
             f'<p class="lead">{html.escape(DESCRIPTION)}</p>{feats}{_cta()}{_foot()}</div></div>'
             # app links (member portal, HMO check-in, machine guides…) never show this
-            '<script>if(location.search)document.getElementById("gp-pre").style.display="none"</script>')
+            # People never see it: the app's own landing page (same words) loads a moment later, so it
+            # stays hidden for browsers and is only read by search engines and link previews.
+            '<script>if(location.search||!/bot|crawl|spider|slurp|preview|facebookexternalhit|lighthouse/i'
+            '.test(navigator.userAgent))document.getElementById("gp-pre").style.display="none"</script>')
     return ROOT_START + body + ROOT_END
 
 
