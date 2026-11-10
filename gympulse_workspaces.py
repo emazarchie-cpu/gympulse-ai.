@@ -2450,6 +2450,12 @@ def render_member_profile(supabase, gym_id, member_id, assess_fn):
                                float(scored["cancellation_probability"])))
     if goal:
         chips.append(chip(goal, "cyan"))
+    pt_trainer = None
+    if _has_pt(m):
+        own = m.get("pt_trainer_id")
+        pt_trainer = next((t for t in load_trainers(supabase, gym_id)
+                           if own and str(t.get("id")) == str(own)), None)
+        chips.append(chip("PT · " + _text((pt_trainer or {}).get("full_name"), "Personal training"), "lime"))
 
     contact = []
     if email:
@@ -2492,6 +2498,21 @@ def render_member_profile(supabase, gym_id, member_id, assess_fn):
             ("Renewal date",
              state["end"].strftime("%d %b %Y") if state["end"] else "—", "cyan", ""),
         ])
+        if _has_pt(m):
+            t = pt_trainer or {}
+            tphone = _text(t.get("phone"))
+            links = ""
+            if tphone:
+                links = chip(f"Call {tphone}", "grey", href=f"tel:{tphone}")
+                d = whatsapp_digits(tphone)
+                if d:
+                    links += chip("WhatsApp", "lime", href=f"https://wa.me/{d}")
+            _md(f'''<div class="panel"><h4>Personal trainer</h4>
+              <div class="kv"><span>Trainer</span><b>{_esc(_text(t.get("full_name"), "Not set yet"))}</b></div>
+              <div class="kv"><span>Specialty</span><b>{_esc(_text(t.get("specialty"), "—"))}</b></div>
+              {f'<div class="chip-row" style="margin-top:8px">{links}</div>' if links else ""}
+              {"" if t else '<div class="why" style="padding-top:6px">Pick their trainer in Edit details.</div>'}
+            </div>''')
         if scored is not None:
             level = scored["risk_category"]
             prob = float(scored["cancellation_probability"])
