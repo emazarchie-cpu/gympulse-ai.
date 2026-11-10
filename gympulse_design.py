@@ -597,7 +597,7 @@ def landing_top(lockup_uri, icon):
       <div class="lx-kicker">See it in action</div>
       <div class="lx-h2">Every feature, in under a minute.</div>
       <div class="lx-video">
-        <video src="/app/static/gympulse-demo.mp4?v=3" poster="/app/static/gympulse-demo-poster.jpg?v=3"
+        <video src="/app/static/gympulse-demo.mp4?v=4" poster="/app/static/gympulse-demo-poster.jpg?v=4"
                autoplay muted loop playsinline controls preload="metadata"
                aria-label="GymPulse AI product demo"></video>
       </div>
@@ -689,7 +689,7 @@ def landing_showcase(icon):
         <div><b>1 min</b><span>to set up</span></div>
         <div><b>₦</b><span>priced in naira, by gym size</span></div>
       </div>
-      <div class="lx-credit">Photos: Unsplash</div>
+      <div class="lx-credit">Photos: Pexels</div>
     </div>'''.replace("PH", "/app/static/landing/")
 
 
