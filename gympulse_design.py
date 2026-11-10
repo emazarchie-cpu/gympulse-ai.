@@ -223,6 +223,13 @@ html body .chip { border-radius: 999px; }
 .lx-nav { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 6px 0 8px; }
 .lx-nav img { height: 44px; width: auto; display: block; }
 .lx-nav-links { display: flex; gap: 22px; color: var(--gp-muted); font-size: 13.5px; font-weight: 600; }
+.lx-hero { position: relative; isolation: isolate; }
+.lx-hero::before { content: ""; position: absolute; inset: 0 -60px -10px; z-index: -1; border-radius: 32px;
+    background: linear-gradient(90deg, rgba(10,15,30,0.97) 30%, rgba(10,15,30,0.78) 65%, rgba(10,15,30,0.92)),
+                url('/app/static/landing/hero.jpg') center / cover no-repeat; opacity: .95; }
+@media (max-width: 860px) { .lx-hero::before { inset: 0 -16px -10px; border-radius: 22px;
+    background: linear-gradient(180deg, rgba(10,15,30,0.9), rgba(10,15,30,0.97) 60%),
+                url('/app/static/landing/hero.jpg') center top / cover no-repeat; } }
 .lx-hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr); gap: 40px; align-items: center;
     padding: 34px 0 26px; }
 .lx-pill { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px 6px 8px; border-radius: 999px;
@@ -298,6 +305,55 @@ html body .chip { border-radius: 999px; }
 .lx-card .lx-out { margin-top: 14px; font-size: 11.5px; font-weight: 700; color: var(--gp-cyan); letter-spacing: .3px; }
 
 .lx-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
+
+/* ---------- photo mosaic and feature showcase (2026 landing) ---------- */
+.lx-mosaic { display: grid; grid-template-columns: 1.4fr 1fr 1fr; grid-template-rows: 190px 190px; gap: 12px; margin: 26px 0 6px; }
+.lx-mosaic .ph { border-radius: 20px; background-size: cover; background-position: center; position: relative; overflow: hidden;
+    border: 1px solid var(--gp-line); }
+.lx-mosaic .ph::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 45%, rgba(10,15,30,0.85)); }
+.lx-mosaic .ph span { position: absolute; left: 16px; bottom: 14px; z-index: 1; font-weight: 700; font-size: 14px; color: #fff; }
+.lx-mosaic .ph span em { display: block; font-style: normal; font-weight: 500; font-size: 12px; color: #C9D3E3; }
+.lx-mosaic .big { grid-row: span 2; }
+.lx-show { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: 34px; align-items: center; margin: 54px 0 0; }
+.lx-show.flip .lx-show-ph { order: 2; }
+.lx-show-ph { position: relative; border-radius: 26px; min-height: 380px; background-size: cover; background-position: center;
+    border: 1px solid var(--gp-line-2); box-shadow: 0 40px 80px -40px rgba(0,0,0,0.8); overflow: hidden; }
+.lx-show-ph::after { content: ""; position: absolute; inset: 0;
+    background: linear-gradient(160deg, rgba(183,243,74,0.16), transparent 35%, rgba(10,15,30,0.55)); }
+.lx-show-ph .tag { position: absolute; left: 16px; bottom: 16px; z-index: 1; padding: 8px 12px; border-radius: 12px;
+    background: rgba(10,15,30,0.78); backdrop-filter: blur(8px); border: 1px solid var(--gp-line-2);
+    font-size: 12.5px; color: #E6ECF5; }
+.lx-show-ph .tag b { color: var(--gp-lime); }
+.lx-show .lx-kicker, .lx-show .lx-h2 { text-align: left; margin-left: 0; }
+.lx-show .lx-h2 { font-size: 32px; }
+.lx-show-sub { color: var(--gp-muted); font-size: 15px; line-height: 1.65; margin: 0 0 18px; }
+.lx-feat { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.lx-f { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 10px; padding: 12px; border-radius: 14px;
+    background: rgba(255,255,255,0.03); border: 1px solid var(--gp-line); transition: border-color .2s, transform .2s; }
+.lx-f:hover { border-color: rgba(183,243,74,0.45); transform: translateY(-2px); }
+.lx-f .i { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center;
+    background: rgba(183,243,74,0.1); color: var(--gp-lime); border: 1px solid rgba(183,243,74,0.25); }
+.lx-f b { display: block; font-size: 14px; color: var(--gp-text); margin-bottom: 2px; }
+.lx-f span { display: block; font-size: 12.5px; color: var(--gp-muted); line-height: 1.45 !important; }
+.lx-f b { line-height: 1.3 !important; }
+.lx-count { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 46px; }
+.lx-count div { border-radius: 18px; padding: 20px; text-align: center; border: 1px solid var(--gp-line);
+    background: linear-gradient(180deg, rgba(183,243,74,0.06), rgba(255,255,255,0.01)), var(--gp-s1); }
+.lx-count b { display: block; font-family: var(--gp-display); font-size: 34px; background: var(--gp-grad);
+    -webkit-background-clip: text; background-clip: text; color: transparent; }
+.lx-count span { font-size: 12.5px; color: var(--gp-muted); }
+.lx-credit { text-align: center; font-size: 11px; color: var(--gp-dim); margin-top: 18px; }
+@media (max-width: 860px) {
+    .lx-mosaic { grid-template-columns: 1fr 1fr; grid-template-rows: 170px 130px 130px; }
+    .lx-mosaic .big { grid-column: span 2; grid-row: auto; }
+    .lx-show { grid-template-columns: 1fr; gap: 18px; margin-top: 40px; }
+    .lx-show.flip .lx-show-ph { order: 0; }
+    .lx-show-ph { min-height: 230px; }
+    .lx-show .lx-h2 { font-size: 26px; }
+    .lx-feat { grid-template-columns: 1fr; }
+    .lx-count { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .lx-count b { font-size: 28px; }
+}
 .lx-grid .lx-card.w3 { grid-column: span 3; } .lx-grid .lx-card.w2 { grid-column: span 2; }
 .lx-story { margin-top: 14px; border-radius: 12px; padding: 12px 14px; background: rgba(255,255,255,0.03); border: 1px solid var(--gp-line);
     font-size: 12.5px; color: #C9D3E3; line-height: 1.6; }
@@ -495,7 +551,7 @@ def landing_top(lockup_uri, icon):
     return f"""
     <div class="lx-nav">
       <img src="{lockup_uri}" alt="GymPulse AI">
-      <div class="lx-nav-links"><span>How it works</span><span>Features</span><span>Archie AI</span><a href="#pricing">Pricing</a></div>
+      <div class="lx-nav-links"><a href="#demo">How it works</a><a href="#features">Features</a><a href="#pricing">Pricing</a></div>
     </div>
     <div class="lx-hero">
       <div>
@@ -539,9 +595,9 @@ def landing_top(lockup_uri, icon):
     </div>
     <div class="lx-demo" id="demo">
       <div class="lx-kicker">See it in action</div>
-      <div class="lx-h2">The whole retention loop, in under a minute.</div>
+      <div class="lx-h2">Every feature, in under a minute.</div>
       <div class="lx-video">
-        <video src="/app/static/gympulse-demo.mp4?v=2" poster="/app/static/gympulse-demo-poster.jpg?v=2"
+        <video src="/app/static/gympulse-demo.mp4?v=3" poster="/app/static/gympulse-demo-poster.jpg?v=3"
                autoplay muted loop playsinline controls preload="metadata"
                aria-label="GymPulse AI product demo"></video>
       </div>
@@ -560,9 +616,86 @@ def landing_top(lockup_uri, icon):
     """
 
 
+SHOWCASE = [
+    ("retain", "Keep members", "Know who's about to leave, and do something about it today",
+     "Every member is scored every day from their real check-ins, plan and renewal date. You see who is drifting, "
+     "why, and the one thing to do next.", "<b>88%</b> risk · visits down 12 → 3 a month", [
+        ("pulse", "Risk Radar", "Every member scored daily, with the reason behind each flag."),
+        ("target", "Action Centre", "One board of plays: call, WhatsApp, renewal offer, trainer intro."),
+        ("chat", "Follow-up calls", "No reply to a message? A call with a script is set up for your staff."),
+        ("gauge", "Prediction check", "Saves every score monthly and shows how many leavers it caught."),
+        ("calendar", "Renewal watch", "Who renews in 30 days and is attending less, before it's too late."),
+        ("check", "Verified revenue", "Only confirmed renewals count as money saved. No made-up numbers."),
+    ]),
+    ("grow", "Grow", "Bring more people in, and bring the quiet ones back",
+     "Automatic messages, referrals and campaigns that sound like you, sent in your gym's name.",
+     "<b>12</b> friends invited this month", [
+        ("chat", "WhatsApp & email reminders", "Renewal reminders, missed-visit check-ins, welcome-backs, birthdays."),
+        ("users", "Bring-a-friend referrals", "Every member gets an invite link; rewards are tracked for you."),
+        ("shield", "HMO & corporate members", "QR check-in by HMO ID, visit reports and covers ending."),
+        ("sliders", "Campaigns", "Branded emails with your logo for promos, classes and challenges."),
+        ("target", "Loyalty & rewards", "Points for visits and renewals, rewards members actually want."),
+        ("pulse", "Archie, your AI analyst", "Ask anything about your gym and get answers with the figures."),
+    ]),
+    ("run", "Run the gym", "Members, check-ins, payments and your team in one place",
+     "Everything a Nigerian gym needs day to day, on any phone. No scanners or new hardware.",
+     "<b>₦</b> payments, receipts and renewals", [
+        ("users", "Member management", "Profiles with photos, plans, goals and personal trainer."),
+        ("upload", "Import in minutes", "From GymMaster, Excel or any software, with visits and photos."),
+        ("check", "QR & front-desk check-in", "Members scan in, or staff tap them in on a phone."),
+        ("download", "Payments & receipts", "Record payments in naira; receipts carry your gym's name."),
+        ("shield", "Staff logins", "Front desk sees what they need. Revenue and settings stay with you."),
+        ("calendar", "Classes & bookings", "Timetable, bookings and class invites in one place."),
+    ]),
+    ("trainer", "Members & trainers", "An app for every member, and a workspace for every trainer",
+     "Members get their own app with no download. Personal trainers get their own login with their day planned.",
+     "<b>Today</b> · 4 sessions · 07:00 leg day", [
+        ("pulse", "Member app", "Renew, check-in code, visits, rewards, classes and messages."),
+        ("target", "Train tab", "Log sets, personal records, progress charts and today's workout."),
+        ("gauge", "Gym now", "How busy the gym is right now, and the quietest times today."),
+        ("user", "Trainer workspace", "Today's sessions, timetable, availability and their clients."),
+        ("calendar", "Weekly trainer reports", "Numbers fill in automatically; trainers add notes for you."),
+        ("check", "Machine guides", "A QR code on each machine opens a how-to video and tips."),
+    ]),
+]
+
+
+def landing_showcase(icon):
+    """Photo-led feature sections for the landing page."""
+    rows = []
+    for i, (img, kicker, title, sub, tag, feats) in enumerate(SHOWCASE):
+        items = "".join(f'<div class="lx-f"><div class="i">{icon(ic, 18)}</div><div><b>{t}</b><span>{d}</span>'
+                        f'</div></div>' for ic, t, d in feats)
+        rows.append(f'''<div class="lx-show{' flip' if i % 2 else ''}">
+          <div class="lx-show-ph" style="background-image:url('PH{img}.jpg')"><div class="tag">{tag}</div></div>
+          <div><div class="lx-kicker">{kicker}</div><div class="lx-h2">{title}</div>
+          <div class="lx-show-sub">{sub}</div><div class="lx-feat">{items}</div></div></div>''')
+    return f'''<div class="lx-sec" id="features">
+      <div class="lx-kicker">Everything in one app</div>
+      <div class="lx-h2">Built for real gyms. Every feature on every plan.</div>
+      <div class="lx-sub">Retention, growth, the front desk, your trainers and your members' own app.
+        You only pay by the size of your gym.</div>
+      <div class="lx-mosaic">
+        <div class="ph big" style="background-image:url('PHhero.jpg')"><span>Your gym floor<em>every member scored daily</em></span></div>
+        <div class="ph" style="background-image:url('PHlift.jpg')"><span>Strength<em>personal records</em></span></div>
+        <div class="ph" style="background-image:url('PHmembers.jpg')"><span>Classes<em>bookings & invites</em></span></div>
+        <div class="ph" style="background-image:url('PHropes.jpg')"><span>Challenges<em>visit streaks</em></span></div>
+        <div class="ph" style="background-image:url('PHweights.jpg')"><span>Machine guides<em>QR on every machine</em></span></div>
+      </div>
+      {"".join(rows)}
+      <div class="lx-count">
+        <div><b>24+</b><span>features, all included</span></div>
+        <div><b>30 days</b><span>free trial</span></div>
+        <div><b>1 min</b><span>to set up</span></div>
+        <div><b>₦</b><span>priced in naira, by gym size</span></div>
+      </div>
+      <div class="lx-credit">Photos: Unsplash</div>
+    </div>'''.replace("PH", "/app/static/landing/")
+
+
 def landing_sections(icon, bot_svg):
     """Everything below the sign-in card."""
-    return f"""
+    return landing_showcase(icon) + f"""
     <div class="lx-sec">
       <div class="lx-kicker">The retention loop</div>
       <div class="lx-h2">One connected system, from first warning sign to money kept</div>
