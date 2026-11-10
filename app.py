@@ -2880,6 +2880,7 @@ elif page == "Member Management":
             )
             paid_method = pcol2.selectbox("Paid by", ["Cash", "Bank transfer", "Card", "POS",
                                                       "Mobile money", "Other"])
+            new_has_pt, new_pt_trainer = gw.pt_fields(supabase, gym_id, key="reg_pt")
 
             submitted = st.form_submit_button(
                 "Register Member",
@@ -2936,6 +2937,9 @@ elif page == "Member Management":
                     note = gw.save_membership(
                         supabase, gym_id, new_id, plan, monthly_fee, membership_end
                     )
+                    if new_has_pt:
+                        _pt_note = gw.save_pt(supabase, gym_id, new_id, True, new_pt_trainer)
+                        note = (note + " " if note else "") + (_pt_note or "Marked as a personal training client.")
                     if new_id and paid_today > 0:
                         import gympulse_revenue as gr
                         try:

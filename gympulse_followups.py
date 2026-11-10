@@ -40,6 +40,17 @@ DRAFTS = {
 }
 
 
+def _fu_row(mid):
+    """The member's roster row (has their personal trainer, if any)."""
+    roster = st.session_state.get("_fu_roster")
+    try:
+        if roster is not None and not roster.empty and mid in set(roster["id"]):
+            return roster[roster["id"] == mid].iloc[0]
+    except Exception:
+        pass
+    return {}
+
+
 def _secret(name, default=""):
     """A setting from Render's environment variables, or Streamlit secrets."""
     import os
@@ -249,7 +260,7 @@ def _compose(supabase, gym_id, members, owner, gym):
         extra = {}
         trainers = gw.load_trainers(supabase, gym_id)
         tmap = {x["id"]: x for x in trainers}
-        t = (tmap.get(open_row.get("trainer_id")) if open_row else None) or gw.pick_trainer(trainers, goal)
+        t = (tmap.get(open_row.get("trainer_id")) if open_row else None) or gw.member_trainer(trainers, _fu_row(mid), goal)
         if t:
             extra["trainer"] = gw._text(t.get("full_name"))
             extra["trainer_id"] = t["id"]
@@ -275,7 +286,7 @@ def _compose(supabase, gym_id, members, owner, gym):
         trainers = gw.load_trainers(supabase, gym_id)
         tmap = {t["id"]: t for t in trainers}
         trainer = (tmap.get(open_row.get("trainer_id")) if open_row else None) or \
-            gw.pick_trainer(trainers, goal)
+            gw.member_trainer(trainers, _fu_row(mid), goal)
     if theme == "Class invite" and not (isinstance(details, dict) and details.get("title")):
         nxt = gw.next_class(gw.load_classes(supabase, gym_id))
         if nxt:

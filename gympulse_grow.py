@@ -678,7 +678,7 @@ def render_onboarding(supabase, gym_id):
                 send_row(f"grow_ob_rescue_{m['id']}", m, f"grow_obr_{m['id']}", f"We'd love to see you at {_biz()[0]}",
                          important=True, supabase=supabase, gym_id=gym_id)
             if p["next"]:
-                t = gw.pick_trainer(trainers, m.get("fitness_goal"))
+                t = gw.member_trainer(trainers, m, m.get("fitness_goal"))
                 st.markdown(f"**{p['next']['title']}**")
                 k = f"grow_ob_{m['id']}_{p['next']['step']}"
                 _message_box(onboarding_message(p["next"]["text"], m, gw._text((t or {}).get("full_name"))), k)
