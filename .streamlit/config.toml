@@ -8,4 +8,7 @@ textColor = "#F4F7FB"
 
 [server]
 enableStaticServing = true
+# Phones drop the live connection when you switch apps. Keep the visit for 30 minutes (default 2) so
+# coming back resumes where you were; after that, the remember-me cookie signs you back in.
+disconnectedSessionTTL = 1800
 
