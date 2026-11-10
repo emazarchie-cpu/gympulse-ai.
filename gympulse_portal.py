@@ -44,6 +44,18 @@ CSS = """
 .mp-in { background: rgba(183,243,74,.14); margin-left: auto; } .mp-out { background: var(--gp-s2, #172033); }
 .mp-when { font-size: 11px; color: var(--gp-muted, #93A0B4); margin-top: 4px; }
 .st-key-mp_wrap { max-width: 620px; margin: 0 auto; width: 100%; }
+/* member sign-in links, same look as the owner card's "Sign up" / "Forgot password?" */
+html body .stApp.stApp :is(.st-key-mp_to_setup, .st-key-mp_to_forgot, .st-key-mp_back) button { background: transparent !important;
+  border: none !important; box-shadow: none !important; min-height: 0 !important; padding: 2px 0 !important;
+  width: 100%; justify-content: center !important; }
+html body .stApp.stApp.stApp .st-key-mp_to_setup button p { color: #B7F34A !important; font-size: 14px !important;
+  font-weight: 800 !important; margin: 0 !important; white-space: pre !important; }
+html body .stApp.stApp.stApp .st-key-mp_to_setup button p::before { content: "First time here?  "; color: #93A0B4; font-weight: 500; }
+html body .stApp.stApp.stApp :is(.st-key-mp_to_forgot, .st-key-mp_back) button p { color: #93A0B4 !important; font-size: 12px !important;
+  font-weight: 600 !important; margin: 0 !important; }
+:is(.st-key-mp_to_setup, .st-key-mp_to_forgot, .st-key-mp_back) button:hover p { text-decoration: underline; }
+html body .stApp.stApp.stApp :is(.st-key-mp_to_forgot, .st-key-mp_back) button:hover p { color: #B7F34A !important; }
+.mp-auth-sub { text-align: center; color: var(--muted, #93A0B4); font-size: 14px; margin: 0 0 6px; }
 /* ---------- 2026 look: app-style tabs, soft glass cards ---------- */
 .st-key-mp_tabs [role="tab"] { padding: 7px 8px !important; }   /* five tabs fit a phone */
 .st-key-mp_wrap [data-testid="stLayoutWrapper"] > div[class*="st-key"] { border-radius: 24px !important; }
@@ -368,17 +380,6 @@ def _open(members):
         st.rerun()
 
 
-def email_has_password(sc, email):
-    try:
-        for f in _find(sc, email)[:5]:
-            m = _member(sc, f["member_id"])
-            if m and gw._text(m.get("email")).strip().lower() == email and has_password(sc, m["id"]):
-                return True
-    except Exception:
-        pass
-    return False
-
-
 def _send(sc, e, mode):
     """Email a code and move to the code step. Returns False when too many codes were asked for."""
     n = st.session_state.get("mp_sends", 0)
@@ -396,53 +397,45 @@ def render_login(supabase):
 
 
 def render_code_login(supabase, embedded=False):
-    """Members sign in with their email. First time: we email a 6-digit code, they create a password and
-    they're in. After that: email and password, with "Forgot password?" (code, then a new password)."""
+    """Members sign in with email and password, on a card that looks like the owner's.
+    First time: "Set up your account" emails a 6-digit code, then they create a password and they're in.
+    "Forgot password?" works the same way with a new password."""
     if not embedded:
         import gympulse_booking as gb
         gb._header()
     st.markdown(CSS, unsafe_allow_html=True)
-    box = st.container(border=True, key="mp_login_card") if embedded else st.container(key="mp_wrap")
-    step = st.session_state.get("mp_step", "email")
+    box = st.container(border=True, key="auth_card") if embedded else st.container(key="mp_wrap")
+    step = st.session_state.get("mp_step", "login")
     e = st.session_state.get("mp_email", "")
     with box:
-        st.markdown('<div class="auth-title">Member sign in</div>' if embedded else
-                    '<div class="bk-title">Your membership</div>', unsafe_allow_html=True)
         sc = _sc()
         if sc is None:
+            st.markdown('<div class="auth-title">Member sign in</div>', unsafe_allow_html=True)
             st.info("Member sign in isn't available yet. Please ask your gym.")
             return
 
-        def other_email(key):
-            if st.button("Use a different email", key=key, use_container_width=True, type="tertiary"):
-                st.session_state["mp_step"] = "email"
+        def back(key="mp_back"):
+            if st.button("Back to sign in", key=key):
+                st.session_state["mp_step"] = "login"
                 st.rerun()
 
-        if step == "email":
-            st.caption("Enter the email your gym has for you.")
-            with st.form("mp_email_form"):
-                email = st.text_input("Email", placeholder="you@email.com", key="mp_email_in")
-                go = st.form_submit_button("Continue", type="primary", use_container_width=True)
-            if go:
-                e = email.strip().lower()
-                if "@" not in e or "." not in e.split("@")[-1]:
-                    st.error("Please enter your email address.")
-                elif email_has_password(sc, e):
-                    st.session_state.update({"mp_email": e, "mp_step": "password"})
-                    st.rerun()
-                else:
-                    _send(sc, e, "setup")              # first time: a code, then they create a password
-            st.caption("No email with your gym? Ask the front desk to add it, or to send your private link on "
-                       "WhatsApp.")
-        elif step == "password":
-            gw._md(f'<div class="gp-intro-s">Signing in as <b>{gw._esc(e)}</b></div>')
-            with st.form("mp_pw_form"):
+        def go(to):
+            st.session_state["mp_email"] = st.session_state.get("mp_login_email", "").strip().lower() or e
+            st.session_state["mp_step"] = to
+
+        if step == "login":
+            st.markdown('<div class="auth-title">Welcome back, sign in</div>', unsafe_allow_html=True)
+            st.button("Set up your account", key="mp_to_setup", on_click=go, args=("setup",))
+            with st.form("mp_login_form", border=False):
+                email = st.text_input("Email address", value=e, key="mp_login_email")
                 pw = st.text_input("Password", type="password", key="mp_pw_in")
-                go = st.form_submit_button("Sign in", type="primary", use_container_width=True)
-            if go:
+                submit = st.form_submit_button("Sign in with email", type="primary", use_container_width=True)
+            st.button("Forgot password?", key="mp_to_forgot", on_click=go, args=("forgot",))
+            if submit:
+                e = email.strip().lower()
                 tries = st.session_state.get("mp_pw_tries", 0)
-                if not pw:
-                    st.error("Enter your password.")
+                if "@" not in e or not pw:
+                    st.warning("Enter your email and password.")
                 elif tries >= 12:
                     st.error("Too many tries. Tap “Forgot password?” to get a code instead.")
                 else:
@@ -457,20 +450,39 @@ def render_code_login(supabase, embedded=False):
                         st.error(f"Too many wrong passwords. Try again in {PW_LOCK_MINUTES} minutes, or tap "
                                  "“Forgot password?”.")
                     else:
-                        st.error("That password isn't right. Try again, or tap “Forgot password?”.")
-            if st.button("Forgot password?", key="mp_forgot", use_container_width=True):
-                _send(sc, e, "reset")
-            other_email("mp_other_pw")
+                        st.error("That email and password don't match. First time here? Tap “Set up your "
+                                 "account” above.")
+            st.markdown('<div class="auth-secure">Secure sign-in. Your password is never stored in plain text.'
+                        '</div>', unsafe_allow_html=True)
+        elif step in ("setup", "forgot"):
+            setup = step == "setup"
+            st.markdown(f'<div class="auth-title">{"Set up your account" if setup else "Reset your password"}'
+                        '</div>', unsafe_allow_html=True)
+            gw._md('<div class="mp-auth-sub">' + ("Enter the email your gym has for you. We'll email you a "
+                   "6-digit code, then you create your password." if setup else
+                   "Enter your email. We'll send you a 6-digit code to choose a new password.") + '</div>')
+            with st.form("mp_email_form", border=False):
+                email = st.text_input("Email address", value=e, key="mp_email_in")
+                submit = st.form_submit_button("Email me a code", type="primary", use_container_width=True)
+            if submit:
+                e = email.strip().lower()
+                if "@" not in e or "." not in e.split("@")[-1]:
+                    st.error("Please enter your email address.")
+                else:
+                    _send(sc, e, "setup" if setup else "reset")
+            back()
+            st.markdown('<div class="auth-secure">No email with your gym? Ask the front desk to add it.</div>',
+                        unsafe_allow_html=True)
         elif step == "code":
             first = st.session_state.get("mp_mode") == "setup"
-            st.info((f"Welcome! To set up your account, we've emailed a 6-digit code to {e.replace('@', '&#64;')} "
-                     "if it belongs to a gym member. " if first else
-                     f"If {e.replace('@', '&#64;')} belongs to a gym member, a 6-digit code is on its way. ")
-                    + "Check your spam folder too.")
-            with st.form("mp_code_form"):
+            st.markdown(f'<div class="auth-title">{"Set up your account" if first else "Reset your password"}'
+                        '</div>', unsafe_allow_html=True)
+            gw._md(f'<div class="mp-auth-sub">If <b>{gw._esc(e)}</b> belongs to a gym member, a 6-digit code '
+                   'is on its way. Check your spam folder too.</div>')
+            with st.form("mp_code_form", border=False):
                 code = st.text_input("6-digit code", max_chars=6, placeholder="123456", key="mp_code_in")
-                go = st.form_submit_button("Continue", type="primary", use_container_width=True)
-            if go:
+                submit = st.form_submit_button("Continue", type="primary", use_container_width=True)
+            if submit:
                 digits = "".join(ch for ch in code if ch.isdigit())
                 tries = st.session_state.get("mp_code_tries", 0)
                 if len(digits) != 6:
@@ -489,21 +501,22 @@ def render_code_login(supabase, embedded=False):
                 (st.warning if res == "recent" else st.success)(
                     "Please wait a minute before asking for another code." if res == "recent" else
                     "A new code is on its way if this email belongs to a member.")
-            other_email("mp_other_code")
+            back()
         elif step == "setpw":
             members = [m for m in (_member(sc, i) for i in st.session_state.get("mp_verified", [])) if m]
             if not members:
-                st.session_state["mp_step"] = "email"
+                st.session_state["mp_step"] = "login"
                 st.rerun()
             reset = st.session_state.get("mp_mode") == "reset"
-            st.markdown("**Choose a new password**" if reset else "**Create your password**")
-            st.caption(f"You'll sign in with {e.replace('@', '&#64;')} and this password from now on. "
-                       f"At least {PW_MIN} characters.")
-            with st.form("mp_setpw_form"):
+            st.markdown(f'<div class="auth-title">{"Choose a new password" if reset else "Create your password"}'
+                        '</div>', unsafe_allow_html=True)
+            gw._md(f'<div class="mp-auth-sub">You\'ll sign in with <b>{gw._esc(e)}</b> and this password from now '
+                   f'on. At least {PW_MIN} characters.</div>')
+            with st.form("mp_setpw_form", border=False):
                 new = st.text_input("New password", type="password", key="mp_new_pw")
                 again = st.text_input("Type it again", type="password", key="mp_new_pw2")
-                go = st.form_submit_button("Save and sign in", type="primary", use_container_width=True)
-            if go:
+                submit = st.form_submit_button("Save and sign in", type="primary", use_container_width=True)
+            if submit:
                 problem = password_problem(new, again)
                 if problem:
                     st.error(problem)
@@ -515,7 +528,9 @@ def render_code_login(supabase, embedded=False):
                         pass                               # passwords not switched on yet: still let them in
                     _open(members)
         else:
-            st.markdown("You're a member of more than one gym. Which one would you like to open?")
+            st.markdown('<div class="auth-title">Choose your gym</div>', unsafe_allow_html=True)
+            gw._md('<div class="mp-auth-sub">You\'re a member of more than one gym. Which one would you like to '
+                   'open?</div>')
             for mid in st.session_state.get("mp_choices", []):
                 m = _member(sc, mid)
                 if not m:
