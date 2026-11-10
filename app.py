@@ -1997,6 +1997,7 @@ def _is_mobile():
     return any(w in ua for w in ("iphone", "android", "ipad", "mobile"))
 def show_page(name):
     """Open a page and keep the top-bar radio in sync."""
+    st.session_state["_menu_n"] = st.session_state.get("_menu_n", 0) + 1
     _cur = st.session_state.get("current_page")
     if _cur and _cur != name:
         _h = st.session_state.setdefault("nav_hist", [])
@@ -2597,17 +2598,24 @@ with st.container(key="top_nav"):
                               use_container_width=True)
 
             with st.container(key="top_menu"):
-                with st.popover("☰"):
+                # A new key after every navigation: the full-screen menu closes once a page is picked
+                with st.popover("☰", key=f"top_menu_pop_{st.session_state.get('_menu_n', 0)}"):
                     with st.container(key="pop_main"):
                         for name in MAIN_PAGES:
-                            st.button(name, key=f"mob_main_{name}", on_click=show_page,
+                            st.button(NAV_SHORT.get(name, name) if name != "Member Management" else "Members",
+                                      key=f"mob_main_{name}", on_click=show_page,
                                       args=(name,), use_container_width=True)
-                        st.divider()
-                    for name in MORE_PAGES:
-                        if name == "Follow-ups":
-                            continue
-                        st.button(name, key=f"mob_more_{name}", on_click=show_page,
-                                  args=(name,), use_container_width=True)
+                    with st.container(key="pop_more"):
+                        for name in MORE_PAGES:
+                            if name == "Follow-ups":
+                                continue
+                            st.button(name, key=f"mob_more_{name}", on_click=show_page,
+                                      args=(name,), use_container_width=True)
+                    with st.container(key="pop_acct"):
+                        st.button("Profile & settings", icon=":material/account_circle:", key="mob_acct_settings",
+                                  on_click=open_settings, args=("Personal info",), use_container_width=True)
+                        st.button("Log out", icon=":material/logout:", key="mob_acct_logout",
+                                  on_click=log_out, use_container_width=True)
 
     page = st.session_state["current_page"]
     if gteam.is_trainer() and page not in gteam.TRAINER_PAGES:
