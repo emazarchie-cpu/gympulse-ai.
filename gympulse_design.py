@@ -80,6 +80,14 @@ html body button[kind="primary"]:hover, html body button[kind="primaryFormSubmit
     filter: brightness(1.07); transform: translateY(-1px);
 }
 html body button[kind="secondary"] { border-radius: 12px !important; }
+/* secondary buttons: a soft lime tint when hovered or tapped (iPhone keeps the tapped look), never a solid
+   lime block with white text on it */
+html body .stApp :is(button[kind="secondary"], button[kind="secondaryFormSubmit"]):is(:hover, :focus-visible, :active) {
+    background: rgba(183,243,74,0.10) !important; border-color: rgba(183,243,74,0.55) !important;
+}
+html body .stApp :is(button[kind="secondary"], button[kind="secondaryFormSubmit"]):is(:hover, :focus-visible, :active) * {
+    color: var(--gp-text, #F4F7FB) !important;
+}
 
 /* ---------- inputs ---------- */
 html body [data-baseweb="input"], html body [data-baseweb="select"] > div,

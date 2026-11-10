@@ -1680,9 +1680,15 @@ try:
         skip_empty=True
     )
 
+    # A staff or trainer login works in their owner's gym (sql/phase13_staff.sql). Check that first:
+    # staff own no gym, so "no gym" is normal for them and isn't a lapsed login.
+    _staff_ctx = None
+    if not gym_rows:
+        _staff_ctx = gteam.staff_context(supabase)
+
     # An empty answer can mean the login has lapsed, not that there's no gym:
     # renew the session and ask again before creating anything.
-    if not gym_rows:
+    if not gym_rows and not _staff_ctx:
         try:
             supabase.auth.refresh_session()
         except Exception:
@@ -1694,7 +1700,9 @@ try:
             if _auth_error(error):
                 _session_lost = True
             gym_rows = []
-    if not gym_rows and _session is None and not _session_lost:
+        if not gym_rows and not _session_lost:
+            _staff_ctx = gteam.staff_context(supabase)
+    if not gym_rows and not _staff_ctx and _session is None and not _session_lost:
         try:
             _session_lost = supabase.auth.get_session() is None and bool(
                 st.session_state.get("_had_gym"))
@@ -1702,11 +1710,6 @@ try:
             pass
     if _session_lost:
         raise PermissionError("session expired")
-
-    # A staff login works in their owner's gym (sql/phase13_staff.sql)
-    _staff_ctx = None
-    if not gym_rows:
-        _staff_ctx = gteam.staff_context(supabase)
 
     # Create a workspace if this owner does not have one
     if gym_rows:
@@ -1725,7 +1728,7 @@ try:
             st.stop()
         gym = _staff_ctx["gym"]
         st.session_state["_had_gym"] = True
-        if st.session_state.get("role") != "staff":
+        if not gteam.is_staff():                     # once: staff and personal trainers
             gteam.enter_staff_mode(_staff_ctx, st.session_state.get("user_profile"))
         gteam.touch_last_seen()
 
@@ -1955,7 +1958,10 @@ MORE_PAGES = [
     "Subscription",
     "FAQs",
 ]
-if gteam.is_staff():
+if gteam.is_trainer():                     # a personal trainer's own login: their workspace only
+    MAIN_PAGES = ["My workspace", "Check-in"]
+    MORE_PAGES = ["FAQs"]
+elif gteam.is_staff():
     MAIN_PAGES = [p for p in MAIN_PAGES if p not in gteam.OWNER_ONLY]
     MORE_PAGES = [p for p in MORE_PAGES if p not in gteam.OWNER_ONLY]
 else:
@@ -2604,7 +2610,9 @@ with st.container(key="top_nav"):
                                   args=(name,), use_container_width=True)
 
     page = st.session_state["current_page"]
-    if gteam.is_staff() and page in gteam.OWNER_ONLY:
+    if gteam.is_trainer() and page not in gteam.TRAINER_PAGES:
+        page = st.session_state["current_page"] = "My workspace"
+    elif gteam.is_staff() and page in gteam.OWNER_ONLY:
         page = st.session_state["current_page"] = "Dashboard"
     st.session_state["_rendered_page"] = page
 
@@ -2727,6 +2735,9 @@ if page == "Dashboard":
 # =========================================================
 elif page == "Risk Radar":
     gw.render_risk_radar(supabase, st.session_state.gym_id, assess_members)
+elif page == "My workspace":
+    import gympulse_ptw as gptw
+    gptw.render(supabase, st.session_state.gym_id)
 elif page == "Prediction check":
     import gympulse_predcheck as gpc
     gpc.render(supabase, st.session_state.gym_id, assess_members)
