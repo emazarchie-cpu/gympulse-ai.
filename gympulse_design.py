@@ -314,6 +314,11 @@ html body .chip { border-radius: 999px; }
 .lx-mosaic .ph span { position: absolute; left: 16px; bottom: 14px; z-index: 1; font-weight: 700; font-size: 14px; color: #fff; }
 .lx-mosaic .ph span em { display: block; font-style: normal; font-weight: 500; font-size: 12px; color: #C9D3E3; }
 .lx-mosaic .big { grid-row: span 2; }
+.lx-mosaic .ph-vid video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.lx-mosaic .ph-vid .ph-play b { font-weight: 700; }
+.lx-mosaic .ph-vid .ph-play { position: absolute; top: 12px; left: 12px; z-index: 1; font-style: normal; font-size: 11.5px;
+    font-weight: 700; padding: 5px 10px; border-radius: 999px; background: rgba(10,15,30,0.78); color: var(--gp-lime);
+    border: 1px solid rgba(183,243,74,0.4); backdrop-filter: blur(6px); }
 .lx-show { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: 34px; align-items: center; margin: 54px 0 0; }
 .lx-show.flip .lx-show-ph { order: 2; }
 .lx-show-ph { position: relative; border-radius: 26px; min-height: 380px; background-size: cover; background-position: center;
@@ -346,6 +351,8 @@ html body .chip { border-radius: 999px; }
 @media (max-width: 860px) {
     .lx-mosaic { grid-template-columns: 1fr 1fr; grid-template-rows: 170px 130px 130px; }
     .lx-mosaic .big { grid-column: span 2; grid-row: auto; }
+    .lx-mosaic .ph-vid .ph-play { font-size: 10.5px; padding: 4px 8px; top: 8px; left: 8px; }
+    .lx-mosaic .ph-vid .ph-play b { display: none; }
     .lx-show { grid-template-columns: 1fr; gap: 18px; margin-top: 40px; }
     .lx-show.flip .lx-show-ph { order: 0; }
     .lx-show-ph { min-height: 230px; }
@@ -680,7 +687,9 @@ def landing_showcase(icon):
         <div class="ph" style="background-image:url('PHlift.jpg')"><span>Strength<em>personal records</em></span></div>
         <div class="ph" style="background-image:url('PHmembers.jpg')"><span>Classes<em>bookings & invites</em></span></div>
         <div class="ph" style="background-image:url('PHropes.jpg')"><span>Challenges<em>visit streaks</em></span></div>
-        <div class="ph" style="background-image:url('PHweights.jpg')"><span>Machine guides<em>QR on every machine</em></span></div>
+        <div class="ph ph-vid"><video src="PHmachine-guide.mp4?v=1" poster="PHmachine-guide.jpg?v=1" autoplay muted loop
+          playsinline preload="metadata" aria-label="A member using a seated cable row machine"></video>
+          <i class="ph-play">▶ How to use<b>: seated cable row</b></i><span>Machine guides<em>scan the QR, watch how it works</em></span></div>
       </div>
       {"".join(rows)}
       <div class="lx-count">
