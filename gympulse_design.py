@@ -325,8 +325,7 @@ html body .chip { border-radius: 999px; }
       border: 0 !important; border-radius: 0 !important; box-shadow: none !important; }
   html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stButton button p {
       font-size: 21px !important; font-weight: 600 !important; color: var(--gp-text, #F4F7FB) !important; }
-  html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) :is(.st-key-pop_main, .st-key-pop_more, .st-key-mob_to_profile) .stButton button::after {
-      content: "›"; font-size: 28px; line-height: 1; color: var(--gp-muted, #93A1B8); margin-left: auto; }
+
   html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stButton button:is(:hover, :active, :focus-visible) {
       background: rgba(183,243,74,0.06) !important; }
   html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stButton button:is(:hover, :active) p { color: var(--gp-lime, #B7F34A) !important; }
@@ -357,10 +356,21 @@ html body .chip { border-radius: 999px; }
       display: flex; gap: 12px; align-items: center; padding: 6px 4px 12px; }
   html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stButton button:focus:not(:hover) { background: transparent !important; }
   html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stButton button:focus:not(:hover) p { color: var(--gp-text, #F4F7FB) !important; }
-  /* Profile row: round icon on the left, › on the right */
-  html body .st-key-mob_to_profile button::after { content: "›"; font-size: 28px; line-height: 1;
-      color: var(--gp-muted, #93A1B8); margin-left: auto; }
-  html body .st-key-mob_to_profile button > div { width: 100% !important; }
+  /* Profile ›: a hidden checkbox switches between the list and the Profile page, instantly, in the browser */
+  html body .gp-prof-cb { position: absolute; opacity: 0; pointer-events: none; width: 0; height: 0; }
+  html body [data-testid="stPopoverBody"] [data-testid="stElementContainer"]:has(.gp-prof-cb) { height: 0 !important; margin: 0 !important; }
+  html body [data-testid="stPopoverBody"] .st-key-pop_sub { display: none !important; }
+  html body [data-testid="stPopoverBody"]:has(.gp-prof-cb:checked) .st-key-pop_sub { display: flex !important; }
+  html body [data-testid="stPopoverBody"]:has(.gp-prof-cb:checked) :is(.st-key-pop_main, .st-key-pop_more, .st-key-pop_acct) {
+      display: none !important; }
+  html body .gp-prof-row { display: flex; align-items: center; gap: 14px; min-height: 60px; padding: 0 4px; cursor: pointer;
+      font-size: 21px; font-weight: 600; color: var(--gp-text, #F4F7FB); -webkit-tap-highlight-color: transparent; }
+  html body .gp-prof-row i, html body .gp-prof-back i { font-style: normal; font-size: 30px; line-height: 1; color: var(--gp-muted, #93A1B8); }
+  html body .gp-prof-row i { margin-left: auto; }
+  html body .gp-prof-row:active { color: var(--gp-lime, #B7F34A); }
+  html body .gp-prof-ic { display: grid; place-items: center; }
+  html body .gp-prof-back { display: flex; align-items: center; gap: 14px; min-height: 52px; padding: 0 4px 6px; cursor: pointer;
+      font-size: 19px; font-weight: 700; color: var(--gp-text, #F4F7FB); -webkit-tap-highlight-color: transparent; }
   /* Profile sub-page: slides in from the right, ‹ Profile header like a back link */
   @keyframes gpSubIn { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
   html body .st-key-pop_sub { animation: gpSubIn .26s ease-out both; }
