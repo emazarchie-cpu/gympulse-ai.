@@ -19,7 +19,7 @@ Settings (Render environment variables or Streamlit secrets):
 import base64
 import os
 import uuid
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import datetime, time, timedelta, timezone
 from urllib.parse import quote, urlencode
 
 import streamlit as st
@@ -279,6 +279,25 @@ PAGE_CSS = """
 .bk-done h2 { margin: 0 0 6px; font-size: 26px; color: #F4F7FB; }
 .bk-when { font-size: 18px; font-weight: 700; color: #B7F34A; margin: 10px 0 4px; }
 .bk-small { color: #93A1B8; font-size: 13px; line-height: 1.55; }
+
+.dm-tlabel { font-size: 14px; color: var(--gp-text, #F4F7FB); margin: 4px 0 2px; }
+[class*="st-key-dm_time_"] [data-testid="stWidgetLabel"] p { font-size: 12px !important; letter-spacing: 1.2px;
+  text-transform: uppercase; color: var(--gp-muted, #93A1B8) !important; font-weight: 700 !important; }
+html body .stApp [class*="st-key-dm_time_"], html body .stApp [class*="st-key-dm_time_"] [data-testid="stButtonGroup"] {
+  width: 100% !important; max-width: none !important; }
+html body .stApp.stApp.stApp [class*="st-key-dm_time_"] [role="radiogroup"] { display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 8px !important; width: 100% !important;
+  flex-wrap: wrap !important; overflow: visible !important; background: transparent !important; padding: 0 !important;
+  border: 0 !important; }
+html body .stApp.stApp.stApp [class*="st-key-dm_time_"] [role="radiogroup"] button { width: 100% !important;
+  min-width: 0 !important; min-height: 46px !important; border-radius: 12px !important; justify-content: center !important;
+  background: #0C1324 !important; border: 1px solid rgba(255,255,255,0.14) !important; }
+html body .stApp.stApp.stApp [class*="st-key-dm_time_"] [role="radiogroup"] button p { font-weight: 600 !important;
+  white-space: nowrap !important; color: #F4F7FB !important; }
+html body .stApp.stApp.stApp.stApp [class*="st-key-dm_time_"] [role="radiogroup"] button[aria-checked="true"] {
+  background: linear-gradient(100deg,#B7F34A,#35D6ED) !important; border-color: transparent !important; }
+html body .stApp.stApp.stApp.stApp [class*="st-key-dm_time_"] [role="radiogroup"] button[aria-checked="true"] p {
+  color: #0A0F1E !important; }
 """
 
 
@@ -339,8 +358,19 @@ def render_booking(supabase):
             if not slots:
                 pick = None
             else:
-                pick = st.radio("Time (Lagos time, WAT)", slots, horizontal=True, key=f"dm_time_{day}",
-                                format_func=lambda s: f"{s:%I:%M %p}".lstrip("0"))
+                # Tidy time chips, morning and afternoon, nothing chosen until they tap one
+                fmt = lambda s: f"{s:%I:%M %p}".lstrip("0")
+                st.markdown('<div class="dm-tlabel">Time · Lagos time (WAT)</div>', unsafe_allow_html=True)
+                morning = [x for x in slots if x.hour < 12]
+                later = [x for x in slots if x.hour >= 12]
+                picks = []
+                for label, group, part in (("Morning", morning, "am"), ("Afternoon", later, "pm")):
+                    if group:
+                        picks.append(st.pills(label, group, format_func=fmt, key=f"dm_time_{part}_{day}",
+                                              on_change=_one_time, args=(f"dm_time_{'pm' if part == 'am' else 'am'}_{day}",)))
+                pick = next((x for x in picks if x), None)
+                st.caption(f"You picked {pick:%A %d %B at} {fmt(pick)}." if pick else
+                           "Pick a time. Each demo is 15 minutes.")
             notes = st.text_area("Anything we should know? (optional)", key="dm_notes", height=80,
                                  placeholder="e.g. we use a spreadsheet today, two locations…")
             go = st.button("Confirm my demo", type="primary", use_container_width=True, key="dm_go",
@@ -357,6 +387,11 @@ def render_booking(supabase):
                 st.error(problem)
                 return
             _book(supabase, cfg, name, email, phone, gym, members, notes, pick)
+
+
+def _one_time(other_key):
+    """Only one time can be picked: choosing a morning time clears the afternoon one, and back."""
+    st.session_state[other_key] = None
 
 
 def _book(supabase, cfg, name, email, phone, gym, members, notes, start):
