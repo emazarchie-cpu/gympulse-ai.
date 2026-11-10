@@ -306,6 +306,22 @@ html body .chip { border-radius: 999px; }
 
 .lx-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
 
+/* ---------- polish ---------- */
+/* toasts: at the bottom on phones, so they never cover the logo and menu */
+@media (max-width: 1000px) {
+  html body [data-testid="stToastContainer"] { top: auto !important; bottom: 18px !important; left: 12px !important;
+      right: 12px !important; align-items: stretch !important; }
+}
+/* horizontal radio choices: even spacing, no tall empty rows */
+html body .stMain [role="radiogroup"]:not(.st-key-top_nav *) { gap: 4px 18px !important; }
+html body .stMain [data-testid="stRadioOption"]:not(.st-key-top_nav *) { min-height: 34px !important; }
+/* tab and segmented rows that scroll sideways fade at the right edge, so it's clear there's more */
+@media (max-width: 1000px) {
+  html body .stApp :is([data-baseweb="tab-list"], [data-testid="stButtonGroup"] [role="radiogroup"]) {
+      -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent);
+              mask-image: linear-gradient(90deg, #000 85%, transparent); padding-right: 28px !important; }
+  html body .stApp [class*="st-key-dm_time_"] [role="radiogroup"] { -webkit-mask-image: none; mask-image: none; padding-right: 0 !important; }
+}
 /* ---------- full-screen menu (phones and tablets): fades in over the page, rows drift in ---------- */
 @keyframes gpMenuIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes gpRowIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }

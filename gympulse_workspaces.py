@@ -814,7 +814,7 @@ span[data-baseweb="tag"] span { color: #B7F34A !important; }
 @media (max-width: 640px) {
     .pg-title { font-size: 26px; }
     .profile-hero, .archie-hero { flex-direction: column; text-align: center; }
-    .chip-row { justify-content: center; }
+    :is(.profile-hero, .archie-hero) .chip-row { justify-content: center; }   /* only centred heroes centre their chips */
     [data-testid="stHorizontalBlock"]:has(.kpi) { flex-wrap: wrap !important; gap: .6rem !important; }
     [data-testid="stHorizontalBlock"]:has(.kpi) > [data-testid="stColumn"] {
         flex: 1 1 calc(50% - .6rem) !important; min-width: calc(50% - .6rem) !important; }
