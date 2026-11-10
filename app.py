@@ -1998,6 +1998,7 @@ def _is_mobile():
 def show_page(name):
     """Open a page and keep the top-bar radio in sync."""
     st.session_state["_menu_n"] = st.session_state.get("_menu_n", 0) + 1
+    st.session_state["_menu_sub"] = None
     _cur = st.session_state.get("current_page")
     if _cur and _cur != name:
         _h = st.session_state.setdefault("nav_hist", [])
@@ -2498,6 +2499,21 @@ def toggle_theme():
         pass
 
 
+def _menu_sub(view):
+    """Open a sub-page inside the full-screen menu (Profile), or go back (None)."""
+    st.session_state["_menu_sub"] = view
+
+
+def _menu_toggled():
+    st.session_state["_menu_sub"] = None          # every time the menu opens or closes, start at the top
+
+
+def _menu_theme():
+    toggle_theme()
+    st.session_state["_menu_sub"] = None
+    st.session_state["_menu_n"] = st.session_state.get("_menu_n", 0) + 1     # close the menu
+
+
 def open_settings(section):
     st.session_state["settings_section"] = section
     show_page("Settings")
@@ -2599,23 +2615,49 @@ with st.container(key="top_nav"):
 
             with st.container(key="top_menu"):
                 # A new key after every navigation: the full-screen menu closes once a page is picked
-                with st.popover("☰", key=f"top_menu_pop_{st.session_state.get('_menu_n', 0)}"):
-                    with st.container(key="pop_main"):
-                        for name in MAIN_PAGES:
-                            st.button(NAV_SHORT.get(name, name) if name != "Member Management" else "Members",
-                                      key=f"mob_main_{name}", on_click=show_page,
-                                      args=(name,), use_container_width=True)
-                    with st.container(key="pop_more"):
-                        for name in MORE_PAGES:
-                            if name == "Follow-ups":
-                                continue
-                            st.button(name, key=f"mob_more_{name}", on_click=show_page,
-                                      args=(name,), use_container_width=True)
-                    with st.container(key="pop_acct"):
-                        st.button("Profile & settings", icon=":material/account_circle:", key="mob_acct_settings",
-                                  on_click=open_settings, args=("Personal info",), use_container_width=True)
-                        st.button("Log out", icon=":material/logout:", key="mob_acct_logout",
-                                  on_click=log_out, use_container_width=True)
+                with st.popover("☰", key=f"top_menu_pop_{st.session_state.get('_menu_n', 0)}",
+                                on_change=_menu_toggled):
+                    if st.session_state.get("_menu_sub") == "profile":
+                        # Profile sub-page: ‹ back, title, then the account items
+                        with st.container(key="pop_sub"):
+                            st.button("Profile", icon=":material/chevron_left:", key="mob_sub_back",
+                                      on_click=_menu_sub, args=(None,))
+                            _mwho = user_name if gteam.is_staff() else (profile.get("full_name") or user_name)
+                            gw._md(f'<div class="pm-id">{gw.avatar_html(_mwho, _av, 52)}'
+                                   f'<div><div class="pm-name">{gw._esc(_mwho)}</div>'
+                                   f'<div class="pm-gym">{gw._esc(profile.get("business_name") or business_name)}</div>'
+                                   '</div></div>')
+                            _mdark = st.session_state.get("theme", "dark") == "dark"
+                            st.button("Switch to light mode" if _mdark else "Switch to dark mode",
+                                      icon=":material/light_mode:" if _mdark else ":material/dark_mode:",
+                                      key="mob_acct_theme", on_click=_menu_theme, use_container_width=True)
+                            st.button("Profile & settings", icon=":material/person:", key="mob_acct_settings",
+                                      on_click=open_settings, args=("Personal info",), use_container_width=True)
+                            if not gteam.is_staff():
+                                st.button("Trainers", icon=":material/groups:", key="mob_acct_trainers",
+                                          on_click=open_settings, args=("Trainers",), use_container_width=True)
+                                st.button("Check-in devices", icon=":material/qr_code_scanner:",
+                                          key="mob_acct_devices", on_click=open_settings,
+                                          args=("Check-in devices",), use_container_width=True)
+                                st.button("Preferences", icon=":material/tune:", key="mob_acct_prefs",
+                                          on_click=open_settings, args=("Preferences",), use_container_width=True)
+                            st.button("Log out", icon=":material/logout:", key="mob_acct_logout",
+                                      on_click=log_out, use_container_width=True)
+                    else:
+                        with st.container(key="pop_main"):
+                            for name in MAIN_PAGES:
+                                st.button(NAV_SHORT.get(name, name) if name != "Member Management" else "Members",
+                                          key=f"mob_main_{name}", on_click=show_page,
+                                          args=(name,), use_container_width=True)
+                        with st.container(key="pop_more"):
+                            for name in MORE_PAGES:
+                                if name == "Follow-ups":
+                                    continue
+                                st.button(name, key=f"mob_more_{name}", on_click=show_page,
+                                          args=(name,), use_container_width=True)
+                        with st.container(key="pop_acct"):
+                            st.button("Profile", icon=":material/account_circle:", key="mob_to_profile",
+                                      on_click=_menu_sub, args=("profile",), use_container_width=True)
 
     page = st.session_state["current_page"]
     if gteam.is_trainer() and page not in gteam.TRAINER_PAGES:
