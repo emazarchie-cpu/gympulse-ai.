@@ -604,7 +604,7 @@ def landing_top(lockup_uri, icon):
       <div class="lx-kicker">See it in action</div>
       <div class="lx-h2">Every feature, in under a minute.</div>
       <div class="lx-video">
-        <video src="/app/static/gympulse-demo.mp4?v=4" poster="/app/static/gympulse-demo-poster.jpg?v=4"
+        <video src="/app/static/gympulse-demo.mp4?v=5" poster="/app/static/gympulse-demo-poster.jpg?v=5"
                autoplay muted loop playsinline controls preload="metadata"
                aria-label="GymPulse AI product demo"></video>
       </div>
