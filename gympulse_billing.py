@@ -573,6 +573,59 @@ def must_lock(supabase, gym_id):
     return state(subscription(supabase, gym_id))["locked"] and not is_admin_account()
 
 
+# ------------------------------------------------------------------ members and public pages of a locked gym
+def gym_locked(gym_id):
+    """For member and public pages (member app, sign-up link, HMO check-in, machine guides, trainer pages):
+    True when this gym's plan has ended. Uses the server key; never locks when billing isn't set up."""
+    if not gym_id:
+        return False
+    import gympulse_admin as gadm
+    sc = gadm.service_client()
+    if sc is None:
+        return False
+    try:
+        return bool(state(subscription(sc, gym_id))["locked"])
+    except Exception:
+        return False
+
+
+def gym_by(table, column, value):
+    """The gym id behind a public code or link (join code, guide id, trainer link), or None."""
+    import gympulse_admin as gadm
+    sc = gadm.service_client()
+    if sc is None or not value:
+        return None
+    try:
+        rows = sc.table(table).select("gym_id" if table != "gyms" else "id").eq(column, str(value)) \
+            .limit(1).execute().data or []
+    except Exception:
+        return None
+    return (rows[0].get("gym_id") or rows[0].get("id")) if rows else None
+
+
+def render_gym_locked(gym_name=""):
+    """What members and visitors see when their gym's GymPulse AI plan has ended."""
+    who = gw._esc(gym_name) if gym_name else "your gym"
+    gw._md(f'''<div class="mp-card" style="text-align:center;padding:28px 18px">
+      <div style="font-size:40px">⏸️</div>
+      <div class="bk-title" style="margin:8px 0 6px">Not available right now</div>
+      <p>This service from {who} is paused. Please contact {who} (the front desk or the gym manager).</p>
+    </div>''')
+
+
+def locked_gyms(sc):
+    """{gym_id} whose plan has ended, for the scheduled jobs (none when billing isn't set up)."""
+    try:
+        rows = sc.table("platform_settings").select("value").eq("key", "pricing").limit(1).execute().data
+        p = {**DEFAULT_PRICING, **(rows[0]["value"] if rows else {})}
+        if not billing_on(p):
+            return set()
+        subs = sc.table("gym_subscriptions").select("*").execute().data or []
+    except Exception:
+        return set()
+    return {r["gym_id"] for r in subs if state(r)["locked"]}
+
+
 def _email_founder(subject, text, reply_to=None, to=None):
     import gympulse_admin as gadm
     import requests

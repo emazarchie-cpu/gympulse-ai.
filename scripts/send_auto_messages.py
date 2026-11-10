@@ -30,8 +30,12 @@ def main():
         return 1
     import gympulse_billing as gbill
     levels = gbill.gym_levels(sc)
+    locked = gbill.locked_gyms(sc)                    # plan ended: no messages until they renew
     total = [0, 0, 0]
     for entry in gadm.all_gyms(sc, fresh=True):
+        if entry["gym"]["id"] in locked:
+            print(f"{entry['name']}: plan ended, skipped")
+            continue
         if levels.get(entry["gym"]["id"], 3) < 2:      # Starter plan: renewal reminders only
             settings = dict(entry["profile"].get("settings") or {})
             auto_raw = dict(settings.get("auto_messages") or {})

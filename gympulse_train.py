@@ -932,6 +932,10 @@ def render_guide(supabase, gid):
         if not rows:
             st.error("This guide isn't available. Please ask a coach.")
             return
+        import gympulse_billing as gbill
+        if gbill.gym_locked(gbill.gym_by("machine_guides", "id", gid)):
+            gbill.render_gym_locked(rows[0].get("business_name"))
+            return
         g = rows[0]
         gw._md(f'<div class="bk-sub">{gw._esc(g.get("business_name") or "")}</div>'
                f'<div class="bk-title">{gw._esc(g["name"])}</div>')

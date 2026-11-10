@@ -58,6 +58,10 @@ def render_public(supabase, code, token=None):
         if not gym:
             st.error("This check-in code isn't active. Please ask the front desk.")
             return
+        import gympulse_billing as gbill
+        if gbill.gym_locked(gbill.gym_by("gyms", "join_code", code)):
+            gbill.render_gym_locked(gym)
+            return
         gw._md(f'<div class="bk-title">Check in at {gw._esc(gym)}</div>'
                '<div class="bk-sub">For members whose gym access is paid by their HMO or company.</div>')
         res = st.session_state.pop("hmo_res", None)
