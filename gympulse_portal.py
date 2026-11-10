@@ -667,6 +667,11 @@ def render_portal(supabase, token):
             st.link_button("Get a new link", login_url(), type="primary", use_container_width=True)
         return
     gym, prof, gym_name = _gym(sc, m["gym_id"])
+    import gympulse_billing as gbill
+    if gbill.gym_locked(m["gym_id"]):                         # the gym's GymPulse AI plan has ended
+        with col:
+            gbill.render_gym_locked(gym_name)
+        return
     if st.session_state.get("_mp_seen") != m["id"]:          # once per visit, not on every tap
         st.session_state["_mp_seen"] = m["id"]
         try:

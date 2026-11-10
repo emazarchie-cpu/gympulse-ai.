@@ -38,6 +38,10 @@ def render_public(supabase, code):
         if not gym:
             st.error("This sign-up link isn't active. Please ask your gym for a new one.")
             return
+        import gympulse_billing as gbill
+        if gbill.gym_locked(gbill.gym_by("gyms", "join_code", code)):
+            gbill.render_gym_locked(gym)
+            return
         done = st.session_state.pop("join_done", None)      # shown once: the next visit starts a fresh form
         if done and st.session_state.pop("join_done_code", None) != str(code):
             done = None

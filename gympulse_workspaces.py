@@ -3208,6 +3208,10 @@ def render_public_trainer(supabase, token):
     if not data:
         st.error("This profile link is not valid or has been switched off.")
         return
+    import gympulse_billing as gbill
+    if gbill.gym_locked(gbill.gym_by("trainers", "share_token", token)):
+        gbill.render_gym_locked(_text(data.get("gym")))
+        return
     gym = _text(data.get("gym"))
     _md(f'<div class="pg-head"><div class="pg-eyebrow">Meet your trainer</div>'
         f'<div class="pg-title">{_esc(_text(data.get("full_name"), "Trainer"))}</div>'

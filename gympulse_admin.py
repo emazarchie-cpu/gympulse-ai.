@@ -248,10 +248,16 @@ def send_all(sc, start, end, sent_by="auto", only=None, log=print):
     period = f"{start:%Y-%m}"
     done = sent_log(sc, period) or {}
     flags = gym_flags(sc) or {}
+    import gympulse_billing as gbill
+    locked = gbill.locked_gyms(sc) if not only else set()      # plan ended: no report (you can still send one)
     sent = skipped = failed = 0
     for entry in all_gyms(sc, fresh=True):
         gid = entry["gym"]["id"]
         if only and gid not in only:
+            continue
+        if gid in locked:
+            skipped += 1
+            log(f"plan ended {entry['name']}")
             continue
         if flags.get(gid, {}).get("reports_paused"):
             skipped += 1
