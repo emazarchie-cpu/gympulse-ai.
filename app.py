@@ -278,6 +278,10 @@ st.markdown(
         color: #10182A;
         border: none;
     }
+    .stButton > button:hover :is(p, span, div),
+    .stFormSubmitButton > button:hover :is(p, span, div) {
+        color: #10182A !important;            /* dark text on the lime hover/tap colour */
+    }
 
 
     .stProgress > div > div > div > div {
