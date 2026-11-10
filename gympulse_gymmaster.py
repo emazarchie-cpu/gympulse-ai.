@@ -57,6 +57,11 @@ FIELDS = [  # key, label, common GymMaster/other headings (lowercase, spaces nor
     ("visits_30", "Visits in the last 30 days", ["visits last 30 days", "visits in last 30 days", "visits this month",
                                                  "attendance last 30 days", "visits (30 days)", "visits 30 days",
                                                  "check ins last 30 days", "recent visits"]),
+    ("trainer", "Personal trainer", ["personal trainer", "trainer", "pt trainer", "assigned trainer",
+                                     "trainer name", "personal trainer name", "coach", "assigned coach", "pt coach"]),
+    ("has_pt", "Personal training (yes / no)", ["personal training", "pt", "has pt", "pt client", "pt member",
+                                                 "pt package", "personal training client", "pt sessions",
+                                                 "personal training sessions"]),
     ("photo", "Photo link", ["photo", "photo url", "picture", "image", "avatar", "profile picture", "photo link",
                              "image url", "picture url", "profile photo"]),
 ]
@@ -89,6 +94,23 @@ PLAN_WORDS = [  # (pattern, GymPulse plan), checked in order
     (r"\bmonth(ly)?\b|30 ?days?|1 ?month", "Monthly"),
 ]
 PLACEHOLDER = {"age": 30, "weight_kg": 70.0, "height_cm": 170.0}
+PT_PLAN = re.compile(r"\bpt\b|personal ?train|\b1\s*(?:-\s*)?(?:on|to|:|-)\s*(?:-\s*)?1\b|one ?(?:to|on) ?one", re.I)
+NO_WORDS = {"", "no", "n", "none", "false", "0", "-", "nil", "n/a", "na", "not set"}
+YES_WORDS = {"yes", "y", "true", "x", "✓", "1"}
+
+
+def pt_from(trainer, flag, membership):
+    """(has_pt, known) for one row: a named trainer, a yes / number in a personal training column,
+    or a personal training membership name (e.g. "PT Package", "Personal Training 3x week")."""
+    flag = str(flag or "").strip().lower()
+    trainer = str(trainer or "").strip()
+    if trainer.lower() in YES_WORDS:                   # a yes/no column mapped as the trainer
+        flag, trainer = "yes", ""
+    if trainer.lower() in NO_WORDS:
+        trainer = ""
+    if trainer or (flag and flag not in NO_WORDS) or PT_PLAN.search(str(membership or "")):
+        return True, True
+    return False, bool(flag)
 
 
 def _norm(h):
@@ -208,6 +230,9 @@ def build_rows(df, cols, plan_map, existing, stats=None):
                "age": age, "goal": get(r, "goal"), "last_visit": last_visit, "membership": mname,
                "member_no": get(r, "member_no"), "weight": weight, "height": height, "price": price,
                "visits_30": int(min(v30, 60)) if v30 is not None else None,
+               "trainer": "" if get(r, "trainer").lower() in NO_WORDS | YES_WORDS else get(r, "trainer"),
+               "has_pt": pt_from(get(r, "trainer"), get(r, "has_pt"), mname)[0],
+               "pt_known": any(pt_from(get(r, "trainer"), get(r, "has_pt"), mname)),
                "photo_url": photo if photo.lower().startswith(("http://", "https://")) else ""}
         if dup is None:
             seen[key] = row
@@ -227,7 +252,7 @@ def build_rows(df, cols, plan_map, existing, stats=None):
 
 
 OPTIONAL = {"plan_name", "member_no", "import_batch", "member_since", "last_renewed_on", "last_payment",
-            "membership_end", "weight_kg", "height_cm", "fitness_goal", "photo"}
+            "membership_end", "weight_kg", "height_cm", "fitness_goal", "photo", "has_pt", "pt_trainer_id"}
 
 
 def _missing_column(error):
@@ -316,7 +341,40 @@ def _member_fields(r, today):
             d["last_renewed_on"] = max(r["start"], min(back, today)).isoformat()
     if r.get("price"):
         d["last_payment"] = float(r["price"])
+    if r.get("pt_known") or r.get("has_pt"):           # only when the file says something about PT
+        d["has_pt"] = bool(r.get("has_pt"))
+    if r.get("pt_trainer_id"):
+        d["pt_trainer_id"] = r["pt_trainer_id"]
     return d
+
+
+def link_trainers(supabase, gym_id, rows):
+    """Match each row's trainer name to Settings → Trainers, adding trainers that aren't there yet.
+    Sets row["pt_trainer_id"]. Returns how many trainers were added."""
+    names = {r["trainer"].strip() for r in rows if r.get("trainer")}
+    if not names:
+        return 0
+    try:
+        have = supabase.table("trainers").select("id, full_name").eq("gym_id", gym_id).execute().data or []
+    except Exception:
+        return 0
+    ids = {gw._text(t.get("full_name")).strip().lower(): t["id"] for t in have}
+    added = 0
+    for n in sorted(names):
+        if n.lower() in ids:
+            continue
+        try:
+            res = supabase.table("trainers").insert({"gym_id": gym_id, "full_name": n[:80],
+                                                     "specialty": "Personal trainer"}).execute().data or []
+            if res:
+                ids[n.lower()] = res[0]["id"]
+                added += 1
+        except Exception:
+            pass
+    for r in rows:
+        if r.get("trainer"):
+            r["pt_trainer_id"] = ids.get(r["trainer"].strip().lower())
+    return added
 
 
 def _activity_row(gym_id, mid, r, now_iso, today, hist=None):
@@ -340,6 +398,7 @@ def run_import(supabase, gym_id, rows, update_existing=True, progress=None, hist
     """Import in batches of 500 so thousands of members take seconds, not minutes.
     history: [(keys, datetime)] past visits from the old software (see build_history)."""
     from datetime import timezone
+    trainers_added = link_trainers(supabase, gym_id, rows)
     created = updated = skipped = failed = placeholders = visits = 0
     problems = []
     today, now_iso = gw.today_local(), datetime.now(timezone.utc).isoformat()
@@ -470,6 +529,7 @@ def run_import(supabase, gym_id, rows, update_existing=True, progress=None, hist
     return {"created": created, "updated": updated, "skipped": skipped, "failed": failed,
             "placeholders": placeholders, "visits": visits, "problems": problems, "photos": photos,
             "photo_fail": photo_fail, "with_history": len(per_member),
+            "pt_clients": sum(1 for r in rows if r.get("has_pt")), "trainers_added": trainers_added,
             "keys": {k: mid for mid, r in ready for k in _photo_keys(r) if k}}
 
 
@@ -972,6 +1032,10 @@ def render_gymmaster_import(supabase, gym_id):
                + (f", {res['skipped']} skipped" if res["skipped"] else "")
                + (f", {res['visits']:,} past visits brought over" if res["visits"] else "")
                + (f", {res['photos']} photos added" if res.get("photos") else "") + ".")
+        if res.get("pt_clients"):
+            msg += (f" {res['pt_clients']:,} personal training client(s) marked, so they won't be offered a trainer"
+                    + (f"; {res['trainers_added']} trainer(s) added to Settings → Trainers" if res.get("trainers_added")
+                       else "") + ".")
         if res.get("photo_fail"):
             msg += (f" {res['photo_fail']} photo(s) couldn't be added (the link needed a login, or no member matched "
                     "the file name); add them on the member's profile or with Add photos below.")
