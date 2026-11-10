@@ -1409,6 +1409,8 @@ MEMBER_BASE = ["id", "full_name", "email", "phone", "age", "weight_kg",
 MEMBER_SUSPEND = ["suspended"]
 MEMBER_PROFILE = ["photo", "membership_end", "last_renewed_on", "last_payment"]
 MEMBER_PROFILE_LIGHT = ["membership_end", "last_renewed_on", "last_payment"]
+MEMBER_PT = ["has_pt", "pt_trainer_id"]          # sql/phase34_personal_training.sql
+NO_TRAINER_PLAYS = {"Trainer intro", "Free PT session"}   # pointless for someone who already has a trainer
 
 def fetch_all(query, page=1000, cap=50000):
     """Every row of a query, page by page. Supabase returns at most 1,000 rows per request,
@@ -1424,7 +1426,8 @@ def fetch_all(query, page=1000, cap=50000):
 
 def _fetch_members_uncached(supabase, gym_id, archived=None, include_photo=True):
     profile = MEMBER_PROFILE if include_photo else MEMBER_PROFILE_LIGHT
-    attempts = [MEMBER_BASE + MEMBER_SUSPEND + profile,
+    attempts = [MEMBER_BASE + MEMBER_SUSPEND + profile + MEMBER_PT,
+                MEMBER_BASE + MEMBER_SUSPEND + profile,
                 MEMBER_BASE + MEMBER_SUSPEND,
                 MEMBER_BASE]
     rows, used, last_error = None, None, None
@@ -1444,13 +1447,15 @@ def _fetch_members_uncached(supabase, gym_id, archived=None, include_photo=True)
     df = pd.DataFrame(rows)
     if df.empty:
         df = pd.DataFrame(columns=MEMBER_BASE + MEMBER_SUSPEND + MEMBER_PROFILE)
-    for column in MEMBER_SUSPEND + MEMBER_PROFILE:
+    for column in MEMBER_SUSPEND + MEMBER_PROFILE + MEMBER_PT:
         if column not in df.columns:
             df[column] = None
+    df["has_pt"] = df["has_pt"].fillna(False).astype(bool)
     df["archived"] = df["archived"].fillna(False).astype(bool)
     df["suspended"] = df["suspended"].fillna(False).astype(bool)
     features = {"suspend_ready": "suspended" in used,
-                "profile_ready": "membership_end" in used}
+                "profile_ready": "membership_end" in used,
+                "pt_ready": "has_pt" in used}
     return df, features
 
 def _load_roster_uncached(supabase, gym_id, assess_fn, with_photos=True):
@@ -1458,7 +1463,7 @@ def _load_roster_uncached(supabase, gym_id, assess_fn, with_photos=True):
     members = members_all[~members_all["suspended"]]
 
     keep = ["id", "full_name", "email", "phone", "fitness_goal",
-            "membership_end", "last_payment", "last_renewed_on"]
+            "membership_end", "last_payment", "last_renewed_on", "has_pt", "pt_trainer_id"]
     if with_photos:
         keep.append("photo")
     members = members[[c for c in keep if c in members.columns]].reset_index(drop=True)
@@ -1592,7 +1597,7 @@ def drivers(row):
         d = int(row["renewal_due_days"])
         out.append("renews today" if d == 0 else f"lapsed {-d} days ago" if d < 0
                    else f"renews in {d} day{'s' if d != 1 else ''}")
-    if row["pt_sessions_attended"] == 0:
+    if row["pt_sessions_attended"] == 0 and not _has_pt(row):
         out.append("no PT sessions")
     if PLAN_DAYS.get(plan_name(row["membership_type"]), 30) <= 30:
         out.append(f"{plan_phrase(row['membership_type'])} plan (easy to leave)")
@@ -1606,12 +1611,26 @@ def drivers(row):
             return "visiting regularly"
     return ", ".join(out) or "no major warning signs"
 
+def _has_pt(row):
+    v = row.get("has_pt") if hasattr(row, "get") else None
+    return bool(v) and not (isinstance(v, float) and pd.isna(v))
+
+
+def member_trainer(trainers, row, goal=""):
+    """The member's own personal trainer when they have one, otherwise the best match for their goal."""
+    own = row.get("pt_trainer_id") if hasattr(row, "get") else None
+    for t in trainers or []:
+        if own and str(t.get("id")) == str(own):
+            return t
+    return pick_trainer(trainers, goal)
+
+
 def suggest_action(row):
     if row["renewal_due_days"] <= 14 and row["risk_category"] != "Low":
         return "Renewal offer"
     if row["days_since_last_visit"] >= 14:
         return "Personal call"
-    if row["pt_sessions_attended"] == 0:
+    if row["pt_sessions_attended"] == 0 and not _has_pt(row):
         return "Trainer intro"
     if row["risk_category"] == "Low":
         return "Goal review"
@@ -2675,6 +2694,7 @@ def render_member_profile(supabase, gym_id, member_id, assess_fn):
             new_goal = st.selectbox(
                 "Fitness goal", goal_options,
                 index=goal_options.index(goal) if goal in goal_options else 2)
+            new_pt, new_trainer = pt_fields(supabase, gym_id, m, key=f"pt_{member_id}")
             saved = st.form_submit_button("Save changes", type="primary", use_container_width=True)
         if saved:
             if not new_name.strip():
@@ -2690,11 +2710,53 @@ def render_member_profile(supabase, gym_id, member_id, assess_fn):
                         "height_cm": float(new_height),
                         "fitness_goal": new_goal,
                     }).eq("id", member_id).eq("gym_id", gym_id).execute())
+                    pt_note = save_pt(supabase, gym_id, member_id, new_pt, new_trainer)
                 except Exception as error:
                     st.error(f"Could not save the changes: {error}")
                 else:
-                    st.session_state["profile_flash"] = "Details saved."
+                    st.session_state["profile_flash"] = "Details saved." + (f" {pt_note}" if pt_note else "")
                     st.rerun()
+
+
+PT_OPTIONS = ["No personal trainer", "Has a personal trainer"]
+
+
+def pt_fields(supabase, gym_id, member=None, key="pt"):
+    """Inside a form: does this member pay for personal training, and with which trainer.
+    Returns (has_pt, trainer_id or None)."""
+    member = member if member is not None else {}
+    cur = bool(member.get("has_pt")) if not isinstance(member.get("has_pt"), float) else False
+    trainers = load_trainers(supabase, gym_id)
+    tmap = {t["id"]: t for t in trainers}
+    c1, c2 = st.columns(2)
+    choice = c1.radio("Personal training", PT_OPTIONS, index=1 if cur else 0, horizontal=False, key=f"{key}_has",
+                      help="Members who already pay for personal training won't be offered trainer intros or "
+                           "free PT sessions.")
+    trainer = None
+    if tmap:
+        ids = [None] + list(tmap)
+        own = member.get("pt_trainer_id")
+        trainer = c2.selectbox("Their trainer (if they have one)", ids,
+                               index=ids.index(own) if own in ids else 0, key=f"{key}_who",
+                               format_func=lambda i: "Not set" if i is None else _text(tmap[i].get("full_name"), "Trainer"))
+    else:
+        c2.caption("Add your trainers in Settings → Trainers to pick who trains them.")
+    has = choice == PT_OPTIONS[1]
+    return has, (trainer if has else None)
+
+
+def save_pt(supabase, gym_id, member_id, has_pt, trainer_id):
+    """Save personal training. Returns a note when the database isn't set up for it yet."""
+    if not member_id:
+        return ""
+    try:
+        (supabase.table("members").update({"has_pt": bool(has_pt), "pt_trainer_id": trainer_id})
+         .eq("id", member_id).eq("gym_id", gym_id).execute())
+        bump_data_version(gym_id)
+        return ""
+    except Exception:
+        return ("Personal training wasn't saved: run sql/phase34_personal_training.sql in Supabase first."
+                if has_pt else "")
 
 # --------------------------------------------------------- radar
 def _short_naira(v):
@@ -2988,7 +3050,8 @@ def member_message_ctx(r):
     get = r.get if hasattr(r, "get") else (lambda k, d=None: d)
     return {"name": _text(get("full_name")), "phone": _text(get("phone")),
             "email": _text(get("email")), "goal": _text(get("fitness_goal")),
-            "renew_days": get("renewal_due_days"), "days_away": get("days_since_last_visit")}
+            "renew_days": get("renewal_due_days"), "days_away": get("days_since_last_visit"),
+            "pt_trainer_id": get("pt_trainer_id")}
 
 
 def _biz_ctx():
@@ -3259,7 +3322,7 @@ def _play_panel(supabase, a):
     trainers = ctx_play.get("trainers") or {}
     trainer = trainers.get(a.get("trainer_id")) if play in TRAINER_PLAYS else None
     if play in TRAINER_PLAYS and trainer is None and trainers:
-        trainer = pick_trainer(list(trainers.values()), member.get("goal"))
+        trainer = member_trainer(list(trainers.values()), member, member.get("goal"))
     details = a.get("details")
     if not isinstance(details, dict):
         details = {}
@@ -3688,12 +3751,18 @@ def _pillars_panel(supabase, gym_id, roster, actions):
         play = c2.selectbox("Play", plays, format_func=lambda t: f"{t[0]} · {t[1]}",
                             key="play_type")
         trainer_id = None
+        who_row = roster[roster["id"] == who].iloc[0] if who in set(roster["id"]) else {}
+        if play[1] in NO_TRAINER_PLAYS and _has_pt(who_row):
+            st.warning(f"{names[who]} already has a personal trainer, so a {play[1].lower()} isn't needed. "
+                       "Try a goal review with their trainer, or a check-in.")
         if play[1] in TRAINER_PLAYS:
             trainers = load_trainers(supabase, gym_id)
             if trainers:
                 tmap = {t["id"]: t for t in trainers}
+                own = member_trainer(trainers, who_row) if _has_pt(who_row) else None
+                order = ([own["id"]] if own else []) + [i for i in tmap if not own or i != own["id"]]
                 trainer_id = st.selectbox(
-                    "Trainer", list(tmap), key="play_trainer",
+                    "Trainer", order, key="play_trainer",
                     format_func=lambda i: f'{tmap[i]["full_name"]} · {_text(tmap[i].get("specialty"), "Trainer")}')
                 _md(trainer_card_html(tmap[trainer_id]))
             else:

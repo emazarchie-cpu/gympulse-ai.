@@ -55,6 +55,7 @@ select step, ok from (values
   ('phase31_traffic    accurate Gym now',          exists (select 1 from fn where proname = 'gp_gym_traffic')),
   ('phase32_predcheck  prediction check',          to_regclass('public.prediction_snapshots') is not null),
   ('phase33_passwords  member email + password',  to_regclass('public.member_passwords') is not null),
+  ('phase34_pt         members with a personal trainer', exists (select 1 from col where c = 'members.has_pt')),
   ('security           RLS on every gym table',       not exists (
         select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace
         where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity
