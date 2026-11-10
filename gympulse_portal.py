@@ -240,6 +240,100 @@ def verify_code(sc, email, code):
     return ok
 
 
+# ------------------------------------------------------------------ public: sign in with email and password
+PW_MIN = 8
+PW_MAX_TRIES = 10            # wrong passwords in a row before sign-in locks
+PW_LOCK_MINUTES = 15
+PW_ITER = 200_000
+
+
+def _pw_hash(password):
+    """PBKDF2-SHA256 with a random salt: the password itself is never stored."""
+    import hashlib
+    import secrets
+    salt = secrets.token_bytes(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, PW_ITER)
+    return f"pbkdf2_sha256${PW_ITER}${salt.hex()}${digest.hex()}"
+
+
+def _pw_ok(password, stored):
+    import hashlib
+    import hmac
+    try:
+        _, rounds, salt, digest = str(stored).split("$")
+        calc = hashlib.pbkdf2_hmac("sha256", password.encode(), bytes.fromhex(salt), int(rounds)).hex()
+    except (ValueError, TypeError):
+        return False
+    return hmac.compare_digest(calc, digest)
+
+
+def _pw_row(sc, member_id):
+    rows = (sc.table("member_passwords").select("*").eq("member_id", member_id).limit(1).execute().data or [])
+    return rows[0] if rows else None
+
+
+def has_password(sc, member_id):
+    try:
+        return _pw_row(sc, member_id) is not None
+    except Exception:
+        return False
+
+
+def set_password(sc, m, password):
+    """Save the password for this membership and every other membership with the same email,
+    so one password opens all of a member's gyms."""
+    ids = {str(m["id"]): m["gym_id"]}
+    e = gw._text(m.get("email")).strip().lower()
+    if e:
+        for f in _find(sc, e)[:5]:
+            other = _member(sc, f["member_id"])
+            if other and gw._text(other.get("email")).strip().lower() == e:
+                ids[str(other["id"])] = other["gym_id"]
+    now = datetime.now(timezone.utc).isoformat()
+    sc.table("member_passwords").upsert(
+        [{"member_id": mid, "gym_id": gid, "hash": _pw_hash(password), "tries": 0, "locked_until": None,
+          "updated_at": now} for mid, gid in ids.items()], on_conflict="member_id").execute()
+
+
+def verify_password(sc, email, password):
+    """(memberships this password opens, "ok" | "locked" | "wrong"). Wrong tries count per membership."""
+    now = datetime.now(timezone.utc)
+    ok, locked = [], False
+    for f in _find(sc, email)[:5]:
+        m = _member(sc, f["member_id"])
+        if not m or gw._text(m.get("email")).strip().lower() != email:
+            continue
+        row = _pw_row(sc, m["id"])
+        if not row:
+            continue
+        until = pd.to_datetime(row.get("locked_until"), utc=True, errors="coerce")
+        if not pd.isna(until) and until.to_pydatetime() > now:
+            locked = True
+            continue
+        if _pw_ok(password, row.get("hash")):
+            ok.append(m)
+            if row.get("tries"):
+                sc.table("member_passwords").update({"tries": 0, "locked_until": None}) \
+                    .eq("member_id", m["id"]).execute()
+        else:
+            tries = int(row.get("tries") or 0) + 1
+            upd = {"tries": tries}
+            if tries >= PW_MAX_TRIES:
+                upd = {"tries": 0, "locked_until": (now + timedelta(minutes=PW_LOCK_MINUTES)).isoformat()}
+            sc.table("member_passwords").update(upd).eq("member_id", m["id"]).execute()
+    return ok, ("ok" if ok else "locked" if locked else "wrong")
+
+
+def password_problem(new, again):
+    if len(new) < PW_MIN:
+        return f"Use at least {PW_MIN} characters."
+    if new != again:
+        return "The two passwords don't match."
+    if new.isdigit() or new.lower() in ("password", "12345678", "password1", "qwertyui"):
+        return "That password is too easy to guess. Mix letters and numbers."
+    return ""
+
+
 def _end(m):
     e = pd.to_datetime(m.get("membership_end"), errors="coerce")
     return None if pd.isna(e) else e.date()
@@ -256,7 +350,7 @@ def _one_per_gym(members):
 
 
 def _enter(m):
-    for k in ("mp_step", "mp_email", "mp_choices", "mp_code_tries"):
+    for k in ("mp_step", "mp_email", "mp_choices", "mp_code_tries", "mp_pw_tries"):
         st.session_state.pop(k, None)
     st.query_params.clear()
     st.query_params["me"] = str(m["portal_token"])
@@ -268,13 +362,14 @@ def render_login(supabase):
 
 
 def render_code_login(supabase, embedded=False):
-    """Members sign in: email, then the 6-digit code we email them. No sign-up, no password."""
+    """Members sign in with their email and password. First time, or forgot it? A 6-digit code by email
+    (then they set a password under Me)."""
     if not embedded:
         import gympulse_booking as gb
         gb._header()
     st.markdown(CSS, unsafe_allow_html=True)
     box = st.container(border=True, key="mp_login_card") if embedded else st.container(key="mp_wrap")
-    step = st.session_state.get("mp_step", "email")
+    step = st.session_state.get("mp_step", "password")
     with box:
         st.markdown('<div class="auth-title">Member sign in</div>' if embedded else
                     '<div class="bk-title">Your membership</div>', unsafe_allow_html=True)
@@ -282,9 +377,49 @@ def render_code_login(supabase, embedded=False):
         if sc is None:
             st.info("Member sign in isn't available yet. Please ask your gym.")
             return
-        if step == "email":
-            st.caption("Enter the email your gym has for you. We'll email you a 6-digit code: no sign-up and no "
-                       "password needed.")
+        if step == "password":
+            st.caption("Sign in with the email your gym has for you and your password.")
+            with st.form("mp_pw_form"):
+                email = st.text_input("Email", placeholder="you@email.com", key="mp_pw_email")
+                pw = st.text_input("Password", type="password", key="mp_pw_in")
+                go = st.form_submit_button("Sign in", type="primary", use_container_width=True)
+            if go:
+                e = email.strip().lower()
+                tries = st.session_state.get("mp_pw_tries", 0)
+                if "@" not in e or not pw:
+                    st.error("Enter your email and password.")
+                elif tries >= 12:
+                    st.error("Too many tries. Use “Email me a code” below instead.")
+                else:
+                    st.session_state["mp_pw_tries"] = tries + 1
+                    try:
+                        ok, state = verify_password(sc, e, pw)
+                    except Exception:
+                        ok, state = [], "setup"
+                    ok = _one_per_gym(ok)
+                    if len(ok) == 1:
+                        _enter(ok[0])
+                    elif ok:
+                        st.session_state["mp_choices"] = [m["id"] for m in ok]
+                        st.session_state["mp_step"] = "pick"
+                        st.rerun()
+                    elif state == "locked":
+                        st.error(f"Too many wrong passwords. Try again in {PW_LOCK_MINUTES} minutes, "
+                                 "or sign in with an email code below.")
+                    elif state == "setup":
+                        st.error("Password sign-in isn't switched on yet. Please use “Email me a code”.")
+                    else:
+                        st.error("That email and password don't match. First time here, or forgot your "
+                                 "password? Use “Email me a code”.")
+            if st.button("First time here, or forgot your password? Email me a code", key="mp_to_code",
+                         use_container_width=True):
+                st.session_state["mp_step"] = "email"
+                st.rerun()
+            st.caption("No email with your gym? Ask the front desk to add it, or to send your private link on "
+                       "WhatsApp.")
+        elif step == "email":
+            st.caption("Enter the email your gym has for you. We'll email you a 6-digit code to sign in, then "
+                       "you can set a password under Me.")
             with st.form("mp_email_form"):
                 email = st.text_input("Email", placeholder="you@email.com", key="mp_email_in")
                 go = st.form_submit_button("Email me a code", type="primary", use_container_width=True)
@@ -301,8 +436,9 @@ def render_code_login(supabase, embedded=False):
                     st.session_state["mp_email"] = e
                     st.session_state["mp_step"] = "code"
                     st.rerun()
-            st.caption("No email with your gym? Ask the front desk to add it, or to send your private link on "
-                       "WhatsApp.")
+            if st.button("Sign in with my password instead", key="mp_to_pw", use_container_width=True):
+                st.session_state["mp_step"] = "password"
+                st.rerun()
         elif step == "code":
             e = st.session_state.get("mp_email", "")
             st.info(f"If {e} belongs to a gym member, a 6-digit code is on its way. Check your spam folder too.")
@@ -652,6 +788,8 @@ def _details(sc, m, gym_name):
         st.session_state["mp_flash"] = "Your details are saved."
         st.rerun()
     st.divider()
+    _password_box(sc, m)
+    st.divider()
     if st.button("Log out", key="mp_logout", icon=":material/logout:"):
         st.query_params.clear()
         st.rerun()
@@ -665,6 +803,35 @@ def _details(sc, m, gym_name):
                                         + (", and we've sent it to you by " + " and ".join(used) if used else "")
                                         + ". Save it (Add to Home Screen) so you don't lose it.")
         st.query_params["me"] = new
+        st.rerun()
+
+
+def _password_box(sc, m):
+    """Set (first time) or change the password used to sign in with email and password."""
+    has = has_password(sc, m["id"])
+    st.markdown("**Change your password**" if has else "**Set a password**")
+    if not gw._text(m.get("email")).strip():
+        st.caption("Add your email above first: you sign in with your email and password.")
+        return
+    if not has:
+        st.caption("Set one so next time you can sign in with your email and password, without waiting for a "
+                   "code.")
+    with st.form("mp_pw_set"):
+        new = st.text_input("New password", type="password", help=f"At least {PW_MIN} characters.")
+        again = st.text_input("Type it again", type="password")
+        save = st.form_submit_button("Save password", type="primary", use_container_width=True)
+    if save:
+        problem = password_problem(new, again)
+        if problem:
+            st.error(problem)
+            return
+        try:
+            set_password(sc, m, new)
+        except Exception:
+            st.error("Passwords aren't switched on yet. Please ask your gym.")
+            return
+        st.session_state["mp_flash"] = ("Password saved. Next time, sign in with "
+                                        f"{gw._text(m.get('email')).strip()} and this password.")
         st.rerun()
 
 
