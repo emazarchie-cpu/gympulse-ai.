@@ -53,7 +53,9 @@ _rp = st.session_state.get("_rendered_page")
 _nav_new = bool(st.session_state.get("navigate_to")) or (
     _rp is not None and st.session_state.get("current_page") != _rp
     and (_rp != "__landing__" or bool(st.session_state.get("auth_user"))))   # landing -> app after sign-in
-st.markdown('<style>[data-testid="stElementContainer"][data-stale="true"]{display:none !important}</style>'
+st.markdown('<style>[data-testid="stElementContainer"][data-stale="true"]:not(:has(.boot-overlay)),'
+            '[data-testid="stVerticalBlock"]:has([data-stale="true"]):not(:has([data-stale="false"]))'
+            ':not(:has(.boot-overlay)){display:none !important}</style>'
             if _nav_new else '<style></style>', unsafe_allow_html=True)
 
 
@@ -1175,6 +1177,22 @@ show_terms, show_privacy, show_dpa = gl.show_terms, gl.show_privacy, gl.show_dpa
 # Design system v2 sits on top of every earlier style layer
 gd.apply()
 
+# Stay signed in: a new visit (after switching apps, or the next day) signs back in from the
+# "remember me" cookie instead of showing the sign-in page again.
+import gympulse_remember as grem
+if st.session_state.auth_user is None:
+    _remembered = grem.restore(supabase)
+    if _remembered:
+        st.session_state.auth_user = {"id": str(_remembered.id), "email": _remembered.email}
+        try:
+            _rows = supabase.table("profiles").select("*").eq("id", str(_remembered.id)).execute().data or []
+        except Exception:
+            _rows = []
+        _meta = getattr(_remembered, "user_metadata", None) or {}
+        st.session_state.user_profile = _rows[0] if _rows else {
+            "id": str(_remembered.id), "full_name": _meta.get("full_name") or "User",
+            "business_name": _meta.get("business_name") or "My Gym"}
+
 # Show login and registration until authenticated
 if st.session_state.auth_user is None:
     # -------------------------
@@ -1637,6 +1655,8 @@ try:
 except Exception:
     _session = None
 _session_lost = False
+if _session is not None and getattr(_session, "refresh_token", None):
+    grem.write(_session.refresh_token)            # keep the "remember me" cookie on the newest token
 
 
 def _auth_error(error):
@@ -2005,6 +2025,7 @@ def log_out():
 
     for key in list(st.session_state.keys()):
         del st.session_state[key]
+    grem.forget_on_next_run()                     # and delete the "remember me" cookie
 
     try:
         st.query_params.clear()
