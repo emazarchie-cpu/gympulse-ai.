@@ -56,6 +56,8 @@ select step, ok from (values
   ('phase32_predcheck  prediction check',          to_regclass('public.prediction_snapshots') is not null),
   ('phase33_passwords  member email + password',  to_regclass('public.member_passwords') is not null),
   ('phase34_pt         members with a personal trainer', exists (select 1 from col where c = 'members.has_pt')),
+  ('phase35_trainers   trainer logins and workspace', to_regclass('public.pt_sessions') is not null
+                                                    and exists (select 1 from col where c = 'gym_staff.trainer_id')),
   ('security           RLS on every gym table',       not exists (
         select 1 from pg_class c join pg_namespace n on n.oid = c.relnamespace
         where n.nspname = 'public' and c.relkind = 'r' and not c.relrowsecurity
@@ -64,5 +66,5 @@ select step, ok from (values
                             'community_posts','community_comments','community_likes','community_reports','archie_usage',
                             'community_stories','community_follows','community_dms','community_blocks',
                             'community_notifications','community_challenges','community_challenge_entries',
-                            'community_poll_votes','community_badges','prediction_snapshots','member_passwords')))
+                            'community_poll_votes','community_badges','prediction_snapshots','member_passwords','pt_sessions','trainer_availability','trainer_reports')))
 ) as t(step, ok);

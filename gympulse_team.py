@@ -32,7 +32,19 @@ OWNER_ONLY_LIST = ["Owner page: business insights, revenue and retention rate", 
 
 
 def is_staff():
-    return st.session_state.get("role") == "staff"
+    """Front desk staff and personal trainers: anyone who isn't the owner."""
+    return st.session_state.get("role") in ("staff", "trainer")
+
+
+def is_trainer():
+    return st.session_state.get("role") == "trainer"
+
+
+def trainer_id():
+    return (st.session_state.get("staff") or {}).get("trainer_id")
+
+
+TRAINER_PAGES = {"My workspace", "Member Profile", "Check-in", "Settings", "FAQs"}
 
 
 def staff_context(supabase):
@@ -52,7 +64,7 @@ def enter_staff_mode(ctx, own_profile):
     """Make this session work in the owner's gym, under the staff member's own name."""
     owner = ctx.get("owner") or {}
     staff = ctx.get("staff") or {}
-    st.session_state["role"] = "staff"
+    st.session_state["role"] = "trainer" if staff.get("role") == "trainer" else "staff"
     st.session_state["staff"] = {**staff, "own_profile": own_profile}
     st.session_state["user_profile"] = {
         "id": owner.get("id"), "full_name": owner.get("full_name"),
@@ -86,7 +98,7 @@ def _temp_password():
     return "GP-" + secrets.token_urlsafe(9).replace("_", "x").replace("-", "y")
 
 
-def _send_invite(name, email, password, gym_name, owner_name):
+def _send_invite(name, email, password, gym_name, owner_name, role="staff"):
     import requests
     import gympulse_admin as gadm
     import gympulse_email as ge
@@ -96,7 +108,9 @@ def _send_invite(name, email, password, gym_name, owner_name):
     first = gw._text(name).split(" ")[0] or "there"
     body = (f'<p style="margin:0 0 10px">Hi {ge.esc(first)},</p>'
             f'<p style="margin:0 0 6px">{ge.esc(owner_name or "Your gym owner")} has added you to '
-            f'<b>{ge.esc(gym_name)}</b> on GymPulse AI, so you can help with members, check-ins and renewals.</p>'
+            f'<b>{ge.esc(gym_name)}</b> on GymPulse AI, '
+            + ("so you can see your clients, your timetable and send your weekly reports.</p>" if role == "trainer"
+               else "so you can help with members, check-ins and renewals.</p>")
             + ge.details([("Sign in at", ge.esc(ge.SITE.replace("https://", ""))), ("Email", ge.esc(email)),
                           ("Temporary password", f"<code>{ge.esc(password)}</code>")])
             + '<p style="margin:0 0 12px">Please change your password after you sign in (Settings → Password).</p>'
@@ -115,8 +129,9 @@ def _send_invite(name, email, password, gym_name, owner_name):
         return False
 
 
-def add_staff(gym_id, name, email, gym_name, owner_name):
-    """Create the staff login and email it to them. Returns (ok, message, password or None)."""
+def add_staff(gym_id, name, email, gym_name, owner_name, role="staff", trainer=None):
+    """Create the staff login and email it to them. Returns (ok, message, password or None).
+    role "trainer": a personal trainer's own login, linked to their trainer profile (trainer id)."""
     sc = _service()
     if not sc:
         return False, "Adding staff isn't available right now (server key missing).", None
@@ -133,15 +148,19 @@ def add_staff(gym_id, name, email, gym_name, owner_name):
                            "Use a different email (e.g. a work email)."), None
         return False, f"Could not create the login: {error}", None
     try:
-        sc.table("gym_staff").insert({"gym_id": gym_id, "user_id": str(user.id), "email": email,
-                                      "full_name": name.strip()}).execute()
+        row = {"gym_id": gym_id, "user_id": str(user.id), "email": email, "full_name": name.strip()}
+        if role == "trainer":
+            row.update({"role": "trainer", "trainer_id": trainer})
+        sc.table("gym_staff").insert(row).execute()
     except Exception as error:
         try:
             sc.auth.admin.delete_user(str(user.id))
         except Exception:
             pass
-        return False, f"{SQL_HINT} ({error})", None
-    sent = _send_invite(name, email, password, gym_name, owner_name)
+        hint = ("Trainer logins need a quick setup: run sql/phase35_trainer_workspace.sql in Supabase."
+                if role == "trainer" else SQL_HINT)
+        return False, f"{hint} ({error})", None
+    sent = _send_invite(name, email, password, gym_name, owner_name, role)
     return True, (f"{name} can now sign in. " + ("We've emailed them their login." if sent else
                                                  "Share the login below with them.")), password
 
@@ -179,10 +198,11 @@ def render_team(supabase, gym_id):
 
     st.markdown('<div class="section-label">YOUR TEAM</div>', unsafe_allow_html=True)
     gw.table([{"Name": r.get("full_name") or "–", "Email": r.get("email"),
+               "Role": "Personal trainer" if r.get("role") == "trainer" else "Staff",
                "Access": "Active" if r.get("status") == "active" else "Off",
                "Added": str(r.get("created_at"))[:10],
                "Last seen": str(r.get("last_seen_at") or "")[:16].replace("T", " ") or "Not yet"} for r in rows],
-             pills={"Access": {"Active": "lime", "Off": "grey"}},
+             pills={"Access": {"Active": "lime", "Off": "grey"}, "Role": {"Personal trainer": "cyan", "Staff": "grey"}},
              empty="No staff yet. Add your first team member below.")
 
     new_pw = st.session_state.pop("team_new_pw", None)
@@ -191,22 +211,45 @@ def render_team(supabase, gym_id):
         st.code(f"Sign in at usegympulseai.com\nEmail: {new_pw[1]}\nTemporary password: {new_pw[2]}", language=None)
         st.caption("This password is shown once. They should change it after signing in.")
 
-    with st.expander("Add a staff member", expanded=not rows):
+    with st.expander("Add a staff member or personal trainer", expanded=not rows):
+        trainers = gw.load_trainers(supabase, gym_id)
+        tmap = {t["id"]: t for t in trainers}
         with st.form("team_add", clear_on_submit=True):
+            kind = st.radio("Role", ["Front desk / staff", "Personal trainer"], horizontal=True,
+                            help="A personal trainer gets their own workspace: today's sessions, timetable, "
+                                 "availability, their clients and weekly reports. Nothing else.")
             a1, a2 = st.columns(2)
             name = a1.text_input("Full name", placeholder="e.g. Ada Obi")
             email = a2.text_input("Email", placeholder="ada@example.com")
+            NEW = "new"
+            link = st.selectbox("Trainer profile (personal trainers only)", [NEW] + list(tmap),
+                                format_func=lambda i: "Create a new trainer profile with this name" if i == NEW
+                                else gw._text(tmap[i].get("full_name"), "Trainer"))
             go = st.form_submit_button("Add and send their login", type="primary")
         if go:
+            trainer = None
             if not name.strip() or "@" not in email:
                 st.error("Please enter their name and email.")
-            else:
-                ok, msg, pw = add_staff(gym_id, name, email, profile.get("business_name") or "your gym",
-                                        profile.get("full_name"))
-                if ok:
-                    st.session_state["team_new_pw"] = (msg, email.strip().lower(), pw)
-                    st.rerun()
-                st.error(msg)
+                go = False
+            if go and kind == "Personal trainer":
+                trainer = link if link != NEW else None
+                if trainer is None:
+                    try:
+                        res = (supabase.table("trainers").insert({"gym_id": gym_id, "full_name": name.strip(),
+                                                                  "specialty": "Personal trainer"})
+                               .execute().data or [])
+                        trainer = res[0]["id"] if res else None
+                    except Exception as error:
+                        st.error(f"Could not create the trainer profile: {error}")
+                        go = False
+        if go:
+            ok, msg, pw = add_staff(gym_id, name, email, profile.get("business_name") or "your gym",
+                                    profile.get("full_name"),
+                                    role="trainer" if kind == "Personal trainer" else "staff", trainer=trainer)
+            if ok:
+                st.session_state["team_new_pw"] = (msg, email.strip().lower(), pw)
+                st.rerun()
+            st.error(msg)
 
     if rows:
         st.markdown('<div class="section-label">MANAGE ACCESS</div>', unsafe_allow_html=True)
@@ -241,7 +284,7 @@ def render_team(supabase, gym_id):
 
 
 # ------------------------------------------------------------------ the Owner page
-OWNER_SECTIONS = ["Business insights", "Team & access", "Monthly report", "Subscription & billing"]
+OWNER_SECTIONS = ["Business insights", "Team & access", "Trainers", "Monthly report", "Subscription & billing"]
 
 
 def render_owner_hub(supabase, gym_id, assess_fn, owner_id):
@@ -257,6 +300,9 @@ def render_owner_hub(supabase, gym_id, assess_fn, owner_id):
         gw.render_business_insights(supabase, gym_id, assess_fn, header=False)
     elif section == "Team & access":
         render_team(supabase, gym_id)
+    elif section == "Trainers":
+        import gympulse_ptw as gptw
+        gptw.render_owner_view(supabase, gym_id)
     elif section == "Monthly report":
         gg.render_monthly(supabase, gym_id, assess_fn, owner_id)
     else:
