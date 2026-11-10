@@ -310,38 +310,71 @@ html body .chip { border-radius: 999px; }
 @keyframes gpMenuIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes gpRowIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
 @media (max-width: 1000px) {
-  html body [data-testid="stPopoverBody"]:has(.st-key-pop_main) {
-      position: fixed !important; inset: 0 !important; transform: none !important;
-      width: 100vw !important; max-width: none !important; height: 100dvh !important; max-height: none !important;
+  html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) {
+      position: fixed !important; inset: 72px 0 0 0 !important; transform: none !important; will-change: auto !important;
+      filter: none !important; backdrop-filter: none !important;
+      width: 100vw !important; max-width: none !important; height: calc(100dvh - 72px) !important; max-height: none !important;
       margin: 0 !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important;
-      padding: 76px 22px 28px !important; overflow-y: auto !important; z-index: 1000000 !important;
-      background: var(--gp-bg, #0A0F1E) !important; animation: gpMenuIn .22s ease-out both; }
-  html body [data-testid="stPopoverBody"]:has(.st-key-pop_main) [data-testid="stVerticalBlock"] { gap: 0 !important; }
-  html body [data-testid="stPopoverBody"]:has(.st-key-pop_main) .stButton { animation: gpRowIn .32s ease-out both; }
-  html body [data-testid="stPopoverBody"]:has(.st-key-pop_main) .stButton button {
+      padding: 6px 22px 28px !important; overflow-y: auto !important; z-index: 1000000 !important;
+      background: var(--gp-bg, #0A0F1E) !important; animation: gpMenuIn .22s ease-out; }
+  html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) [data-testid="stVerticalBlock"] { gap: 0 !important; }
+  html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stButton { animation: gpRowIn .32s ease-out both; }
+  html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stButton button {
       justify-content: space-between !important; text-align: left !important; width: 100% !important;
       min-height: 60px !important; padding: 0 4px !important; background: transparent !important;
       border: 0 !important; border-radius: 0 !important; box-shadow: none !important; }
-  html body [data-testid="stPopoverBody"]:has(.st-key-pop_main) .stButton button p {
+  html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stButton button p {
       font-size: 21px !important; font-weight: 600 !important; color: var(--gp-text, #F4F7FB) !important; }
-  html body [data-testid="stPopoverBody"]:has(.st-key-pop_main) :is(.st-key-pop_main, .st-key-pop_more) .stButton button::after {
+  html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) :is(.st-key-pop_main, .st-key-pop_more, .st-key-mob_to_profile) .stButton button::after {
       content: "›"; font-size: 28px; line-height: 1; color: var(--gp-muted, #93A1B8); margin-left: auto; }
-  html body [data-testid="stPopoverBody"]:has(.st-key-pop_main) .stButton button:is(:hover, :active, :focus-visible) {
+  html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stButton button:is(:hover, :active, :focus-visible) {
       background: rgba(183,243,74,0.06) !important; }
-  html body [data-testid="stPopoverBody"]:has(.st-key-pop_main) .stButton button:is(:hover, :active) p { color: var(--gp-lime, #B7F34A) !important; }
-  html body [data-testid="stPopoverBody"]:has(.st-key-pop_main) :is(.st-key-pop_more, .st-key-pop_acct) {
+  html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stButton button:is(:hover, :active) p { color: var(--gp-lime, #B7F34A) !important; }
+  html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) :is(.st-key-pop_more, .st-key-pop_acct) {
       margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--gp-line, rgba(255,255,255,0.08)); }
-  html body [data-testid="stPopoverBody"]:has(.st-key-pop_main) :is(.st-key-pop_more) .stButton button p { font-size: 17px !important;
+  html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) :is(.st-key-pop_more) .stButton button p { font-size: 17px !important;
       color: var(--gp-muted, #93A1B8) !important; }
-  html body [data-testid="stPopoverBody"]:has(.st-key-pop_main) .st-key-pop_acct .stButton button { justify-content: flex-start !important; gap: 14px; }
-  html body [data-testid="stPopoverBody"]:has(.st-key-pop_main) .st-key-pop_acct .stButton button p { font-size: 18px !important; }
-  html body [data-testid="stPopoverBody"]:has(.st-key-pop_main) .st-key-pop_acct [data-testid="stIconMaterial"] {
+  html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .st-key-pop_acct .stButton button { justify-content: flex-start !important; gap: 14px; }
+  html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .st-key-pop_acct .stButton button p { font-size: 18px !important; }
+  html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .st-key-pop_acct [data-testid="stIconMaterial"] {
       font-size: 26px !important; color: var(--gp-text, #F4F7FB) !important; }
-  html body [data-testid="stPopoverBody"]:has(.st-key-pop_main) .stButton button > div {
+  html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stButton button > div {
       width: 100% !important; justify-content: flex-start !important; }
-  html body [data-testid="stPopoverBody"]:has(.st-key-pop_main) .stButton button :is(p, [data-testid="stMarkdownContainer"]) {
+  html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stButton button :is(p, [data-testid="stMarkdownContainer"]) {
       text-align: left !important; width: auto !important; }
-  html body:has([data-testid="stPopoverBody"] .st-key-pop_main) [data-testid="stToastContainer"] { display: none !important; }
+  html body:has([data-testid="stPopoverBody"] :is(.st-key-pop_main, .st-key-pop_sub)) :is([data-testid="stToastContainer"], [data-testid="stToast"]) { display: none !important; }
+  /* phones: the ☰ menu holds the account too, so the round profile button is hidden */
+  html body .st-key-top_profile { display: none !important; }
+  /* a solid bar under the ✕, so rows scroll beneath it */
+  /* the strip above the menu: page colour, with the ✕ on it */
+  html body:has([data-testid="stPopoverBody"] :is(.st-key-pop_main, .st-key-pop_sub))::before {
+      content: ""; position: fixed; top: 0; left: 0; right: 0; height: 72px; z-index: 999990;
+      background: var(--gp-bg, #0A0F1E); border-bottom: 1px solid var(--gp-line, rgba(255,255,255,0.08));
+      animation: gpMenuIn .22s ease-out; }
+  html body:has([data-testid="stPopoverBody"] :is(.st-key-pop_main, .st-key-pop_sub)) :is(.stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"], .stMainBlockContainer, header) {
+      z-index: auto !important; }
+  html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .st-key-pop_acct .pm-id {
+      display: flex; gap: 12px; align-items: center; padding: 6px 4px 12px; }
+  html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stButton button:focus:not(:hover) { background: transparent !important; }
+  html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stButton button:focus:not(:hover) p { color: var(--gp-text, #F4F7FB) !important; }
+  /* Profile row: round icon on the left, › on the right */
+  html body .st-key-mob_to_profile button::after { content: "›"; font-size: 28px; line-height: 1;
+      color: var(--gp-muted, #93A1B8); margin-left: auto; }
+  html body .st-key-mob_to_profile button > div { width: 100% !important; }
+  /* Profile sub-page: slides in from the right, ‹ Profile header like a back link */
+  @keyframes gpSubIn { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
+  html body .st-key-pop_sub { animation: gpSubIn .26s ease-out both; }
+  html body .st-key-pop_sub .st-key-mob_sub_back { margin: -8px 0 10px; }
+  html body .st-key-pop_sub .st-key-mob_sub_back button { min-height: 48px !important; justify-content: center !important; }
+  html body .st-key-pop_sub .st-key-mob_sub_back button > div { justify-content: center !important; }
+  html body .st-key-pop_sub .st-key-mob_sub_back button [data-testid="stIconMaterial"] {
+      position: absolute; left: 4px; font-size: 30px !important; }
+  html body .st-key-pop_sub .st-key-mob_sub_back button p { font-size: 18px !important; font-weight: 700 !important; }
+  html body .st-key-pop_sub .pm-id { display: flex; gap: 14px; align-items: center; padding: 4px 4px 16px;
+      margin-bottom: 6px; border-bottom: 1px solid var(--gp-line, rgba(255,255,255,0.08)); }
+  html body .st-key-pop_sub .stButton button { justify-content: flex-start !important; gap: 14px; }
+  html body .st-key-pop_sub .stButton button p { font-size: 19px !important; }
+  html body .st-key-pop_sub [data-testid="stIconMaterial"] { font-size: 26px !important; color: var(--gp-text, #F4F7FB) !important; }
   /* the menu button turns into a close ✕ above the open menu */
   html body .st-key-top_menu [data-testid="stPopoverButton"][aria-expanded="true"] {
       position: fixed !important; top: 14px !important; right: 14px !important; z-index: 1000001 !important;
@@ -354,30 +387,30 @@ html body .chip { border-radius: 999px; }
   html body .st-key-top_menu [data-testid="stPopoverButton"][aria-expanded="true"]::after {
       content: "✕"; font-size: 24px; font-weight: 500; color: var(--gp-text, #F4F7FB); }
 }
-@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(.st-key-pop_main) .stElementContainer:nth-child(1) .stButton { animation-delay: 0.03s; } }
-@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(.st-key-pop_main) .stElementContainer:nth-child(2) .stButton { animation-delay: 0.06s; } }
-@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(.st-key-pop_main) .stElementContainer:nth-child(3) .stButton { animation-delay: 0.09s; } }
-@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(.st-key-pop_main) .stElementContainer:nth-child(4) .stButton { animation-delay: 0.12s; } }
-@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(.st-key-pop_main) .stElementContainer:nth-child(5) .stButton { animation-delay: 0.15s; } }
-@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(.st-key-pop_main) .stElementContainer:nth-child(6) .stButton { animation-delay: 0.18s; } }
-@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(.st-key-pop_main) .stElementContainer:nth-child(7) .stButton { animation-delay: 0.21s; } }
-@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(.st-key-pop_main) .stElementContainer:nth-child(8) .stButton { animation-delay: 0.24s; } }
-@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(.st-key-pop_main) .stElementContainer:nth-child(9) .stButton { animation-delay: 0.27s; } }
-@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(.st-key-pop_main) .stElementContainer:nth-child(10) .stButton { animation-delay: 0.30s; } }
-@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(.st-key-pop_main) .stElementContainer:nth-child(11) .stButton { animation-delay: 0.33s; } }
-@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(.st-key-pop_main) .stElementContainer:nth-child(12) .stButton { animation-delay: 0.36s; } }
-@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(.st-key-pop_main) .stElementContainer:nth-child(13) .stButton { animation-delay: 0.39s; } }
-@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(.st-key-pop_main) .stElementContainer:nth-child(14) .stButton { animation-delay: 0.42s; } }
-@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(.st-key-pop_main) .stElementContainer:nth-child(15) .stButton { animation-delay: 0.45s; } }
-@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(.st-key-pop_main) .stElementContainer:nth-child(16) .stButton { animation-delay: 0.48s; } }
-@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(.st-key-pop_main) .stElementContainer:nth-child(17) .stButton { animation-delay: 0.51s; } }
-@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(.st-key-pop_main) .stElementContainer:nth-child(18) .stButton { animation-delay: 0.54s; } }
-@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(.st-key-pop_main) .stElementContainer:nth-child(19) .stButton { animation-delay: 0.57s; } }
-@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(.st-key-pop_main) .stElementContainer:nth-child(20) .stButton { animation-delay: 0.60s; } }
-@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(.st-key-pop_main) .stElementContainer:nth-child(21) .stButton { animation-delay: 0.63s; } }
-@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(.st-key-pop_main) .stElementContainer:nth-child(22) .stButton { animation-delay: 0.66s; } }
-@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(.st-key-pop_main) .stElementContainer:nth-child(23) .stButton { animation-delay: 0.69s; } }
-@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(.st-key-pop_main) .stElementContainer:nth-child(24) .stButton { animation-delay: 0.72s; } }
+@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(1) .stButton { animation-delay: 0.03s; } }
+@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(2) .stButton { animation-delay: 0.06s; } }
+@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(3) .stButton { animation-delay: 0.09s; } }
+@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(4) .stButton { animation-delay: 0.12s; } }
+@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(5) .stButton { animation-delay: 0.15s; } }
+@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(6) .stButton { animation-delay: 0.18s; } }
+@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(7) .stButton { animation-delay: 0.21s; } }
+@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(8) .stButton { animation-delay: 0.24s; } }
+@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(9) .stButton { animation-delay: 0.27s; } }
+@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(10) .stButton { animation-delay: 0.30s; } }
+@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(11) .stButton { animation-delay: 0.33s; } }
+@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(12) .stButton { animation-delay: 0.36s; } }
+@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(13) .stButton { animation-delay: 0.39s; } }
+@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(14) .stButton { animation-delay: 0.42s; } }
+@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(15) .stButton { animation-delay: 0.45s; } }
+@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(16) .stButton { animation-delay: 0.48s; } }
+@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(17) .stButton { animation-delay: 0.51s; } }
+@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(18) .stButton { animation-delay: 0.54s; } }
+@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(19) .stButton { animation-delay: 0.57s; } }
+@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(20) .stButton { animation-delay: 0.60s; } }
+@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(21) .stButton { animation-delay: 0.63s; } }
+@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(22) .stButton { animation-delay: 0.66s; } }
+@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(23) .stButton { animation-delay: 0.69s; } }
+@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(24) .stButton { animation-delay: 0.72s; } }
 /* ---------- photo mosaic and feature showcase (2026 landing) ---------- */
 .lx-mosaic { display: grid; grid-template-columns: 1.4fr 1fr 1fr; grid-template-rows: 190px 190px; gap: 12px; margin: 26px 0 6px; }
 .lx-mosaic .ph { border-radius: 20px; background-size: cover; background-position: center; position: relative; overflow: hidden;
