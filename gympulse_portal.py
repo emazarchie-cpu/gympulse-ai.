@@ -521,6 +521,46 @@ def visit_stats(days, today):
     return {"month": month, "total": len(days), "last": max(days) if days else None, "streak": streak}
 
 
+# ------------------------------------------------------------------ locking out long-expired members
+LOCK_CHOICES = {0: "Never lock", 30: "1 month after it ends", 60: "2 months after it ends",
+                90: "3 months after it ends"}
+LOCK_DEFAULT = 60
+LET_BACK_DAYS = 14
+
+
+def lock_cfg(prof):
+    """{"days": 0 | 30 | 60 | 90, "allow": {member_id: "YYYY-MM-DD"}} from the owner's settings."""
+    c = dict(((prof or {}).get("settings") or {}).get("member_app") or {})
+    days = c.get("lock_days", LOCK_DEFAULT)
+    return {"days": int(days) if str(days).isdigit() else LOCK_DEFAULT, "allow": dict(c.get("allow") or {})}
+
+
+def is_locked(m, prof, today):
+    """True when the membership ended longer ago than the gym allows and the GM hasn't let them back in.
+    Renewing (a later end date) unlocks it by itself."""
+    cfg = lock_cfg(prof)
+    end = _end(m)
+    if not cfg["days"] or end is None or (today - end).days <= cfg["days"]:
+        return False
+    until = pd.to_datetime(cfg["allow"].get(str(m["id"])), errors="coerce")
+    return pd.isna(until) or until.date() < today
+
+
+def _locked_screen(m, gym_name):
+    end = _end(m)
+    first = _first(m.get("full_name"))
+    gw._md(f'''<div class="mp-card" style="text-align:center;padding:28px 18px">
+      <div style="font-size:40px">🔒</div>
+      <div class="bk-title" style="margin:8px 0 6px">Your member app is locked</div>
+      <p>Hi {gw._esc(first)}, your membership at <b>{gw._esc(gym_name)}</b> ended on
+      <b>{end:%d %B %Y}</b> and hasn't been renewed.</p>
+      <p>Please contact <b>{gw._esc(gym_name)}</b> (the front desk or the gym manager) to renew. Your access comes back
+      as soon as your membership is renewed.</p></div>''')
+    if st.button("Log out", key="mp_locked_out", icon=":material/logout:", use_container_width=True):
+        st.query_params.clear()
+        st.rerun()
+
+
 def status_of(end, today):
     if end is None:
         return "No plan yet", "mp-none", None
@@ -552,6 +592,10 @@ def render_portal(supabase, token):
             sc.table("members").update({"portal_seen_at": datetime.now(timezone.utc).isoformat()}).eq("id", m["id"]).execute()
         except Exception:
             pass
+    if is_locked(m, prof, gw.today_local()):
+        with col:
+            _locked_screen(m, gym_name)
+        return
     with col, gadm.as_gym({"profile": prof, "gym": gym, "email": ""}):
         flash = st.session_state.pop("mp_flash", None)
         if flash:
@@ -841,8 +885,8 @@ def render_owner(supabase, gym_id):
     import gympulse_signup as gsign
     gw.intro("Member app", ":material/smartphone:",
              "Each member gets their own page: renew and pay, check-in QR code, visits, streak and rewards, class "
-             "bookings and messages with you. No app to download and no password: they go to usegympulseai.com, tap "
-             "Member, and sign in with their email and a code we send them.")
+             "bookings and messages with you. No app to download: they go to usegympulseai.com, tap Member, and sign in "
+             "with their email and password (first time, with a code we email them).")
     try:
         rows = gw.fetch_all(supabase.table("members").select("id, full_name, email, phone, portal_token, "
                                                              "portal_sent_at, portal_seen_at")
@@ -860,12 +904,13 @@ def render_owner(supabase, gym_id):
         st.code(url, language=None)
         st.markdown("**Message for your WhatsApp group**")
         st.code("Your membership is now on your phone 📱 Renew, see your check-in code, visits and rewards, and book "
-                f"classes. Go to {gw.APP_URL.replace('https://', '')}, tap Member, enter your email and the code we "
-                f"send you. Or open: {url}", language=None, wrap_lines=True)
+                f"classes. Go to {gw.APP_URL.replace('https://', '')}, tap Member and sign in with your email (first time, "
+                f"we email you a code). Or open: {url}", language=None, wrap_lines=True)
     with c2:
         png = gsign._qr_png(url)
         st.image(png, caption="Print this for your front desk", use_container_width=True)
         rp.download_link("Download QR code", png, "gympulse-member-app-qr.png", "image/png", "mp_qr")
+    _owner_lock(supabase, gym_id)
     st.markdown("**Send a member their link**")
     if not rows:
         st.caption("No members yet.")
@@ -885,3 +930,55 @@ def render_owner(supabase, gym_id):
         else:
             st.warning(f"{r['full_name']} has no email, and WhatsApp isn't set up yet. Send them this link yourself: "
                        f"{portal_url(r['portal_token'])}")
+
+
+def _owner_lock(supabase, gym_id):
+    """Owner: when members whose membership has ended get locked out of the member app, who is locked
+    now, and letting someone back in for a short while."""
+    import gympulse_grow as gg
+    prof = st.session_state.get("user_profile") or {}
+    cfg = lock_cfg(prof)
+    today = gw.today_local()
+    st.markdown("**Lock out members who stop paying**")
+    st.caption("When a membership has ended and hasn't been renewed for this long, the member can't open the "
+               "member app or sign in any more. They see a message to contact you. Renewing them unlocks it "
+               "straight away.")
+    owner = st.session_state.get("role") != "staff"
+    keys = list(LOCK_CHOICES)
+    a, b = st.columns([3, 1], vertical_alignment="bottom")
+    pick = a.selectbox("Lock the member app", keys, index=keys.index(cfg["days"]) if cfg["days"] in keys else 2,
+                       format_func=LOCK_CHOICES.get, key="mp_lock_days", disabled=not owner)
+    if owner and b.button("Save", key="mp_lock_save", use_container_width=True) and pick != cfg["days"]:
+        settings = dict(prof.get("settings") or {})
+        gg._save_settings(supabase, prof.get("id"),
+                          {"member_app": {**dict(settings.get("member_app") or {}), "lock_days": int(pick)}},
+                          "Member app lock saved.")
+        st.session_state["mm_flash"] = "Member app lock saved: " + LOCK_CHOICES[int(pick)].lower() + "."
+        st.rerun()
+    try:
+        rows = gw.fetch_all(supabase.table("members").select("id, full_name, membership_end")
+                            .eq("gym_id", gym_id).eq("archived", False).order("full_name"))
+    except Exception:
+        rows = []
+    locked = [r for r in rows if is_locked(r, prof, today)]
+    if not cfg["days"]:
+        return
+    if not locked:
+        st.caption("Nobody is locked out right now.")
+        return
+    st.caption(f"{len(locked)} member{'s are' if len(locked) != 1 else ' is'} locked out right now.")
+    by_id = {r["id"]: r for r in locked}
+    c, d = st.columns([3, 1], vertical_alignment="bottom")
+    who = c.selectbox("Let a member back in", list(by_id), key="mp_lock_who",
+                      format_func=lambda i: f"{by_id[i]['full_name']} · ended {_end(by_id[i]):%d %b %Y}")
+    if owner and d.button(f"Let in for {LET_BACK_DAYS} days", key="mp_lock_allow", use_container_width=True):
+        settings = dict(prof.get("settings") or {})
+        app = dict(settings.get("member_app") or {})
+        allow = {k: v for k, v in dict(app.get("allow") or {}).items()
+                 if not pd.isna(pd.to_datetime(v, errors="coerce")) and pd.to_datetime(v).date() >= today}
+        allow[str(who)] = (today + timedelta(days=LET_BACK_DAYS)).isoformat()
+        gg._save_settings(supabase, prof.get("id"), {"member_app": {**app, "allow": allow}}, "Access given back.")
+        st.session_state["mm_flash"] = (f"{by_id[who]['full_name']} can use the member app again until "
+                                        f"{today + timedelta(days=LET_BACK_DAYS):%d %b}. Renew them to unlock it "
+                                        "for good.")
+        st.rerun()
