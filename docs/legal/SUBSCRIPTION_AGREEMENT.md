@@ -2,7 +2,7 @@
 
 # Subscription Agreement
 
-This Subscription Agreement ("Agreement") is between **GYMPULSE AI LTD** (RC 9996401), a company registered in Nigeria with its office in Calabar, Cross River State ("GymPulse AI", "we", "us"), and the gym business named at signing ("the Gym", "you"). It applies when you subscribe to a paid GymPulse AI plan. It sits alongside our Terms of Service, Privacy Policy and Data Processing Agreement, which form part of it. If they conflict, this Agreement wins on fees, plans and payment.
+This Subscription Agreement ("Agreement") is between **GYMPULSE AI LTD** (RC 9996401), a company registered in Nigeria with its office in Calabar, Cross River State ("GymPulse AI", "we", "us"), and the gym business named at signing ("the Gym", "you"). You sign it once, when you first pay for GymPulse AI after your free trial; it then covers every later payment until it ends or a new version is issued. It sits alongside our Terms of Service, Privacy Policy and Data Processing Agreement, which form part of it. If they conflict, this Agreement wins on fees, plans and payment.
 
 ## 1. What you are buying
 1.1 GymPulse AI is online software that helps gyms keep their members. It records members, plans, payments and check-ins, estimates which members may stop attending, suggests and sends follow-ups, and provides reports, a member app and related tools ("the Service").
@@ -19,14 +19,14 @@ This Subscription Agreement ("Agreement") is between **GYMPULSE AI LTD** (RC 999
 3.3 You will not split one gym into several accounts, share one account between separate businesses, or use other means to pay for fewer members than you have. If we find this, we may move you to the correct plan and charge the difference from when it started.
 
 ## 4. Fees and payment
-4.1 The fee is the price of your plan and billing period (monthly or yearly) shown at checkout, in Nigerian naira. Prices include any value added tax that applies.
+4.1 GymPulse AI is a month-to-month subscription. There is no fixed term and no yearly commitment. The fee is the price of your plan shown at checkout, in Nigerian naira. You may choose to pay for a year in advance at a lower price; that is optional. Prices include any value added tax that applies.
 4.2 Fees are paid in advance, by bank transfer or by card/USSD through Paystack. Your plan starts when payment is confirmed. A plan paid during the free trial starts when the trial ends.
 4.3 Plans do not renew or charge you automatically. Before your paid period ends we remind you by email and in the app; you renew by paying for the next period.
 4.4 If you do not renew, access to the Service is paused when your paid period ends for you, your staff and trainers, your members' app and public pages, and automatic messages and reports. Your data stays safe and everything returns as soon as you renew.
 4.5 We will give you at least 30 days' notice of any price change. A change never affects a period you have already paid for.
 
 ## 5. Refunds and cancellation
-5.1 You can stop at any time by not renewing. There is no cancellation fee and no minimum term beyond the period you paid for.
+5.1 **You have the right to cancel at any time.** Simply don't renew, or tell us by email. There is no cancellation fee, no notice period and no minimum term beyond the period you have already paid for.
 5.2 Fees for a period that has started are not refundable, except: (a) a payment made twice or by mistake is refunded in full; (b) if the Service is unavailable for more than 7 days in a row through our fault, we extend your plan by the lost days or, if you prefer, refund that part of the fee; (c) where Nigerian law requires a refund.
 5.3 A yearly plan cancelled in its first 14 days because the Service does not work as described is refunded for the unused months.
 
@@ -61,7 +61,7 @@ Risk scores, predictions, suggested actions and money figures marked "estimate" 
 Each party keeps the other's non-public business information confidential and uses it only for this Agreement. This continues for 2 years after the Agreement ends.
 
 ## 12. Term and ending
-12.1 This Agreement starts when you sign it and continues for each period you pay for.
+12.1 This Agreement starts when you sign it and continues month to month for as long as you keep paying for GymPulse AI. You do not need to sign again for each payment.
 12.2 Either party may end it by giving notice by email. You may end it at any time; we may end it with 30 days' notice, and refund any fees for the time not used.
 12.3 Either party may end it straight away if the other seriously breaks it and does not put it right within 14 days of being asked, or becomes insolvent.
 12.4 Clauses 8, 10, 11 and 14 continue after the Agreement ends.
@@ -78,7 +78,7 @@ Neither party is responsible for delays or failures caused by events beyond its 
 15.2 We may update this Agreement for future periods with at least 30 days' notice. Changes apply from your next renewal; you can choose not to renew.
 15.3 Notices are given by email: to you at your billing email, to us at hello@usegympulseai.com.
 15.4 You may not transfer this Agreement without our written consent. We may transfer it to a company that takes over the Service, and will tell you.
-15.5 Signing electronically (typing your name and ticking the box at checkout) is a valid signature. A record of the signature, the time, and a fingerprint of this exact text is kept by both parties.
+15.5 Signing electronically (typing your name and ticking the box at checkout) is a valid signature. GymPulse AI's signature is applied electronically by its Founder. A record of both signatures, the time, and a fingerprint of this exact text is kept, and you receive a signed PDF copy.
 
-**Signed for GYMPULSE AI LTD:** Emmanuel Archibong, Founder.
+**Signed for GYMPULSE AI LTD:** Emmanuel Archibong, Founder (signature applied electronically).
 **Signed for the Gym:** the person named at checkout, who confirms they are authorised to sign for the Gym.
