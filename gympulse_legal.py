@@ -12,8 +12,12 @@ import streamlit as st
 
 LEGAL_VERSION = "1.0"
 HERE = os.path.dirname(os.path.abspath(__file__))
-DOCS = {"terms": "TERMS_OF_SERVICE.md", "privacy": "PRIVACY_POLICY.md", "dpa": "DATA_PROCESSING_AGREEMENT.md"}
-TITLES = {"terms": "Terms of Service", "privacy": "Privacy Policy", "dpa": "Data Processing Agreement"}
+DOCS = {"terms": "TERMS_OF_SERVICE.md", "privacy": "PRIVACY_POLICY.md", "dpa": "DATA_PROCESSING_AGREEMENT.md",
+        "subscription": "SUBSCRIPTION_AGREEMENT.md"}
+TITLES = {"terms": "Terms of Service", "privacy": "Privacy Policy", "dpa": "Data Processing Agreement",
+          "subscription": "Subscription Agreement"}
+SUBSCRIPTION_VERSION = "1.0"
+SIGNER_ROLES = ["Owner", "Director", "Manager", "Partner", "Other authorised person"]
 
 CONSENT_TEXT = ("I have my members' permission to store their details in GymPulse AI and to email or message them, "
                 "and I'll tell my members that my gym uses GymPulse AI.")
@@ -46,6 +50,25 @@ def show_privacy():
 @st.dialog("Data Processing Agreement", width="large")
 def show_dpa():
     st.markdown(read("dpa"))
+
+
+@st.dialog("Subscription Agreement", width="large")
+def show_subscription():
+    st.markdown(read("subscription"))
+
+
+def subscription_text():
+    """The exact agreement text a gym signs (file contents), for the fingerprint and the emailed copy."""
+    try:
+        with open(os.path.join(HERE, "docs", "legal", DOCS["subscription"]), encoding="utf-8") as f:
+            return f.read()
+    except Exception:
+        return ""
+
+
+def fingerprint(text):
+    import hashlib
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def acceptance(email):
