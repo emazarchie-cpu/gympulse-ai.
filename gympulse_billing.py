@@ -1174,6 +1174,13 @@ def _render_checkout(supabase, gym_id, plan, period, s, p, ps):
                     + (p.get("contact_email") or "emmanuel@usegympulseai.com"))
             return
         import gympulse_legal as glegal
+        signed_before = glegal.latest_signature(supabase, gym_id, prof)
+        if signed_before:
+            when = pd.to_datetime(signed_before.get("signed_at"), errors="coerce", utc=True)
+            st.success(f"Subscription Agreement signed by {signed_before.get('signer_name')}"
+                       + ("" if pd.isna(when) else f" on {when.tz_convert(gw.APP_TZ):%d %B %Y}")
+                       + ". You don't need to sign again. You can cancel at any time.",
+                       icon=":material/verified:")
         if st.button("Read the Subscription Agreement", key="co_read_sa", icon=":material/contract:",
                      type="tertiary"):
             glegal.show_subscription()
@@ -1197,16 +1204,21 @@ def _render_checkout(supabase, gym_id, plan, period, s, p, ps):
                 "pay_transfer": "Bank transfer · confirmed instantly, your plan switches on straight away",
                 "pay_card": "Card or USSD · secured by Paystack",
                 "transfer": "Bank transfer · your plan switches on when the money arrives"}[m])
-            gw._md('<div class="co-sec" style="margin-top:10px">Sign the agreement</div>')
-            st.caption("Before paying, please sign the GymPulse AI Subscription Agreement (link above). It protects "
-                       "both your gym and us: what you get, how billing works, refunds and your data.")
-            s1, s2 = st.columns([1.4, 1])
-            signed = s1.text_input("Type your full name to sign", placeholder="Same as your full name above")
-            role = s2.selectbox("Your role", glegal.SIGNER_ROLES)
-            agree = st.checkbox(f"I have read and agree to the Subscription Agreement (version "
-                                f"{glegal.SUBSCRIPTION_VERSION}), the Terms of Service, Privacy Policy and Data "
-                                "Processing Agreement. I am authorised to sign for this business, and I authorise "
-                                "this payment.")
+            if signed_before:
+                signed, role = signed_before.get("signer_name"), signed_before.get("signer_role")
+                agree = st.checkbox("I authorise this payment.")
+            else:
+                gw._md('<div class="co-sec" style="margin-top:10px">Sign the agreement (once)</div>')
+                st.caption("Before your first payment, please sign the GymPulse AI Subscription Agreement (link "
+                           "above). It's month to month, you can cancel at any time, and it's already signed by "
+                           "GymPulse AI. You only sign once.")
+                s1, s2 = st.columns([1.4, 1])
+                signed = s1.text_input("Type your full name to sign", placeholder="Same as your full name above")
+                role = s2.selectbox("Your role", glegal.SIGNER_ROLES)
+                agree = st.checkbox(f"I have read and agree to the Subscription Agreement (version "
+                                    f"{glegal.SUBSCRIPTION_VERSION}), the Terms of Service, Privacy Policy and Data "
+                                    "Processing Agreement. I am authorised to sign for this business, and I "
+                                    "authorise this payment.")
             go = st.form_submit_button(f"Continue · {_money(price_for(plan, period))}", type="primary",
                                        use_container_width=True)
         if go:
@@ -1216,8 +1228,8 @@ def _render_checkout(supabase, gym_id, plan, period, s, p, ps):
             problems = [m for ok, m in [(biz.strip(), "your business name"), (name.strip(), "your full name"),
                                         ("@" in email and "." in email.split("@")[-1], "a valid email"),
                                         (len("".join(ch for ch in phone if ch.isdigit())) >= 10, "a phone number"),
-                                        (_same_name(signed, name), "your signature (type your full name exactly "
-                                                                   "as above)"),
+                                        (signed_before or _same_name(signed, name),
+                                         "your signature (type your full name exactly as above)"),
                                         (agree, "to accept the agreement")] if not ok]
             if problems:
                 st.error("Please add " + ", ".join(problems) + ".")
@@ -1232,7 +1244,8 @@ def _render_checkout(supabase, gym_id, plan, period, s, p, ps):
             if method in PAY_CHANNELS:
                 ref = f"gp-{str(gym_id)[:8]}-{uuid.uuid4().hex[:12]}"
                 inv = gi.create(sc, gym_id, plan["name"], period, amount, details, "paystack", ref)
-                record_signature(sc, gym_id, details, {**signature, "invoice_id": inv.get("id")})
+                if not signed_before:
+                    record_signature(sc, gym_id, details, {**signature, "invoice_id": inv.get("id")})
                 url, msg = start_payment(gym_id, plan, period, email.strip(), ref, inv.get("id"),
                                          PAY_CHANNELS[method])
                 st.session_state["co_channel"] = method
@@ -1243,7 +1256,8 @@ def _render_checkout(supabase, gym_id, plan, period, s, p, ps):
                 _view("pay", co_url=url, co_inv=inv)
             else:
                 inv = gi.create(sc, gym_id, plan["name"], period, amount, details, "transfer")
-                record_signature(sc, gym_id, details, {**signature, "invoice_id": inv.get("id")})
+                if not signed_before:
+                    record_signature(sc, gym_id, details, {**signature, "invoice_id": inv.get("id")})
                 if inv.get("number"):
                     inv = gi.update(sc, inv, reference=gi.number(inv))
                 _view("transfer", co_inv=inv)
@@ -1283,19 +1297,51 @@ def record_signature(sc, gym_id, details, sig):
             sc.table("profiles").update({"settings": settings}).eq("id", g[0]["owner_id"]).execute()
         except Exception:
             pass
-    lagos = now.astimezone(gw.APP_TZ)
-    block = (f"Signed electronically for {details.get('business_name')} by {sig['signer_name']} "
-             f"({sig.get('signer_role')}), {details.get('billing_email')}, on {lagos:%d %B %Y at %H:%M} (Lagos time)"
-             + (f" from IP {ip}" if ip else "") + f".\nPlan: {sig.get('plan')}, {sig.get('period')}, "
-             f"{_money(sig.get('amount'))}.\nAgreement version {glegal.SUBSCRIPTION_VERSION}, "
-             f"fingerprint (SHA-256) {row['text_sha256']}.")
-    body = (f"Thank you for choosing GymPulse AI. This is your copy of the Subscription Agreement you signed.\n\n"
-            f"{block}\n\n----------------------------------------\n\n{text}")
-    subject = f"Your signed GymPulse AI Subscription Agreement ({details.get('business_name')})"
-    if "@" in gw._text(details.get("billing_email")):
-        _email_founder(subject, body, to=details["billing_email"].strip())
-    _email_founder(f"Agreement signed: {details.get('business_name')}", block)
+    send_signed_copy(row)
     return row
+
+
+def send_signed_copy(row):
+    """Email the signed agreement (PDF with both signatures) to the gym, with a copy to GymPulse AI."""
+    import base64
+    import requests
+    import gympulse_admin as gadm
+    import gympulse_email as ge
+    import gympulse_legal as glegal
+    key = gadm._env("RESEND_API_KEY")
+    to = gw._text(row.get("signer_email")).strip()
+    if not (key and "@" in to):
+        return False
+    when = pd.to_datetime(row.get("signed_at"), errors="coerce", utc=True)
+    when = "" if pd.isna(when) else f"{when.tz_convert(gw.APP_TZ):%d %B %Y at %H:%M} (Lagos time)"
+    first = gw._text(row.get("signer_name")).split(" ")[0] or "there"
+    body = (f'<p style="margin:0 0 10px">Hi {ge.esc(first)},</p>'
+            '<p style="margin:0 0 10px">Thank you for choosing GymPulse AI. Your signed Subscription Agreement is '
+            "attached, signed by you and by GymPulse AI. It's month to month and you can cancel at any time. "
+            "You only sign it once.</p>"
+            + ge.details([("Business", ge.esc(row.get("business_name") or "–")),
+                          ("Signed by", ge.esc(f"{row.get('signer_name')} ({row.get('signer_role')})")),
+                          ("Signed on", ge.esc(when)),
+                          ("For GymPulse AI", ge.esc(f"{glegal.FOUNDER}, {glegal.FOUNDER_TITLE}")),
+                          ("Agreement version", ge.esc(row.get("version")))]))
+    try:
+        pdf = glegal.agreement_pdf(row)
+        safe = re.sub(r"[^A-Za-z0-9]+", "-", gw._text(row.get("business_name")) or "gym").strip("-")
+        r = requests.post("https://api.resend.com/emails", timeout=25, headers={"Authorization": f"Bearer {key}"},
+                          json={"from": gadm._env("BILLING_FROM", "GymPulse AI <billing@usegympulseai.com>"),
+                                "to": [to], "bcc": ["emmanuel@usegympulseai.com"],
+                                "reply_to": "emmanuel@usegympulseai.com",
+                                "subject": f"Your signed GymPulse AI Subscription Agreement ({row.get('business_name')})",
+                                "html": ge.layout("Agreement signed", body, preheader="Your signed agreement is attached"),
+                                "text": (f"Hi {first},\n\nYour signed GymPulse AI Subscription Agreement is attached. "
+                                         "It's month to month and you can cancel at any time.\n\n" + ge.SITE),
+                                "attachments": [{"filename": f"GymPulse-AI-Subscription-Agreement-{safe}.pdf",
+                                                 "content": base64.b64encode(pdf).decode()}]})
+        return r.status_code < 300
+    except Exception as error:
+        import gympulse_monitoring as gmon
+        gmon.capture(error, "signed agreement email")
+        return False
 
 
 def _render_pay(plan, period, s, ps):
