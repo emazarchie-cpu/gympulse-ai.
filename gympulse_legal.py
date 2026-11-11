@@ -56,6 +56,117 @@ def show_dpa():
     st.markdown(read("dpa"))
 
 
+# ------------------------------------------------------------------ the signature pad (draw with finger or mouse)
+_PAD_HTML = """
+<div class="gp-sig">
+  <canvas class="gp-sig-canvas" aria-label="Signature box: draw your signature"></canvas>
+  <div class="gp-sig-line"></div>
+  <div class="gp-sig-bar"><span class="gp-sig-hint">Sign above with your finger or mouse</span>
+    <button type="button" class="gp-sig-clear">Clear</button></div>
+</div>
+"""
+_PAD_CSS = """
+.gp-sig { position: relative; }
+.gp-sig-canvas { width: 100%; height: 170px; display: block; background: #ffffff; border-radius: 12px;
+  border: 1.5px dashed rgba(120,130,150,.6); touch-action: none; cursor: crosshair; }
+.gp-sig-line { position: absolute; left: 22px; right: 22px; top: 128px; border-top: 1px solid #c9ced8;
+  pointer-events: none; }
+.gp-sig-bar { display: flex; justify-content: space-between; align-items: center; margin-top: 6px;
+  font-size: 13px; color: var(--st-text-color, #8a93a6); opacity: .85; }
+.gp-sig-clear { border: 1px solid rgba(120,130,150,.5); background: transparent; color: inherit;
+  border-radius: 999px; padding: 4px 14px; font-size: 13px; cursor: pointer; }
+"""
+_PAD_JS = """
+export default function(component) {
+  const { parentElement, setStateValue } = component;
+  const canvas = parentElement.querySelector('.gp-sig-canvas');
+  const clear = parentElement.querySelector('.gp-sig-clear');
+  const hint = parentElement.querySelector('.gp-sig-hint');
+  const ctx = canvas.getContext('2d');
+  let drawing = false, points = 0, last = null;
+  function size() {
+    const r = canvas.getBoundingClientRect(), d = window.devicePixelRatio || 1;
+    const keep = points ? canvas.toDataURL() : null;
+    canvas.width = Math.round(r.width * d); canvas.height = Math.round(r.height * d);
+    ctx.setTransform(d, 0, 0, d, 0, 0);
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#161c46'; ctx.lineWidth = 2.6;
+    if (keep) { const im = new Image(); im.onload = () => ctx.drawImage(im, 0, 0, r.width, r.height); im.src = keep; }
+  }
+  function pos(e) { const r = canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+  canvas.addEventListener('pointerdown', (e) => {
+    e.preventDefault(); canvas.setPointerCapture(e.pointerId); drawing = true; last = pos(e);
+    ctx.beginPath(); ctx.arc(last.x, last.y, 1.2, 0, Math.PI * 2); ctx.fillStyle = '#161c46'; ctx.fill();
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (!drawing) return; e.preventDefault();
+    const p = pos(e); ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+    last = p; points += 1;
+  });
+  function end() {
+    if (!drawing) return; drawing = false;
+    if (points >= 12) { hint.textContent = 'Signed. Tap Clear to sign again.'; setStateValue('signature', canvas.toDataURL('image/png')); }
+  }
+  canvas.addEventListener('pointerup', end); canvas.addEventListener('pointercancel', end);
+  canvas.addEventListener('pointerleave', end);
+  clear.addEventListener('click', () => {
+    const r = canvas.getBoundingClientRect(); ctx.clearRect(0, 0, r.width, r.height); points = 0;
+    hint.textContent = 'Sign above with your finger or mouse'; setStateValue('signature', null);
+  });
+  size(); window.addEventListener('resize', size);
+  return () => window.removeEventListener('resize', size);
+}
+"""
+try:
+    _SIGN_PAD = st.components.v2.component("gp_signature_pad", html=_PAD_HTML, css=_PAD_CSS, js=_PAD_JS)
+except Exception:                                   # an older Streamlit without two-way components
+    _SIGN_PAD = None
+
+
+def signature_pad(key):
+    """A box to draw a signature in. Returns the drawing as PNG bytes, None when empty, or False when the
+    pad isn't available (then the typed signature is used instead)."""
+    if _SIGN_PAD is None:
+        return False
+    try:
+        res = _SIGN_PAD(key=key, on_signature_change=lambda: None)
+    except Exception:
+        return False
+    url = getattr(res, "signature", None) if res is not None else None
+    if not url or not str(url).startswith("data:image/png;base64,"):
+        return None
+    import base64
+    try:
+        png = base64.b64decode(str(url).split(",", 1)[1])
+    except Exception:
+        return None
+    if png[:8] != b"\x89PNG\r\n\x1a\n" or len(png) > 600_000:
+        return None
+    return _trim(png)
+
+
+def _trim(png):
+    """Cut the empty space around a drawn signature, so it prints at a good size."""
+    try:
+        import io
+        from PIL import Image
+        im = Image.open(io.BytesIO(png)).convert("RGBA")
+        box = im.getchannel("A").getbbox()
+        if not box:
+            return None
+        pad = 12
+        box = (max(box[0] - pad, 0), max(box[1] - pad, 0), min(box[2] + pad, im.width), min(box[3] + pad, im.height))
+        out = io.BytesIO()
+        im.crop(box).save(out, "PNG", optimize=True)
+        return out.getvalue()
+    except Exception:
+        return png
+
+
+def png_data_url(png):
+    import base64
+    return "data:image/png;base64," + base64.b64encode(png).decode()
+
+
 def founder_signature_png():
     try:
         with open(FOUNDER_SIGNATURE, "rb") as f:
@@ -135,7 +246,15 @@ def agreement_pdf(sig, text=None):
             Paragraph(f"<b>{FOUNDER}</b>, {FOUNDER_TITLE}<br/>for and on behalf of GYMPULSE AI LTD<br/>"
                       "Signature applied electronically", body)]
     when = str(sig.get("signed_at") or "")[:16].replace("T", " ")
-    theirs = [Paragraph(escape(gw_text(sig.get("signer_name"))), script),
+    drawn = None
+    if str(sig.get("signature_image") or "").startswith("data:image/png;base64,"):
+        import base64
+        try:
+            drawn = Image(io.BytesIO(base64.b64decode(sig["signature_image"].split(",", 1)[1])),
+                          width=50 * mm, height=18 * mm, kind="proportional")
+        except Exception:
+            drawn = None
+    theirs = [drawn or Paragraph(escape(gw_text(sig.get("signer_name"))), script),
               Paragraph(f"<b>{escape(gw_text(sig.get('signer_name')))}</b>, {escape(gw_text(sig.get('signer_role')))}"
                         f"<br/>for and on behalf of {escape(gw_text(sig.get('business_name')))}<br/>"
                         f"Signed electronically on {escape(when)} UTC", body)]

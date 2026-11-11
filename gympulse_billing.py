@@ -1184,6 +1184,14 @@ def _render_checkout(supabase, gym_id, plan, period, s, p, ps):
         if st.button("Read the Subscription Agreement", key="co_read_sa", icon=":material/contract:",
                      type="tertiary"):
             glegal.show_subscription()
+        drawn, role = None, None
+        if not signed_before:
+            gw._md('<div class="co-sec">Sign the agreement (once)</div>')
+            st.caption("Before your first payment, please sign the GymPulse AI Subscription Agreement (link above). "
+                       "It's month to month, you can cancel at any time, and it's already signed by GymPulse AI. "
+                       "You only sign once.")
+            drawn = glegal.signature_pad("co_sigpad")
+            role = st.selectbox("Your role", glegal.SIGNER_ROLES, key="co_sig_role")
         with st.form("co_form", border=False):
             gw._md('<div class="co-sec">Billing details</div>')
             biz = st.text_input("Business name", prev.get("business_name") or prof.get("business_name") or "")
@@ -1208,13 +1216,10 @@ def _render_checkout(supabase, gym_id, plan, period, s, p, ps):
                 signed, role = signed_before.get("signer_name"), signed_before.get("signer_role")
                 agree = st.checkbox("I authorise this payment.")
             else:
-                gw._md('<div class="co-sec" style="margin-top:10px">Sign the agreement (once)</div>')
-                st.caption("Before your first payment, please sign the GymPulse AI Subscription Agreement (link "
-                           "above). It's month to month, you can cancel at any time, and it's already signed by "
-                           "GymPulse AI. You only sign once.")
-                s1, s2 = st.columns([1.4, 1])
-                signed = s1.text_input("Type your full name to sign", placeholder="Same as your full name above")
-                role = s2.selectbox("Your role", glegal.SIGNER_ROLES)
+                if drawn is False:                     # no drawing pad here: sign by typing your name
+                    signed = st.text_input("Type your full name to sign", placeholder="Same as your full name above")
+                else:
+                    signed = None
                 agree = st.checkbox(f"I have read and agree to the Subscription Agreement (version "
                                     f"{glegal.SUBSCRIPTION_VERSION}), the Terms of Service, Privacy Policy and Data "
                                     "Processing Agreement. I am authorised to sign for this business, and I "
@@ -1228,8 +1233,10 @@ def _render_checkout(supabase, gym_id, plan, period, s, p, ps):
             problems = [m for ok, m in [(biz.strip(), "your business name"), (name.strip(), "your full name"),
                                         ("@" in email and "." in email.split("@")[-1], "a valid email"),
                                         (len("".join(ch for ch in phone if ch.isdigit())) >= 10, "a phone number"),
-                                        (signed_before or _same_name(signed, name),
-                                         "your signature (type your full name exactly as above)"),
+                                        (signed_before or (drawn is not False and drawn) or
+                                         (drawn is False and _same_name(signed, name)),
+                                         "your signature (type your full name exactly as above)" if drawn is False
+                                         else "your signature (draw it in the box above)"),
                                         (agree, "to accept the agreement")] if not ok]
             if problems:
                 st.error("Please add " + ", ".join(problems) + ".")
@@ -1239,8 +1246,9 @@ def _render_checkout(supabase, gym_id, plan, period, s, p, ps):
                 st.error("Checkout isn't available right now. Please try again shortly.")
                 return
             amount = price_for(plan, period)
-            signature = {"signer_name": " ".join(signed.split()), "signer_role": role, "plan": plan["name"],
-                         "period": period, "amount": amount}
+            signature = {"signer_name": " ".join(gw._text(signed or name).split()), "signer_role": role,
+                         "plan": plan["name"], "period": period, "amount": amount,
+                         "signature_image": glegal.png_data_url(drawn) if drawn else None}
             if method in PAY_CHANNELS:
                 ref = f"gp-{str(gym_id)[:8]}-{uuid.uuid4().hex[:12]}"
                 inv = gi.create(sc, gym_id, plan["name"], period, amount, details, "paystack", ref)
@@ -1285,9 +1293,13 @@ def record_signature(sc, gym_id, details, sig):
            "signer_name": sig["signer_name"], "signer_role": sig.get("signer_role"),
            "signer_email": details.get("billing_email"), "signed_at": now.isoformat(), "ip": ip,
            "user_agent": (agent or "")[:300] or None, "plan": sig.get("plan"), "period": sig.get("period"),
-           "amount": sig.get("amount"), "invoice_id": sig.get("invoice_id")}
+           "amount": sig.get("amount"), "invoice_id": sig.get("invoice_id"),
+           "signature_image": sig.get("signature_image")}
     try:
-        sc.table("agreement_signatures").insert(row).execute()
+        try:
+            sc.table("agreement_signatures").insert(row).execute()
+        except Exception:                              # phase 41 not run yet: keep the record without the drawing
+            sc.table("agreement_signatures").insert({k: v for k, v in row.items() if k != "signature_image"}).execute()
     except Exception:                                  # phase 40 not run yet: keep it on the owner's profile
         try:
             g = sc.table("gyms").select("owner_id").eq("id", gym_id).limit(1).execute().data
