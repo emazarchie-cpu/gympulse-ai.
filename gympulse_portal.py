@@ -57,7 +57,23 @@ html body .stApp.stApp.stApp :is(.st-key-mp_to_forgot, .st-key-mp_back) button p
 html body .stApp.stApp.stApp :is(.st-key-mp_to_forgot, .st-key-mp_back) button:hover p { color: #B7F34A !important; }
 .mp-auth-sub { text-align: center; color: var(--muted, #93A0B4); font-size: 14px; margin: 0 0 6px; }
 /* ---------- 2026 look: app-style tabs, soft glass cards ---------- */
-.st-key-mp_tabs [role="tab"] { padding: 7px 8px !important; }   /* five tabs fit a phone */
+/* ---------- bottom navigation bar, like a phone app ---------- */
+html body .stApp.stApp .st-key-mp_tabs [role="tablist"] { position: fixed !important; left: 0; right: 0; bottom: 0; z-index: 999;
+  display: grid !important; grid-template-columns: repeat(5, 1fr); gap: 2px; margin: 0 !important; overflow: visible !important;
+  padding: 8px max(10px, env(safe-area-inset-left, 0px)) calc(10px + env(safe-area-inset-bottom, 0px)) max(10px, env(safe-area-inset-right, 0px)) !important;
+  background: rgba(10, 15, 30, .94) !important; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  border-top: 1px solid rgba(255,255,255,0.08) !important; border-radius: 0 !important; box-shadow: 0 -8px 24px rgba(0,0,0,.35) !important; }
+html body .stApp.stApp .st-key-mp_tabs [role="tab"] { background: transparent !important; border: 0 !important; box-shadow: none !important;
+  padding: 2px 0 !important; min-height: 0 !important; height: auto !important; margin: 0 !important; justify-content: center !important; }
+html body .stApp.stApp .st-key-mp_tabs [role="tab"] [data-testid="stMarkdownContainer"] p { display: flex !important; flex-direction: column;
+  align-items: center; gap: 5px; margin: 0 !important; font-size: 11.5px !important; font-weight: 600 !important; color: #6B7A93 !important; }
+html body .stApp.stApp .st-key-mp_tabs [role="tab"] p > span[role="img"] { font-size: 22px !important; width: 50px !important; height: 30px !important;
+  display: inline-flex !important; align-items: center; justify-content: center; text-align: center; line-height: 30px !important; border-radius: 12px; color: #6B7A93 !important; margin: 0 !important; }
+html body .stApp.stApp .st-key-mp_tabs [role="tab"][aria-selected="true"] [data-testid="stMarkdownContainer"] p { color: #B7F34A !important; }
+html body .stApp.stApp .st-key-mp_tabs [role="tab"][aria-selected="true"] p > span[role="img"] {
+  background: linear-gradient(100deg, #B7F34A 0%, #35D6ED 100%); color: #0A0F1E !important; }
+html body .stApp.stApp .st-key-mp_tabs [data-baseweb="tab-highlight"], html body .stApp.stApp .st-key-mp_tabs [data-baseweb="tab-border"] { display: none !important; }
+html body .stApp.stApp .st-key-mp_tabs [role="tabpanel"] { padding-bottom: 96px; }   /* room above the bar */
 .st-key-mp_wrap [data-testid="stLayoutWrapper"] > div[class*="st-key"] { border-radius: 24px !important; }
 .st-key-mp_wrap [data-testid="stVerticalBlock"][class*="emotion"] { }
 .mp-card { border: none !important; border-radius: 28px !important;
@@ -687,7 +703,8 @@ def render_portal(supabase, token):
         flash = st.session_state.pop("mp_flash", None)
         if flash:
             st.success(flash)
-        tabs = st.tabs(["Home", "Train", "Classes", "Inbox", "Me"], key="mp_tabs")
+        tabs = st.tabs([":material/home: Home", ":material/fitness_center: Train", ":material/event: Classes",
+                        ":material/chat: Inbox", ":material/person: Me"], key="mp_tabs")
         with tabs[0]:
             import gympulse_waiver as gwv
             gwv.render_status(sc, m["gym_id"], m["id"], gym_name, for_member=True, compact=True)
