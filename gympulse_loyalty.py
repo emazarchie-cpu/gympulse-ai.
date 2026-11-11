@@ -186,6 +186,8 @@ def due_messages(supabase, gym_id, profile=None, today=None):
     import gympulse_grow as gg
     today = today or gw.today_local()
     auto = auto_cfg(profile)
+    import gympulse_sidebyside as gsbs
+    side_by_side = gsbs.skips_renewals(profile)       # the old software still sends renewal reminders
     sent, sent_rows = _sent_refs(supabase, gym_id)
     if sent is None:
         return None
@@ -210,7 +212,7 @@ def due_messages(supabase, gym_id, profile=None, today=None):
                 ref = f"hmo:{cover.isoformat()}"
                 if (m["id"], "hmo_cover", ref) not in sent:
                     out.append(("hmo_cover", md, ref) + hmo_cover_letter(md, cover))
-        if auto["renewal"]["on"] and end is not None and not hmo and not gw.is_company(md):   # HR is reminded
+        if auto["renewal"]["on"] and end is not None and not hmo and not gw.is_company(md) and not side_by_side:   # HR is reminded
             left = (end - today).days
             if 0 <= left <= int(auto["renewal"]["days"]):
                 ref = f"end:{end.isoformat()}"
