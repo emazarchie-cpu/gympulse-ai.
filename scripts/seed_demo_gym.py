@@ -295,6 +295,18 @@ def build(sc, gym_id, rng):
         log(f"  corporate plan: Lekki Tech Ltd, {len(staff)} staff")
 
 
+def check_sign_in(password):
+    """Sign in as the demo owner with a fresh client, exactly like the app does. Never prints the password."""
+    try:
+        import gympulse_admin as gadm
+        from supabase import create_client
+        c = create_client(gadm.clean_url(gadm._env("SUPABASE_URL")), gadm._env("SUPABASE_SERVICE_ROLE_KEY"))
+        r = c.auth.sign_in_with_password({"email": DEMO_EMAIL, "password": password})
+        return "OK" if getattr(r, "session", None) else "no session returned"
+    except Exception as error:
+        return f"FAILED: {str(error)[:200]}"
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
@@ -306,7 +318,9 @@ def main():
     if sc is None:
         log("Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.")
         return 1
-    password = "Demo-" + secrets.token_urlsafe(9)
+    # Letters and digits only (no look-alikes such as 0/O or 1/l), easy to type on a phone.
+    abc = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789"
+    password = "Demo" + "".join(secrets.choice(abc) for _ in range(10))
     owner = find_or_create_owner(sc, password, args.dry_run)
     if args.dry_run:
         log("dry run: nothing changed")
@@ -316,6 +330,7 @@ def main():
     wipe(sc, gym_id)
     log("Building the demo")
     build(sc, gym_id, random.Random(SEED))
+    log("Sign-in check: " + check_sign_in(password))
     import gympulse_billing as gbill
     ok = gbill._email_founder(
         "GymPulse AI demo gym is ready",
