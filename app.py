@@ -1679,7 +1679,8 @@ try:
             supabase.table("gyms")
             .select("*")
             .eq("owner_id", owner_id)
-            .limit(1)
+            .order("created_at")
+            .limit(50)
             .execute()
             .data or []
         ),
@@ -1720,7 +1721,9 @@ try:
 
     # Create a workspace if this owner does not have one
     if gym_rows:
-        gym = gym_rows[0]
+        import gympulse_branches as gbr
+        st.session_state["branches"] = gym_rows          # a chain: one login, several branches
+        gym = gbr.pick(gym_rows)
         st.session_state["_had_gym"] = True
         st.session_state["role"] = "owner"
 
@@ -1973,6 +1976,7 @@ elif gteam.is_staff():
     MORE_PAGES = [p for p in MORE_PAGES if p not in gteam.OWNER_ONLY]
 else:
     MAIN_PAGES = ["Owner" if p == "Business Insights" else p for p in MAIN_PAGES]
+    MORE_PAGES.insert(0, "Branches")             # a chain's HQ view, and where new branches are added
 import gympulse_admin as gadm
 if gadm.is_admin():
     MORE_PAGES.append("Admin")
@@ -2723,6 +2727,11 @@ try:
             gw.apply_theme(st.session_state.get("theme", "dark"))
             st.stop()
     else:
+        try:
+            import gympulse_branches as gbr
+            gbr.render_switcher(st.session_state.get("branches") or [], st.session_state.get("gym_id"))
+        except Exception:
+            pass
         gbill.render_banner(supabase, st.session_state.get("gym_id"))
         if st.session_state.get("gym_id") and st.session_state.get("current_page") in ("Dashboard", "Member Management"):
             gbill.render_limit_banner(supabase, st.session_state.get("gym_id"))
@@ -2771,6 +2780,9 @@ elif page == "Risk Radar":
 elif page == "My workspace":
     import gympulse_ptw as gptw
     gptw.render(supabase, st.session_state.gym_id)
+elif page == "Branches":
+    import gympulse_branches as gbr
+    gbr.render_hq(supabase, owner_id, st.session_state.get("branches") or [], assess_members)
 elif page == "Prediction check":
     import gympulse_predcheck as gpc
     gpc.render(supabase, st.session_state.gym_id, assess_members)

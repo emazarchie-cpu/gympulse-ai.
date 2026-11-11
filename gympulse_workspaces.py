@@ -5434,7 +5434,7 @@ def render_settings(supabase, owner_id, gym_id, log_out):
                 st.warning("Some settings need the one-time database update "
                            "(the SQL in the setup notes). Name and gym name were saved.")
         profile.update(saved)
-        if "business_name" in saved and gym_id:
+        if "business_name" in saved and gym_id and len(st.session_state.get("branches") or []) <= 1:
             try:
                 (supabase.table("gyms").update({"business_name": saved["business_name"]})
                  .eq("id", gym_id).execute())
