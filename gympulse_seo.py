@@ -9,6 +9,7 @@ almost empty page. This module, run at start-up by hide_streamlit_chrome.apply()
                    The app replaces it the moment it loads (and it's hidden at once on app links
                    such as ?hmo= or ?guide=, so members never see it).
 * write_static()   robots.txt, sitemap.xml and one plain, fast page per topic gym owners search for
+* IndexNow         when a page changes on a deploy, Bing (and the other IndexNow engines) are told at once
                    (served at /gym-management-software-nigeria.html and so on; the web server
                    redirects folder-style URLs, so plain .html files are used).
 
@@ -22,6 +23,9 @@ import re
 from datetime import date
 
 SITE = (os.environ.get("APP_URL") or "https://usegympulseai.com").rstrip("/")
+# IndexNow key: public by design (search engines read it from SITE/<key>.txt to confirm the site is ours).
+INDEXNOW_KEY = os.environ.get("INDEXNOW_KEY") or "f848cdbe83c604ffcb8a19b72cf7f5f3"
+INDEXNOW_URL = "https://api.indexnow.org/indexnow"
 GOOGLE_VERIFY = os.environ.get("GOOGLE_SITE_VERIFICATION", "").strip()
 NAME = "GymPulse AI"
 TITLE = "GymPulse AI · Gym member retention software for Nigeria"
@@ -371,12 +375,13 @@ def apply_index(index_html):
     return out
 
 
-def write_static(static_dir):
-    """robots.txt, sitemap.xml and the topic pages, served from the app's own web root."""
-    files = {"robots.txt": robots_txt(), "sitemap.xml": sitemap_xml()}
+def write_static(static_dir, ping=True):
+    """robots.txt, sitemap.xml, the IndexNow key file and the topic pages, served from the app's own web root.
+    Topic pages that changed are sent to IndexNow (on the live server only)."""
+    files = {"robots.txt": robots_txt(), "sitemap.xml": sitemap_xml(), f"{INDEXNOW_KEY}.txt": INDEXNOW_KEY}
     for p in PAGES:
         files[p["slug"] + ".html"] = page_html(p)
-    n = 0
+    n, changed = 0, []
     for rel, text in files.items():
         path = os.path.join(static_dir, rel)
         try:
@@ -388,4 +393,34 @@ def write_static(static_dir):
         with open(path, "w", encoding="utf-8") as f:
             f.write(text)
         n += 1
+        if rel.endswith(".html"):
+            changed.append(f"{SITE}/{rel}")
+    if changed and ping:
+        indexnow([SITE + "/"] + changed)
     return n
+
+
+def indexnow(urls, wait=False):
+    """Tell IndexNow (Bing, Yandex, Seznam, Naver…) these pages changed. Only from the live server (Render),
+    in the background, so a slow reply never holds up the app starting. Returns the HTTP status when wait=True."""
+    if not urls or not (os.environ.get("RENDER") or wait):
+        return None
+    host = SITE.split("://", 1)[-1].split("/", 1)[0]
+    body = {"host": host, "key": INDEXNOW_KEY, "keyLocation": f"{SITE}/{INDEXNOW_KEY}.txt",
+            "urlList": list(dict.fromkeys(urls))[:10000]}
+
+    def send():
+        try:
+            import requests
+            r = requests.post(INDEXNOW_URL, json=body, timeout=15,
+                              headers={"Content-Type": "application/json; charset=utf-8"})
+            print(f"[seo] IndexNow: {len(body['urlList'])} page(s), status {r.status_code}")
+            return r.status_code
+        except Exception as error:
+            print(f"[seo] IndexNow skipped: {error}")
+            return None
+    if wait:
+        return send()
+    import threading
+    threading.Thread(target=send, daemon=True).start()
+    return None
