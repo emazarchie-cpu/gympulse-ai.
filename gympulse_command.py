@@ -95,7 +95,8 @@ def renewal_watch(roster, horizon=30):
     """Members renewing soon who are also attending less or flagged at risk."""
     if roster.empty:
         return roster
-    soon = roster[(roster["renewal_due_days"] >= -7) & (roster["renewal_due_days"] <= horizon)]
+    soon = roster[(roster["renewal_due_days"] >= -7) & (roster["renewal_due_days"] <= horizon)
+                  & gw.pays_own_renewal(roster)]
     return soon[(soon["attendance_change"] < 0) | (soon["risk_category"] != "Low")] \
         .sort_values(["renewal_due_days", "cancellation_probability"], ascending=[True, False])
 
@@ -118,7 +119,7 @@ def daily_brief(roster, actions, res, watch, need):
     lines = []
     declining = roster[roster["attendance_change"] <= -3] if not roster.empty else roster
     if len(declining):
-        renewing = declining[declining["renewal_due_days"].between(0, 30)]
+        renewing = declining[declining["renewal_due_days"].between(0, 30) & gw.pays_own_renewal(declining)]
         line = f"<b>{_plural(len(declining), 'member')}</b> {'is' if len(declining) == 1 else 'are'} attending less than last month"
         if len(renewing):
             line += (f", and <b>{len(renewing)}</b> of them renew within 30 days "

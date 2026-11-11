@@ -1410,6 +1410,7 @@ MEMBER_SUSPEND = ["suspended"]
 MEMBER_PROFILE = ["photo", "membership_end", "last_renewed_on", "last_payment"]
 MEMBER_PROFILE_LIGHT = ["membership_end", "last_renewed_on", "last_payment"]
 MEMBER_PT = ["has_pt", "pt_trainer_id"]          # sql/phase34_personal_training.sql
+MEMBER_HMO = ["hmo_provider", "hmo_valid_until"]  # sql/phase28_referrals_hmo.sql
 NO_TRAINER_PLAYS = {"Trainer intro", "Free PT session"}   # pointless for someone who already has a trainer
 
 def fetch_all(query, page=1000, cap=50000):
@@ -1426,7 +1427,8 @@ def fetch_all(query, page=1000, cap=50000):
 
 def _fetch_members_uncached(supabase, gym_id, archived=None, include_photo=True):
     profile = MEMBER_PROFILE if include_photo else MEMBER_PROFILE_LIGHT
-    attempts = [MEMBER_BASE + MEMBER_SUSPEND + profile + MEMBER_PT,
+    attempts = [MEMBER_BASE + MEMBER_SUSPEND + profile + MEMBER_PT + MEMBER_HMO,
+                MEMBER_BASE + MEMBER_SUSPEND + profile + MEMBER_PT,
                 MEMBER_BASE + MEMBER_SUSPEND + profile,
                 MEMBER_BASE + MEMBER_SUSPEND,
                 MEMBER_BASE]
@@ -1447,9 +1449,10 @@ def _fetch_members_uncached(supabase, gym_id, archived=None, include_photo=True)
     df = pd.DataFrame(rows)
     if df.empty:
         df = pd.DataFrame(columns=MEMBER_BASE + MEMBER_SUSPEND + MEMBER_PROFILE)
-    for column in MEMBER_SUSPEND + MEMBER_PROFILE + MEMBER_PT:
+    for column in MEMBER_SUSPEND + MEMBER_PROFILE + MEMBER_PT + MEMBER_HMO:
         if column not in df.columns:
             df[column] = None
+    df["is_hmo"] = df["hmo_provider"].fillna("").astype(str).str.strip() != ""   # their HMO pays, not them
     df["has_pt"] = df["has_pt"].fillna(False).astype(bool)
     df["archived"] = df["archived"].fillna(False).astype(bool)
     df["suspended"] = df["suspended"].fillna(False).astype(bool)
@@ -1463,7 +1466,8 @@ def _load_roster_uncached(supabase, gym_id, assess_fn, with_photos=True):
     members = members_all[~members_all["suspended"]]
 
     keep = ["id", "full_name", "email", "phone", "fitness_goal",
-            "membership_end", "last_payment", "last_renewed_on", "has_pt", "pt_trainer_id"]
+            "membership_end", "last_payment", "last_renewed_on", "has_pt", "pt_trainer_id",
+            "hmo_provider", "hmo_valid_until", "is_hmo"]
     if with_photos:
         keep.append("photo")
     members = members[[c for c in keep if c in members.columns]].reset_index(drop=True)
@@ -1595,8 +1599,13 @@ def drivers(row):
         out.append("attendance dropping")
     if row["renewal_due_days"] <= 14:
         d = int(row["renewal_due_days"])
-        out.append("renews today" if d == 0 else f"lapsed {-d} days ago" if d < 0
-                   else f"renews in {d} day{'s' if d != 1 else ''}")
+        what = "HMO cover" if is_hmo(row) else None
+        if what:
+            out.append(f"{what} ends today" if d == 0 else f"{what} ended {-d} days ago" if d < 0
+                       else f"{what} ends in {d} day{'s' if d != 1 else ''}")
+        else:
+            out.append("renews today" if d == 0 else f"lapsed {-d} days ago" if d < 0
+                       else f"renews in {d} day{'s' if d != 1 else ''}")
     if row["pt_sessions_attended"] == 0 and not _has_pt(row):
         out.append("no PT sessions")
     if PLAN_DAYS.get(plan_name(row["membership_type"]), 30) <= 30:
@@ -1610,6 +1619,21 @@ def drivers(row):
         elif not out and days <= 1.5 * float(ug) + 1:
             return "visiting regularly"
     return ", ".join(out) or "no major warning signs"
+
+def is_hmo(row):
+    """True for members whose gym access an HMO or employer pays for: never ask them to renew and pay."""
+    v = row.get("is_hmo") if hasattr(row, "get") else None
+    if v is None or (isinstance(v, float) and pd.isna(v)):
+        v = _text(row.get("hmo_provider") if hasattr(row, "get") else None) != ""
+    return bool(v)
+
+
+def pays_own_renewal(df):
+    """Row mask: members who renew and pay themselves (HMO members are left out of renewal lists)."""
+    if "is_hmo" not in df.columns:
+        return pd.Series(True, index=df.index)
+    return ~df["is_hmo"].fillna(False).astype(bool)
+
 
 def _has_pt(row):
     v = row.get("has_pt") if hasattr(row, "get") else None
@@ -1626,7 +1650,7 @@ def member_trainer(trainers, row, goal=""):
 
 
 def suggest_action(row):
-    if row["renewal_due_days"] <= 14 and row["risk_category"] != "Low":
+    if row["renewal_due_days"] <= 14 and row["risk_category"] != "Low" and not is_hmo(row):
         return "Renewal offer"
     if row["days_since_last_visit"] >= 14:
         return "Personal call"

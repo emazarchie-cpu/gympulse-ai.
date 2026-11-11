@@ -916,7 +916,7 @@ def audience(roster, key):
     if key == "high":
         return roster[roster["risk_category"] == "High"]
     if key == "renewing":
-        return roster[roster["renewal_due_days"].between(0, 14)]
+        return roster[roster["renewal_due_days"].between(0, 14) & gw.pays_own_renewal(roster)]
     return roster
 
 

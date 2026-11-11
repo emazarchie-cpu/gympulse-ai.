@@ -201,7 +201,16 @@ def due_messages(supabase, gym_id, profile=None, today=None):
     for _, m in members.iterrows():
         md = dict(m)
         end = m["end"] if gg._has_date(m.get("end")) else None
-        if auto["renewal"]["on"] and end is not None:
+        hmo = gw.is_hmo(md)
+        if auto["renewal"]["on"] and hmo:
+            # Their HMO or employer pays, so no "renew and pay" email: tell them their cover is ending instead.
+            cover = pd.to_datetime(m.get("hmo_valid_until"), errors="coerce")
+            cover = end if pd.isna(cover) else cover.date()
+            if cover is not None and 0 <= (cover - today).days <= int(auto["renewal"]["days"]):
+                ref = f"hmo:{cover.isoformat()}"
+                if (m["id"], "hmo_cover", ref) not in sent:
+                    out.append(("hmo_cover", md, ref) + hmo_cover_letter(md, cover))
+        if auto["renewal"]["on"] and end is not None and not hmo:
             left = (end - today).days
             if 0 <= left <= int(auto["renewal"]["days"]):
                 ref = f"end:{end.isoformat()}"
@@ -282,7 +291,7 @@ def due_messages(supabase, gym_id, profile=None, today=None):
                         out.append(("reward", by_id[r["member_id"]], ref, subject, body, None))
     # At most one automatic email per member per day: renewal first, then we missed you,
     # then reward. The others stay due and go out on a later day.
-    order = {"renewal": 0, "missed": 1, "week1": 2, "welcome": 3, "milestone": 4, "level": 5, "reward": 6,
+    order = {"renewal": 0, "hmo_cover": 0, "missed": 1, "week1": 2, "welcome": 3, "milestone": 4, "level": 5, "reward": 6,
              "progress": 7, "pulse": 8}
     picked, seen = [], set(had_today)
     for item in sorted(out, key=lambda x: order[x[0]]):
@@ -290,6 +299,22 @@ def due_messages(supabase, gym_id, profile=None, today=None):
             seen.add(item[1]["id"])
             picked.append(item)
     return picked
+
+
+def hmo_cover_letter(m, cover_end):
+    """For HMO and company-paid members: their cover is ending. Nothing to pay the gym, so no payment ask."""
+    import gympulse_grow as gg
+    biz, owner = gg._biz()
+    first = gg._first(m.get("full_name"))
+    hmo = gw._text(m.get("hmo_provider"), "your HMO")
+    days = (cover_end - gw.today_local()).days
+    when = "today" if days == 0 else f"on {cover_end:%A %d %B}"
+    body = (f"Hi {first},\n\nA quick heads-up: your gym cover with {hmo} at {biz} ends {when}.\n\n"
+            f"To keep training without a break, ask {hmo} or your HR team to renew it. If it has already been "
+            "renewed, just let us know at the front desk on your next visit and we'll update your record.\n\n"
+            "There is nothing for you to pay us.\n\n"
+            f"See you soon,\n{owner}\n{biz}")
+    return f"{first}, your {hmo} gym cover ends {when}", body, None
 
 
 def missed_letter(m, last_visit, away, story, pause=True):
@@ -595,7 +620,9 @@ def render_auto(supabase, gym_id, owner_id):
         with g1.container(border=True):
             st.markdown("##### :material/autorenew: Renewals and win-backs")
             c1, c2 = st.columns([1.3, 1])
-            r_on = c1.toggle("Remind them to renew", value=auto["renewal"]["on"])
+            r_on = c1.toggle("Remind them to renew", value=auto["renewal"]["on"],
+                             help="HMO members aren't asked to pay. They get a short note that their HMO "
+                                  "cover is ending instead.")
             r_days = c2.number_input("Days before it ends", 1, 14, int(auto["renewal"]["days"]))
             c3, c4 = st.columns([1.3, 1])
             m_on = c3.toggle("\"We missed you\"", value=auto["missed"]["on"],
@@ -657,7 +684,7 @@ def render_auto(supabase, gym_id, owner_id):
     if due is None:
         st.info(SQL_HINT)
         return
-    label = {"renewal": "Renew reminder", "missed": "We missed you", "reward": "Gift earned",
+    label = {"renewal": "Renew reminder", "hmo_cover": "HMO cover ending", "missed": "We missed you", "reward": "Gift earned",
              "welcome": "New member check-in", "progress": "Monthly progress", "update": "Gym update",
              "week1": "First week", "milestone": "Milestone", "level": "Level up", "pulse": "Happiness check"}
     import gympulse_whatsapp as gwa
