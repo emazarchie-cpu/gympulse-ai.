@@ -48,7 +48,7 @@ def _channels(supabase, gym_id, plays, members):
         if m is None:
             continue
         end = m.get("end")
-        renewing = not gw.is_hmo(m) and (a["action_type"] == "Renewal offer" or (
+        renewing = not gw.paid_by_sponsor(m) and (a["action_type"] == "Renewal offer" or (
             end is not None and not pd.isna(end) and (end - gw.today_local()).days <= RENEWAL_DAYS))
         kind = "renewal" if renewing else "missed"
         cat = gwa.TEMPLATES[gwa.KIND_TEMPLATE[kind]]["category"]

@@ -210,7 +210,7 @@ def due_messages(supabase, gym_id, profile=None, today=None):
                 ref = f"hmo:{cover.isoformat()}"
                 if (m["id"], "hmo_cover", ref) not in sent:
                     out.append(("hmo_cover", md, ref) + hmo_cover_letter(md, cover))
-        if auto["renewal"]["on"] and end is not None and not hmo:
+        if auto["renewal"]["on"] and end is not None and not hmo and not gw.is_company(md):   # HR is reminded
             left = (end - today).days
             if 0 <= left <= int(auto["renewal"]["days"]):
                 ref = f"end:{end.isoformat()}"
@@ -622,7 +622,8 @@ def render_auto(supabase, gym_id, owner_id):
             c1, c2 = st.columns([1.3, 1])
             r_on = c1.toggle("Remind them to renew", value=auto["renewal"]["on"],
                              help="HMO members aren't asked to pay. They get a short note that their HMO "
-                                  "cover is ending instead.")
+                                  "cover is ending instead. Staff on a corporate plan aren't asked either: "
+                                  "their HR contact gets one reminder a week before the company plan renews.")
             r_days = c2.number_input("Days before it ends", 1, 14, int(auto["renewal"]["days"]))
             c3, c4 = st.columns([1.3, 1])
             m_on = c3.toggle("\"We missed you\"", value=auto["missed"]["on"],

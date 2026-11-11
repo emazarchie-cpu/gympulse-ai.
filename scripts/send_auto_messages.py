@@ -60,6 +60,8 @@ def main():
                                dry_run=args.dry_run)
                 if a or c:
                     print(f"  follow-up calls: {a} {'would add' if args.dry_run else 'added'}, {c} closed")
+                import gympulse_grow as ggr
+                ggr.send_company_renewals(sc, entry["gym"]["id"], entry["profile"], dry_run=args.dry_run)
         except Exception as error:
             print(f"  failed: {error}")
             total[2] += 1

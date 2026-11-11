@@ -1247,6 +1247,159 @@ def render_challenges(supabase, gym_id):
 
 
 # ================================================================== 8. Corporate
+# How often a company pays: label, months per payment.
+CYCLES = {"monthly": ("Every month", 1), "quarterly": ("Every 3 months", 3), "yearly": ("Every year", 12)}
+HR_LEAD_DAYS = 7          # HR hears about a company renewal a week ahead
+CORP_SQL_HINT = ("Company renewal dates need a one-time setup: open Supabase, go to SQL Editor, paste in the file "
+                 "sql/phase36_corporate_renewals.sql and press Run.")
+
+
+def _insert_quiet(supabase, table, row):
+    try:
+        supabase.table(table).insert(row).execute()
+        gw.bump_data_version()
+        return True
+    except Exception:
+        return False
+
+
+def _cycle(c):
+    k = gw._text(c.get("billing_cycle"), "monthly")
+    return k if k in CYCLES else "monthly"
+
+
+def company_amount_due(c):
+    """What the company pays each time: the monthly fee times the months in its cycle."""
+    return float(c.get("monthly_fee") or 0) * CYCLES[_cycle(c)][1]
+
+
+def _next_renewal(c):
+    d = pd.to_datetime(c.get("next_renewal"), errors="coerce")
+    return None if pd.isna(d) else d.date()
+
+
+def advance_renewal(c):
+    """The renewal date after this one, one cycle on."""
+    d = _next_renewal(c) or _today()
+    return (pd.Timestamp(d) + pd.DateOffset(months=CYCLES[_cycle(c)][1])).date()
+
+
+def hr_renewal_letter(c, rep, pay=None):
+    """(subject, body) for the company's HR contact a week before the company plan renews."""
+    biz, owner = _biz()
+    due = _next_renewal(c)
+    label = CYCLES[_cycle(c)][0].lower()
+    amount = company_amount_due(c)
+    names = [p["name"] for p in rep["people"]]
+    para = [f"Dear {gw._text(c.get('hr_name'), 'HR team')},",
+            f"{c['name']}'s staff gym plan at {biz} renews on {due:%A %d %B %Y}."
+            + (f" The amount due is {_money(amount)} ({label})." if amount else ""),
+            f"{rep['enrolled']} staff are on the plan" + (f" (of {c['seats']} seats)" if c.get("seats") else "")
+            + f", and {rep['active']} trained in the last 30 days with {rep['visits']} visits in total."]
+    if names:
+        shown = names[:40]
+        para.append("Staff on the plan: " + ", ".join(shown)
+                    + (f" and {len(names) - len(shown)} more." if len(names) > len(shown) else "."))
+    para.append("If anyone has joined or left your team, just reply to this email with the changes and we'll "
+                "update the list before the renewal.")
+    pay = dict(pay or {})
+    if pay.get("bank_account"):
+        bank = " · ".join(x for x in (gw._text(pay.get("bank_name")), gw._text(pay.get("bank_account")),
+                                      gw._text(pay.get("bank_holder"))) if x)
+        para.append(f"Payment details: {bank}. Please use {c['name']} as the reference.")
+    para.append(f"Thank you for keeping your team active.\n\nKind regards,\n{owner}\n{biz}".replace("\n\n\n", "\n\n"))
+    return f"{c['name']}: gym plan renews on {due:%d %B %Y}", "\n\n".join(para)
+
+
+def company_renewals_due(companies, today=None):
+    """Companies whose HR should get the renewal reminder today (once per renewal date)."""
+    today = today or _today()
+    out = []
+    for c in companies or []:
+        due = _next_renewal(c)
+        if due is None or "@" not in gw._text(c.get("hr_email")):
+            continue
+        if 0 <= (due - today).days <= HR_LEAD_DAYS and str(c.get("hr_reminded_for") or "")[:10] != due.isoformat():
+            out.append(c)
+    return out
+
+
+def send_company_renewals(supabase, gym_id, profile=None, dry_run=False, log=print):
+    """The daily job: email each company's HR a week before its plan renews. Returns how many were sent."""
+    import gympulse_loyalty as gl
+    if not gl.auto_cfg(profile)["renewal"]["on"]:
+        return 0
+    try:
+        comps = supabase.table("companies").select("*").eq("gym_id", gym_id).execute().data or []
+    except Exception:
+        return 0
+    due = company_renewals_due(comps)
+    if not due:
+        return 0
+    import gympulse_campaigns as gcamp
+    df = _members(supabase, gym_id)
+    ck = _checkins(supabase, gym_id, 35)
+    pay = dict(dict((profile or {}).get("settings") or {}).get("collect") or {})
+    sent = 0
+    for c in due:
+        staff = df[df["company_id"] == c["id"]] if len(df) and "company_id" in df.columns else df.iloc[0:0]
+        subject, body = hr_renewal_letter(c, company_report(c, staff, ck), pay)
+        if dry_run:
+            log(f"  would send company renewal -> {c['name']} HR ({c['hr_email']})")
+            sent += 1
+            continue
+        try:
+            gcamp.email_letter(c["hr_email"], subject, body)
+            supabase.table("companies").update({"hr_reminded_for": _next_renewal(c).isoformat()}) \
+                .eq("id", c["id"]).execute()
+            log(f"  sent company renewal -> {c['name']} HR")
+            sent += 1
+        except Exception as error:
+            log(f"  failed company renewal -> {c['name']}: {error}")
+    return sent
+
+
+def _company_plan(supabase, c, rep):
+    """Inside a company card: how often they pay, when the next payment is due, and mark it paid."""
+    if "billing_cycle" not in c:
+        st.caption(CORP_SQL_HINT)
+        return
+    due = _next_renewal(c)
+    amount = company_amount_due(c)
+    when = "No date set" if due is None else f"{due:%d %b %Y}"
+    left = None if due is None else (due - _today()).days
+    note = ("" if left is None else "overdue" if left < 0 else "due today" if left == 0
+            else f"in {left} day{'s' if left != 1 else ''}")
+    st.markdown(f"**Company plan:** {CYCLES[_cycle(c)][0].lower()} · {_money(amount)} each time · "
+                f"next payment **{when}**" + (f" ({note})" if note else ""))
+    if due is not None and "@" in gw._text(c.get("hr_email")):
+        reminded = str(c.get("hr_reminded_for") or "")[:10] == due.isoformat()
+        st.caption("HR has been reminded about this payment." if reminded else
+                   f"HR gets a reminder email {HR_LEAD_DAYS} days before, if \"Remind them to renew\" is on in "
+                   "Automatic messages.")
+    elif due is not None:
+        st.caption("Add an HR email so HR gets a reminder before each payment.")
+    with st.popover("Change plan or mark paid", icon=":material/event_repeat:"):
+        with st.form(f"grow_co_plan_{c['id']}"):
+            cycle = st.selectbox("The company pays", list(CYCLES), index=list(CYCLES).index(_cycle(c)),
+                                 format_func=lambda k: CYCLES[k][0])
+            nxt = st.date_input("Next payment due", value=due, format="DD/MM/YYYY")
+            hr_email = st.text_input("HR email", value=gw._text(c.get("hr_email")))
+            if st.form_submit_button("Save", type="primary"):
+                if _update(supabase, "companies", c["id"], {"billing_cycle": cycle, "hr_email": hr_email.strip() or None,
+                                                            "next_renewal": nxt.isoformat() if nxt else None}):
+                    st.session_state["grow_flash"] = f"{c['name']} plan saved."
+                    st.rerun()
+        if due is not None:
+            nxt_due = advance_renewal(c)
+            if st.button(f"Mark paid · next due {nxt_due:%d %b %Y}", key=f"grow_co_paid_{c['id']}",
+                         icon=":material/check_circle:", use_container_width=True):
+                if _update(supabase, "companies", c["id"], {"next_renewal": nxt_due.isoformat(),
+                                                            "hr_reminded_for": None}):
+                    st.session_state["grow_flash"] = f"{c['name']} marked paid. Next payment due {nxt_due:%d %B %Y}."
+                    st.rerun()
+
+
 def company_report(company, staff, checkins, today=None):
     today = today or _today()
     since = pd.Timestamp(today - timedelta(days=30))
@@ -1301,13 +1454,19 @@ def render_corporate(supabase, gym_id):
             hr = c3.text_input("HR contact name")
             hr_email = c4.text_input("HR email")
             hr_phone = c5.text_input("HR phone")
-            fee = st.number_input("Monthly fee for the company (₦)", 0.0, step=10000.0)
+            c6, c7, c8 = st.columns(3)
+            fee = c6.number_input("Monthly fee for the company (₦)", 0.0, step=10000.0)
+            cycle = c7.selectbox("The company pays", list(CYCLES), format_func=lambda k: CYCLES[k][0])
+            nxt = c8.date_input("Next payment due", value=None, format="DD/MM/YYYY",
+                                help="HR gets a reminder a week before this date.")
             if st.form_submit_button("Add company", type="primary"):
+                row = {"gym_id": gym_id, "name": name.strip(), "seats": int(seats) or None,
+                       "hr_name": hr.strip() or None, "hr_email": hr_email.strip() or None,
+                       "hr_phone": hr_phone.strip() or None, "monthly_fee": fee or None}
+                plan = {"billing_cycle": cycle, "next_renewal": nxt.isoformat() if nxt else None}
                 if not name.strip():
                     st.error("Enter the company name.")
-                elif _insert(supabase, "companies", {"gym_id": gym_id, "name": name.strip(), "seats": int(seats) or None,
-                                                     "hr_name": hr.strip() or None, "hr_email": hr_email.strip() or None,
-                                                     "hr_phone": hr_phone.strip() or None, "monthly_fee": fee or None}):
+                elif _insert_quiet(supabase, "companies", {**row, **plan}) or _insert(supabase, "companies", row):
                     st.session_state["grow_flash"] = f"{name.strip()} added. Now link their staff."
                     st.rerun()
     if not comps:
@@ -1321,6 +1480,7 @@ def render_corporate(supabase, gym_id):
                         ("Active (30 days)", f"{rep['active_rate']:.0%}", "lime", f"{rep['active']} people"),
                         ("Visits", str(rep["visits"]), "amber", "last 30 days"),
                         ("Value", _money(c.get("monthly_fee") or 0), "grey", "per month")])
+            _company_plan(supabase, c, rep)
             current = [i for i in names if links.get(i) == c["id"]]
             chosen = st.multiselect("Staff on this plan", list(names), default=current, format_func=names.get,
                                     key=f"grow_co_staff_{c['id']}")
