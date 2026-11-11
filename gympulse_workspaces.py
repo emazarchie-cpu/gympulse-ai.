@@ -1479,7 +1479,8 @@ def _load_roster_uncached(supabase, gym_id, assess_fn, with_photos=True):
         fetch_all(supabase.table("member_activity").select("*").eq("gym_id", gym_id).order("member_id"))
     )
     # Real check-ins override typed-in attendance numbers
-    stats = checkin_stats(load_checkins(supabase, gym_id))
+    _ck = load_checkins(supabase, gym_id)
+    stats = checkin_stats(_ck, as_of=data_as_of(_ck))
     if not stats.empty and not activity.empty and "member_id" in activity.columns:
         activity = activity.merge(stats, on="member_id", how="left")
         live = activity["ck_days"].notna()
@@ -4817,12 +4818,33 @@ def load_classes(supabase, gym_id):
     return _cached(("classes", gym_id), lambda: _fetch_classes(supabase, gym_id))
 
 
-def checkin_stats(ck):
+def data_as_of(ck, today=None):
+    """The date visits are known up to, when a gym only gets visits from file uploads (running side by side
+    with GymMaster): the latest imported visit. None when check-ins are live in GymPulse AI (any non-import
+    check-in in the last 14 days) or when there's nothing to go on. Without this, a 5-day-old upload would
+    make every member look 5 days more 'away' than they really are."""
+    if ck is None or ck.empty or "source" not in ck.columns:
+        return None
+    today = today or today_local()
+    src = ck["source"].fillna("unknown")
+    live = ck[src != "import"]
+    if len(live) and (pd.Timestamp(today) - live["day"].max()).days <= 14:
+        return None
+    imp = ck[src == "import"]
+    if imp.empty:
+        return None
+    last = imp["day"].max().date()
+    lag = (today - last).days
+    return last if 1 <= lag <= 60 else None
+
+
+def checkin_stats(ck, as_of=None):
     """Per member, from real check-ins: days since last visit, recent pace (last 14 days,
-    scaled to 30), their own earlier baseline pace, and their usual gap between visits."""
+    scaled to 30), their own earlier baseline pace, and their usual gap between visits.
+    as_of: count from this date instead of today (see data_as_of)."""
     if ck is None or ck.empty:
         return pd.DataFrame()
-    today = pd.Timestamp(today_local())
+    today = pd.Timestamp(as_of or today_local())
     d = ck.drop_duplicates(["member_id", "day"]).copy()
     d["age"] = (today - d["day"]).dt.days.clip(lower=0)
     rows = []

@@ -124,6 +124,13 @@ def render_panel(supabase, gym_id):
         st.markdown(f"**Running side by side with {c['source']}**")
         st.caption(f"Since {c['since'] or '–'} · last export uploaded {_when(t)}. Keep checking members in on "
                    f"{c['source']} for now, and upload a fresh export here once a week (more often is fine).")
+        try:
+            upto = gw.data_as_of(gw.load_checkins(supabase, gym_id))
+        except Exception:
+            upto = None
+        if upto:
+            st.caption(f"Risk scores count visits up to **{upto:%d %b}** (your latest upload), so members aren't "
+                       "flagged just because the export is a few days old. Daily uploads make them sharper.")
         if owner:
             ren = st.checkbox(f"GymPulse AI sends renewal reminders too ({c['source']} may already send them)",
                               value=c["gympulse_renewals"], key="sbs_ren",
