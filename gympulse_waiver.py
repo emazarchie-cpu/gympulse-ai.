@@ -335,3 +335,57 @@ def render_overview(supabase, gym_id):
                 st.caption(f"Signed {_date(rec.get('signed_at'))}"
                            + (" at the front desk." if rec.get("signed_via") == "front_desk" else " by personal link."))
                 _download(gym_name, rec, text, "wv_dl_btn")
+
+
+# ------------------------------------------------------------------ status: member's page and member profile
+def render_status(client, gym_id, member_id, gym_name, for_member=False, compact=False):
+    """The member's agreement status. On the member's own page: signed date and their PDF, or a button to sign.
+    On the profile (staff): status, health flags, emergency contact, PDF, or sign now / send the link."""
+    try:
+        m = (client.table("members").select("*").eq("id", member_id).limit(1).execute().data or [None])[0]
+    except Exception:
+        m = None
+    if not m:
+        return
+    rec = latest(client, member_id)
+    if compact:                                      # a one-line reminder (member's Home tab) when not signed
+        if not rec:
+            st.info("Please sign your membership agreement with " + gym_name + ". It takes 2 minutes.",
+                    icon=":material/draw:")
+            st.link_button("Sign my membership agreement", link_for(m), type="primary", icon=":material/draw:",
+                           use_container_width=True)
+        return
+    with st.container(border=True):
+        st.markdown("**Membership agreement and waiver**")
+        if rec:
+            via = "at the front desk" if rec.get("signed_via") == "front_desk" else "by personal link"
+            st.success(f"Signed on {_date(rec.get('signed_at'))}" + ("" if for_member else f", {via}") + ".",
+                       icon=":material/verified:")
+            if not for_member:
+                health = dict(rec.get("health") or {})
+                yes = [q for k, q in HEALTH if health.get(k)]
+                if yes:
+                    st.warning("Health: answered yes to " + "; ".join(yes), icon=":material/health_and_safety:")
+                else:
+                    st.caption("Health: answered no to all questions.")
+                if rec.get("emergency_name") or rec.get("emergency_phone"):
+                    st.caption(f"Emergency contact: {gw._text(rec.get('emergency_name'))} · "
+                               f"{gw._text(rec.get('emergency_phone'))}")
+            text = rec.get("agreement_text") or agreement_text(gym_name, m, member_terms(client, gym_id, m),
+                                                               house_rules(client, gym_id))
+            _download(gym_name, rec, text, f"wv_st_dl_{member_id}_{int(for_member)}")
+            return
+        if for_member:
+            st.caption("You haven't signed your membership agreement yet. It covers your membership, your health "
+                       "and safety, and takes 2 minutes.")
+            st.link_button("Sign my membership agreement", link_for(m), type="primary", icon=":material/draw:",
+                           use_container_width=True)
+            return
+        st.warning("Not signed yet.", icon=":material/pending_actions:")
+        with st.expander("Sign now on this device"):
+            st.caption("Hand this phone or tablet to the member to read, answer and sign.")
+            new = sign_form(client, gym_id, gym_name, m, "front_desk", f"wv_prof_{member_id}")
+            if new:
+                st.rerun()
+        with st.expander("Send them the link"):
+            _send_link(m, gym_name, f"wv_prof_send_{member_id}")
