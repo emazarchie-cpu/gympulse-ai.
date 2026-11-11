@@ -209,7 +209,43 @@ def latest_signature(supabase, gym_id, profile=None):
 
 
 def agreement_pdf(sig, text=None):
-    """The signed agreement as a PDF: the full text, then both signatures and the signing record."""
+    """The signed Subscription Agreement as a PDF: the full text, both signatures and the signing record."""
+    png = founder_signature_png()
+    ours = ("FOR GYMPULSE AI LTD", png, FOUNDER,
+            f"<b>{FOUNDER}</b>, {FOUNDER_TITLE}<br/>for and on behalf of GYMPULSE AI LTD<br/>"
+            "Signature applied electronically")
+    when = str(sig.get("signed_at") or "")[:16].replace("T", " ")
+    theirs = ("FOR THE SUBSCRIBER", data_url_png(sig.get("signature_image")), gw_text(sig.get("signer_name")),
+              f"<b>{_esc(sig.get('signer_name'))}</b>, {_esc(sig.get('signer_role'))}<br/>"
+              f"for and on behalf of {_esc(sig.get('business_name'))}<br/>Signed electronically on {_esc(when)} UTC")
+    rec = (f"Signing record: {_esc(sig.get('signer_email'))}"
+           + (f" · IP {_esc(sig.get('ip'))}" if sig.get("ip") else "")
+           + f" · Plan at signing: {_esc(sig.get('plan'))}"
+           + f" · Agreement version {_esc(sig.get('version') or SUBSCRIPTION_VERSION)}"
+           + f" · SHA-256 of the text: {_esc(sig.get('text_sha256'))}")
+    return signed_pdf(text if text is not None else subscription_text(), [ours, theirs], [rec, _esc(COMPANY)],
+                      "GymPulse AI Subscription Agreement")
+
+
+def _esc(v):
+    from xml.sax.saxutils import escape
+    return escape(gw_text(v))
+
+
+def data_url_png(url):
+    if str(url or "").startswith("data:image/png;base64,"):
+        import base64
+        try:
+            return base64.b64decode(str(url).split(",", 1)[1])
+        except Exception:
+            return None
+    return None
+
+
+def signed_pdf(text, blocks, footer, title):
+    """A signed document as a PDF: markdown-ish text (headings, bold, bullets), then signature blocks side by
+    side. blocks: [(heading, signature PNG bytes or None, name shown in a signature font when no PNG,
+    caption HTML)]. footer: small lines (already escaped)."""
     import io
     import re as _re
     from reportlab.lib import colors
@@ -218,7 +254,6 @@ def agreement_pdf(sig, text=None):
     from reportlab.lib.units import mm
     from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
     from xml.sax.saxutils import escape
-    text = text if text is not None else subscription_text()
     ss = getSampleStyleSheet()
     body = ParagraphStyle("b", parent=ss["Normal"], fontName="Helvetica", fontSize=9.5, leading=13.5, spaceAfter=5)
     h1 = ParagraphStyle("h1", parent=body, fontName="Helvetica-Bold", fontSize=17, leading=21, spaceAfter=10)
@@ -226,9 +261,8 @@ def agreement_pdf(sig, text=None):
     small = ParagraphStyle("s", parent=body, fontSize=7.5, leading=10, textColor=colors.HexColor("#6B7280"))
     script = ParagraphStyle("sig", parent=body, fontName="Times-BoldItalic", fontSize=22, leading=26)
 
-    def md(line):
-        line = escape(line)
-        return _re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", line)
+    def md(line):                                    # PDF fonts have no naira sign: NGN, like receipts
+        return _re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", escape(line.replace("₦", "NGN ")))
     flow = []
     for line in text.split("\n"):
         if line.startswith("# "):
@@ -240,41 +274,29 @@ def agreement_pdf(sig, text=None):
         elif line.strip():
             flow.append(Paragraph(md(line), body))
     flow.append(Spacer(1, 10))
-    png = founder_signature_png()
-    ours = [Image(io.BytesIO(png), width=50 * mm, height=18 * mm, kind="proportional") if png
-            else Paragraph(FOUNDER, script),
-            Paragraph(f"<b>{FOUNDER}</b>, {FOUNDER_TITLE}<br/>for and on behalf of GYMPULSE AI LTD<br/>"
-                      "Signature applied electronically", body)]
-    when = str(sig.get("signed_at") or "")[:16].replace("T", " ")
-    drawn = None
-    if str(sig.get("signature_image") or "").startswith("data:image/png;base64,"):
-        import base64
-        try:
-            drawn = Image(io.BytesIO(base64.b64decode(sig["signature_image"].split(",", 1)[1])),
-                          width=50 * mm, height=18 * mm, kind="proportional")
-        except Exception:
-            drawn = None
-    theirs = [drawn or Paragraph(escape(gw_text(sig.get("signer_name"))), script),
-              Paragraph(f"<b>{escape(gw_text(sig.get('signer_name')))}</b>, {escape(gw_text(sig.get('signer_role')))}"
-                        f"<br/>for and on behalf of {escape(gw_text(sig.get('business_name')))}<br/>"
-                        f"Signed electronically on {escape(when)} UTC", body)]
-    t = Table([[Paragraph("<b>FOR GYMPULSE AI LTD</b>", body), Paragraph("<b>FOR THE SUBSCRIBER</b>", body)],
-               [ours[0], theirs[0]], [ours[1], theirs[1]]], colWidths=[85 * mm, 85 * mm])
+    heads, sigs, caps = [], [], []
+    for head, png, name, cap in blocks:
+        heads.append(Paragraph(f"<b>{escape(head)}</b>", body))
+        img = None
+        if png:
+            try:
+                img = Image(io.BytesIO(png), width=50 * mm, height=18 * mm, kind="proportional")
+            except Exception:
+                img = None
+        sigs.append(img or Paragraph(escape(name or ""), script))
+        caps.append(Paragraph(cap, body))
+    width = 170 * mm / max(len(blocks), 1)
+    t = Table([heads, sigs, caps], colWidths=[width] * len(blocks))
     t.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "BOTTOM"),
                            ("LINEABOVE", (0, 2), (-1, 2), 0.6, colors.HexColor("#111827")),
                            ("TOPPADDING", (0, 0), (-1, -1), 4)]))
     flow.append(t)
     flow.append(Spacer(1, 10))
-    rec = (f"Signing record: {escape(gw_text(sig.get('signer_email')))}"
-           + (f" · IP {escape(gw_text(sig.get('ip')))}" if sig.get("ip") else "")
-           + f" · Plan at signing: {escape(gw_text(sig.get('plan')))}"
-           + f" · Agreement version {escape(gw_text(sig.get('version') or SUBSCRIPTION_VERSION))}"
-           + f" · SHA-256 of the text: {escape(gw_text(sig.get('text_sha256')))}")
-    flow.append(Paragraph(rec, small))
-    flow.append(Paragraph(escape(COMPANY), small))
+    for line in footer:
+        flow.append(Paragraph(line.replace("₦", "NGN "), small))
     buf = io.BytesIO()
     SimpleDocTemplate(buf, pagesize=A4, leftMargin=18 * mm, rightMargin=18 * mm, topMargin=16 * mm,
-                      bottomMargin=16 * mm, title="GymPulse AI Subscription Agreement").build(flow)
+                      bottomMargin=16 * mm, title=title).build(flow)
     return buf.getvalue()
 
 

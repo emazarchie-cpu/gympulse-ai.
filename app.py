@@ -1090,6 +1090,13 @@ if st.query_params.get("join"):
     gsign.render_public(supabase, st.query_params.get("join"))
     st.stop()
 
+# Public membership agreement page (a member's personal signing link, no sign-in)
+if st.query_params.get("waiver"):
+    import gympulse_waiver as gwv
+    gd.apply()
+    gwv.render_public(supabase, st.query_params.get("waiver"))
+    st.stop()
+
 # Public machine guide page (QR code on a machine, no sign-in)
 if st.query_params.get("guide"):
     import gympulse_train as gtr
@@ -2827,6 +2834,13 @@ elif page == "Member Management":
         _mm_flash = st.session_state.pop("mm_flash", None)
         if _mm_flash:
             st.success(_mm_flash)
+        if st.session_state.get("mm_new_member"):
+            import gympulse_waiver as gwv
+            gwv.render_new_member(supabase, gym_id, st.session_state["mm_new_member"])
+        with st.expander("Membership agreements and waivers: every member signs once",
+                         icon=":material/contract:"):
+            import gympulse_waiver as gwv
+            gwv.render_overview(supabase, gym_id)
         with st.expander("Bring your members in: import from GymMaster, Excel or any software",
                          icon=":material/upload_file:",
                          expanded=bool(st.session_state.get("gm_flash") or st.session_state.get("gm_errors")
@@ -2998,6 +3012,8 @@ elif page == "Member Management":
                         f"{full_name.strip()} is registered." + (f" {note}" if note else
                         " They're on the Risk Radar now; check-ins will keep them up to date.")
                     )
+                    if new_id:
+                        st.session_state["mm_new_member"] = new_id      # next: they sign the agreement
                     st.rerun()
 
         st.markdown("---")
