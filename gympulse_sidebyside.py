@@ -31,7 +31,8 @@ def cfg(profile=None):
     p = profile if profile is not None else (st.session_state.get("user_profile") or {})
     raw = dict(dict(p.get("settings") or {}).get("side_by_side") or {})
     return {"on": bool(raw.get("on")), "source": raw.get("source") or "GymMaster", "since": raw.get("since"),
-            "gympulse_renewals": bool(raw.get("gympulse_renewals")), "switched_on": raw.get("switched_on")}
+            "gympulse_renewals": bool(raw.get("gympulse_renewals")), "switched_on": raw.get("switched_on"),
+            "keep": bool(raw.get("keep"))}
 
 
 def skips_renewals(profile=None):
@@ -121,9 +122,21 @@ def render_panel(supabase, gym_id):
                 st.caption(f"You switched fully to GymPulse AI on {c['switched_on']}.")
             return
         t = last_import(supabase, gym_id)
-        st.markdown(f"**Running side by side with {c['source']}**")
-        st.caption(f"Since {c['since'] or '–'} · last export uploaded {_when(t)}. Keep checking members in on "
-                   f"{c['source']} for now, and upload a fresh export here once a week (more often is fine).")
+        if c["keep"]:
+            st.markdown(f"**Connected to {c['source']}**")
+            st.caption(f"{c['source']} stays your main system for check-ins, billing and access. GymPulse AI adds "
+                       "retention on top. Connect automatic check-ins below (best), or upload a fresh export weekly. "
+                       f"Last export uploaded {_when(t)}.")
+        else:
+            st.markdown(f"**Running side by side with {c['source']}**")
+            st.caption(f"Since {c['since'] or '–'} · last export uploaded {_when(t)}. Keep checking members in on "
+                       f"{c['source']} for now, and upload a fresh export here once a week (more often is fine).")
+        if owner:
+            plans = ["Testing GymPulse AI, then switching to it", f"Keeping {c['source']} for good"]
+            choice = st.radio("Your plan", plans, index=1 if c["keep"] else 0, key="sbs_keep", horizontal=False)
+            if (choice == plans[1]) != c["keep"]:
+                _save(supabase, {"keep": choice == plans[1]},
+                      f"Connected to {c['source']} for good." if choice == plans[1] else "Side by side while you test.")
         try:
             upto = gw.data_as_of(gw.load_checkins(supabase, gym_id))
         except Exception:
@@ -141,24 +154,26 @@ def render_panel(supabase, gym_id):
         _render_webhook(supabase, gym_id, c["source"], owner)
         st.caption(f"Members already use {c['source']}'s app? Switch off the GymPulse member app under "
                    "Member Management → Member app, so they don't have two.")
-        with st.expander("Ready to switch fully? Checklist", icon=":material/task_alt:"):
-            d = _days_ago(t)
-            fresh = d is not None and d <= 1
-            st.markdown(("✅" if fresh else "⬜") + f" **1. Final import:** upload today's {c['source']} export, "
-                        "with visit history, after the gym closes." + ("" if fresh else f" (last one: {_when(t)})"))
-            st.markdown("⬜ **2. Check-ins:** from tomorrow, the front desk checks members in on GymPulse AI "
-                        "(Member Management or the QR code), not on " + c["source"] + ".")
-            st.markdown("⬜ **3. Messages:** switch on renewal reminders and \"we missed you\" in "
-                        "Grow → Automatic messages, and switch them off in " + c["source"] + ".")
-            st.markdown("⬜ **4. Members:** share the sign-up link or each member's personal link, so they can see "
-                        "their visits and renew.")
-            st.markdown("⬜ **5. Keep " + c["source"] + " read-only for a month**, just in case, then cancel it.")
-            if owner and st.button("We've switched fully", key="sbs_done", type="primary",
-                                   icon=":material/rocket_launch:", disabled=not fresh,
-                                   help=None if fresh else "Upload today's final export first."):
-                _save(supabase, {"on": False, "switched_on": gw.today_local().isoformat(), "gympulse_renewals": True},
-                      f"Welcome fully to GymPulse AI. {c['source']} can stay read-only for a month, just in case.")
-        if owner and st.button("Stop running side by side", key="sbs_off", type="tertiary"):
+        if not c["keep"]:
+            with st.expander("Ready to switch fully? Checklist", icon=":material/task_alt:"):
+                d = _days_ago(t)
+                fresh = d is not None and d <= 1
+                st.markdown(("✅" if fresh else "⬜") + f" **1. Final import:** upload today's {c['source']} export, "
+                            "with visit history, after the gym closes." + ("" if fresh else f" (last one: {_when(t)})"))
+                st.markdown("⬜ **2. Check-ins:** from tomorrow, the front desk checks members in on GymPulse AI "
+                            "(Member Management or the QR code), not on " + c["source"] + ".")
+                st.markdown("⬜ **3. Messages:** switch on renewal reminders and \"we missed you\" in "
+                            "Grow → Automatic messages, and switch them off in " + c["source"] + ".")
+                st.markdown("⬜ **4. Members:** share the sign-up link or each member's personal link, so they can see "
+                            "their visits and renew.")
+                st.markdown("⬜ **5. Keep " + c["source"] + " read-only for a month**, just in case, then cancel it.")
+                if owner and st.button("We've switched fully", key="sbs_done", type="primary",
+                                       icon=":material/rocket_launch:", disabled=not fresh,
+                                       help=None if fresh else "Upload today's final export first."):
+                    _save(supabase, {"on": False, "switched_on": gw.today_local().isoformat(), "gympulse_renewals": True},
+                          f"Welcome fully to GymPulse AI. {c['source']} can stay read-only for a month, just in case.")
+        if owner and st.button("Disconnect" if c["keep"] else "Stop running side by side", key="sbs_off",
+                               type="tertiary"):
             _save(supabase, {"on": False}, "Side by side is off.")
 
 
