@@ -682,6 +682,7 @@ def render_portal(supabase, token):
         with col:
             _locked_screen(m, gym_name)
         return
+    st.session_state["_mp_prof"] = prof
     with col, gadm.as_gym({"profile": prof, "gym": gym, "email": ""}):
         flash = st.session_state.pop("mp_flash", None)
         if flash:
@@ -726,29 +727,152 @@ def _visit_days(sc, m):
     return at, {t.date() for t in at}
 
 
+MP_DEFAULT_ACCENT = "#5EE0A8"          # mint, when the gym hasn't chosen its own brand colour
+
+MP_CSS = """
+<style>
+:root { --mp-acc: %(acc)s; --mp-ink: #06231a; --mp-s1: #121b19; --mp-s2: #182522; --mp-muted: #8aa79c;
+  --mp-warn-bg: #2a1d0b; --mp-warn-line: #5a3d12; --mp-warn: #ffcf7a; }
+.mp2-top { margin: 2px 0 12px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.mp2-top .d { color: var(--mp-muted); font-size: 13px; }
+.mp2-top h2 { margin: 2px 0 0 !important; padding: 0 !important; font-size: 27px !important; line-height: 1.15 !important;
+  letter-spacing: -.5px; font-weight: 750 !important; color: #eef5f2 !important; text-wrap: balance; }
+.mp2-top img, .mp2-top .av { width: 48px; height: 48px; border-radius: 50%%; object-fit: cover; flex: 0 0 auto; }
+.mp2-top .av { background: var(--mp-s2); display: grid; place-items: center; font-weight: 800; color: var(--mp-acc); }
+.mp2-busy { background: var(--mp-s1); border-radius: 22px; padding: 16px 16px 12px; margin-bottom: 12px; }
+.mp2-busy .l { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.mp2-busy .l b { font-size: 18px; color: var(--mp-lvl, var(--mp-acc)); } .mp2-busy .l span { color: var(--mp-muted); font-size: 12.5px; }
+.mp2-bars { display: flex; gap: 4px; align-items: flex-end; height: 86px; margin-top: 12px; }
+.mp2-bars i { flex: 1; display: block; background: #24423a; border-radius: 5px 5px 2px 2px; min-height: 4px; }
+.mp2-bars i.now { background: var(--mp-acc); } .mp2-bars i.past { opacity: .45; }
+.mp2-hrs { display: flex; justify-content: space-between; color: #5f7d72; font-size: 11px; margin-top: 5px; }
+.mp2-ci { border-radius: 22px; padding: 18px; background: var(--mp-acc); color: var(--mp-ink); display: flex;
+  justify-content: space-between; align-items: center; gap: 14px; margin-bottom: 12px; }
+.mp2-ci b { display: block; font-size: 21px; font-weight: 800; } .mp2-ci span { font-size: 13px; opacity: .78; }
+.mp2-ci .code { font-family: Menlo, Consolas, monospace; font-size: 17px; letter-spacing: 3px; font-weight: 800; margin-top: 8px; }
+.mp2-ci img { width: 118px; height: 118px; background: #fff; border-radius: 14px; padding: 7px; flex: 0 0 auto; }
+.mp2-alert { border-radius: 16px; padding: 12px 14px; background: var(--mp-warn-bg); border: 1px solid var(--mp-warn-line);
+  color: var(--mp-warn); font-size: 14px; margin-bottom: 8px; display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+.mp2-alert b { color: #ffe2ab; }
+.mp2-mini { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin: 4px 0 14px; }
+.mp2-mini div { background: var(--mp-s1); border-radius: 16px; padding: 12px; min-width: 0; }
+.mp2-mini b { display: block; font-size: 19px; color: #eef5f2; } .mp2-mini span { color: var(--mp-muted); font-size: 11.5px; }
+.mp2-cap { font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; color: #6f8f83; margin: 6px 2px 8px; }
+.mp2-wk { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin-bottom: 14px; }
+.mp2-wk div { background: var(--mp-s1); border-radius: 14px; padding: 8px 0 9px; text-align: center; font-size: 11.5px; color: var(--mp-muted); }
+.mp2-wk div b { display: block; font-size: 16px; color: #eef5f2; margin: 2px 0 5px; }
+.mp2-wk div i { display: block; width: 7px; height: 7px; border-radius: 4px; margin: 0 auto; }
+.mp2-wk div.v i { background: var(--mp-acc); }
+.mp2-wk div.today { background: var(--mp-acc); color: var(--mp-ink); } .mp2-wk div.today b { color: var(--mp-ink); }
+.mp2-wk div.today.v i { background: var(--mp-ink); }
+[class*="st-key-mp2_cls_"] { background: var(--mp-s1); border-radius: 16px; padding: 10px 12px; margin-bottom: 8px; }
+[class*="st-key-mp2_cls_"] [data-testid="stHorizontalBlock"] { flex-wrap: nowrap !important; gap: 10px !important; align-items: center; }
+[class*="st-key-mp2_cls_"] [data-testid="stColumn"] { min-width: 0 !important; width: auto !important; flex: 1 1 auto !important; }
+[class*="st-key-mp2_cls_"] [data-testid="stColumn"]:first-child, [class*="st-key-mp2_cls_"] [data-testid="stColumn"]:last-child { flex: 0 0 auto !important; }
+.mp2-t { font-family: Menlo, Consolas, monospace; font-weight: 700; color: var(--mp-acc); font-size: 14px; }
+.mp2-cn b { display: block; color: #eef5f2; font-size: 14.5px; } .mp2-cn span { color: var(--mp-muted); font-size: 12px; }
+/* chat (Inbox) */
+.mp2-chathd { display: flex; gap: 10px; align-items: center; padding: 4px 2px 12px; border-bottom: 1px solid #1d2a26; margin-bottom: 10px; }
+.mp2-chathd i { width: 40px; height: 40px; border-radius: 50%%; background: var(--mp-acc); color: var(--mp-ink); display: grid;
+  place-items: center; font-style: normal; font-weight: 800; }
+.mp2-chathd b { display: block; color: #eef5f2; } .mp2-chathd span { color: var(--mp-muted); font-size: 12px; }
+.mp2-b { max-width: 82%%; padding: 10px 13px; border-radius: 18px 18px 18px 6px; background: var(--mp-s2); color: #e6efeb;
+  font-size: 14.5px; line-height: 1.45; white-space: pre-wrap; margin: 6px 0; }
+.mp2-b.me { margin-left: auto; border-radius: 18px 18px 6px 18px; background: var(--mp-acc); color: var(--mp-ink); }
+.mp2-b small { display: block; font-size: 11px; opacity: .65; margin-top: 4px; }
+.mp2-day { text-align: center; color: #5f7d72; font-size: 11.5px; margin: 12px 0 4px; }
+.st-key-mp2_send [data-testid="stHorizontalBlock"] { flex-wrap: nowrap !important; gap: 8px !important; }
+.st-key-mp2_send [data-testid="stColumn"] { min-width: 0 !important; width: auto !important; flex: 1 1 auto !important; }
+.st-key-mp2_send [data-testid="stColumn"]:last-child { flex: 0 0 auto !important; }
+.st-key-mp_qr button p { white-space: nowrap; }
+html body .stApp [class*="st-key-mp2_cls_"] button[kind="secondary"] { background: transparent !important;
+  border: 1.5px solid var(--mp-acc) !important; color: var(--mp-acc) !important; }
+html body .stApp [class*="st-key-mp2_cls_"] button[kind="secondary"] p { color: var(--mp-acc) !important; }
+</style>
+"""
+
+
+def _accent(prof):
+    """The gym's own brand colour when it has chosen one, else mint."""
+    c = gw._text(dict(dict((prof or {}).get("settings") or {}).get("email_brand") or {}).get("color"))
+    return c if c.startswith("#") and len(c) in (4, 7) else MP_DEFAULT_ACCENT
+
+
+def _busy_now(sc, m, prof):
+    """(headline level, colour, people in now or None, [(hour, 0–1, state)]) for today, from the gym's own
+    check-ins blended with a typical Lagos pattern (gympulse_train)."""
+    import gympulse_train as gtr
+    cfg = gtr.traffic_cfg(prof)
+    data = gtr.traffic(sc, m["gym_id"], cfg["visit"]) or {}
+    nowt = datetime.now(gw.APP_TZ)
+    dow = (nowt.weekday() + 1) % 7
+    slot = nowt.hour * 2 + nowt.minute // 30
+    slots, busy, _w, _peak = gtr.busyness(data.get(dow) or {"days": 0, "slots": {}}, dow, cfg)
+    hours = {}
+    for x in slots:
+        hours.setdefault(x // 2, []).append(busy.get(x, 0))
+    bars = [(h, max(v), "now" if h == nowt.hour else "past" if h < nowt.hour else "") for h, v in sorted(hours.items())]
+    if slot not in busy:
+        return "Closed now", "#8aa79c", None, bars
+    lvl, colour = gtr._lvl(busy[slot])
+    return lvl, colour, gtr.inside_now(sc, m["gym_id"], cfg["visit"]), bars
+
+
+def _hour(h):
+    return f"{h % 12 or 12}{'am' if h < 12 else 'pm'}"
+
+
 def _home(sc, m, gym_name, prof):
     import gympulse_grow as gg
+    st.markdown(MP_CSS % {"acc": _accent(prof)}, unsafe_allow_html=True)
     today = gw.today_local()
+    first = gw._esc(_first(m.get("full_name")))
     act = _activity(sc, m)
     end = pd.to_datetime(m.get("membership_end"), errors="coerce")
     end = None if pd.isna(end) else end.date()
     label, cls, left = status_of(end, today)
     plan, amount = gg.plan_price({**act, **m}) if act else ("Monthly", 0.0)
-    plan_txt = gw._text(m.get("plan_name")) or (gw.plan_phrase(plan).capitalize() + " plan" if act else "")
-    photo = m.get("photo") if gw.has_photo(m.get("photo")) else None
-    pic = (f'<img src="{photo}" style="width:56px;height:56px;border-radius:50%;object-fit:cover;float:right">'
-           if photo else "")
-    gw._md(f'<div class="mp-card">{pic}<div class="mp-gym">{gw._esc(gym_name)}</div>'
-           f'<div class="mp-hi">Hi {gw._esc(_first(m.get("full_name")))} 👋</div>'
-           f'<div class="mp-plan">{gw._esc(plan_txt or "Your membership")}<span class="mp-pill {cls}">{label}</span></div>'
-           + (f'<div class="mp-plan" style="color:var(--gp-muted,#93A0B4);margin-top:4px">'
-              f'{"Ended" if left is not None and left < 0 else "Runs until"} {end:%A %d %B %Y}</div>' if end else "")
-           + '</div>')
+    at, days = _visit_days(sc, m)
+    s = visit_stats(days, today)
 
+    # 1 · today: should I go now?
+    try:
+        lvl, colour, people, bars = _busy_now(sc, m, prof)
+    except Exception:
+        lvl, colour, people, bars = None, None, None, []
+    head = {"Quiet": f"Good time to train, {first}", "Moderate": f"It's moderately busy, {first}",
+            "Busy": f"It's busy right now, {first}", "Closed now": f"The gym is closed now, {first}"}.get(
+        lvl, f"Hi {first}")
+    photo = m.get("photo") if gw.has_photo(m.get("photo")) else None
+    av = (f'<img src="{photo}" alt="">' if photo else f'<div class="av">{first[:1]}</div>')
+    gw._md(f'<div class="mp2-top"><div><div class="d">{datetime.now(gw.APP_TZ):%A, %d %B} · {gw._esc(gym_name)}</div>'
+           f'<h2>{head}</h2></div>{av}</div>')
+    if bars:
+        top = max(v for _h, v, _s in bars) or 1
+        bar_html = "".join(f'<i class="{st_}" style="height:{max(6, int(v / top * 100))}%" title="{_hour(h)}"></i>'
+                           for h, v, st_ in bars)
+        ticks = [bars[0][0], bars[len(bars) // 3][0], bars[2 * len(bars) // 3][0], bars[-1][0]]
+        sub = (f"about {people} {'person' if people == 1 else 'people'} in" if people else
+               "how busy it usually is today")
+        gw._md(f'<div class="mp2-busy" style="--mp-lvl:{colour}"><div class="l"><b>{gw._esc(lvl)}</b>'
+               f'<span>{sub}</span></div><div class="mp2-bars">{bar_html}</div>'
+               f'<div class="mp2-hrs">{"".join(f"<span>{_hour(t)}</span>" for t in ticks)}</div></div>')
+
+    # 2 · check in
+    code = gw.member_code(m["id"])
+    uri = gw.qr_data_uri(code)
+    gw._md(f'<div class="mp2-ci"><div><b>Check in</b><span>Show this at the front desk</span>'
+           f'<div class="code">{code}</div></div>' + (f'<img src="{uri}" alt="Check-in code">' if uri else "") + '</div>')
+
+    # 3 · renewal alert (from the week planner)
     pay = dict((prof.get("settings") or {}).get("collect") or {})
+    if left is not None and left <= 14:
+        when = "ended" if left < 0 else "ends today" if left == 0 else f"ends {end:%a %d %b}"
+        gw._md(f'<div class="mp2-alert"><span>Your {gw._esc(gw.plan_phrase(plan))} plan <b>{when}</b></span>'
+               + (f'<b>₦{amount:,.0f}</b>' if amount else "") + '</div>')
     if left is None or left <= 14 or pay.get("paystack_link"):
-        with st.container(border=True):
-            st.markdown(f"**Renew** · {gw.plan_phrase(plan).capitalize()} plan" + (f" · ₦{amount:,.0f}" if amount else ""))
+        with st.expander(f"Renew · {gw.plan_phrase(plan).capitalize()} plan" + (f" · ₦{amount:,.0f}" if amount else ""),
+                         expanded=left is not None and left <= 7, icon=":material/autorenew:"):
             ref = gg.reference_for(m["id"], m.get("full_name"))
             if pay.get("paystack_link"):
                 st.link_button("Pay securely with Paystack", pay["paystack_link"], type="primary",
@@ -757,26 +881,34 @@ def _home(sc, m, gym_name, prof):
                 st.markdown(f"Or transfer to **{gw._esc(pay.get('bank_name', ''))} · {gw._esc(pay['bank_account'])}**"
                             f" · {gw._esc(pay.get('bank_holder', ''))}, reference **{ref}**")
             if not (pay.get("paystack_link") or pay.get("bank_account")):
-                st.caption("Renew at the front desk, or message the gym in Messages.")
+                st.caption("Renew at the front desk, or message the gym in Inbox.")
             else:
-                st.caption("Paid by transfer? Send the receipt in Messages and the gym will confirm it.")
+                st.caption("Paid by transfer? Send the receipt in Inbox and the gym will confirm it.")
             if pay.get("perk"):
                 st.caption(f"Renew early and get {pay['perk']}.")
 
-    at, days = _visit_days(sc, m)
-    s = visit_stats(days, today)
-    gw.kpi_row([("This month", str(s["month"]), "lime", "visits"),
-                ("Weeks in a row", str(s["streak"]), "cyan", "with a visit"),
-                ("All visits", str(s["total"]), "white", "since you joined"),
-                ("Last visit", f"{s['last']:%d %b}" if s["last"] else "–", "grey", "")])
+    # 4 · numbers
+    if left is None:
+        left_txt, left_sub = "–", "no plan yet"
+    elif left < 0:
+        left_txt, left_sub = "Ended", f"on {end:%d %b}"
+    else:
+        left_txt, left_sub = f"{left} day{'s' if left != 1 else ''}", "until renewal"
+    gw._md('<div class="mp2-mini">'
+           f'<div><b>{left_txt}</b><span>{left_sub}</span></div>'
+           f'<div><b>{s["month"]}</b><span>visits this month</span></div>'
+           f'<div><b>{s["streak"]} wk</b><span>in a row</span></div></div>')
 
-    code = gw.member_code(m["id"])
-    uri = gw.qr_data_uri(code)
-    with st.container(border=True):
-        st.markdown("**Check in**")
-        gw._md(f'<div class="mp-qr">{f"<img src={chr(34)}{uri}{chr(34)} alt=QR>" if uri else ""}'
-               f'<div class="mp-code">{code}</div></div>')
-        st.caption("Show this at the front desk to check in.")
+    # 5 · your week (from the week planner)
+    monday = today - timedelta(days=today.weekday())
+    week = [monday + timedelta(days=i) for i in range(7)]
+    n_week = sum(1 for d in week if d in days)
+    gw._md(f'<div class="mp2-cap">Your week · {n_week} visit{"s" if n_week != 1 else ""} so far</div><div class="mp2-wk">'
+           + "".join(f'<div class="{" ".join(c for c in ("v" if d in days else "", "today" if d == today else "") if c)}">'
+                     f'{d:%a}<b>{d.day}</b><i></i></div>' for d in week) + '</div>')
+
+    # 6 · classes in the next 7 days
+    _class_list(sc, m, days_ahead=7, limit=4, title="Classes this week", prefix="h")
 
     _rewards(sc, m, prof, at)
     st.caption("Tip: on your phone, open the share menu and choose **Add to Home Screen** to keep this page like an "
@@ -819,13 +951,17 @@ def _rewards(sc, m, prof, at):
                       if int(cfg.get("week_bonus") or 0) else ""))
 
 
-def _classes(sc, m):
+def _class_list(sc, m, days_ahead=14, limit=None, title=None, prefix="c"):
+    """Upcoming classes as rows: time, name and day, and a Book / Booked button."""
     now = datetime.now(gw.APP_TZ).replace(tzinfo=None)
-    classes = [c for c in gw._fetch_classes(sc, m["gym_id"]) if now <= c["_start"] <= now + timedelta(days=14)]
+    classes = [c for c in gw._fetch_classes(sc, m["gym_id"]) if now <= c["_start"] <= now + timedelta(days=days_ahead)]
+    if title:
+        gw._md(f'<div class="mp2-cap">{gw._esc(title)}</div>')
     if not classes:
-        st.info("No classes in the next two weeks yet. Check back soon.")
+        st.caption("No classes coming up yet. Check back soon.")
         return
-    ids = [str(c["id"]) for c in classes]
+    shown = classes[:limit] if limit else classes
+    ids = [str(c["id"]) for c in shown]
     try:
         bk = sc.table("class_bookings").select("class_id, member_id").eq("gym_id", m["gym_id"]) \
             .in_("class_id", ids).execute().data or []
@@ -836,21 +972,25 @@ def _classes(sc, m):
     for b in bk:
         count[b["class_id"]] = count.get(b["class_id"], 0) + 1
     mine = {b["class_id"] for b in bk if b["member_id"] == m["id"]}
-    for c in classes:
+    for c in shown:
         cid = str(c["id"])
-        with st.container(border=True):
-            a, b = st.columns([3, 1.3], vertical_alignment="center")
-            a.markdown(f"**{gw._esc(c.get('name') or 'Class')}**  \n{c['_start']:%a %d %b · %I:%M %p}"
-                       + (f"  \n{count.get(cid, 0)} booked" if count.get(cid) else ""))
+        with st.container(key=f"mp2_cls_{prefix}_{cid}"):
+            a, b, d = st.columns([1, 3, 1.4], vertical_alignment="center")
+            a.markdown(f'<span class="mp2-t">{c["_start"]:%H:%M}</span>', unsafe_allow_html=True)
+            booked = count.get(cid, 0)
+            b.markdown(f'<div class="mp2-cn"><b>{gw._esc(c.get("name") or "Class")}</b>'
+                       f'<span>{c["_start"]:%a %d %b}' + (f" · {booked} booked" if booked else "") + '</span></div>',
+                       unsafe_allow_html=True)
             if not ready:
                 continue
             if cid in mine:
-                if b.button("Cancel", key=f"mp_cx_{cid}", use_container_width=True):
+                if d.button("Booked ✓", key=f"mp_cx_{prefix}_{cid}", use_container_width=True,
+                            help="Tap to cancel your booking"):
                     sc.table("class_bookings").delete().eq("gym_id", m["gym_id"]).eq("class_id", cid) \
                         .eq("member_id", m["id"]).execute()
                     st.session_state["mp_flash"] = "Booking cancelled."
                     st.rerun()
-            elif b.button("Book", key=f"mp_bk_{cid}", type="primary", use_container_width=True):
+            elif d.button("Book", key=f"mp_bk_{prefix}_{cid}", type="primary", use_container_width=True):
                 try:
                     sc.table("class_bookings").insert({"gym_id": m["gym_id"], "class_id": cid,
                                                        "member_id": m["id"]}).execute()
@@ -858,42 +998,90 @@ def _classes(sc, m):
                 except Exception:
                     st.session_state["mp_flash"] = "You're already booked."
                 st.rerun()
+    if limit and len(classes) > limit:
+        st.caption(f"{len(classes) - limit} more in the Classes tab.")
     if not ready:
         st.caption("Booking opens soon. Until then, just come along.")
 
 
+def _classes(sc, m):
+    _class_list(sc, m, days_ahead=14, prefix="c")
+
+
+QUICK_REPLIES = {"Renew": "Hi, I'd like to renew my plan.",
+                 "Book a class": "Hi, can you book me into a class this week?",
+                 "Freeze": "Hi, I'd like to freeze my membership for a while.",
+                 "Question": "Hi, I have a question about my membership."}
+
+
+def _send_msg(sc, m, gym_name, text):
+    row = {"gym_id": m["gym_id"], "member_id": m["id"], "channel": "portal", "direction": "in",
+           "body": text.strip(), "status": "received", "is_read": False}
+    try:
+        sc.table("messages").insert(row).execute()
+    except Exception:
+        try:
+            sc.table("messages").insert({**row, "channel": "email", "subject": "From the member page"}).execute()
+        except Exception:
+            st.error("Your message couldn't be sent. Please try again later.")
+            return
+    st.session_state["mp_flash"] = f"Sent. {gym_name} will reply here or on WhatsApp."
+    st.rerun()
+
+
+def _quick_reply(sc, m, gym_name):
+    """A quick-reply chip was tapped: send its message, then clear the chip."""
+    pick = st.session_state.get("mp_qr")
+    st.session_state["mp_qr"] = None
+    if not pick:
+        return
+    try:
+        sc.table("messages").insert({"gym_id": m["gym_id"], "member_id": m["id"], "channel": "portal",
+                                     "direction": "in", "body": QUICK_REPLIES[pick], "status": "received",
+                                     "is_read": False}).execute()
+        st.session_state["mp_flash"] = f"Sent. {gym_name} will reply here or on WhatsApp."
+    except Exception:
+        st.session_state["mp_flash"] = "Your message couldn't be sent. Please try again later."
+
+
 def _messages(sc, m, gym_name):
+    st.markdown(MP_CSS % {"acc": _accent(st.session_state.get("_mp_prof"))}, unsafe_allow_html=True)
+    gw._md(f'<div class="mp2-chathd"><i>{gw._esc(gym_name[:1].upper())}</i><div><b>{gw._esc(gym_name)}</b>'
+           '<span>Messages with the gym</span></div></div>')
     try:
         rows = (sc.table("messages").select("direction, body, created_at").eq("gym_id", m["gym_id"])
-                .eq("member_id", m["id"]).order("created_at", desc=True).limit(30).execute().data or [])
+                .eq("member_id", m["id"]).order("created_at", desc=True).limit(40).execute().data or [])
     except Exception:
         rows = []
     if rows:
+        last_day = None
+        out = []
         for r in reversed(rows):
             mine = r.get("direction") == "in"
             when = pd.to_datetime(r.get("created_at"), errors="coerce", utc=True)
-            when = "" if pd.isna(when) else when.tz_convert(gw.APP_TZ).strftime("%d %b, %I:%M %p")
-            gw._md(f'<div class="mp-msg {"mp-in" if mine else "mp-out"}">{gw._esc(r.get("body") or "")}'
-                   f'<div class="mp-when">{"You" if mine else gw._esc(gym_name)} · {when}</div></div>')
+            if not pd.isna(when):
+                local = when.tz_convert(gw.APP_TZ)
+                day = local.date()
+                if day != last_day:
+                    out.append(f'<div class="mp2-day">{"Today" if day == gw.today_local() else f"{local:%a %d %b}"}</div>')
+                    last_day = day
+                t = f"{local:%I:%M %p}".lstrip("0")
+            else:
+                t = ""
+            out.append(f'<div class="mp2-b{" me" if mine else ""}">{gw._esc(r.get("body") or "")}<small>{t}</small></div>')
+        gw._md("".join(out))
     else:
-        st.caption(f"Messages from {gym_name} appear here.")
-    with st.form("mp_msg", clear_on_submit=True):
-        text = st.text_area(f"Message {gym_name}", placeholder="Ask a question, send a payment receipt reference…",
-                            max_chars=1000)
-        go = st.form_submit_button("Send", type="primary", use_container_width=True)
+        gw._md(f'<div class="mp2-b">Hi {gw._esc(_first(m.get("full_name")))}! Message {gw._esc(gym_name)} here: questions, '
+               'payment receipts, bookings or freezing your plan.</div>')
+    st.pills("Quick replies", list(QUICK_REPLIES), key="mp_qr", label_visibility="collapsed",
+             on_change=_quick_reply, args=(sc, m, gym_name))
+    with st.container(key="mp2_send"), st.form("mp_msg", clear_on_submit=True, border=False):
+        a, b = st.columns([4, 1.3], vertical_alignment="bottom")
+        text = a.text_input(f"Message {gym_name}", placeholder=f"Message {gym_name}…", max_chars=1000,
+                            label_visibility="collapsed")
+        go = b.form_submit_button("Send", type="primary", use_container_width=True)
     if go and text.strip():
-        row = {"gym_id": m["gym_id"], "member_id": m["id"], "channel": "portal", "direction": "in",
-               "body": text.strip(), "status": "received", "is_read": False}
-        try:
-            sc.table("messages").insert(row).execute()
-        except Exception:
-            try:
-                sc.table("messages").insert({**row, "channel": "email", "subject": "From the member page"}).execute()
-            except Exception:
-                st.error("Your message couldn't be sent. Please try again later.")
-                return
-        st.session_state["mp_flash"] = f"Sent. {gym_name} will reply here or on WhatsApp."
-        st.rerun()
+        _send_msg(sc, m, gym_name, text)
 
 
 def _details(sc, m, gym_name):
