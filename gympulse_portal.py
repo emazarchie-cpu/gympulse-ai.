@@ -727,64 +727,79 @@ def _visit_days(sc, m):
     return at, {t.date() for t in at}
 
 
-MP_DEFAULT_ACCENT = "#5EE0A8"          # mint, when the gym hasn't chosen its own brand colour
 
 MP_CSS = """
 <style>
-:root { --mp-acc: %(acc)s; --mp-ink: #06231a; --mp-s1: #121b19; --mp-s2: #182522; --mp-muted: #8aa79c;
-  --mp-warn-bg: #2a1d0b; --mp-warn-line: #5a3d12; --mp-warn: #ffcf7a; }
+:root { --mp-acc: %(acc)s; --mp-grad: var(--gp-grad, linear-gradient(100deg, #B7F34A 0%%, #35D6ED 100%%));
+  --mp-ink: #0A0F1E; --mp-s1: var(--gp-s1, #10172A); --mp-s2: var(--gp-s2, #141D33); --mp-s3: var(--gp-s3, #1A2540);
+  --mp-text: var(--gp-text, #F4F7FB); --mp-muted: var(--gp-muted, #93A1B8); --mp-dim: var(--gp-dim, #6B7A93);
+  --mp-line: var(--gp-line, rgba(255,255,255,0.08)); --mp-amber: var(--gp-amber, #FFC44D);
+  --mp-display: var(--gp-display, 'Space Grotesk', 'Inter', sans-serif); }
 .mp2-top { margin: 2px 0 12px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .mp2-top .d { color: var(--mp-muted); font-size: 13px; }
-.mp2-top h2 { margin: 2px 0 0 !important; padding: 0 !important; font-size: 27px !important; line-height: 1.15 !important;
-  letter-spacing: -.5px; font-weight: 750 !important; color: #eef5f2 !important; text-wrap: balance; }
+.mp2-top h2 { margin: 2px 0 0 !important; padding: 0 !important; font-family: var(--mp-display) !important; font-size: 27px !important;
+  line-height: 1.15 !important; letter-spacing: -.5px; font-weight: 700 !important; color: var(--mp-text) !important; text-wrap: balance; }
 .mp2-top img, .mp2-top .av { width: 48px; height: 48px; border-radius: 50%%; object-fit: cover; flex: 0 0 auto; }
-.mp2-top .av { background: var(--mp-s2); display: grid; place-items: center; font-weight: 800; color: var(--mp-acc); }
-.mp2-busy { background: var(--mp-s1); border-radius: 22px; padding: 16px 16px 12px; margin-bottom: 12px; }
+.mp2-top .av { background: var(--mp-grad); display: grid; place-items: center; font-weight: 800; color: var(--mp-ink); }
+.mp2-busy { background: var(--mp-s1); border: 1px solid var(--mp-line); border-radius: 22px; padding: 16px 16px 12px; margin-bottom: 12px; }
 .mp2-busy .l { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-.mp2-busy .l b { font-size: 18px; color: var(--mp-lvl, var(--mp-acc)); } .mp2-busy .l span { color: var(--mp-muted); font-size: 12.5px; }
+.mp2-busy .l b { font-family: var(--mp-display); font-size: 18px; color: var(--mp-lvl, var(--mp-acc)); }
+.mp2-busy .l span { color: var(--mp-muted); font-size: 12.5px; }
 .mp2-bars { display: flex; gap: 4px; align-items: flex-end; height: 86px; margin-top: 12px; }
-.mp2-bars i { flex: 1; display: block; background: #24423a; border-radius: 5px 5px 2px 2px; min-height: 4px; }
-.mp2-bars i.now { background: var(--mp-acc); } .mp2-bars i.past { opacity: .45; }
-.mp2-hrs { display: flex; justify-content: space-between; color: #5f7d72; font-size: 11px; margin-top: 5px; }
-.mp2-ci { border-radius: 22px; padding: 18px; background: var(--mp-acc); color: var(--mp-ink); display: flex;
-  justify-content: space-between; align-items: center; gap: 14px; margin-bottom: 12px; }
-.mp2-ci b { display: block; font-size: 21px; font-weight: 800; } .mp2-ci span { font-size: 13px; opacity: .78; }
+.mp2-bars i { flex: 1; display: block; background: var(--mp-s3); border-radius: 5px 5px 2px 2px; min-height: 4px; }
+.mp2-bars i.now { background: var(--mp-grad); } .mp2-bars i.past { opacity: .5; }
+.mp2-hrs { display: flex; justify-content: space-between; color: var(--mp-dim); font-size: 11px; margin-top: 5px; }
+.mp2-ci { border-radius: 22px; padding: 18px; background: var(--mp-grad); color: var(--mp-ink); display: flex;
+  justify-content: space-between; align-items: center; gap: 14px; margin-bottom: 12px; box-shadow: 0 10px 30px rgba(53,214,237,.12); }
+.mp2-ci b { display: block; font-family: var(--mp-display); font-size: 22px; font-weight: 700; } .mp2-ci span { font-size: 13px; opacity: .8; }
 .mp2-ci .code { font-family: Menlo, Consolas, monospace; font-size: 17px; letter-spacing: 3px; font-weight: 800; margin-top: 8px; }
 .mp2-ci img { width: 118px; height: 118px; background: #fff; border-radius: 14px; padding: 7px; flex: 0 0 auto; }
-.mp2-alert { border-radius: 16px; padding: 12px 14px; background: var(--mp-warn-bg); border: 1px solid var(--mp-warn-line);
-  color: var(--mp-warn); font-size: 14px; margin-bottom: 8px; display: flex; justify-content: space-between; gap: 10px; align-items: center; }
-.mp2-alert b { color: #ffe2ab; }
+.mp2-alert { border-radius: 16px; padding: 12px 14px; background: rgba(255,196,77,.10); border: 1px solid rgba(255,196,77,.32);
+  color: var(--mp-amber); font-size: 14px; margin-bottom: 8px; display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+.mp2-alert b { color: #FFD98A; }
 .mp2-mini { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin: 4px 0 14px; }
-.mp2-mini div { background: var(--mp-s1); border-radius: 16px; padding: 12px; min-width: 0; }
-.mp2-mini b { display: block; font-size: 19px; color: #eef5f2; } .mp2-mini span { color: var(--mp-muted); font-size: 11.5px; }
-.mp2-cap { font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; color: #6f8f83; margin: 6px 2px 8px; }
+.mp2-mini div { background: var(--mp-s1); border: 1px solid var(--mp-line); border-radius: 16px; padding: 12px; min-width: 0; }
+.mp2-mini b { display: block; font-family: var(--mp-display); font-size: 20px; color: var(--mp-text); }
+.mp2-mini span { color: var(--mp-muted); font-size: 11.5px; }
+.mp2-cap { font-size: 11.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--mp-muted); font-weight: 700; margin: 6px 2px 8px; }
 .mp2-wk { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; margin-bottom: 14px; }
-.mp2-wk div { background: var(--mp-s1); border-radius: 14px; padding: 8px 0 9px; text-align: center; font-size: 11.5px; color: var(--mp-muted); }
-.mp2-wk div b { display: block; font-size: 16px; color: #eef5f2; margin: 2px 0 5px; }
+.mp2-wk div { background: var(--mp-s1); border: 1px solid var(--mp-line); border-radius: 14px; padding: 8px 0 9px; text-align: center;
+  font-size: 11.5px; color: var(--mp-muted); }
+.mp2-wk div b { display: block; font-family: var(--mp-display); font-size: 16px; color: var(--mp-text); margin: 2px 0 5px; }
 .mp2-wk div i { display: block; width: 7px; height: 7px; border-radius: 4px; margin: 0 auto; }
 .mp2-wk div.v i { background: var(--mp-acc); }
-.mp2-wk div.today { background: var(--mp-acc); color: var(--mp-ink); } .mp2-wk div.today b { color: var(--mp-ink); }
+.mp2-wk div.today { background: var(--mp-grad); border-color: transparent; color: var(--mp-ink); } .mp2-wk div.today b { color: var(--mp-ink); }
 .mp2-wk div.today.v i { background: var(--mp-ink); }
-[class*="st-key-mp2_cls_"] { background: var(--mp-s1); border-radius: 16px; padding: 10px 12px; margin-bottom: 8px; }
+[class*="st-key-mp2_cls_"] { background: var(--mp-s1); border: 1px solid var(--mp-line); border-radius: 16px; padding: 10px 12px; margin-bottom: 8px; }
 [class*="st-key-mp2_cls_"] [data-testid="stHorizontalBlock"] { flex-wrap: nowrap !important; gap: 10px !important; align-items: center; }
 [class*="st-key-mp2_cls_"] [data-testid="stColumn"] { min-width: 0 !important; width: auto !important; flex: 1 1 auto !important; }
 [class*="st-key-mp2_cls_"] [data-testid="stColumn"]:first-child, [class*="st-key-mp2_cls_"] [data-testid="stColumn"]:last-child { flex: 0 0 auto !important; }
 .mp2-t { font-family: Menlo, Consolas, monospace; font-weight: 700; color: var(--mp-acc); font-size: 14px; }
-.mp2-cn b { display: block; color: #eef5f2; font-size: 14.5px; } .mp2-cn span { color: var(--mp-muted); font-size: 12px; }
+.mp2-cn b { display: block; color: var(--mp-text); font-size: 14.5px; } .mp2-cn span { color: var(--mp-muted); font-size: 12px; }
 /* chat (Inbox) */
-.mp2-chathd { display: flex; gap: 10px; align-items: center; padding: 4px 2px 12px; border-bottom: 1px solid #1d2a26; margin-bottom: 10px; }
-.mp2-chathd i { width: 40px; height: 40px; border-radius: 50%%; background: var(--mp-acc); color: var(--mp-ink); display: grid;
+.mp2-chathd { display: flex; gap: 10px; align-items: center; padding: 4px 2px 12px; border-bottom: 1px solid var(--mp-line); margin-bottom: 10px; }
+.mp2-chathd i { width: 40px; height: 40px; border-radius: 50%%; background: var(--mp-grad); color: var(--mp-ink); display: grid;
   place-items: center; font-style: normal; font-weight: 800; }
-.mp2-chathd b { display: block; color: #eef5f2; } .mp2-chathd span { color: var(--mp-muted); font-size: 12px; }
-.mp2-b { max-width: 82%%; padding: 10px 13px; border-radius: 18px 18px 18px 6px; background: var(--mp-s2); color: #e6efeb;
-  font-size: 14.5px; line-height: 1.45; white-space: pre-wrap; margin: 6px 0; }
-.mp2-b.me { margin-left: auto; border-radius: 18px 18px 6px 18px; background: var(--mp-acc); color: var(--mp-ink); }
+.mp2-chathd b { display: block; color: var(--mp-text); font-family: var(--mp-display); } .mp2-chathd span { color: var(--mp-muted); font-size: 12px; }
+.mp2-b { max-width: 82%%; padding: 10px 13px; border-radius: 18px 18px 18px 6px; background: var(--mp-s2); border: 1px solid var(--mp-line);
+  color: var(--mp-text); font-size: 14.5px; line-height: 1.45; white-space: pre-wrap; margin: 6px 0; }
+.mp2-b.me { margin-left: auto; border-radius: 18px 18px 6px 18px; background: var(--mp-grad); border-color: transparent; color: var(--mp-ink); }
 .mp2-b small { display: block; font-size: 11px; opacity: .65; margin-top: 4px; }
-.mp2-day { text-align: center; color: #5f7d72; font-size: 11.5px; margin: 12px 0 4px; }
+.mp2-day { text-align: center; color: var(--mp-dim); font-size: 11.5px; margin: 12px 0 4px; }
 .st-key-mp2_send [data-testid="stHorizontalBlock"] { flex-wrap: nowrap !important; gap: 8px !important; }
 .st-key-mp2_send [data-testid="stColumn"] { min-width: 0 !important; width: auto !important; flex: 1 1 auto !important; }
 .st-key-mp2_send [data-testid="stColumn"]:last-child { flex: 0 0 auto !important; }
 .st-key-mp_qr button p { white-space: nowrap; }
+/* the renew panel: a navy card like the others, readable text */
+html body .stApp .st-key-mp2_renew [data-testid="stExpander"] details { background: var(--mp-s1) !important;
+  border: 1px solid rgba(255,196,77,.32) !important; border-radius: 16px !important; overflow: hidden; }
+html body .stApp .st-key-mp2_renew [data-testid="stExpander"] summary { background: var(--mp-s1) !important; }
+html body .stApp .st-key-mp2_renew [data-testid="stExpander"] summary p,
+html body .stApp .st-key-mp2_renew [data-testid="stExpander"] summary span { color: var(--mp-text) !important; font-weight: 700; }
+html body .stApp .st-key-mp2_renew [data-testid="stExpanderDetails"] p,
+html body .stApp .st-key-mp2_renew [data-testid="stExpanderDetails"] li { color: var(--mp-text) !important; }
+html body .stApp .st-key-mp2_renew [data-testid="stExpanderDetails"] [data-testid="stCaptionContainer"] p { color: var(--mp-muted) !important; }
+html body .stApp .st-key-mp2_renew [data-testid="stExpanderDetails"] strong { color: var(--mp-acc) !important; }
 html body .stApp [class*="st-key-mp2_cls_"] button[kind="secondary"] { background: transparent !important;
   border: 1.5px solid var(--mp-acc) !important; color: var(--mp-acc) !important; }
 html body .stApp [class*="st-key-mp2_cls_"] button[kind="secondary"] p { color: var(--mp-acc) !important; }
@@ -793,9 +808,8 @@ html body .stApp [class*="st-key-mp2_cls_"] button[kind="secondary"] p { color: 
 
 
 def _accent(prof):
-    """The gym's own brand colour when it has chosen one, else mint."""
-    c = gw._text(dict(dict((prof or {}).get("settings") or {}).get("email_brand") or {}).get("color"))
-    return c if c.startswith("#") and len(c) in (4, 7) else MP_DEFAULT_ACCENT
+    """The member page uses the website's own colours: lime, with the lime-to-cyan gradient."""
+    return "#B7F34A"
 
 
 def _busy_now(sc, m, prof):
@@ -871,14 +885,15 @@ def _home(sc, m, gym_name, prof):
         gw._md(f'<div class="mp2-alert"><span>Your {gw._esc(gw.plan_phrase(plan))} plan <b>{when}</b></span>'
                + (f'<b>₦{amount:,.0f}</b>' if amount else "") + '</div>')
     if left is None or left <= 14 or pay.get("paystack_link"):
-        with st.expander(f"Renew · {gw.plan_phrase(plan).capitalize()} plan" + (f" · ₦{amount:,.0f}" if amount else ""),
+        with st.container(key="mp2_renew"), st.expander(f"Renew · {gw.plan_phrase(plan).capitalize()} plan" + (f" · ₦{amount:,.0f}" if amount else ""),
                          expanded=left is not None and left <= 7, icon=":material/autorenew:"):
             ref = gg.reference_for(m["id"], m.get("full_name"))
             if pay.get("paystack_link"):
                 st.link_button("Pay securely with Paystack", pay["paystack_link"], type="primary",
                                use_container_width=True)
             if pay.get("bank_account"):
-                st.markdown(f"Or transfer to **{gw._esc(pay.get('bank_name', ''))} · {gw._esc(pay['bank_account'])}**"
+                st.markdown(f"{'Or transfer' if pay.get('paystack_link') else 'Transfer'} to "
+                            f"**{gw._esc(pay.get('bank_name', ''))} · {gw._esc(pay['bank_account'])}**"
                             f" · {gw._esc(pay.get('bank_holder', ''))}, reference **{ref}**")
             if not (pay.get("paystack_link") or pay.get("bank_account")):
                 st.caption("Renew at the front desk, or message the gym in Inbox.")
