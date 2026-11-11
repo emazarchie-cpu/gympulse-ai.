@@ -138,6 +138,7 @@ def render_panel(supabase, gym_id):
             if ren != c["gympulse_renewals"]:
                 _save(supabase, {"gympulse_renewals": ren},
                       "GymPulse AI renewal reminders " + ("on." if ren else "off while running side by side."))
+        _render_webhook(supabase, gym_id, c["source"], owner)
         with st.expander("Ready to switch fully? Checklist", icon=":material/task_alt:"):
             d = _days_ago(t)
             fresh = d is not None and d <= 1
@@ -157,3 +158,73 @@ def render_panel(supabase, gym_id):
                       f"Welcome fully to GymPulse AI. {c['source']} can stay read-only for a month, just in case.")
         if owner and st.button("Stop running side by side", key="sbs_off", type="tertiary"):
             _save(supabase, {"on": False}, "Side by side is off.")
+
+
+# ------------------------------------------------------------------ automatic check-ins (GymMaster webhook)
+def _integration(supabase, gym_id):
+    """The gym's GymMaster webhook row, {} when not set up, or None when phase 39 hasn't been run."""
+    try:
+        rows = supabase.table("gym_integrations").select("*").eq("gym_id", gym_id).eq("kind", "gymmaster") \
+            .limit(1).execute().data or []
+        return rows[0] if rows else {}
+    except Exception:
+        return None
+
+
+def webhook_url(gym_id, secret):
+    import gympulse_admin as gadm
+    base = gadm.clean_url(gadm._env("SUPABASE_URL")).rstrip("/")
+    return f"{base}/functions/v1/gymmaster-webhook?gym={gym_id}&key={secret}"
+
+
+def _render_webhook(supabase, gym_id, source, owner):
+    with st.expander(f"Automatic check-ins from {source}", icon=":material/sync_alt:"):
+        st.caption(f"Instead of uploading exports, {source} can send each check-in to GymPulse AI the moment it "
+                   "happens, so the risk list is always up to date. Your front desk keeps checking in on "
+                   f"{source} as usual.")
+        row = _integration(supabase, gym_id)
+        if row is None:
+            st.info("This needs a one-time setup: open Supabase, go to SQL Editor, paste in the file "
+                    "sql/phase39_gymmaster_checkins.sql and press Run.")
+            return
+        if not row:
+            if owner and st.button("Create my connection link", key="gmw_make", type="primary",
+                                   icon=":material/link:"):
+                import secrets
+                try:
+                    supabase.table("gym_integrations").upsert({"gym_id": gym_id, "kind": "gymmaster",
+                                                               "secret": secrets.token_urlsafe(24)}).execute()
+                    st.session_state["gm_flash"] = "Connection link created. Paste it into GymMaster's Webhook Manager."
+                    st.rerun()
+                except Exception as error:
+                    if type(error).__name__ in ("RerunException", "StopException"):
+                        raise
+                    st.error(f"Could not create the link: {error}")
+            return
+        url = webhook_url(gym_id, row["secret"])
+        st.markdown("**1.** In GymMaster, open **Settings → Integrations → Webhook Manager**.")
+        st.markdown("**2.** Add a webhook for **member check-in**, with this as the target URL:")
+        st.code(url, language=None, wrap_lines=True)
+        st.markdown("**3.** Check a member in on GymMaster. Within a minute it shows below.")
+        st.caption("Keep this link private: anyone with it could add check-ins to your gym.")
+        n, ok = int(row.get("events") or 0), int(row.get("matched") or 0)
+        if not n:
+            st.caption("Waiting for the first check-in from GymMaster…")
+        else:
+            when = pd.to_datetime(row.get("last_event_at"), errors="coerce", utc=True)
+            last = "" if pd.isna(when) else f", last one {when.tz_convert(gw.APP_TZ):%d %b %H:%M}"
+            res = {"saved": "saved ✅", "duplicate": "already counted ✅", "no_match": "member not found ⚠️"}
+            st.markdown(f"**{n:,}** check-in message{'s' if n != 1 else ''} received, **{ok:,}** matched to a "
+                        f"member{last} · latest: {res.get(row.get('last_result'), row.get('last_result') or '–')}")
+            if row.get("last_unmatched"):
+                st.warning("Some check-ins couldn't be matched to a member. Usually the member isn't imported "
+                           "yet, or their GymMaster member ID wasn't in the import file. Re-import with the "
+                           "member ID column, or send the message below to GymPulse AI support.")
+                with st.popover("Last message we couldn't match"):
+                    st.json(row["last_unmatched"])
+        if owner and st.button("Make a new link (the old one stops working)", key="gmw_new", type="tertiary"):
+            import secrets
+            supabase.table("gym_integrations").update({"secret": secrets.token_urlsafe(24)}) \
+                .eq("gym_id", gym_id).eq("kind", "gymmaster").execute()
+            st.session_state["gm_flash"] = "New link made. Paste it into GymMaster again."
+            st.rerun()
