@@ -1411,6 +1411,7 @@ MEMBER_PROFILE = ["photo", "membership_end", "last_renewed_on", "last_payment"]
 MEMBER_PROFILE_LIGHT = ["membership_end", "last_renewed_on", "last_payment"]
 MEMBER_PT = ["has_pt", "pt_trainer_id"]          # sql/phase34_personal_training.sql
 MEMBER_HMO = ["hmo_provider", "hmo_valid_until"]  # sql/phase28_referrals_hmo.sql
+MEMBER_COMPANY = ["company_id"]                   # sql/phase5_growth.sql (corporate plans)
 NO_TRAINER_PLAYS = {"Trainer intro", "Free PT session"}   # pointless for someone who already has a trainer
 
 def fetch_all(query, page=1000, cap=50000):
@@ -1427,7 +1428,8 @@ def fetch_all(query, page=1000, cap=50000):
 
 def _fetch_members_uncached(supabase, gym_id, archived=None, include_photo=True):
     profile = MEMBER_PROFILE if include_photo else MEMBER_PROFILE_LIGHT
-    attempts = [MEMBER_BASE + MEMBER_SUSPEND + profile + MEMBER_PT + MEMBER_HMO,
+    attempts = [MEMBER_BASE + MEMBER_SUSPEND + profile + MEMBER_PT + MEMBER_HMO + MEMBER_COMPANY,
+                MEMBER_BASE + MEMBER_SUSPEND + profile + MEMBER_PT + MEMBER_HMO,
                 MEMBER_BASE + MEMBER_SUSPEND + profile + MEMBER_PT,
                 MEMBER_BASE + MEMBER_SUSPEND + profile,
                 MEMBER_BASE + MEMBER_SUSPEND,
@@ -1449,10 +1451,11 @@ def _fetch_members_uncached(supabase, gym_id, archived=None, include_photo=True)
     df = pd.DataFrame(rows)
     if df.empty:
         df = pd.DataFrame(columns=MEMBER_BASE + MEMBER_SUSPEND + MEMBER_PROFILE)
-    for column in MEMBER_SUSPEND + MEMBER_PROFILE + MEMBER_PT + MEMBER_HMO:
+    for column in MEMBER_SUSPEND + MEMBER_PROFILE + MEMBER_PT + MEMBER_HMO + MEMBER_COMPANY:
         if column not in df.columns:
             df[column] = None
     df["is_hmo"] = df["hmo_provider"].fillna("").astype(str).str.strip() != ""   # their HMO pays, not them
+    df["is_company"] = df["company_id"].notna()                                   # their employer pays the gym
     df["has_pt"] = df["has_pt"].fillna(False).astype(bool)
     df["archived"] = df["archived"].fillna(False).astype(bool)
     df["suspended"] = df["suspended"].fillna(False).astype(bool)
@@ -1467,7 +1470,7 @@ def _load_roster_uncached(supabase, gym_id, assess_fn, with_photos=True):
 
     keep = ["id", "full_name", "email", "phone", "fitness_goal",
             "membership_end", "last_payment", "last_renewed_on", "has_pt", "pt_trainer_id",
-            "hmo_provider", "hmo_valid_until", "is_hmo"]
+            "hmo_provider", "hmo_valid_until", "is_hmo", "company_id", "is_company"]
     if with_photos:
         keep.append("photo")
     members = members[[c for c in keep if c in members.columns]].reset_index(drop=True)
@@ -1597,7 +1600,7 @@ def drivers(row):
     change = row["visits_last_30_days"] - row["visits_previous_30_days"]
     if change <= -3:
         out.append("attendance dropping")
-    if row["renewal_due_days"] <= 14:
+    if row["renewal_due_days"] <= 14 and not is_company(row):    # company plans renew through HR
         d = int(row["renewal_due_days"])
         what = "HMO cover" if is_hmo(row) else None
         if what:
@@ -1628,11 +1631,26 @@ def is_hmo(row):
     return bool(v)
 
 
+def is_company(row):
+    """True for staff on a corporate plan: the company pays the gym, so HR gets the renewal reminder."""
+    v = row.get("is_company") if hasattr(row, "get") else None
+    if v is None or (isinstance(v, float) and pd.isna(v)):
+        v = _text(row.get("company_id") if hasattr(row, "get") else None) != ""
+    return bool(v)
+
+
+def paid_by_sponsor(row):
+    """An HMO or an employer pays for this member: never ask them to renew and pay."""
+    return is_hmo(row) or is_company(row)
+
+
 def pays_own_renewal(df):
-    """Row mask: members who renew and pay themselves (HMO members are left out of renewal lists)."""
-    if "is_hmo" not in df.columns:
-        return pd.Series(True, index=df.index)
-    return ~df["is_hmo"].fillna(False).astype(bool)
+    """Row mask: members who renew and pay themselves (HMO and corporate members are left out)."""
+    mask = pd.Series(True, index=df.index)
+    for col in ("is_hmo", "is_company"):
+        if col in df.columns:
+            mask &= ~df[col].fillna(False).astype(bool)
+    return mask
 
 
 def _has_pt(row):
@@ -1650,7 +1668,7 @@ def member_trainer(trainers, row, goal=""):
 
 
 def suggest_action(row):
-    if row["renewal_due_days"] <= 14 and row["risk_category"] != "Low" and not is_hmo(row):
+    if row["renewal_due_days"] <= 14 and row["risk_category"] != "Low" and not paid_by_sponsor(row):
         return "Renewal offer"
     if row["days_since_last_visit"] >= 14:
         return "Personal call"
