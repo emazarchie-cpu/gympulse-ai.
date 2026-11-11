@@ -689,7 +689,7 @@ def landing_top(lockup_uri, icon):
     return f"""
     <div class="lx-nav">
       <img src="{lockup_uri}" alt="GymPulse AI">
-      <div class="lx-nav-links"><a href="#demo">How it works</a><a href="#features">Features</a><a href="#pricing">Pricing</a></div>
+      <div class="lx-nav-links"><a href="#demo">How it works</a><a href="#connect">Works with your software</a><a href="#calculator">Calculator</a><a href="#pricing">Pricing</a></div>
     </div>
     <div class="lx-hero">
       <div>
@@ -701,7 +701,7 @@ def landing_top(lockup_uri, icon):
         <div class="lx-trust">
           <span>{icon('check', 15)} 30-day free trial</span>
           <span>{icon('check', 15)} No card needed</span>
-          <span>{icon('check', 15)} Front-desk check-in or CSV</span>
+          <span>{icon('check', 15)} Works with GymMaster, Excel or any software</span>
           <span>{icon('check', 15)} You choose what gets sent</span>
         </div>
       </div>
@@ -775,18 +775,20 @@ SHOWCASE = [
         ("target", "Loyalty & rewards", "Points for visits and renewals, rewards members actually want."),
         ("pulse", "Archie, your AI analyst", "Ask anything about your gym and get answers with the figures."),
     ]),
-    ("run", "Run the gym", "Members, check-ins, payments and your team in one place",
-     "Everything a Nigerian gym needs day to day, on any phone. No scanners or new hardware.",
-     "<b>₦</b> payments, receipts and renewals", [
-        ("users", "Member management", "Profiles with photos, plans, goals and personal trainer."),
+    ("run", "What GymPulse AI reads", "Members, check-ins and payments: from your software or ours",
+     "Retention starts with knowing who comes and who pays. Keep your gym software: GymPulse AI reads what it "
+     "records, or records it for you if you have none.",
+     "<b>Live</b> check-ins from GymMaster", [
+        ("users", "Your member list", "Name, phone, plan, fee and expiry date, imported once from any software."),
+        ("pulse", "Every check-in", "Live from GymMaster, from a weekly export, or by QR at your front desk."),
+        ("download", "Payments and renewals", "Who paid and when, so a missed renewal is caught the same day."),
         ("upload", "Import in minutes", "From GymMaster, Excel or any software, with visits and photos."),
-        ("check", "QR & front-desk check-in", "Members scan in, or staff tap them in on a phone."),
-        ("download", "Payments & receipts", "Record payments in naira; receipts carry your gym's name."),
-        ("shield", "Staff logins", "Front desk sees what they need. Revenue and settings stay with you."),
-        ("calendar", "Classes & bookings", "Timetable, bookings and class invites in one place."),
+        ("shield", "Staff logins", "Front desk and trainers see their follow-ups. Revenue stays with you."),
+        ("check", "Nothing to replace", "No new hardware, no change to your doors, billing or front desk."),
     ]),
-    ("trainer", "Members & trainers", "An app for every member, and a workspace for every trainer",
-     "Members get their own app with no download. Personal trainers get their own login with their day planned.",
+    ("trainer", "Keep members coming back", "Give members reasons to stay, and trainers a reason to check in",
+     "Members who train with a plan, see their progress and know the gym is quiet stay longer. Members get their "
+     "own app with no download, and trainers see which of their clients are going quiet.",
      "<b>Today</b> · 4 sessions · 07:00 leg day", [
         ("pulse", "Member app", "Renew, check-in code, visits, rewards, classes and messages."),
         ("target", "Train tab", "Log sets, personal records, progress charts and today's workout."),
@@ -809,10 +811,10 @@ def landing_showcase(icon):
           <div><div class="lx-kicker">{kicker}</div><div class="lx-h2">{title}</div>
           <div class="lx-show-sub">{sub}</div><div class="lx-feat">{items}</div></div></div>''')
     return f'''<div class="lx-sec" id="features">
-      <div class="lx-kicker">Everything in one app</div>
-      <div class="lx-h2">Built for real gyms. Every feature on every plan.</div>
-      <div class="lx-sub">Retention, growth, the front desk, your trainers and your members' own app.
-        You only pay by the size of your gym.</div>
+      <div class="lx-kicker">Everything you need to keep members</div>
+      <div class="lx-h2">One retention platform. Every feature on every plan.</div>
+      <div class="lx-sub">Spot who's drifting, bring them back, and keep the rest coming, alongside the gym
+        software you already use. You only pay by the size of your gym.</div>
       <div class="lx-mosaic">
         <div class="ph big" style="background-image:url('PHhero.jpg')"><span>Your gym floor<em>every member scored daily</em></span></div>
         <div class="ph" style="background-image:url('PHlift.jpg')"><span>Strength<em>personal records</em></span></div>
@@ -833,9 +835,33 @@ def landing_showcase(icon):
     </div>'''.replace("PH", "/app/static/landing/")
 
 
+def CONNECT_HTML(icon):
+    """Works with what you already use: the three ways member data comes in."""
+    return f'''<div class="lx-sec" id="connect">
+      <div class="lx-kicker">Works with what you already use</div>
+      <div class="lx-h2">Keep your gym software. We add the part it doesn't do: keeping members.</div>
+      <div class="lx-sub">GymPulse AI isn't another system to run your gym. It's the retention layer on top:
+        it needs your members, their check-ins and their renewals, and there are three ways in.</div>
+      <div class="lx-principles">
+        <div class="lx-card"><div class="lx-num">USE GYMMASTER?</div><div class="lx-ic">{icon('pulse')}</div>
+          <h4>Connected, live</h4><p>Paste one GymPulse AI link into GymMaster and every check-in comes across as
+          it happens. Your doors, billing and front desk stay exactly as they are.</p>
+          <div class="lx-out">Set up in about 5 minutes</div></div>
+        <div class="lx-card"><div class="lx-num">OTHER SOFTWARE OR EXCEL?</div><div class="lx-ic">{icon('upload')}</div>
+          <h4>Upload a spreadsheet</h4><p>Export your members and visits from any software and upload them. Do it
+          again each week: members are updated, never added twice.</p>
+          <div class="lx-out">Any CSV or Excel file</div></div>
+        <div class="lx-card"><div class="lx-num">NO SOFTWARE YET?</div><div class="lx-ic">{icon('check')}</div>
+          <h4>Use our check-in</h4><p>Members scan a QR code at the front desk, or staff tap them in on a phone.
+          No scanners or new hardware.</p>
+          <div class="lx-out">Ready the day you sign up</div></div>
+      </div>
+    </div>'''
+
+
 def landing_sections(icon, bot_svg):
     """Everything below the sign-in card."""
-    return landing_showcase(icon) + f"""
+    return CONNECT_HTML(icon) + landing_showcase(icon) + f"""
     <div class="lx-sec">
       <div class="lx-kicker">The retention loop</div>
       <div class="lx-h2">One connected system, from first warning sign to money kept</div>
@@ -843,8 +869,8 @@ def landing_sections(icon, bot_svg):
         behaviour means, recommends what to do next, and measures whether it worked.</div>
       <div class="lx-loop">
         <div class="lx-card"><div class="lx-num">01 · DATA</div><div class="lx-ic">{icon('users')}</div>
-          <h4>One member record</h4><p>Profiles, plans, renewal dates, trainers and every check-in in one place.</p>
-          <div class="lx-out">Member Management · Check-in</div></div>
+          <h4>Connect your data</h4><p>Members, renewal dates and every check-in, from GymMaster, a spreadsheet or our own check-in.</p>
+          <div class="lx-out">GymMaster · Import · Check-in</div></div>
         <div class="lx-card"><div class="lx-num">02 · DETECT</div><div class="lx-ic">{icon('pulse')}</div>
           <h4>Spot the drift early</h4><p>Each member is compared with their own habits, so a daily lifter who goes quiet is flagged fast.</p>
           <div class="lx-out">Risk Radar · Drop-off alerts</div></div>
@@ -900,18 +926,23 @@ def landing_sections(icon, bot_svg):
     </div>
 
     <div class="lx-sec">
-      <div class="lx-kicker">Our principles</div>
-      <div class="lx-h2">Honest numbers. Human decisions.</div>
-      <div class="lx-sub">GymPulse AI is in early access. Risk estimates come from an experimental model,
-        and we say so wherever they appear.</div>
-      <div class="lx-principles">
-        <div class="lx-card"><div class="lx-ic">{icon('users')}</div><h4>Data before predictions</h4>
-          <p>Real check-ins first. Typed-in numbers are only a fallback.</p></div>
-        <div class="lx-card"><div class="lx-ic">{icon('arrow')}</div><h4>Action before alerts</h4>
-          <p>Every risk flag comes with a practical next step for your team.</p></div>
-        <div class="lx-card"><div class="lx-ic">{icon('gauge')}</div><h4>Revenue you can trust</h4>
-          <p>A message sent is not a member saved. Only recorded outcomes count.</p></div>
+      <div class="lx-kicker">Proof, not promises</div>
+      <div class="lx-h2">How we count the money you keep</div>
+      <div class="lx-sub">A message sent is not a member saved. GymPulse AI only counts money kept when it can
+        point to the renewal. GymPulse AI is in early access: risk scores come from an experimental model, and we
+        say so wherever they appear.</div>
+      <div class="lx-loop">
+        <div class="lx-card"><div class="lx-num">01 · FLAGGED</div><div class="lx-ic">{icon('pulse')}</div>
+          <h4>The risk is recorded</h4><p>The day a member is flagged, their score, reason and monthly fee are saved.</p></div>
+        <div class="lx-card"><div class="lx-num">02 · CONTACTED</div><div class="lx-ic">{icon('chat')}</div>
+          <h4>The action is logged</h4><p>Who reached out, how (call, WhatsApp, offer) and when.</p></div>
+        <div class="lx-card"><div class="lx-num">03 · RENEWED</div><div class="lx-ic">{icon('check')}</div>
+          <h4>Only a payment counts</h4><p>Money is counted as kept only when that member renews or pays after being contacted.</p></div>
+        <div class="lx-card"><div class="lx-num">04 · CHECKED</div><div class="lx-ic">{icon('gauge')}</div>
+          <h4>The model is marked</h4><p>Every month we check how many of the members who left were flagged in time.</p></div>
       </div>
+      <div class="lx-plan-foot">Results from our first pilot gyms will be shared here, with their permission, once they
+        have a full month of data.</div>
     </div>
 
     <div class="lx-sec">

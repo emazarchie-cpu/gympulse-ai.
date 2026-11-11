@@ -644,10 +644,10 @@ def render_landing_pricing(icon):
     ps = plans(p)
     gw._md("""<div class="lx-sec" id="pricing" style="padding-bottom:0">
       <div class="lx-kicker">Plans and prices</div>
-      <div class="lx-h2">Your first 30 days are on us</div>
-      <div class="lx-sub" style="margin-bottom:22px">Sign up and use every part of GymPulse AI free for a month,
-        with no card. After that, choose the plan that fits your gym and pay month by month, or for the whole year
-        and spend less.</div></div>""")
+      <div class="lx-h2">Pays for itself when you keep a few members</div>
+      <div class="lx-sub" style="margin-bottom:22px">For most gyms, keeping just a few members a month pays for the
+        whole plan: try your own numbers in the calculator above. Your first 30 days are free, with no card. After that, choose the plan that fits your gym's
+        size and pay month by month, or for the whole year and spend less. Chains save up to 20% per branch.</div></div>""")
     gw._md(landing_cards_html(ps, icon)
            + '<div class="lx-demo-cta" style="margin-top:22px"><a class="lx-btn lx-btn-primary" href="#get-started">'
              'Start your free month</a></div>'

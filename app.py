@@ -1214,6 +1214,11 @@ if st.session_state.auth_user is None:
 
     # Landing: navigation, hero and live product preview
     html(gd.landing_top(lockup_data_uri(900), icon))
+    try:
+        import gympulse_landing as glanding
+        glanding.render_calculator()
+    except Exception as _calc_error:
+        gmon.capture(_calc_error, "landing calculator")
     if st.session_state.get("bill_flash"):
         (st.success if st.session_state.get("bill_flash_ok") else st.info)(
             st.session_state["bill_flash"] + " Sign in below to continue.")
