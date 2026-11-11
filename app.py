@@ -2963,7 +2963,10 @@ elif page == "Member Management":
                         .execute()
                     ).data or []
                 except Exception as error:
-                    st.error(f"Could not register member: {error}")
+                    if "GP_MEMBER_LIMIT" in str(error):
+                        st.error(_gb_lim.limit_message(error))
+                    else:
+                        st.error(f"Could not register member: {error}")
                 else:
                     new_id = created[0]["id"] if created else None
                     note = gw.save_membership(

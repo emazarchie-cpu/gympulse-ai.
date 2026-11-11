@@ -29,22 +29,12 @@ def main():
         print("Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.")
         return 1
     import gympulse_billing as gbill
-    levels = gbill.gym_levels(sc)
     locked = gbill.locked_gyms(sc)                    # plan ended: no messages until they renew
     total = [0, 0, 0]
     for entry in gadm.all_gyms(sc, fresh=True):
         if entry["gym"]["id"] in locked:
             print(f"{entry['name']}: plan ended, skipped")
             continue
-        if levels.get(entry["gym"]["id"], 3) < 2:      # Starter plan: renewal reminders only
-            settings = dict(entry["profile"].get("settings") or {})
-            auto_raw = dict(settings.get("auto_messages") or {})
-            auto_raw["missed"] = {**dict(auto_raw.get("missed") or {}), "on": False}
-            for k in gl.AUTO_KINDS:
-                if k in ("renewal", "missed"):
-                    continue
-                auto_raw[k] = {**dict(auto_raw.get(k) or {}), "on": False}
-            entry = {**entry, "profile": {**entry["profile"], "settings": {**settings, "auto_messages": auto_raw}}}
         auto = gl.auto_cfg(entry["profile"])
         if not any(auto[k]["on"] for k in gl.AUTO_KINDS):
             continue

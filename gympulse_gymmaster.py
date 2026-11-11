@@ -439,7 +439,12 @@ def run_import(supabase, gym_id, rows, update_existing=True, progress=None, hist
             placeholders += len(chunk) if used else 0
             created += len(ids)
             ready += [(i, r) for i, r in zip(ids, chunk) if i]
-        except Exception:
+        except Exception as batch_error:
+            if "GP_MEMBER_LIMIT" in str(batch_error):       # the plan's member limit: stop, don't trickle in
+                import gympulse_billing as gbill
+                failed += len(new) - start
+                problems.append(gbill.limit_message(batch_error))
+                break
             for d, r in zip(items, chunk):            # one bad row: find it, keep the rest
                 try:
                     try:
@@ -1003,7 +1008,7 @@ def render_gymmaster_import(supabase, gym_id):
                               visits_by=visits_by)
 
     import gympulse_billing as gbill
-    can_add, why_full = gbill.can_add_members(supabase, gym_id)
+    can_add, why_full = gbill.can_add_members(supabase, gym_id, adding=new or 1)
     if not can_add and new:
         st.info(why_full + f" The {new:,} new member(s) in this file will be skipped; existing members are still "
                            "updated.")
