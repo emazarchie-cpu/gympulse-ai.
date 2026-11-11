@@ -940,7 +940,7 @@ def landing_sections(icon, bot_svg):
         <a class="lx-btn" href="?demo=book" target="_self">Book a 15-minute demo</a>
       </div>
     </div>
-    <div class="lx-foot"><span><a href="/gym-management-software-nigeria.html" target="_self">Gym software Nigeria</a> · <a href="/gym-member-retention.html" target="_self">Member retention</a> · <a href="/gym-whatsapp-renewal-reminders.html" target="_self">WhatsApp reminders</a> · <a href="/switch-from-gymmaster-or-excel.html" target="_self">Moving from GymMaster or Excel</a> · <a href="/gym-hmo-members.html" target="_self">HMO members</a></span></div>
+    <div class="lx-foot"><span><a href="/gym-management-software-nigeria.html" target="_self">Member retention platform</a> · <a href="/gym-member-retention.html" target="_self">Keep members from cancelling</a> · <a href="/gym-whatsapp-renewal-reminders.html" target="_self">WhatsApp reminders</a> · <a href="/switch-from-gymmaster-or-excel.html" target="_self">Works with GymMaster</a> · <a href="/gym-hmo-members.html" target="_self">HMO members</a></span></div>
     <div class="lx-foot"><span>© 2026 GYMPULSE AI LTD · RC 9996401 · Registered in Nigeria</span><span>Calabar, Cross River State · <a href="mailto:hello@usegympulseai.com">hello@usegympulseai.com</a> · <a href="mailto:emmanuel@usegympulseai.com">emmanuel@usegympulseai.com</a></span></div>
     """
 

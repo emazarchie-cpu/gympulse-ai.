@@ -28,7 +28,7 @@ INDEXNOW_KEY = os.environ.get("INDEXNOW_KEY") or "f848cdbe83c604ffcb8a19b72cf7f5
 INDEXNOW_URL = "https://api.indexnow.org/indexnow"
 GOOGLE_VERIFY = os.environ.get("GOOGLE_SITE_VERIFICATION", "").strip()
 NAME = "GymPulse AI"
-TITLE = "GymPulse AI · Gym member retention software for Nigeria"
+TITLE = "GymPulse AI · Member retention platform for Nigerian gyms"
 DESCRIPTION = ("GymPulse AI shows Nigerian gym owners which members are about to stop coming, then "
                "brings them back with WhatsApp and email renewals, follow-up calls and referrals. "
                "Check-ins, payments and a member app included. 30-day free trial.")
@@ -58,24 +58,27 @@ def _naira(n):
 PAGES = [
     {
         "slug": "gym-management-software-nigeria",
-        "title": "Gym management software for Nigeria · GymPulse AI",
-        "description": "Gym software built for Nigerian gyms: members, check-ins, payments in naira, "
-                       "renewal reminders on WhatsApp and a warning before members stop coming.",
-        "h1": "Gym management software built for Nigerian gyms",
-        "lead": "Run your members, check-ins, payments and renewals in one place, and see who is about "
-                "to leave before they do. Made in Nigeria, priced in naira, works on any phone.",
+        "title": "Gym management software for Nigeria, built to keep members · GymPulse AI",
+        "description": "Looking for gym management software in Nigeria? GymPulse AI is a member retention "
+                       "platform: members, check-ins, renewals in naira, WhatsApp reminders and a warning "
+                       "before members stop coming.",
+        "h1": "More than gym management software: a member retention platform for Nigerian gyms",
+        "lead": "Most gym management software records who paid. GymPulse AI also tells you who is about to "
+                "leave, and helps you keep them. Members, check-ins and renewals in one place. Made in "
+                "Nigeria, priced in naira, works on any phone.",
         "sections": [
-            ("Everything a Nigerian gym needs", [
+            ("Everything you need to keep members", [
                 "Member records with photos, plans and renewal dates",
                 "QR check-in at the front desk, with HMO and corporate members",
                 "Payments and renewals in naira, with receipts that carry your gym's name",
                 "Staff logins, so coaches and front desk only see what they need",
                 "A member app with workouts, progress, classes and how busy the gym is now",
             ]),
-            ("Why owners switch", [
-                "Spreadsheets and paper registers don't tell you who is drifting away",
+            ("Why retention, not just management", [
+                "Spreadsheets, paper registers and most gym software don't tell you who is drifting away",
                 "Most members who cancel stop coming weeks before they say anything",
                 "GymPulse AI scores every member daily and tells you who to call first",
+                "Already use GymMaster or other gym software? Keep it: GymPulse AI works alongside it",
             ]),
         ],
     },
@@ -126,14 +129,21 @@ PAGES = [
     },
     {
         "slug": "switch-from-gymmaster-or-excel",
-        "title": "GymMaster alternative for Nigerian gyms · GymPulse AI",
-        "description": "Switching from GymMaster or Excel? Bring members, visit history and photos into "
-                       "GymPulse AI in minutes. Run both side by side, with no new hardware.",
-        "h1": "Moving your gym from GymMaster, Excel or other software",
-        "lead": "Export your members and visits as a spreadsheet, upload them, and GymPulse AI starts "
-                "scoring your members the same day.",
+        "title": "Works with GymMaster: member retention for Nigerian gyms · GymPulse AI",
+        "description": "Use GymMaster? Keep it. GymPulse AI connects to GymMaster and adds member "
+                       "retention on top. On Excel? Bring members, visits and photos across in minutes.",
+        "h1": "Works with GymMaster, Excel or the software you already use",
+        "lead": "Keep running your gym in GymMaster. GymPulse AI connects to it, or to your spreadsheet "
+                "export, and starts finding the members you're about to lose the same day.",
         "sections": [
-            ("How to move, step by step", [
+            ("Connected to GymMaster", [
+                "Keep GymMaster for your doors, front desk and billing: nothing changes for your staff",
+                "Add the GymPulse AI link in GymMaster's webhook settings, and new check-ins come across "
+                "as they happen",
+                "GymPulse AI adds what GymMaster doesn't: a daily list of members at risk, WhatsApp "
+                "follow-ups and win-backs",
+            ]),
+            ("Bring your members in, step by step", [
                 "1. Export your members from GymMaster, Mindbody, Glofox or your spreadsheet as CSV or Excel",
                 "2. Upload the file on the Import screen in GymPulse AI, from 10 members up to 20,000",
                 "3. Check the columns: GymPulse AI guesses which column is the name, phone, plan and expiry "
@@ -149,10 +159,9 @@ PAGES = [
                 "Member photos, matched by member ID from a ZIP file",
                 "Thousands of members at once",
             ]),
-            ("Switching without a gap", [
-                "Run GymMaster and GymPulse AI side by side while your team gets used to it",
-                "Import a fresh export again before you fully switch: members already in GymPulse AI are "
-                "updated, not added twice",
+            ("Side by side, with no gap", [
+                "Run GymMaster and GymPulse AI side by side for as long as you like",
+                "Import a fresh export any time: members already in GymPulse AI are updated, not added twice",
                 "No new door hardware: members check in with a QR code at the front desk or in the member app",
                 "Members get a private link to their own page: no app store download needed",
                 "Payments are recorded in naira, by cash, transfer or POS, so your records continue as before",

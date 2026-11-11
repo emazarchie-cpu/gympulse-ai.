@@ -174,6 +174,42 @@ def price_for(plan, period):
     return plan.get("yearly") if period == "yearly" else plan.get("monthly")
 
 
+# A chain pays each branch's own plan, less a discount for the number of branches on a paid plan
+# (the branch being paid for counts too). Empty or trial branches don't count, so the discount can't be
+# reached by opening branches that aren't used.
+CHAIN_TIERS = [(10, 0.20), (5, 0.15), (2, 0.10)]
+
+
+def chain_pct(n_branches):
+    return next((pct for at_least, pct in CHAIN_TIERS if n_branches >= at_least), 0.0)
+
+
+def chain_discount(client, gym_id, today=None):
+    """(discount 0–0.2, branches counted) for a gym: its owner's other branches with an active paid plan, plus
+    this one."""
+    today = today or gw.today_local()
+    try:
+        g = client.table("gyms").select("owner_id").eq("id", gym_id).limit(1).execute().data
+        if not g:
+            return 0.0, 1
+        others = [x["id"] for x in client.table("gyms").select("id").eq("owner_id", g[0]["owner_id"]).execute().data
+                  or [] if str(x["id"]) != str(gym_id)]
+        if not others:
+            return 0.0, 1
+        subs = client.table("gym_subscriptions").select("gym_id, status, paid_until").in_("gym_id", others) \
+            .execute().data or []
+    except Exception:
+        return 0.0, 1
+    paid = sum(1 for r in subs if r.get("status") == "active" and _d(r.get("paid_until")) and _d(r["paid_until"]) >= today)
+    n = paid + 1
+    return chain_pct(n), n
+
+
+def chain_price(amount, pct):
+    """The price after the branch discount, to the naira."""
+    return round(float(amount) * (1 - float(pct or 0))) if amount else amount
+
+
 def _money(x):
     return f"₦{float(x):,.0f}" if x not in (None, "") else "–"
 
@@ -714,7 +750,9 @@ PAY_CHANNELS = {"pay_transfer": ["bank_transfer"], "pay_card": ["card", "ussd", 
 def start_payment(gym_id, plan, period, email, reference=None, invoice_id=None, channels=None):
     """Create a Paystack checkout. Returns (url, reference) or (None, error)."""
     import gympulse_email as ge
-    amount = price_for(plan, period)
+    sc = _service()
+    pct, _n = chain_discount(sc, gym_id) if sc else (0.0, 1)
+    amount = chain_price(price_for(plan, period), pct)
     if not (paystack_key() and amount and email):
         return None, "Online payment isn't set up yet."
     ref = reference or f"gp-{str(gym_id)[:8]}-{uuid.uuid4().hex[:12]}"
@@ -722,7 +760,7 @@ def start_payment(gym_id, plan, period, email, reference=None, invoice_id=None, 
         "email": email, "amount": int(round(amount * 100)), "currency": "NGN", "reference": ref,
         "callback_url": f"{ge.SITE}/?paystack=1", **({"channels": channels} if channels else {}),
         "metadata": {"source": "gympulse", "gym_id": str(gym_id), "plan": plan["name"], "period": period,
-                     "invoice_id": invoice_id, "cancel_action": f"{ge.SITE}/"}})
+                     "invoice_id": invoice_id, "chain_pct": pct, "cancel_action": f"{ge.SITE}/"}})
     if r.get("status") and (r.get("data") or {}).get("authorization_url"):
         return r["data"]["authorization_url"], ref
     return None, r.get("message") or "Couldn't start the payment. Please try again."
@@ -820,7 +858,11 @@ def apply_payment(reference, sc=None):
     p = {**DEFAULT_PRICING, **(rows[0]["value"] if rows else {})}
     plan = next((x for x in plans(p) if x["name"] == md.get("plan")), None)
     paid = (d.get("amount") or 0) / 100
-    expected = price_for(plan, period) if plan else None
+    try:
+        pct = min(max(float(md.get("chain_pct") or 0), 0.0), CHAIN_TIERS[0][1])
+    except (TypeError, ValueError):
+        pct = 0.0
+    expected = chain_price(price_for(plan, period), pct) if plan else None
     inv = gi.by_reference(sc, reference)
     if d.get("currency") != "NGN" or not expected or paid + 0.5 < expected:
         _email_founder(f"Paystack payment to check: {reference}",
@@ -979,7 +1021,9 @@ CO_CSS = """
 
 def _summary_html(plan, period, sub_state, ps):
     import gympulse_invoices as gi
-    amount = price_for(plan, period)
+    full = price_for(plan, period)
+    pct, n_branches = st.session_state.get("co_disc") or (0.0, 1)
+    amount = chain_price(full, pct)
     today = gw.today_local()
     if sub_state["status"] == "trial" and sub_state.get("ends"):
         starts = sub_state["ends"] + timedelta(days=1)
@@ -998,6 +1042,8 @@ def _summary_html(plan, period, sub_state, ps):
             ("Starts", f"{starts:%d %b %Y}"), ("Renews", f"{renews:%d %b %Y}")]
     if saved:
         rows.append(("You save", gi.money(saved)))
+    if pct:
+        rows.append((f"Branch discount ({n_branches} branches, {pct:.0%})", "−" + gi.money(full - amount)))
     return (f'<div class="co-sum"><h4>Order summary</h4><div class="co-name">GymPulse AI {gw._esc(plan["name"])}</div>'
             f'<div class="co-tag">{gw._esc(plan.get("tagline") or plan.get("for_who") or "")}</div>'
             + "".join(f'<div class="co-row"><span>{a}</span><b>{gw._esc(b)}</b></div>' for a, b in rows)
@@ -1078,6 +1124,14 @@ def _render_plans(supabase, gym_id, s, p, ps):
         if best:
             st.caption(f"You have **{n_members:,} members**, so **{best['name']}** fits your gym. Every plan includes "
                        "WhatsApp messages: no extra charges, ever.")
+        pct, n_br = chain_discount(supabase, gym_id)
+        if pct:
+            st.success(f"**Your branch discount: {pct:.0%} off every plan.** You have {n_br} branches on a paid plan "
+                       "(counting this one), so each one pays less. The discount shows at checkout.",
+                       icon=":material/domain:")
+        elif len(st.session_state.get("branches") or []) > 1:
+            st.caption("Chains save: 10% off each branch with 2–4 branches on a paid plan, 15% with 5–9, 20% with 10 or "
+                       "more.")
         cols = st.columns(len(ps) if len(ps) <= 3 else 3)
         for i, plan in enumerate(ps):
             with cols[i % len(cols)].container(border=True):
@@ -1152,6 +1206,7 @@ def _render_checkout(supabase, gym_id, plan, period, s, p, ps):
     flash = st.session_state.pop("bill_flash", None)
     if flash:
         st.warning(flash)
+    st.session_state["co_disc"] = chain_discount(supabase, gym_id)
     options = [x for x in ("monthly", "yearly") if price_for(plan, x)]
     if len(options) > 1:
         saved = _saving(plan)
@@ -1224,7 +1279,7 @@ def _render_checkout(supabase, gym_id, plan, period, s, p, ps):
                                     f"{glegal.SUBSCRIPTION_VERSION}), the Terms of Service, Privacy Policy and Data "
                                     "Processing Agreement. I am authorised to sign for this business, and I "
                                     "authorise this payment.")
-            go = st.form_submit_button(f"Continue · {_money(price_for(plan, period))}", type="primary",
+            go = st.form_submit_button(f"Continue · {_money(chain_price(price_for(plan, period), st.session_state['co_disc'][0]))}", type="primary",
                                        use_container_width=True)
         if go:
             details = {"business_name": biz, "billing_name": name, "billing_phone": phone, "billing_email": email,
@@ -1245,7 +1300,7 @@ def _render_checkout(supabase, gym_id, plan, period, s, p, ps):
             if not sc:
                 st.error("Checkout isn't available right now. Please try again shortly.")
                 return
-            amount = price_for(plan, period)
+            amount = chain_price(price_for(plan, period), chain_discount(sc, gym_id)[0])
             signature = {"signer_name": " ".join(gw._text(signed or name).split()), "signer_role": role,
                          "plan": plan["name"], "period": period, "amount": amount,
                          "signature_image": glegal.png_data_url(drawn) if drawn else None}
@@ -1373,7 +1428,7 @@ def _render_pay(plan, period, s, ps):
             <div class="co-row"><span>Receipt to</span><b>{gw._esc(inv.get("billing_email"))}</b></div>
             <div class="co-row"><span>Invoice</span><b>{gw._esc(gi.number(inv))}</b></div></div>
             <div class="co-pay"><a class="lx-btn lx-btn-primary" href="{gw._esc(st.session_state.get("co_url", "#"))}"
-            target="_self">{"Get transfer details" if by_transfer else "Pay"} · {gi.money(price_for(plan, period))}</a>
+            target="_self">{"Get transfer details" if by_transfer else "Pay"} · {gi.money(inv.get("amount") or price_for(plan, period))}</a>
             <div class="co-lock">🔒 {("Paystack gives you an account number for this payment. Transfer the exact "
             "amount from any bank app; Paystack confirms it in seconds and you come straight back here.")
             if by_transfer else "You'll pay on Paystack's secure page by card or USSD, then come straight back here."}
