@@ -1,0 +1,35 @@
+# Builds or resets the GymPulse AI demo gym (Actions -> Demo gym -> Run workflow).
+# Wipes and rebuilds only the gym owned by the demo login, sets a new password and
+# emails it to the founder. Uses the same repository secrets as the other jobs.
+name: Demo gym
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run: say what would happen, change nothing"
+        type: boolean
+        default: false
+
+concurrency:
+  group: seed-demo
+  cancel-in-progress: false
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install
+        run: pip install -r requirements.txt
+      - name: Build the demo gym
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+        run: python scripts/seed_demo_gym.py ${{ inputs.dry_run && '--dry-run' || '' }}
