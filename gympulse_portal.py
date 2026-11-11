@@ -92,6 +92,12 @@ html body .stApp.stApp .st-key-mp_tabs [role="tabpanel"] { padding-bottom: 96px;
 """
 
 
+def app_on(prof):
+    """Does this gym use the GymPulse member app? Gyms whose members already have another app (for example
+    GymMaster's) switch it off in Member Management -> Member app. On unless switched off."""
+    return dict(dict((prof or {}).get("settings") or {}).get("member_app") or {}).get("on", True) is not False
+
+
 def login_url():
     return f"{gw.APP_URL}/?member=1"
 
@@ -694,6 +700,10 @@ def render_portal(supabase, token):
             sc.table("members").update({"portal_seen_at": datetime.now(timezone.utc).isoformat()}).eq("id", m["id"]).execute()
         except Exception:
             pass
+    if not app_on(prof):                                      # the gym uses its own member app
+        with col:
+            _app_off_screen(sc, m, gym_name)
+        return
     if is_locked(m, prof, gw.today_local()):
         with col:
             _locked_screen(m, gym_name)
@@ -1286,6 +1296,21 @@ def _password_box(sc, m):
 
 
 # ------------------------------------------------------------------ the gym's side
+def _app_off_screen(sc, m, gym_name):
+    gw._md(f'<div class="mp-card"><div class="mp-gym">{gw._esc(gym_name)}</div>'
+           f'<div class="mp-hi">Hi {gw._esc(_first(m.get("full_name")))} 👋</div>'
+           f'<div class="mp-plan">{gw._esc(gym_name)} uses its own member app, so there\'s nothing to see here. '
+           'Use the gym\'s app, or ask at the front desk.</div></div>')
+    try:
+        import gympulse_waiver as gwv
+        if not gwv.latest(sc, m["id"]):
+            st.caption("You still have a membership agreement to sign.")
+            st.link_button("Sign my membership agreement", gwv.link_for(m), type="primary", icon=":material/draw:",
+                           use_container_width=True)
+    except Exception:
+        pass
+
+
 def render_owner(supabase, gym_id):
     import gympulse_reports as rp
     import gympulse_signup as gsign
@@ -1293,6 +1318,28 @@ def render_owner(supabase, gym_id):
              "Each member gets their own page: renew and pay, check-in QR code, visits, streak and rewards, class "
              "bookings and messages with you. No app to download: they go to usegympulseai.com, tap Member, and sign in "
              "with their email and password (first time, with a code we email them).")
+    prof = st.session_state.get("user_profile") or {}
+    on = app_on(prof)
+    if st.session_state.get("role") != "staff":
+        want = st.toggle("Use the GymPulse member app", value=on, key="mp_app_on",
+                         help="Switch off if your members already use another app, for example GymMaster's.")
+        if want != on:
+            s = {**dict(prof.get("settings") or {}), "member_app": {"on": bool(want)}}
+            owner_id = (st.session_state.get("auth_user") or {}).get("id") or prof.get("id")
+            try:
+                supabase.table("profiles").update({"settings": s}).eq("id", owner_id).execute()
+                prof["settings"] = s
+                st.session_state["user_profile"] = prof
+                st.rerun()
+            except Exception as error:
+                if type(error).__name__ in ("RerunException", "StopException"):
+                    raise
+                st.error(f"Could not save: {error}")
+    if not on:
+        st.info("The member app is off: members aren't sent links, and old links show that your gym uses its own "
+                "app. Membership agreement links and the HMO check-in QR code still work.",
+                icon=":material/smartphone:")
+        return
     try:
         rows = gw.fetch_all(supabase.table("members").select("id, full_name, email, phone, portal_token, "
                                                              "portal_sent_at, portal_seen_at")

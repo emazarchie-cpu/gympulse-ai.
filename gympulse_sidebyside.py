@@ -139,6 +139,8 @@ def render_panel(supabase, gym_id):
                 _save(supabase, {"gympulse_renewals": ren},
                       "GymPulse AI renewal reminders " + ("on." if ren else "off while running side by side."))
         _render_webhook(supabase, gym_id, c["source"], owner)
+        st.caption(f"Members already use {c['source']}'s app? Switch off the GymPulse member app under "
+                   "Member Management → Member app, so they don't have two.")
         with st.expander("Ready to switch fully? Checklist", icon=":material/task_alt:"):
             d = _days_ago(t)
             fresh = d is not None and d <= 1
