@@ -2524,6 +2524,12 @@ def render_member_profile(supabase, gym_id, member_id, assess_fn):
         ["Overview", "Membership", "Photo", "Check-in", "Edit details"])
 
     with tab_overview:
+        try:
+            import gympulse_waiver as gwv
+            gwv.render_status(supabase, gym_id, member_id,
+                              _text((st.session_state.get("user_profile") or {}).get("business_name"), "our gym"))
+        except Exception:
+            pass
         age = _num(m["age"], None)
         weight = _num(m["weight_kg"], None)
         height = _num(m["height_cm"], None)

@@ -688,6 +688,8 @@ def render_portal(supabase, token):
             st.success(flash)
         tabs = st.tabs(["Home", "Train", "Classes", "Inbox", "Me"], key="mp_tabs")
         with tabs[0]:
+            import gympulse_waiver as gwv
+            gwv.render_status(sc, m["gym_id"], m["id"], gym_name, for_member=True, compact=True)
             _home(sc, m, gym_name, prof)
             import gympulse_referrals as gref
             gref.render_member_card(sc, m, gym_name, prof)
@@ -700,6 +702,8 @@ def render_portal(supabase, token):
             _messages(sc, m, gym_name)
         with tabs[4]:
             _details(sc, m, gym_name)
+            import gympulse_waiver as gwv
+            gwv.render_status(sc, m["gym_id"], m["id"], gym_name, for_member=True)
 
 
 def _activity(sc, m):
