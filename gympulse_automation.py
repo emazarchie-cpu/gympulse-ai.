@@ -71,7 +71,8 @@ def matches(rule, roster):
     if t == "high_risk":
         return roster[roster["risk_category"] == "High"]
     if t == "renewal_fading":
-        return roster[(roster["renewal_due_days"].between(0, n)) & (roster["attendance_change"] < 0)]
+        return roster[(roster["renewal_due_days"].between(0, n)) & (roster["attendance_change"] < 0)
+                      & gw.pays_own_renewal(roster)]
     if t == "absent":
         return roster[roster["days_since_last_visit"] >= n]
     if t == "lapsed":
