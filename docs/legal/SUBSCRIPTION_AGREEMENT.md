@@ -105,7 +105,7 @@ Neither Party is liable for delay or failure caused by events beyond its reasona
 16.3 Notices are given by email: to the Subscriber at its billing email, and to the Company at hello@usegympulseai.com.
 16.4 The Subscriber may not assign this Agreement without the Company's written consent. The Company may assign it to a successor that takes over the Service, and shall notify the Subscriber.
 16.5 If any provision is found invalid, the rest of the Agreement continues in force. A failure or delay in enforcing a right is not a waiver of it.
-16.6 **Electronic signature.** The Parties agree that this Agreement may be signed electronically, and that an electronic signature (for the Subscriber, typing the signatory's full name and confirming agreement at checkout; for the Company, its Founder's signature applied electronically) is valid and binding, as recognised by section 93 of the Evidence Act 2011. A record of both signatures, the date and time, and a SHA-256 fingerprint of this exact text is kept, and the Subscriber receives a signed PDF copy.
+16.6 **Electronic signature.** The Parties agree that this Agreement may be signed electronically, and that an electronic signature (for the Subscriber, the signatory drawing their signature, or typing their full name, and confirming agreement at checkout; for the Company, its Founder's signature applied electronically) is valid and binding, as recognised by section 93 of the Evidence Act 2011. A record of both signatures, the date and time, and a SHA-256 fingerprint of this exact text is kept, and the Subscriber receives a signed PDF copy.
 
 ## Execution
 **IN WITNESS WHEREOF** the Parties have executed this Agreement electronically on the dates shown below.
