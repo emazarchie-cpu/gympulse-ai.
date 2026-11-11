@@ -2719,6 +2719,11 @@ try:
         gbill.render_banner(supabase, st.session_state.get("gym_id"))
         if st.session_state.get("gym_id") and st.session_state.get("current_page") in ("Dashboard", "Member Management"):
             gbill.render_limit_banner(supabase, st.session_state.get("gym_id"))
+            try:
+                import gympulse_sidebyside as gsbs
+                gsbs.render_banner(supabase, st.session_state.get("gym_id"))
+            except Exception:
+                pass
     if page not in gbill.ALWAYS_OPEN and gbill.must_lock(supabase, st.session_state.get("gym_id")):
         page = "Subscription"
     elif not gbill.page_allowed(supabase, st.session_state.get("gym_id"), page):
@@ -2824,7 +2829,8 @@ elif page == "Member Management":
             st.success(_mm_flash)
         with st.expander("Bring your members in: import from GymMaster, Excel or any software",
                          icon=":material/upload_file:",
-                         expanded=bool(st.session_state.get("gm_flash") or st.session_state.get("gm_errors"))):
+                         expanded=bool(st.session_state.get("gm_flash") or st.session_state.get("gm_errors")
+                                       or st.session_state.pop("gm_open", False))):
             import gympulse_gymmaster as ggm
             ggm.render_gymmaster_import(supabase, gym_id)
             st.divider()

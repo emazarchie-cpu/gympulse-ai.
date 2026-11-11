@@ -860,6 +860,8 @@ def render_gymmaster_import(supabase, gym_id):
     errs = st.session_state.pop("gm_errors", None)
     if errs:
         st.error("These rows were not imported:\n\n" + "\n".join(f"- {e}" for e in errs[:20]))
+    import gympulse_sidebyside as gsbs
+    gsbs.render_panel(supabase, gym_id)
     _render_recent(supabase, gym_id)
 
     with st.popover("How do I export my members?", icon=":material/help:"):
