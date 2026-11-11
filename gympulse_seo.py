@@ -174,6 +174,12 @@ PAGES = [
                 "Each member's HMO, HMO ID, employer and cover end date in one place",
                 "A warning when covers end in the next 30 days, so you can follow up in time",
             ]),
+            ("Claims that get paid", [
+                "Each plan's weekly gym sessions are kept to at check-in, so you don't train visits the HMO won't pay for",
+                "HMOs that need a code for each visit get it at check-in, saved with the visit",
+                "Each month's claim worked out per HMO, per visit or per member, ready to send",
+                "See which claims are paid, part paid or queried, and which are still owed",
+            ]),
         ],
     },
 ]
