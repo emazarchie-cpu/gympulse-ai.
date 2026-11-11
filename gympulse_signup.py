@@ -48,7 +48,13 @@ def render_public(supabase, code):
         if done:
             if done == "created":
                 gw._md(f'<div class="bk-title">You\'re in! 🎉</div><div class="bk-sub">Welcome to '
-                       f'{gw._esc(gym)}. See you at the gym!</div>')
+                       f'{gw._esc(gym)}. One last step: please sign your membership agreement.</div>')
+                link = _waiver_link(code, st.session_state.pop("join_contact", None))
+                if link:
+                    st.link_button("Sign my membership agreement", link, type="primary",
+                                   icon=":material/draw:", use_container_width=True)
+                else:
+                    st.caption("The front desk will ask you to sign your membership agreement on your first visit.")
             else:
                 gw._md(f'<div class="bk-title">You\'re already a member 👋</div><div class="bk-sub">'
                        f'{gw._esc(gym)} already has a member with this phone number or email, so nothing new '
@@ -113,8 +119,31 @@ def render_public(supabase, code):
                         gref.record_from_signup(supabase, code, st.query_params.get("ref"), name.strip(),
                                                 phone.strip(), email.strip())
                     st.session_state["join_done"] = r["status"]
+                    st.session_state["join_contact"] = (phone.strip(), email.strip())
                     st.session_state["join_done_code"] = str(code)
                     st.rerun()
+
+
+def _waiver_link(code, contact):
+    """The new member's personal signing link (found by the phone or email they just gave), or None."""
+    if not contact:
+        return None
+    try:
+        import gympulse_admin as gadm
+        sc = gadm.service_client()
+        g = sc.table("gyms").select("id").eq("join_code", str(code)).limit(1).execute().data
+        rows = sc.table("members").select("portal_token, phone, email, created_at").eq("gym_id", g[0]["id"]) \
+            .order("created_at", desc=True).limit(50).execute().data or []
+    except Exception:
+        return None
+    phone, email = contact
+    digits = "".join(ch for ch in phone or "" if ch.isdigit())[-10:]
+    for r in rows:
+        r_digits = "".join(ch for ch in gw._text(r.get("phone")) if ch.isdigit())[-10:]
+        if (len(digits) >= 7 and r_digits == digits) or (email and gw._text(r.get("email")).lower() == email.lower()):
+            if r.get("portal_token"):
+                return f"{gw.APP_URL}/?waiver={r['portal_token']}"
+    return None
 
 
 # ------------------------------------------------------------------ owner tools
