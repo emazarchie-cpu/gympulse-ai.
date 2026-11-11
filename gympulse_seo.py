@@ -18,6 +18,7 @@ Google Search Console: set the env var GOOGLE_SITE_VERIFICATION to the code Goog
 import html
 import json
 import os
+import re
 from datetime import date
 
 SITE = (os.environ.get("APP_URL") or "https://usegympulseai.com").rstrip("/")
@@ -128,6 +129,16 @@ PAGES = [
         "lead": "Export your members and visits as a spreadsheet, upload them, and GymPulse AI starts "
                 "scoring your members the same day.",
         "sections": [
+            ("How to move, step by step", [
+                "1. Export your members from GymMaster, Mindbody, Glofox or your spreadsheet as CSV or Excel",
+                "2. Upload the file on the Import screen in GymPulse AI, from 10 members up to 20,000",
+                "3. Check the columns: GymPulse AI guesses which column is the name, phone, plan and expiry "
+                "date, and you can correct any guess",
+                "4. Check the plans: each membership name becomes a GymPulse plan you can rename",
+                "5. Press Import. Members already in GymPulse AI are matched by email, phone or name, so "
+                "nobody is added twice",
+                "6. Changed your mind? Every import can be undone in one click",
+            ]),
             ("What comes across", [
                 "Members, plans, prices, join and expiry dates",
                 "Visit history, so risk scores are accurate from day one",
@@ -138,6 +149,30 @@ PAGES = [
                 "A daily list of members at risk of leaving, with the reason",
                 "Automatic renewal and check-in messages",
                 "A member app with workouts, classes and gym busyness",
+            ]),
+        ],
+    },
+    {
+        "slug": "gym-hmo-members",
+        "title": "HMO and corporate members at your gym · GymPulse AI",
+        "description": "Check in HMO enrollees and company-paid members with a QR code and get a monthly "
+                       "visits report per HMO for your claims, with no paper register.",
+        "h1": "HMO and corporate members at your gym",
+        "lead": "Health plans like Reliance, Hygeia, AXA Mansard and Leadway pay you for their members' gym "
+                "visits. GymPulse AI records every HMO visit for you, so claiming is a download, not a paper "
+                "register.",
+        "sections": [
+            ("How HMO members check in", [
+                "Put your gym's HMO QR code at the front desk",
+                "The first time, the member scans it and types their HMO ID or phone number",
+                "After that they get a personal link to save on their phone and check in with one tap",
+                "Each visit is saved as an HMO visit, kept apart from your regular members' visits",
+            ]),
+            ("What the owner gets", [
+                "A monthly visits report for each HMO, ready to download for claims",
+                "Import an HMO's member list from CSV or Excel, or add one member at a time",
+                "Each member's HMO, HMO ID, employer and cover end date in one place",
+                "A warning when covers end in the next 30 days, so you can follow up in time",
             ]),
         ],
     },
@@ -200,7 +235,7 @@ BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}a{color:#B6F23A}.w{max-width:880
 .btn{display:inline-block;padding:11px 18px;border-radius:999px;font-weight:700;text-decoration:none;
 border:1px solid #2A3350;color:#E8ECF5;margin:4px 8px 4px 0}.btn.p{background:#B6F23A;color:#0B1020;border:0}
 h1{font-size:clamp(28px,5vw,44px);line-height:1.15;margin:34px 0 14px}h2{font-size:22px;margin:34px 0 8px}
-.lead{font-size:18px;color:#B7C0D6}ul{padding-left:20px}li{margin:6px 0}.card{background:#121A30;
+.lead{font-size:18px;color:#B7C0D6}ul,ol{padding-left:20px}li{margin:6px 0}.card{background:#121A30;
 border:1px solid #1F2945;border-radius:16px;padding:6px 22px 14px;margin:18px 0}
 .foot{color:#7F8AA6;font-size:13px;padding:34px 0 40px;border-top:1px solid #1F2945;margin-top:40px}
 .links a{margin-right:14px;display:inline-block}
@@ -229,8 +264,11 @@ def _foot():
 def _sections(sections):
     out = []
     for heading, items in sections:
-        lis = "".join(f"<li>{html.escape(i)}</li>" for i in items)
-        out.append(f'<div class="card"><h2>{html.escape(heading)}</h2><ul>{lis}</ul></div>')
+        steps = all(re.match(r"\d+\. ", i) for i in items)      # "1. …" items become a numbered list
+        tag = "ol" if steps else "ul"
+        texts = [re.sub(r"^\d+\. ", "", i) for i in items] if steps else items
+        lis = "".join(f"<li>{html.escape(t)}</li>" for t in texts)
+        out.append(f'<div class="card"><h2>{html.escape(heading)}</h2><{tag}>{lis}</{tag}></div>')
     return "".join(out)
 
 
