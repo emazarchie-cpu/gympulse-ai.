@@ -56,6 +56,7 @@ SERVICE_LEVEL = [   # (service, lowest support level that includes it)
 ]
 SERVICES = [x for x, _ in SERVICE_LEVEL]
 GRACE_OVER_LIMIT = 30          # days to upgrade after going over the plan's member limit
+HEADROOM = 0.10                # during those days, up to 10% more members can be added (same as the database)
 
 
 def _support_rank(level):
@@ -105,10 +106,7 @@ def plans(p):
     out = []
     for i, x in enumerate(raw):
         mo, yr = _num(x.get("monthly")), _num(x.get("yearly"))
-        try:
-            access = max(1, min(3, int(x.get("access") or min(i + 1, 3))))
-        except (TypeError, ValueError):
-            access = min(i + 1, 3)
+        access = 3                                # every plan includes every feature; price is by gym size
         who = gw._text(x.get("for_who")).strip()
         members = _int(x.get("members"))
         if members is None:                       # older saved plans: read "Up to 300 members"
@@ -419,15 +417,67 @@ def _set_over_since(gym_id, day):
         pass                                          # phase 20 not run yet: reminder still shows
 
 
-def can_add_members(supabase, gym_id):
-    """(ok, message): False once a gym has been over its member limit for longer than the grace period."""
+def billable_members(supabase, gym_id):
+    """Members that count towards a plan: active members plus anyone archived in the last 30 days, so a gym
+    can't archive most of its members, buy a smaller plan and bring them back."""
+    try:
+        n = supabase.rpc("gp_billable_members", {"p_gym": gym_id}).execute().data
+        if isinstance(n, list):
+            n = n[0] if n and not isinstance(n[0], dict) else (list(n[0].values())[0] if n else None)
+        if n is not None:
+            return int(n)
+    except Exception:
+        pass                                          # phase 38 not run yet
+    try:
+        return len(gw.fetch_members(supabase, gym_id, archived=False, include_photo=False)[0])
+    except Exception:
+        return 0
+
+
+def plan_fits(plan, members):
+    """A plan can be chosen only if it covers the gym's members (0 = no limit)."""
+    return not plan.get("members") or int(members) <= int(plan["members"])
+
+
+def member_room(supabase, gym_id, today=None):
+    """How many more active members the gym can add now, or None when there's no limit (trial, free, pilot).
+    Same rule as the database: up to the limit, plus 10% extra room for 30 days after first going over."""
+    today = today or gw.today_local()
+    lim = plan_limits(supabase, gym_id)
+    if lim["status"] != "active" or not lim["members"]:
+        return None
+    try:
+        n = len(gw.fetch_members(supabase, gym_id, archived=False, include_photo=False)[0])
+    except Exception:
+        return None
+    since = _d((subscription(supabase, gym_id) or {}).get("over_limit_since"))
+    in_grace = since is None or (today - since).days < GRACE_OVER_LIMIT
+    ceiling = lim["members"] + (max(int(-(-lim["members"] * HEADROOM // 1)), 1) if in_grace else 0)
+    return max(ceiling - n, 0)
+
+
+def limit_message(error=None, plan=None, limit=None):
+    """Plain words for the database's GP_MEMBER_LIMIT refusal."""
+    m = re.search(r"up to (\d+) members", str(error or ""))
+    limit = limit or (int(m.group(1)) if m else None)
+    return ((f"Your {plan + ' ' if plan else ''}plan covers up to {limit:,} members. " if limit else
+             "This would take you past your plan's member limit. ")
+            + "Upgrade your plan in Subscription to add more members.")
+
+
+def can_add_members(supabase, gym_id, adding=1):
+    """(ok, message): whether `adding` new members fit the gym's plan right now."""
     if is_admin_account():
         return True, ""
-    m = member_limit_status(supabase, gym_id)
-    if m and m["blocked"]:
-        return False, (f"Your {m['plan']} plan covers up to {m['limit']:,} members and you have {m['members']:,}. "
+    room = member_room(supabase, gym_id)
+    if room is None or adding <= room:
+        return True, ""
+    lim = plan_limits(supabase, gym_id)
+    if room <= 0:
+        return False, (f"Your {lim['plan']} plan covers up to {lim['members']:,} members and you're at the limit. "
                        "Upgrade your plan to add new members. Everything else keeps working.")
-    return True, ""
+    return False, (f"Your {lim['plan']} plan covers up to {lim['members']:,} members, so you can add "
+                   f"{room:,} more right now, not {adding:,}. Upgrade your plan to add them all.")
 
 
 def render_limit_banner(supabase, gym_id):
@@ -706,15 +756,41 @@ def activate(sc, gym_id, plan_name, period, months, amount, note):
     start = base if base == today else base + timedelta(days=1)
     until = base + timedelta(days=365 if period == "yearly" else 30 * int(months or 1))
     label = "Yearly" if period == "yearly" else ("Monthly" if int(months or 1) == 1 else f"{months} months")
-    sc.table("gym_subscriptions").upsert({
-        "gym_id": gym_id, "status": "active", "paid_until": until.isoformat(), "plan": f"{plan_name} · {label}",
-        "price": round(float(amount) / (12 if period == "yearly" else int(months or 1)), 2), "note": note,
-        "updated_at": datetime.now(timezone.utc).isoformat()}, on_conflict="gym_id").execute()
+    row = {"gym_id": gym_id, "status": "active", "paid_until": until.isoformat(), "plan": f"{plan_name} · {label}",
+           "price": round(float(amount) / (12 if period == "yearly" else int(months or 1)), 2), "note": note,
+           "updated_at": datetime.now(timezone.utc).isoformat()}
+    row.update(_limit_fields(sc, gym_id, plan_name))
+    try:
+        sc.table("gym_subscriptions").upsert(row, on_conflict="gym_id").execute()
+    except Exception:                                  # phase 38 not run yet
+        sc.table("gym_subscriptions").upsert({k: v for k, v in row.items() if k != "member_limit"},
+                                             on_conflict="gym_id").execute()
     try:
         st.session_state.pop("_cache", None)
     except Exception:
         pass
     return start, until
+
+
+def _limit_fields(sc, gym_id, plan_name):
+    """member_limit for the database, and when the gym already has more members than the plan covers (e.g. a
+    payment that went through for a plan that's too small), no 30 days of grace: adding is blocked at once."""
+    try:
+        rows = sc.table("platform_settings").select("value").eq("key", "pricing").limit(1).execute().data
+        p = {**DEFAULT_PRICING, **(rows[0]["value"] if rows else {})}
+    except Exception:
+        p = dict(DEFAULT_PRICING)
+    plan = next((x for x in plans(p) if x["name"].lower() == gw._text(plan_name).split(" · ")[0].strip().lower()), None)
+    if not plan or not plan.get("members"):
+        return {"member_limit": None}
+    out = {"member_limit": int(plan["members"])}
+    n = billable_members(sc, gym_id)
+    if n > plan["members"]:
+        out["over_limit_since"] = (gw.today_local() - timedelta(days=GRACE_OVER_LIMIT)).isoformat()
+        _email_founder(f"Plan too small for gym {gym_id}",
+                       f"Gym {gym_id} paid for {plan['name']} (up to {plan['members']:,} members) but has {n:,} "
+                       "members. Adding members is blocked until they upgrade. Check it in Admin → Billing.")
+    return out
 
 
 def apply_payment(reference, sc=None):
@@ -997,10 +1073,7 @@ def _render_plans(supabase, gym_id, s, p, ps):
         st.success("Your gym has free access to GymPulse AI. Nothing to pay.")
     else:
         st.markdown('<div class="section-label">CHOOSE A PLAN</div>', unsafe_allow_html=True)
-        try:
-            n_members = len(gw.fetch_members(supabase, gym_id, archived=False, include_photo=False)[0])
-        except Exception:
-            n_members = 0
+        n_members = billable_members(supabase, gym_id)
         best = fits(ps, n_members) if n_members else None
         if best:
             st.caption(f"You have **{n_members:,} members**, so **{best['name']}** fits your gym. Every plan includes "
@@ -1028,10 +1101,13 @@ def _render_plans(supabase, gym_id, s, p, ps):
                                 unsafe_allow_html=True)
                 gw._md("<div style='font-size:13px;line-height:1.7;margin:4px 0 10px'>"
                        + "".join(f"<div>✓ {gw._esc(x)}</div>" for x in plan_lines(plan)) + "</div>")
-                st.button(f"Choose {plan['name']}", key=f"co_choose_{i}", use_container_width=True,
+                small = not plan_fits(plan, n_members)
+                st.button(f"Choose {plan['name']}", key=f"co_choose_{i}", use_container_width=True, disabled=small,
                           type="primary" if (best and plan["name"] == best["name"]) or (not best and plan.get("popular"))
                           else "secondary",
                           on_click=_view, args=("checkout",), kwargs={"sub_plan": plan["name"], "sub_period": "monthly"})
+                if small:
+                    st.caption(f"Too small for your {n_members:,} members")
         with st.expander("Compare what each plan includes"):
             gw._md(compare_table_html(ps, light=st.session_state.get("theme") == "light"))
         if p.get("note"):
@@ -1066,6 +1142,13 @@ def _render_checkout(supabase, gym_id, plan, period, s, p, ps):
     st.button("Back to plans", icon=":material/arrow_back:", type="tertiary", key="co_back",
               on_click=_view, args=("plans",))
     gw.page_header("Checkout", f"GymPulse AI {plan['name']}. Secure payment, receipt by email.", "Subscription")
+    n_members = billable_members(supabase, gym_id)
+    if not plan_fits(plan, n_members):
+        best = fits(ps, n_members)
+        st.error(f"The {plan['name']} plan covers up to {plan['members']:,} members and your gym has "
+                 f"{n_members:,} (members archived in the last 30 days count too)."
+                 + (f" **{best['name']}** fits your gym." if best and plan_fits(best, n_members) else ""))
+        return
     flash = st.session_state.pop("bill_flash", None)
     if flash:
         st.warning(flash)
@@ -1216,9 +1299,14 @@ def _render_transfer(supabase, gym_id, plan, period, s, p, ps):
 
 # ------------------------------------------------------------------ admin
 def admin_set(sc, gym_id, **fields):
-    sc.table("gym_subscriptions").upsert({"gym_id": gym_id, **fields,
-                                         "updated_at": datetime.now(timezone.utc).isoformat()},
-                                        on_conflict="gym_id").execute()
+    if fields.get("plan") and "member_limit" not in fields:
+        fields["member_limit"] = _limit_fields(sc, gym_id, fields["plan"]).get("member_limit")
+    row = {"gym_id": gym_id, **fields, "updated_at": datetime.now(timezone.utc).isoformat()}
+    try:
+        sc.table("gym_subscriptions").upsert(row, on_conflict="gym_id").execute()
+    except Exception:                                  # phase 38 not run yet
+        sc.table("gym_subscriptions").upsert({k: v for k, v in row.items() if k != "member_limit"},
+                                             on_conflict="gym_id").execute()
     st.session_state.pop("_cache", None)
 
 

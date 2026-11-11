@@ -99,7 +99,10 @@ def render_public(supabase, code):
                     except Exception as error:
                         rows, problem = [], str(error)
                 r = rows[0] if isinstance(rows, list) and rows else None
-                if not r or r.get("status") not in ("created", "exists"):
+                if "GP_MEMBER_LIMIT" in problem:       # the gym's plan is full: not the member's fault
+                    st.warning("The gym can't take new sign-ups online right now. Please see the front desk "
+                               "and they'll add you.")
+                elif not r or r.get("status") not in ("created", "exists"):
                     import gympulse_monitoring as gmon
                     gmon.capture(RuntimeError(f"member sign-up link failed: {problem or rows}"), "member sign-up")
                     st.error("Sorry, your details couldn't be saved. Please try again, or ask the front desk."

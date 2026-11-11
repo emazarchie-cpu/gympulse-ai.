@@ -654,6 +654,12 @@ def _import(supabase, gym_id, hm):
         st.warning("Choose which HMO this list is from.")
         return
     new = sum(1 for r in rows if not r["id"])
+    import gympulse_billing as gbill
+    ok, why = gbill.can_add_members(supabase, gym_id, adding=new) if new else (True, "")
+    if not ok:
+        st.error(why + f" This list has {new:,} new member{'s' if new != 1 else ''}. Members already in "
+                 "GymPulse can still be marked as HMO members: remove the new ones from the file, or upgrade.")
+        return
     found = [lbl for k, lbl in (("plan", "plan"), ("limit", "sessions per week"), ("valid", "cover end date"))
              if cols.get(k)]
     st.write(f"**{len(rows)}** HMO members found: **{len(rows) - new}** already in GymPulse, **{new}** new."
