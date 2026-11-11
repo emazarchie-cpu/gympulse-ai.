@@ -122,9 +122,9 @@ PAGES = [
     },
     {
         "slug": "switch-from-gymmaster-or-excel",
-        "title": "Moving from GymMaster or Excel · GymPulse AI",
-        "description": "Bring your gym members, visit history and photos into GymPulse AI from "
-                       "GymMaster, Excel or any gym software in minutes.",
+        "title": "GymMaster alternative for Nigerian gyms · GymPulse AI",
+        "description": "Switching from GymMaster or Excel? Bring members, visit history and photos into "
+                       "GymPulse AI in minutes. Run both side by side, with no new hardware.",
         "h1": "Moving your gym from GymMaster, Excel or other software",
         "lead": "Export your members and visits as a spreadsheet, upload them, and GymPulse AI starts "
                 "scoring your members the same day.",
@@ -144,6 +144,14 @@ PAGES = [
                 "Visit history, so risk scores are accurate from day one",
                 "Member photos, matched by member ID from a ZIP file",
                 "Thousands of members at once",
+            ]),
+            ("Switching without a gap", [
+                "Run GymMaster and GymPulse AI side by side while your team gets used to it",
+                "Import a fresh export again before you fully switch: members already in GymPulse AI are "
+                "updated, not added twice",
+                "No new door hardware: members check in with a QR code at the front desk or in the member app",
+                "Members get a private link to their own page: no app store download needed",
+                "Payments are recorded in naira, by cash, transfer or POS, so your records continue as before",
             ]),
             ("What you get on top", [
                 "A daily list of members at risk of leaving, with the reason",
