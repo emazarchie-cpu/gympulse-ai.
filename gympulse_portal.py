@@ -720,8 +720,6 @@ def render_portal(supabase, token):
             _messages(sc, m, gym_name)
         with tabs[4]:
             _details(sc, m, gym_name)
-            import gympulse_waiver as gwv
-            gwv.render_status(sc, m["gym_id"], m["id"], gym_name, for_member=True)
 
 
 def _activity(sc, m):
@@ -1116,56 +1114,154 @@ def _messages(sc, m, gym_name):
         _send_msg(sc, m, gym_name, text)
 
 
+ME_CSS = """
+<style>
+.mp2-me { background: var(--mp-s1); border: 1px solid var(--mp-line); border-radius: 24px; padding: 20px; margin-bottom: 12px;
+  display: flex; gap: 16px; align-items: center; }
+.mp2-me .ring { width: 76px; height: 76px; border-radius: 50%; padding: 3px; background: var(--mp-grad); flex: 0 0 auto; }
+.mp2-me .ring img, .mp2-me .ring div { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; background: var(--mp-s2);
+  display: grid; place-items: center; font: 700 28px var(--mp-display); color: var(--mp-acc); }
+.mp2-me h3 { margin: 0 !important; padding: 0 !important; font-family: var(--mp-display) !important; font-size: 22px !important;
+  color: var(--mp-text) !important; line-height: 1.2 !important; }
+.mp2-me .sub { color: var(--mp-muted); font-size: 13px; margin-top: 3px; }
+.mp2-me .chip { display: inline-block; margin-top: 8px; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700;
+  background: rgba(183,243,74,.12); color: var(--mp-acc); border: 1px solid rgba(183,243,74,.28); }
+.mp2-plan { border-radius: 22px; padding: 16px 18px; margin-bottom: 12px; background: var(--mp-s2); border: 1px solid var(--mp-line);
+  display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; }
+.mp2-plan .k { color: var(--mp-muted); font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; font-weight: 700; }
+.mp2-plan b { font-family: var(--mp-display); font-size: 19px; color: var(--mp-text); }
+.mp2-plan .pill { justify-self: end; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+.mp2-plan .ok { background: rgba(183,243,74,.14); color: #B7F34A; } .mp2-plan .warn { background: rgba(255,196,77,.14); color: #FFC44D; }
+.mp2-plan .bad { background: rgba(255,107,107,.14); color: #FF6B6B; } .mp2-plan .none { background: rgba(147,161,184,.14); color: #93A1B8; }
+.mp2-plan .row2 { grid-column: 1 / -1; display: flex; justify-content: space-between; color: var(--mp-muted); font-size: 13px;
+  border-top: 1px solid var(--mp-line); padding-top: 10px; margin-top: 8px; }
+.mp2-plan .row2 code { font-family: Menlo, Consolas, monospace; color: var(--mp-text); letter-spacing: 2px; background: none; }
+/* settings rows: each expander looks like a row in a grouped list */
+.st-key-mp2_rows [data-testid="stExpander"] { margin: 0 !important; }
+html body .stApp .st-key-mp2_rows [data-testid="stExpander"] details { background: var(--mp-s1) !important; border: 0 !important;
+  border-radius: 0 !important; border-bottom: 1px solid var(--mp-line) !important; }
+html body .stApp .st-key-mp2_rows { background: var(--mp-s1); border: 1px solid var(--mp-line); border-radius: 20px; overflow: hidden;
+  gap: 0 !important; margin-bottom: 14px; }
+html body .stApp .st-key-mp2_rows [data-testid="stExpander"]:last-child details { border-bottom: 0 !important; }
+html body .stApp .st-key-mp2_rows summary { padding: 14px 16px !important; background: transparent !important; }
+html body .stApp .st-key-mp2_rows summary p { color: var(--mp-text) !important; font-weight: 600 !important; font-size: 15px !important; }
+html body .stApp .st-key-mp2_rows summary [data-testid="stIconMaterial"], html body .stApp .st-key-mp2_rows summary span[role="img"] {
+  color: var(--mp-acc) !important; }
+html body .stApp .st-key-mp2_rows [data-testid="stExpanderDetails"] p, html body .stApp .st-key-mp2_rows label p { color: var(--mp-text) !important; }
+html body .stApp .st-key-mp2_rows [data-testid="stCaptionContainer"] p { color: var(--mp-muted) !important; }
+html body .stApp .st-key-mp2_rows summary [translate="no"] { color: #B7F34A !important; }
+html body .stApp .st-key-mp2_rows input, html body .stApp .st-key-mp2_rows textarea {
+  color: var(--mp-text) !important; -webkit-text-fill-color: var(--mp-text) !important; }
+html body .stApp .st-key-mp2_rows input::placeholder { color: var(--mp-dim) !important; -webkit-text-fill-color: var(--mp-dim) !important; }
+html body .stApp .st-key-mp2_logout button { background: transparent !important; border: 1px solid rgba(255,107,107,.45) !important;
+  box-shadow: none !important; }
+html body .stApp .st-key-mp2_logout button p { color: #FF8A8A !important; font-weight: 700 !important; }
+</style>
+"""
+
+
 def _details(sc, m, gym_name):
-    with st.form("mp_details"):
-        phone = st.text_input("Phone (WhatsApp)", value=gw._text(m.get("phone")))
-        email = st.text_input("Email", value=gw._text(m.get("email")))
-        goal_now = gw._text(m.get("fitness_goal"))
-        goals = GOALS if goal_now in GOALS or not goal_now else [goal_now] + GOALS
-        goal = st.selectbox("Main goal", goals, index=goals.index(goal_now) if goal_now in goals else 2)
-        photo = st.file_uploader("New photo (optional)", type=["jpg", "jpeg", "png", "webp", "heic", "heif"])
-        save = st.form_submit_button("Save", type="primary", use_container_width=True)
-    if save:
-        upd = {"phone": phone.strip() or None, "fitness_goal": goal}
-        e = email.strip().lower()
-        if e and "@" not in e:
-            st.error("That email doesn't look right.")
-            return
-        upd["email"] = e or None
-        if photo is not None:
-            try:
-                upd["photo"] = gw.process_photo(photo.getvalue())
-            except Exception:
-                st.error("That photo couldn't be read. Try a JPG or PNG.")
-                return
-        sc.table("members").update(upd).eq("id", m["id"]).eq("gym_id", m["gym_id"]).execute()
-        st.session_state["mp_flash"] = "Your details are saved."
-        st.rerun()
-    st.divider()
-    _password_box(sc, m)
-    st.divider()
-    if st.button("Log out", key="mp_logout", icon=":material/logout:"):
-        st.query_params.clear()
-        st.rerun()
-    st.markdown("**Your private link**")
-    st.caption("Lost your phone, or shared the link by mistake? Get a new one: older links stop working.")
-    if st.button("Get a new link", key="mp_rotate"):
-        new = str(uuid.uuid4())
-        sc.table("members").update({"portal_token": new}).eq("id", m["id"]).execute()
-        used = send_link(sc, {**m, "portal_token": new}, gym_name, force=True)
-        st.session_state["mp_flash"] = ("Done: older links no longer work. This page now uses your new link"
-                                        + (", and we've sent it to you by " + " and ".join(used) if used else "")
-                                        + ". Save it (Add to Home Screen) so you don't lose it.")
-        st.query_params["me"] = new
-        st.rerun()
+    import gympulse_grow as gg
+    import gympulse_waiver as gwv
+    st.markdown(MP_CSS % {"acc": _accent(None)}, unsafe_allow_html=True)
+    st.markdown(ME_CSS, unsafe_allow_html=True)
+    today = gw.today_local()
+    first = gw._esc(_first(m.get("full_name")))
+
+    # 1 · who you are
+    since = pd.to_datetime(m.get("member_since") or m.get("created_at"), errors="coerce", utc=True)
+    since_txt = "" if pd.isna(since) else f" since {since.tz_convert(gw.APP_TZ):%b %Y}"
+    photo = m.get("photo") if gw.has_photo(m.get("photo")) else None
+    pic = f'<img src="{photo}" alt="">' if photo else f'<div>{first[:1]}</div>'
+    goal = gw._text(m.get("fitness_goal"))
+    gw._md(f'<div class="mp2-me"><div class="ring">{pic}</div><div><h3>{gw._esc(m.get("full_name"))}</h3>'
+           f'<div class="sub">Member at {gw._esc(gym_name)}{since_txt}</div>'
+           + (f'<span class="chip">Goal: {gw._esc(goal)}</span>' if goal else "") + '</div></div>')
+
+    # 2 · membership
+    act = _activity(sc, m)
+    end = pd.to_datetime(m.get("membership_end"), errors="coerce")
+    end = None if pd.isna(end) else end.date()
+    label, cls, left = status_of(end, today)
+    plan, _amount = gg.plan_price({**act, **m}) if act else ("Monthly", 0.0)
+    plan_txt = gw._text(m.get("plan_name")) or (gw.plan_phrase(plan).capitalize() + " plan")
+    pill = {"mp-ok": "ok", "mp-warn": "warn", "mp-bad": "bad"}.get(cls, "none")
+    gw._md(f'<div class="mp2-plan"><span class="k">Membership</span><span class="pill {pill}">{gw._esc(label)}</span>'
+           f'<b>{gw._esc(plan_txt)}</b><span></span>'
+           f'<div class="row2"><span>{("Ended " if left is not None and left < 0 else "Renews ") + f"{end:%d %b %Y}" if end else "No end date yet"}</span>'
+           f'<span>Code <code>{gw.member_code(m["id"])}</code></span></div></div>')
+
+    # 3 · numbers
+    _at, days = _visit_days(sc, m)
+    vs = visit_stats(days, today)
+    months = "–" if pd.isna(since) else max(1, (today.year - since.year) * 12 + today.month - since.month)
+    gw._md('<div class="mp2-mini">'
+           f'<div><b>{vs["total"]}</b><span>visits in total</span></div>'
+           f'<div><b>{vs["streak"]} wk</b><span>in a row</span></div>'
+           f'<div><b>{months}</b><span>month{"s" if months != 1 else ""} with us</span></div></div>')
+
+    # 4 · settings, as rows
+    gw._md('<div class="mp2-cap">Account</div>')
+    with st.container(key="mp2_rows"):
+        with st.expander("Personal details", icon=":material/badge:"):
+            with st.form("mp_details", border=False):
+                phone = st.text_input("Phone (WhatsApp)", value=gw._text(m.get("phone")))
+                email = st.text_input("Email", value=gw._text(m.get("email")))
+                goal_now = gw._text(m.get("fitness_goal"))
+                goals = GOALS if goal_now in GOALS or not goal_now else [goal_now] + GOALS
+                goal_pick = st.selectbox("Main goal", goals, index=goals.index(goal_now) if goal_now in goals else 2)
+                save = st.form_submit_button("Save details", type="primary", use_container_width=True)
+            if save:
+                e = email.strip().lower()
+                if e and "@" not in e:
+                    st.error("That email doesn't look right.")
+                else:
+                    sc.table("members").update({"phone": phone.strip() or None, "fitness_goal": goal_pick,
+                                                "email": e or None}).eq("id", m["id"]).eq("gym_id", m["gym_id"]).execute()
+                    st.session_state["mp_flash"] = "Your details are saved."
+                    st.rerun()
+        with st.expander("Profile photo", icon=":material/photo_camera:"):
+            with st.form("mp_photo", border=False):
+                photo_up = st.file_uploader("Choose a photo", type=["jpg", "jpeg", "png", "webp", "heic", "heif"])
+                save_p = st.form_submit_button("Save photo", type="primary", use_container_width=True)
+            if save_p and photo_up is not None:
+                try:
+                    sc.table("members").update({"photo": gw.process_photo(photo_up.getvalue())}) \
+                        .eq("id", m["id"]).eq("gym_id", m["gym_id"]).execute()
+                    st.session_state["mp_flash"] = "Your photo is saved."
+                    st.rerun()
+                except Exception as error:
+                    if type(error).__name__ in ("RerunException", "StopException"):
+                        raise
+                    st.error("That photo couldn't be read. Try a JPG or PNG.")
+        with st.expander("Password", icon=":material/lock:"):
+            _password_box(sc, m)
+        signed = gwv.latest(sc, m["id"])
+        with st.expander("Membership agreement" + (" · signed ✓" if signed else " · not signed yet"),
+                         icon=":material/contract:"):
+            gwv.render_status(sc, m["gym_id"], m["id"], gym_name, for_member=True)
+        with st.expander("Private link", icon=":material/link:"):
+            st.caption("Lost your phone, or shared your link by mistake? Get a new one: older links stop working.")
+            if st.button("Get a new link", key="mp_rotate", use_container_width=True):
+                new = str(uuid.uuid4())
+                sc.table("members").update({"portal_token": new}).eq("id", m["id"]).execute()
+                used = send_link(sc, {**m, "portal_token": new}, gym_name, force=True)
+                st.session_state["mp_flash"] = ("Done: older links no longer work. This page now uses your new link"
+                                                + (", and we've sent it to you by " + " and ".join(used) if used else "")
+                                                + ". Save it (Add to Home Screen) so you don't lose it.")
+                st.query_params["me"] = new
+                st.rerun()
+    with st.container(key="mp2_logout"):
+        if st.button("Log out", key="mp_logout", icon=":material/logout:", use_container_width=True):
+            st.query_params.clear()
+            st.rerun()
 
 
 def _password_box(sc, m):
     """Set (first time) or change the password used to sign in with email and password."""
     has = has_password(sc, m["id"])
-    st.markdown("**Change your password**" if has else "**Set a password**")
     if not gw._text(m.get("email")).strip():
-        st.caption("Add your email above first: you sign in with your email and password.")
+        st.caption("Add your email in Personal details first: you sign in with your email and password.")
         return
     if not has:
         st.caption("Set one so next time you can sign in with your email and password, without waiting for a "
