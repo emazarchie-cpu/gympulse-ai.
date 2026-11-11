@@ -217,7 +217,7 @@ def build(sc, gym_id, rng):
                     "monthly_fee": round(PRICES[p["plan"]] / (DAYS[p["plan"]] / 30)),
                     "days_since_last_visit": (TODAY - days[-1]).days if days else 60,
                     "visits_last_30_days": last30, "visits_previous_30_days": prev30,
-                    "renewal_due_days": (p["end"] - TODAY).days,
+                    "renewal_due_days": min(max((p["end"] - TODAY).days, 0), 730),   # the database allows 0-730
                     "pt_sessions_attended": rng.choice([0, 0, 1, 2, 4]),
                     "updated_at": datetime.now(timezone.utc).isoformat()})
     log(f"  visits: {len(try_insert(sc, 'checkins', ck))}")
