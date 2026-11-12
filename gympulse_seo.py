@@ -29,9 +29,44 @@ INDEXNOW_URL = "https://api.indexnow.org/indexnow"
 GOOGLE_VERIFY = os.environ.get("GOOGLE_SITE_VERIFICATION", "").strip()
 NAME = "GymPulse AI"
 TITLE = "GymPulse AI · Member retention platform for Nigerian gyms"
-DESCRIPTION = ("GymPulse AI shows Nigerian gym owners which members are about to stop coming, then "
-               "brings them back with WhatsApp and email renewals, follow-up calls and referrals. "
-               "Check-ins, payments and a member app included. 30-day free trial.")
+DESCRIPTION = ("GymPulse AI is a member retention platform for Nigerian gyms. It works alongside GymMaster or "
+               "the gym software you already use, shows which members are about to stop coming, and brings "
+               "them back with WhatsApp and email renewals and follow-up calls. 30-day free trial.")
+
+# Plain answers to what gym owners (and search engines' AI answers) ask most. Shown in the homepage text and on
+# the GymMaster page, and sent as FAQ structured data.
+FAQ = [
+    ("Does GymPulse AI work alongside GymMaster?",
+     "Yes. GymPulse AI is built to run side by side with GymMaster. You keep GymMaster for your doors, front "
+     "desk and billing. Paste your GymPulse AI link into GymMaster's Webhook Manager (Settings → Integrations) "
+     "and every check-in in GymMaster comes across to GymPulse AI as it happens, with no double entry. Your member "
+     "list comes from a GymMaster export: upload a fresh one now and then (weekly is enough) and new members and "
+     "renewals are added without duplicates."),
+    ("Is GymPulse AI a replacement for GymMaster?",
+     "No. GymPulse AI is a member retention platform, not gym management software. It doesn't replace GymMaster, "
+     "your door access or your billing. It adds what they don't do: a daily list of members who are about to "
+     "stop coming, the reason, and WhatsApp and email follow-ups to bring them back."),
+    ("Do my staff have to enter anything twice?",
+     "No. Check-ins come from GymMaster automatically and members come from your export. Your staff keep working "
+     "in GymMaster exactly as they do today."),
+    ("What if my gym uses other software, or Excel?",
+     "GymPulse AI works with any software that can export a spreadsheet, such as Mindbody, Glofox, Excel or Google "
+     "Sheets. Gyms with no software can use GymPulse AI's own QR check-in."),
+    ("What does GymPulse AI cost?",
+     "Plans are priced by gym size, in naira, with every feature on every plan and a 30-day free trial. Chains get "
+     "up to 20% off each branch."),
+]
+
+
+def _faq_ld(faq):
+    return {"@context": "https://schema.org", "@type": "FAQPage",
+            "mainEntity": [{"@type": "Question", "name": q,
+                            "acceptedAnswer": {"@type": "Answer", "text": a}} for q, a in faq]}
+
+
+def _faq_html(faq):
+    items = "".join(f"<h3>{html.escape(q)}</h3><p>{html.escape(a)}</p>" for q, a in faq)
+    return f'<div class="card"><h2>Questions gym owners ask</h2>{items}</div>'
 COMPANY = {"legal": "GYMPULSE AI LTD", "rc": "RC 9996401",
            "city": "Calabar", "state": "Cross River State",
            "email": "hello@usegympulseai.com", "founder_email": "emmanuel@usegympulseai.com"}
@@ -129,6 +164,7 @@ PAGES = [
     },
     {
         "slug": "switch-from-gymmaster-or-excel",
+        "faq": FAQ[:4],
         "title": "Works with GymMaster: member retention for Nigerian gyms · GymPulse AI",
         "description": "Use GymMaster? Keep it. GymPulse AI connects to GymMaster and adds member "
                        "retention on top. On Excel? Bring members, visits and photos across in minutes.",
@@ -136,10 +172,11 @@ PAGES = [
         "lead": "Keep running your gym in GymMaster. GymPulse AI connects to it, or to your spreadsheet "
                 "export, and starts finding the members you're about to lose the same day.",
         "sections": [
-            ("Connected to GymMaster", [
+            ("Runs side by side with GymMaster: not a replacement", [
                 "Keep GymMaster for your doors, front desk and billing: nothing changes for your staff",
-                "Add the GymPulse AI link in GymMaster's webhook settings, and new check-ins come across "
-                "as they happen",
+                "Paste your GymPulse AI link into GymMaster's Webhook Manager (Settings → Integrations), and "
+                "every check-in comes across as it happens, with no double entry",
+                "Upload a fresh GymMaster export now and then (weekly is enough) to add new members and renewals",
                 "GymPulse AI adds what GymMaster doesn't: a daily list of members at risk, WhatsApp "
                 "follow-ups and win-backs",
             ]),
@@ -228,7 +265,7 @@ def _ld_json():
         "publisher": {"@type": "Organization", "name": COMPANY["legal"]},
     }
     return "".join(f'<script type="application/ld+json">{json.dumps(x, ensure_ascii=False)}</script>'
-                   for x in (org, app))
+                   for x in (org, app, _faq_ld(FAQ)))
 
 
 def head_tags():
@@ -309,6 +346,9 @@ def _cta():
 def page_html(p):
     e = html.escape
     url = f"{SITE}/{p['slug']}.html"
+    faq = _faq_html(p["faq"]) if p.get("faq") else ""
+    ld = (f'<script type="application/ld+json">{json.dumps(_faq_ld(p["faq"]), ensure_ascii=False)}</script>'
+          if p.get("faq") else "")
     return f"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{e(p['title'])}</title><meta name="description" content="{e(p['description'])}">
@@ -317,8 +357,8 @@ def page_html(p):
 <meta property="og:description" content="{e(p['description'])}"><meta property="og:url" content="{url}">
 <meta property="og:image" content="{SITE}/apple-touch-icon.png"><meta name="theme-color" content="#0B1020">
 <link rel="icon" href="/favicon.ico" sizes="48x48"><link rel="icon" type="image/png" sizes="192x192" href="/gympulse-icon-v4-192.png"><link rel="apple-touch-icon" sizes="180x180" href="/gympulse-touch-v4.png">
-<style>{CSS}</style></head><body><div class="w">{_nav()}
-<h1>{e(p['h1'])}</h1><p class="lead">{e(p['lead'])}</p>{_sections(p['sections'])}{_cta()}{_foot()}
+<style>{CSS}</style>{ld}</head><body><div class="w">{_nav()}
+<h1>{e(p['h1'])}</h1><p class="lead">{e(p['lead'])}</p>{_sections(p['sections'])}{faq}{_cta()}{_foot()}
 </div></body></html>"""
 
 
@@ -335,23 +375,36 @@ def prerender():
             "Follow-up calls when a member doesn't reply",
             "Bring-a-friend referrals with automatic rewards",
         ]),
-        ("Run the gym", [
-            "QR check-in, including HMO and corporate members",
-            "Payments, renewals and receipts in naira; staff logins",
-            "A member app: workouts, progress, classes and how busy the gym is now",
-            "Import from GymMaster, Excel or any software",
+        ("Works alongside GymMaster and the software you already use", [
+            "Keep GymMaster for your doors, front desk and billing: GymPulse AI runs side by side with it",
+            "Every GymMaster check-in comes across to GymPulse AI as it happens, through GymMaster's Webhook "
+            "Manager: no double entry",
+            "Members come from a GymMaster, Mindbody, Glofox or Excel export; re-upload weekly to add new members",
+            "No software yet? Use GymPulse AI's own QR check-in, including HMO and corporate members",
         ]),
     ])
     # the style sits inside #root too, so it disappears with the text when the app takes over
     body = (f'<div id="gp-pre"><style>{CSS}</style>'
             f'<div class="w">{_nav()}<h1>Keep more gym members. Keep more revenue.</h1>'
-            f'<p class="lead">{html.escape(DESCRIPTION)}</p>{feats}{_cta()}{_foot()}</div></div>'
+            f'<p class="lead">{html.escape(DESCRIPTION)}</p>{feats}{_faq_html(FAQ)}{_cta()}{_foot()}</div></div>'
             # app links (member portal, HMO check-in, machine guides…) never show this
             # People never see it: the app's own landing page (same words) loads a moment later, so it
             # stays hidden for browsers and is only read by search engines and link previews.
             '<script>if(location.search||!/bot|crawl|spider|slurp|preview|facebookexternalhit|lighthouse/i'
             '.test(navigator.userAgent))document.getElementById("gp-pre").style.display="none"</script>')
     return ROOT_START + body + ROOT_END
+
+
+def llms_txt():
+    """A plain summary for AI assistants and answer engines (llmstxt.org format)."""
+    lines = [f"# {NAME}", "", f"> {DESCRIPTION}", "",
+             f"{NAME} ({COMPANY['legal']}, {COMPANY['rc']}, {COMPANY['city']}, {COMPANY['state']}, Nigeria) is a "
+             "member retention platform for gyms. It is not gym management software and does not replace "
+             "GymMaster or other gym software: it runs alongside them.", "", "## Questions", ""]
+    lines += [f"- **{q}** {a}" for q, a in FAQ]
+    lines += ["", "## Pages", "", f"- [Home]({SITE}/)"]
+    lines += [f"- [{p['h1']}]({SITE}/{p['slug']}.html): {p['description']}" for p in PAGES]
+    return "\n".join(lines) + "\n"
 
 
 def robots_txt():
@@ -387,7 +440,8 @@ def apply_index(index_html):
 def write_static(static_dir, ping=True):
     """robots.txt, sitemap.xml, the IndexNow key file and the topic pages, served from the app's own web root.
     Topic pages that changed are sent to IndexNow (on the live server only)."""
-    files = {"robots.txt": robots_txt(), "sitemap.xml": sitemap_xml(), f"{INDEXNOW_KEY}.txt": INDEXNOW_KEY}
+    files = {"robots.txt": robots_txt(), "sitemap.xml": sitemap_xml(), f"{INDEXNOW_KEY}.txt": INDEXNOW_KEY,
+             "llms.txt": llms_txt()}
     for p in PAGES:
         files[p["slug"] + ".html"] = page_html(p)
     n, changed = 0, []
