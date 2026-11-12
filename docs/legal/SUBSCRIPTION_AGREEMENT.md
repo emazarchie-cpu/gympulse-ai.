@@ -1,4 +1,4 @@
-**Version 1.0. Effective 11 November 2026.**
+**Version 1.1. Effective 12 November 2026.**
 
 # Subscription Agreement
 
@@ -6,7 +6,7 @@
 
 **BETWEEN**
 
-**GYMPULSE AI LTD**, a private limited company incorporated in Nigeria under the Companies and Allied Matters Act 2020 with registration number RC 9996401, whose office is in Calabar, Cross River State, Nigeria ("the Company", "GymPulse AI", "we", "us"), of the one part;
+**GYMPULSE AI LTD**, a private company limited by shares incorporated in Nigeria under the Companies and Allied Matters Act 2020 with registration number RC 9996401, whose registered office is in Calabar, Cross River State, Nigeria (at the address recorded with the Corporate Affairs Commission) ("the Company", "GymPulse AI", "we", "us"), of the one part;
 
 **AND**
 
@@ -16,7 +16,7 @@ The Company and the Subscriber are each a "Party" and together the "Parties".
 
 ## Background
 **WHEREAS:**
-A. The Company owns and operates GymPulse AI, online software that helps gyms manage and keep their members.
+A. The Company owns and operates GymPulse AI, an online member retention platform that helps gyms keep their members, and that can run alongside the Subscriber's other gym software.
 B. The Subscriber wishes to use GymPulse AI for its business, after a free trial, on a paid subscription.
 C. The Parties wish to record the terms on which the Company provides, and the Subscriber pays for, GymPulse AI.
 
@@ -35,7 +35,7 @@ In this Agreement:
 ## 2. Commencement and term
 2.1 This Agreement takes effect on the date the Subscriber signs it, which is at the Subscriber's first payment after its free trial.
 2.2 It is a **month-to-month subscription with no fixed term and no yearly commitment**. It continues for as long as the Subscriber keeps paying, and the Subscriber does not need to sign again for each payment.
-2.3 New Subscribers receive a 30-day free trial (or a pilot period agreed in writing) without charge or obligation.
+2.3 Each gym owner receives one 30-day free trial (or a pilot period agreed in writing) without charge or obligation. A branch added during the trial shares it; a branch added after the owner has paid for a branch has 7 days to set up before it needs a Plan; otherwise a new branch needs a Plan before it can be used.
 
 ## 3. The Service
 3.1 The Company grants the Subscriber a non-exclusive, non-transferable right to use the Service for the Subscriber's own business during each paid Subscription Period.
@@ -47,10 +47,11 @@ In this Agreement:
 ## 4. Plans and member limits
 4.1 The Subscriber shall choose a Plan that covers all its Members. A Plan covering fewer Members than the Subscriber has cannot be chosen.
 4.2 If the Subscriber grows past its Plan, it has 30 days to move to the correct Plan, during which it may add up to 10% more Members. After that, new Members cannot be added until it upgrades; everything else keeps working.
-4.3 The Subscriber shall not split one business into several accounts, share an account between separate businesses, or otherwise arrange to pay for fewer Members than it has. If this happens, the Company may move the Subscriber to the correct Plan and charge the difference from when it began.
+4.3 **Branches.** A Subscriber with several branches pays for each branch's own Plan, sized by that branch's Members. Each branch's Fees are reduced by the branch discount shown at checkout: 10% where 2 to 4 of the owner's branches are on a paid Plan (counting the branch being paid for), 15% for 5 to 9, and 20% for 10 or more. Only branches with a current paid Plan count. The discount applies to the Fees paid at that checkout and does not change during the Subscription Period already paid for.
+4.4 The Subscriber shall not split one business into several accounts, share an account between separate businesses, or otherwise arrange to pay for fewer Members than it has. If this happens, the Company may move the Subscriber to the correct Plan and charge the difference from when it began.
 
 ## 5. Fees and payment
-5.1 The Subscriber shall pay the Fees in Nigerian naira, in advance for each Subscription Period, by bank transfer or by card or USSD through Paystack. Fees include any value added tax that applies.
+5.1 The Subscriber shall pay the Fees in Nigerian naira, in advance for each Subscription Period, by bank transfer or by card or USSD through Paystack. Fees include any value added tax that applies, and the Company issues a receipt for every payment.
 5.2 **The Service does not renew or charge automatically.** The Company reminds the Subscriber before each Subscription Period ends; the Subscriber renews by paying for the next one.
 5.3 If the Subscriber does not renew, access to the Service is paused at the end of the paid Subscription Period (including staff and trainer access, the member app and public pages, automatic messages and reports). Subscriber Data remains safe and access returns on payment.
 5.4 The Company shall give at least 30 days' notice of any change in Fees. No change affects a Subscription Period already paid for.
@@ -90,7 +91,7 @@ Each Party shall keep the other's non-public business information confidential a
 13.1 The Subscriber may end this Agreement at any time under clause 6.1.
 13.2 The Company may end it by giving 30 days' notice by email, and shall refund Fees for any part of a Subscription Period not used.
 13.3 Either Party may end it immediately by notice if the other commits a material breach and does not remedy it within 14 days of being asked to, or becomes insolvent.
-13.4 Clauses 8, 9, 11, 12 and 15 survive termination.
+13.4 Clauses 8, 9, 11, 12, 15 and 16.6 survive termination.
 
 ## 14. Force majeure
 Neither Party is liable for delay or failure caused by events beyond its reasonable control, including power or network failure, failure of payment or messaging providers, strikes, natural disasters, epidemics or government action. The affected Party shall notify the other and take reasonable steps to limit the effect.
@@ -105,11 +106,12 @@ Neither Party is liable for delay or failure caused by events beyond its reasona
 16.3 Notices are given by email: to the Subscriber at its billing email, and to the Company at hello@usegympulseai.com.
 16.4 The Subscriber may not assign this Agreement without the Company's written consent. The Company may assign it to a successor that takes over the Service, and shall notify the Subscriber.
 16.5 If any provision is found invalid, the rest of the Agreement continues in force. A failure or delay in enforcing a right is not a waiver of it.
-16.6 **Electronic signature.** The Parties agree that this Agreement may be signed electronically, and that an electronic signature (for the Subscriber, the signatory drawing their signature, or typing their full name, and confirming agreement at checkout; for the Company, its Founder's signature applied electronically) is valid and binding, as recognised by section 93 of the Evidence Act 2011. A record of both signatures, the date and time, and a SHA-256 fingerprint of this exact text is kept, and the Subscriber receives a signed PDF copy.
+16.6 **Electronic signature.** The Parties agree that this Agreement may be signed electronically, and that an electronic signature (for the Subscriber, the signatory drawing their signature, or typing their full name, and confirming agreement at checkout; for the Company, the signature of its Director applied electronically) is valid and binding, as recognised by section 93 of the Evidence Act 2011. The Parties agree that the signing procedure (signing in to the Subscriber's own GymPulse AI account, drawing or typing the signature and ticking agreement) identifies the signatory. A record of both signatures, the date and time, the IP address and browser, and a SHA-256 fingerprint of this exact text is kept for at least 6 years, and the Subscriber receives a signed PDF copy by email. Either Party may rely on these records as evidence, and the Company will provide a certificate under section 84 of the Evidence Act 2011 when they are produced in proceedings.
+16.7 **Costs.** Each Party bears its own costs of entering into this Agreement. Any stamp duty payable on this Agreement shall be paid by the Party that the law requires to pay it.
 
 ## Execution
 **IN WITNESS WHEREOF** the Parties have executed this Agreement electronically on the dates shown below.
 
-**SIGNED for and on behalf of GYMPULSE AI LTD** by Emmanuel Archibong, Founder (signature applied electronically).
+**SIGNED for and on behalf of GYMPULSE AI LTD** by Emmanuel Archibong, Founder and Director, duly authorised (signature applied electronically).
 
 **SIGNED for and on behalf of THE SUBSCRIBER** by the authorised person named at checkout, who confirms that they have authority to bind the Subscriber.

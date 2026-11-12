@@ -17,7 +17,7 @@ import streamlit as st
 import gympulse_legal as glegal
 import gympulse_workspaces as gw
 
-VERSION = "1.0"
+VERSION = "1.1"
 SQL_HINT = ("Membership agreements need a one-time setup: open Supabase, go to SQL Editor, paste in the file "
             "sql/phase42_member_waivers.sql and press Run.")
 HEALTH = [
@@ -95,7 +95,8 @@ def agreement_text(gym_name, member, terms, rules=""):
 # ------------------------------------------------------------------ records
 def latest(client, member_id):
     try:
-        rows = (client.table("member_waivers").select("*").eq("member_id", member_id).eq("version", VERSION)
+        # any version counts: a member who signed an earlier version stays bound by the exact text they signed
+        rows = (client.table("member_waivers").select("*").eq("member_id", member_id)
                 .order("signed_at", desc=True).limit(1).execute().data or [])
         return rows[0] if rows else None
     except Exception:
@@ -103,10 +104,10 @@ def latest(client, member_id):
 
 
 def signed_ids(client, gym_id):
-    """{member_id: signed_at} for the current version, or None when phase 42 hasn't been run."""
+    """{member_id: signed_at} for any signed version, or None when phase 42 hasn't been run."""
     try:
         rows = gw.fetch_all(client.table("member_waivers").select("member_id, signed_at").eq("gym_id", gym_id)
-                            .eq("version", VERSION).order("signed_at"))
+                            .order("signed_at"))
     except Exception:
         return None
     return {r["member_id"]: r["signed_at"] for r in rows}

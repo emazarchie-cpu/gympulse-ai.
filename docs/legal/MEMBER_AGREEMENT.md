@@ -1,4 +1,4 @@
-**Version 1.0. Effective 11 November 2026.**
+**Version 1.1. Effective 12 November 2026.**
 
 # Membership Agreement and Waiver
 
@@ -57,13 +57,18 @@ You agree to follow the Gym's rules and the instructions of its staff, including
 The Gym may suspend or end the membership of anyone who seriously or repeatedly breaks these rules.
 
 ## 9. Your personal data
-9.1 The Gym keeps your details (name, contact details, membership, visits, payments, health answers and emergency contact) to manage your membership, keep you safe and stay in touch with you, under the Nigeria Data Protection Act 2023.
-9.2 The Gym uses GymPulse AI (GYMPULSE AI LTD) to store these details and send you membership messages by email or WhatsApp. You can ask the Gym to see, correct or delete your details, or to stop marketing messages, at any time.
-9.3 Your health answers are used only for your safety and are shared only with staff and trainers who need them.
+9.1 The Gym is responsible for your personal data under the Nigeria Data Protection Act 2023. It keeps your details (name, contact details, membership, visits, payments, this signed Agreement, your health answers and emergency contact) to manage your membership, keep you safe and stay in touch with you about your membership.
+9.2 **Health answers.** Your health answers are sensitive personal data. By signing, you give your explicit consent for the Gym to keep them and use them only for your safety. They are shared only with staff and trainers who need them, and never used for marketing. You can withdraw this consent by asking the Gym to delete them, but the Gym may then ask for a doctor's clearance before you train.
+9.3 The Gym uses GymPulse AI (GYMPULSE AI LTD, Nigeria) to store these details and send you membership messages by email or WhatsApp. GymPulse AI acts only on the Gym's instructions. Your details are stored on secure servers in the European Union (Germany), and some services that send messages are in the United States, under contracts that protect your data.
+9.4 The Gym keeps your details while you are a member and for a reasonable time afterwards (signed agreements are kept as a record of what you agreed). You can ask the Gym to see, correct or delete your details, or to stop marketing messages, at any time. Reply STOP to a WhatsApp message, or use the unsubscribe link in an email, to stop those messages. If you are not satisfied, you can complain to the Nigeria Data Protection Commission (ndpc.gov.ng).
 
-## 10. General
-10.1 This Agreement is governed by the laws of the Federal Republic of Nigeria. Any disagreement will first be discussed in good faith with the Gym's management.
-10.2 If any part of this Agreement is found invalid, the rest still applies.
-10.3 You are signing electronically, by drawing your signature (or typing your full name) and confirming your agreement. This is a valid signature, as recognised by section 93 of the Evidence Act 2011. A record of your signature, the date and time and a fingerprint of this exact text is kept, and you can ask the Gym for a copy at any time.
+## 10. Members under 18
+10.1 A person under 18 may only become a member if their parent or guardian signs this Agreement for them. The parent or guardian agrees to it on the young member's behalf, consents to the Gym keeping the young member's details (Nigeria Data Protection Act 2023, section 31), and is responsible for their fees and conduct.
+10.2 Members under 18 must follow any extra rules the Gym sets for them, such as training only with a trainer or at set times.
 
-**By signing below, I confirm that I am 18 or older (or that my parent or guardian signs for me), that I have read and understood this Agreement, that my health answers are true, and that I agree to it.**
+## 11. General
+11.1 This Agreement is governed by the laws of the Federal Republic of Nigeria. Any disagreement will first be discussed in good faith with the Gym's management. Nothing in this Agreement takes away your rights under the Federal Competition and Consumer Protection Act 2018 where it applies.
+11.2 If any part of this Agreement is found invalid, the rest still applies.
+11.3 You are signing electronically, by drawing your signature (or typing your full name) and confirming your agreement. This is a valid signature, as recognised by section 93 of the Evidence Act 2011. A record of your signature, the date and time, how and where you signed, and a fingerprint of this exact text is kept, and you can ask the Gym for a copy at any time. You agree this record may be used as evidence of your agreement.
+
+**By signing below, I confirm that I am 18 or older (or that I am the parent or guardian signing for a member under 18), that I have read and understood this Agreement, that the health answers are true, that I give my explicit consent for them to be used for my safety, and that I agree to this Agreement.**

@@ -10,15 +10,15 @@ from datetime import datetime, timezone
 
 import streamlit as st
 
-LEGAL_VERSION = "1.0"
+LEGAL_VERSION = "1.1"
 HERE = os.path.dirname(os.path.abspath(__file__))
 DOCS = {"terms": "TERMS_OF_SERVICE.md", "privacy": "PRIVACY_POLICY.md", "dpa": "DATA_PROCESSING_AGREEMENT.md",
         "subscription": "SUBSCRIPTION_AGREEMENT.md"}
 TITLES = {"terms": "Terms of Service", "privacy": "Privacy Policy", "dpa": "Data Processing Agreement",
           "subscription": "Subscription Agreement"}
-SUBSCRIPTION_VERSION = "1.0"
+SUBSCRIPTION_VERSION = "1.1"
 SIGNER_ROLES = ["Owner", "Director", "Manager", "Partner", "Other authorised person"]
-FOUNDER, FOUNDER_TITLE = "Emmanuel Archibong", "Founder"
+FOUNDER, FOUNDER_TITLE = "Emmanuel Archibong", "Founder and Director"
 # The Founder's signature, applied to every Subscription Agreement (transparent PNG). Until it's added, the
 # name is shown in a signature-style font instead.
 FOUNDER_SIGNATURE = os.path.join(HERE, "assets", "founder-signature.png")
