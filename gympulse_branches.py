@@ -152,6 +152,22 @@ def _branch_card(g, row, current):
             st.rerun()
 
 
+def _trial_line(supabase, gym_id):
+    """What the new branch got: shared trial, 7 days to set up, or a plan needed now (set by the database)."""
+    try:
+        sub = (supabase.table("gym_subscriptions").select("status, trial_ends_on").eq("gym_id", gym_id)
+               .limit(1).execute().data or [{}])[0]
+        end = sub.get("trial_ends_on")
+        end = datetime.fromisoformat(str(end)).date() if end else None
+    except Exception:
+        return ""
+    if not end:
+        return ""
+    if end < gw.today_local():
+        return "Your free trial has been used, so choose a plan for this branch (Subscription) to start using it."
+    return f"It's free until {end:%d %b %Y}, then it needs its own plan."
+
+
 def render_hq(supabase, owner_id, branches, assess_fn):
     gw.page_header("Branches", "Every branch side by side, and add new ones.", "Your company")
     flash = st.session_state.pop("branch_flash", None)
@@ -176,7 +192,9 @@ def render_hq(supabase, owner_id, branches, assess_fn):
                    "own branch.")
     with st.expander("Add a branch", icon=":material/add_business:", expanded=len(branches) < 2):
         st.caption("A branch is a separate gym with its own members, check-ins, staff and plan, under your login. "
-                   "Each new branch starts with the 30-day free trial.")
+                   "The 30-day free trial is per owner, not per branch: a new branch shares the trial you're on. "
+                   "Once you pay for a branch, each new one gets 7 days to set up before it needs its own plan, "
+                   "with your branch discount.")
         with st.form("branch_new", clear_on_submit=True):
             name = st.text_input("Branch name", placeholder="e.g. Lekki branch")
             go = st.form_submit_button("Add branch", type="primary", use_container_width=True)
@@ -193,7 +211,8 @@ def render_hq(supabase, owner_id, branches, assess_fn):
                     if row:
                         st.session_state["branch_id"] = str(row[0]["id"])
                     st.session_state["branch_flash"] = (f"{name.strip()} added. You're now working in it: import its "
-                                                        "members from Member Management.")
+                                                        "members from Member Management. "
+                                                        + (_trial_line(supabase, row[0]["id"]) if row else ""))
                     st.session_state.pop("_cache", None)
                     st.rerun()
                 except Exception as error:
