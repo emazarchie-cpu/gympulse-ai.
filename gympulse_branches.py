@@ -199,7 +199,14 @@ def render_hq(supabase, owner_id, branches, assess_fn):
                 except Exception as error:
                     if type(error).__name__ in ("RerunException", "StopException"):
                         raise
-                    st.error(f"Could not add the branch: {error}")
+                    msg = str(error)
+                    if "unique_gym_owner" in msg or "23505" in msg:
+                        st.error("Branches aren't switched on in the database yet. Run sql/phase43_branches.sql in "
+                                 "Supabase (SQL Editor), then add the branch again.")
+                    elif "GP_BRANCH_LIMIT" in msg:
+                        st.error(f"You can have up to {MAX_BRANCHES} branches. Contact us for more.")
+                    else:
+                        st.error(f"Could not add the branch: {error}")
     if len(branches) > 1:
         with st.expander("Rename a branch", icon=":material/edit:"):
             names = {str(g["id"]): name_of(g) for g in branches}
