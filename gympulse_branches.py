@@ -99,6 +99,59 @@ def branch_stats(supabase, g, assess_fn):
     return out
 
 
+CARD_CSS = """
+.br-card { border: 1px solid var(--gp-line); border-radius: 18px; padding: 16px 18px 14px; margin: 0 0 4px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01)), var(--gp-s1); }
+.br-card.cur { border-color: rgba(183,243,74,0.45); }
+.br-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.br-name { font-family: var(--gp-display); font-size: 19px; font-weight: 700; color: var(--gp-text);
+    min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.br-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.br-stat { border-radius: 12px; padding: 10px 12px; background: var(--gp-s2); min-width: 0; }
+.br-stat span { display: block; font-size: 11.5px; color: var(--gp-muted); line-height: 1.3; }
+.br-stat b { display: block; font-family: var(--gp-display); font-size: 20px; color: var(--gp-text); margin-top: 2px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.br-stat.red b { color: #FF8A7A; } .br-stat.amber b { color: #FFC44D; } .br-stat.lime b { color: #B7F34A; }
+@media (max-width: 640px) { .br-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } .br-stat b { font-size: 18px; } }
+"""
+
+
+def _num(v):
+    return None if v is None or (isinstance(v, float) and pd.isna(v)) else v
+
+
+def _branch_card(g, row, current):
+    """One branch: its name, and its numbers in tiles that wrap on a phone."""
+    is_cur = str(g["id"]) == current
+    members, risk = _num(row.get("Members")), _num(row.get("At risk"))
+    renew, visits = _num(row.get("Renewing in 14 days")), _num(row.get("Visits this month"))
+    won, money = _num(row.get("Won back (30 days)")), _num(row.get("Collected (30 days)"))
+    share = f" · {risk / members:.0%}" if members and risk else ""
+
+    def tile(label, value, tone=""):
+        return f'<div class="br-stat {tone}"><span>{label}</span><b>{value}</b></div>'
+
+    fmt = lambda v: "–" if v is None else f"{int(v):,}"
+    tiles = (tile("Members", fmt(members))
+             + tile("At risk" + share, fmt(risk), "red" if risk else "")
+             + tile("Renewing in 14 days", fmt(renew), "amber" if renew else "")
+             + tile("Visits this month", fmt(visits))
+             + tile("Won back · 30 days", fmt(won), "lime" if won else "")
+             + tile("Collected · 30 days", "–" if money is None else f"₦{money:,.0f}"))
+    pill = '<span class="gp-pill gp-pill-lime">Working in it</span>' if is_cur else ""
+    with st.container(key=f"br_card_{g['id']}"):
+        gw._md(f'<div class="br-card{" cur" if is_cur else ""}"><div class="br-head">'
+               f'<div class="br-name">{gw._esc(name_of(g))}</div>{pill}</div>'
+               f'<div class="br-stats">{tiles}</div></div>')
+        if not is_cur and st.button(f"Work in {name_of(g)}", key=f"br_go_{g['id']}", icon=":material/arrow_forward:",
+                                    type="tertiary"):
+            st.session_state["branch_id"] = str(g["id"])
+            st.session_state.pop("branch_pick", None)      # so the picker at the top follows, not undoes, the switch
+            st.session_state.pop("_cache", None)
+            st.session_state["navigate_to"] = "Dashboard"
+            st.rerun()
+
+
 def render_hq(supabase, owner_id, branches, assess_fn):
     gw.page_header("Branches", "Every branch side by side, and add new ones.", "Your company")
     flash = st.session_state.pop("branch_flash", None)
@@ -114,17 +167,13 @@ def render_hq(supabase, owner_id, branches, assess_fn):
                 ("Members", f"{int(totals.get('Members', 0)):,}", "lime", "across all branches"),
                 ("At risk", f"{int(totals.get('At risk', 0)):,}", "red" if totals.get("At risk") else "grey", "right now"),
                 ("Collected", f"₦{totals.get('Collected (30 days)', 0):,.0f}", "amber", "last 30 days")])
-    if len(df):
-        show = df.copy()
-        if "Members" in show and "At risk" in show:
-            show["At-risk share"] = [f"{a / m:.0%}" if m and a is not None and not pd.isna(a) else "–"
-                                     for a, m in zip(show["At risk"], show["Members"])]
-        if "Collected (30 days)" in show:
-            show["Collected (30 days)"] = [f"₦{v:,.0f}" if v is not None and not pd.isna(v) else "–"
-                                           for v in show["Collected (30 days)"]]
-        gw.table(show.fillna("–").to_dict("records"))
-        st.caption("Switch branch at the top of any page to work in it. Staff and trainers are added per branch "
-                   "(Owner → Team), so a branch manager only sees their own branch.")
+    gw._md(f"<style>{CARD_CSS}</style>")
+    current = str(st.session_state.get("branch_id") or (branches[0]["id"] if branches else ""))
+    for g, row in zip(branches, stats):
+        _branch_card(g, row, current)
+    if len(branches) > 1:
+        st.caption("Staff and trainers are added per branch (Owner → Team), so a branch manager only sees their "
+                   "own branch.")
     with st.expander("Add a branch", icon=":material/add_business:", expanded=len(branches) < 2):
         st.caption("A branch is a separate gym with its own members, check-ins, staff and plan, under your login. "
                    "Each new branch starts with the 30-day free trial.")
