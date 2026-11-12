@@ -37,7 +37,7 @@ GymMaster lets each gym choose its own columns, so headings differ. That's fine:
 - If the database requires a field GymMaster doesn't export (age, weight or height), a neutral placeholder is used and you're told, so you can fix it on the member's profile.
 - Up to 3,000 members per file. Import more in batches.
 
-There is no automatic live connection to GymMaster yet. Each gym creates its own API key under GymMaster's Settings → Integrations. With a gym's key and GymMaster's API documentation, an automatic sync can be added later.
+**Live check-ins:** GymPulse AI runs side by side with GymMaster. Each gym gets a private link (Member Management → Import → Running side by side → Automatic check-ins from GymMaster) to paste into GymMaster's **Settings → Integrations → Webhook Manager**; every GymMaster check-in then comes across as it happens (`supabase/functions/gymmaster-webhook`, `sql/phase39_gymmaster_checkins.sql`). Members and plans still come from an export: re-upload one weekly to add new members and renewals.
 
 ## Photos
 
