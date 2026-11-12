@@ -36,3 +36,4 @@ The app shows these files exactly as written. Changing a document and its versio
 12. **Health data:** the Member Agreement collects health answers (sensitive personal data under the NDPA). Is the consent and use wording in clause 9 enough, and should gyms keep these answers separately or for a limited time?
 13. **Who is the contracting party** for the Member Agreement: the gym as a business (many gyms are sole proprietors or unregistered). Does the template need to adapt for that?
 14. Should a ready "Privacy notice for your members" be added for gyms to print or send?
+15. **Trademark:** other products abroad use "GymPulse" in their names (e.g. gympulse.cl, gympulse.fit). Should GYMPULSE AI LTD register "GymPulse AI" (name and logo) as a trademark in Nigeria (and which classes, e.g. 9 and 42), and is there any conflict risk to check first?

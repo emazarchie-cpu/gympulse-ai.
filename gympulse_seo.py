@@ -45,13 +45,18 @@ FAQ = [
     ("Is GymPulse AI a replacement for GymMaster?",
      "No. GymPulse AI is a member retention platform, not gym management software. It doesn't replace GymMaster, "
      "your door access or your billing. It adds what they don't do: a daily list of members who are about to "
-     "stop coming, the reason, and WhatsApp and email follow-ups to bring them back."),
+     "stop coming, the reason, and WhatsApp and email follow-ups to bring them back. It also includes class "
+     "timetables and bookings, a member app and QR check-in, for gyms that want them."),
     ("Do my staff have to enter anything twice?",
      "No. Check-ins come from GymMaster automatically and members come from your export. Your staff keep working "
      "in GymMaster exactly as they do today."),
     ("What if my gym uses other software, or Excel?",
      "GymPulse AI works with any software that can export a spreadsheet, such as Mindbody, Glofox, Excel or Google "
      "Sheets. Gyms with no software can use GymPulse AI's own QR check-in."),
+    ("Is GymPulse AI available now?",
+     "Yes. GymPulse AI launched in 2026 and is open to gyms across Nigeria. Sign up at usegympulseai.com for a "
+     "30-day free trial; paid plans are billed through Paystack. It is made by GYMPULSE AI LTD (RC 9996401) in "
+     "Calabar, and is not connected to other products with \"GymPulse\" in their name."),
     ("What does GymPulse AI cost?",
      "Plans are priced by gym size, in naira, with every feature on every plan and a 30-day free trial. Chains get "
      "up to 20% off each branch."),
@@ -70,6 +75,8 @@ def _faq_html(faq):
 COMPANY = {"legal": "GYMPULSE AI LTD", "rc": "RC 9996401",
            "city": "Calabar", "state": "Cross River State",
            "email": "hello@usegympulseai.com", "founder_email": "emmanuel@usegympulseai.com"}
+# Official accounts, so search engines can tell this GymPulse AI apart from other products with a similar name
+SOCIAL = ["https://www.instagram.com/usegympulseai", "https://x.com/usegympulseai"]
 START = "<!--gp-seo-start-->"
 END = "<!--gp-seo-end-->"
 ROOT_START = "<!--gp-pre-start-->"
@@ -248,6 +255,7 @@ def _ld_json():
         "@context": "https://schema.org", "@type": "Organization", "name": NAME,
         "legalName": COMPANY["legal"], "url": SITE + "/", "logo": SITE + "/apple-touch-icon.png",
         "email": COMPANY["email"], "identifier": COMPANY["rc"],
+        "sameAs": SOCIAL,
         "founder": {"@type": "Person", "name": "Emmanuel Archibong", "email": COMPANY["founder_email"]},
         "contactPoint": [{"@type": "ContactPoint", "contactType": "customer support", "email": COMPANY["email"],
                           "areaServed": "NG", "availableLanguage": "English"},

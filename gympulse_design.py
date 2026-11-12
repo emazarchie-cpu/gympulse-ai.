@@ -929,8 +929,8 @@ def landing_sections(icon, bot_svg):
       <div class="lx-kicker">Proof, not promises</div>
       <div class="lx-h2">How we count the money you keep</div>
       <div class="lx-sub">A message sent is not a member saved. GymPulse AI only counts money kept when it can
-        point to the renewal. GymPulse AI is in early access: risk scores come from an experimental model, and we
-        say so wherever they appear.</div>
+        point to the renewal. Risk scores come from a model that is still learning from Nigerian gyms, so we label
+        them as estimates wherever they appear.</div>
       <div class="lx-loop">
         <div class="lx-card"><div class="lx-num">01 · FLAGGED</div><div class="lx-ic">{icon('pulse')}</div>
           <h4>The risk is recorded</h4><p>The day a member is flagged, their score, reason and monthly fee are saved.</p></div>
