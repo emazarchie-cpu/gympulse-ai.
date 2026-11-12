@@ -279,6 +279,7 @@ html body .chip { border-radius: 999px; }
     aspect-ratio: 16 / 9; background: #05070D; border: 1px solid var(--gp-line-2);
     box-shadow: 0 40px 90px -36px rgba(0,0,0,0.8), 0 0 80px -30px rgba(183,243,74,0.35); }
 .lx-video video { width: 100%; height: 100%; display: block; object-fit: cover; }
+.lx-video.lx-video-tall { max-width: 380px; aspect-ratio: 9 / 16; }
 .lx-demo-note { color: var(--gp-dim); font-size: 12.5px; margin-top: 10px; }
 .lx-demo-cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 18px; }
 .lx-btn { display: inline-flex; align-items: center; justify-content: center; min-height: 46px; padding: 0 24px;
@@ -733,13 +734,13 @@ def landing_top(lockup_uri, icon):
     </div>
     <div class="lx-demo" id="demo">
       <div class="lx-kicker">See it in action</div>
-      <div class="lx-h2">Every feature, in under a minute.</div>
-      <div class="lx-video">
-        <video src="/app/static/gympulse-demo.mp4?v=5" poster="/app/static/gympulse-demo-poster.jpg?v=5"
+      <div class="lx-h2">How GymPulse AI works with GymMaster, in under a minute.</div>
+      <div class="lx-video lx-video-tall">
+        <video src="/app/static/gympulse-explainer.mp4?v=1" poster="/app/static/gympulse-explainer-poster.jpg?v=1"
                autoplay muted loop playsinline controls preload="metadata"
-               aria-label="GymPulse AI product demo"></video>
+               aria-label="GymPulse AI explainer: spotting members who are about to leave and bringing them back"></video>
       </div>
-      <div class="lx-demo-note">Plays muted. Tap the video for sound.</div>
+      <div class="lx-demo-note">Plays muted. Tap the video for music. Member examples are illustrative.</div>
       <div class="lx-demo-cta">
         <a class="lx-btn lx-btn-primary" href="#get-started">Start your free trial</a>
         <a class="lx-btn" href="?demo=book" target="_self">Book a 15-minute demo</a>
@@ -768,7 +769,7 @@ SHOWCASE = [
     ("grow", "Grow", "Bring more people in, and bring the quiet ones back",
      "Automatic messages, referrals and campaigns that sound like you, sent in your gym's name.",
      "<b>12</b> friends invited this month", [
-        ("chat", "WhatsApp & email reminders", "Renewal reminders, missed-visit check-ins, welcome-backs, birthdays."),
+        ("chat", "Email & WhatsApp reminders", "Renewal reminders, missed-visit check-ins, welcome-backs, birthdays. By email now; WhatsApp is switching on this month."),
         ("users", "Bring-a-friend referrals", "Every member gets an invite link; rewards are tracked for you."),
         ("shield", "HMO & corporate members", "QR check-in by HMO ID, visit reports and covers ending."),
         ("sliders", "Campaigns", "Branded emails with your logo for promos, classes and challenges."),
@@ -828,7 +829,7 @@ def landing_showcase(icon):
       <div class="lx-count">
         <div><b>24+</b><span>features, all included</span></div>
         <div><b>30 days</b><span>free trial</span></div>
-        <div><b>1 min</b><span>to set up</span></div>
+        <div><b>1 min</b><span>to sign up</span></div>
         <div><b>₦</b><span>priced in naira, by gym size</span></div>
       </div>
       <div class="lx-credit">Photos: Pexels</div>
@@ -906,6 +907,26 @@ def landing_sections(icon, bot_svg):
       </div>
     </div>
 
+    <div class="lx-sec" id="new">
+      <div class="lx-kicker">Built for how Nigerian gyms run</div>
+      <div class="lx-h2">Branches, signed agreements, HMOs and naira payments</div>
+      <div class="lx-sub">The parts of running a gym in Nigeria that generic software leaves out, all included on every plan.</div>
+      <div class="lx-grid">
+        <div class="lx-card w3"><div class="lx-ic">{icon('users')}</div>
+          <h4>Every branch, one login</h4><p>Switch branch at the top of any page, compare branches side by side, and add a new one in seconds. Branch managers only see their own branch.</p>
+          <div class="lx-story"><b>Chains save:</b> 10% off each branch with 2 to 4 on a paid plan, 15% with 5 to 9, 20% with 10 or more.</div></div>
+        <div class="lx-card w3"><div class="lx-ic">{icon('check')}</div>
+          <h4>Membership agreements, signed on a phone</h4><p>Every new member signs your Membership Agreement and Waiver, with a health check and emergency contact, at the front desk or through a WhatsApp link.</p>
+          <div class="lx-story"><b>Kept for you:</b> the exact text signed, the signature, the date and a downloadable PDF.</div></div>
+        <div class="lx-card w2"><div class="lx-ic">{icon('shield')}</div>
+          <h4>HMO members and claims</h4><p>Check-in by HMO ID, weekly visit limits, visit codes, and each month's claim worked out per HMO, with what is still owed.</p></div>
+        <div class="lx-card w2"><div class="lx-ic">{icon('calendar')}</div>
+          <h4>Corporate plans</h4><p>Staff on a company plan never get payment reminders; the company's HR contact gets one before each renewal.</p></div>
+        <div class="lx-card w2"><div class="lx-ic">{icon('download')}</div>
+          <h4>Pay in naira</h4><p>Card, bank transfer or USSD through Paystack. Your plan switches on the moment payment is confirmed, with a receipt.</p></div>
+      </div>
+    </div>
+
     <div class="lx-sec">
       <div class="lx-kicker">Meet Archie</div>
       <div class="lx-h2">An AI retention analyst that shows its working</div>
@@ -948,15 +969,16 @@ def landing_sections(icon, bot_svg):
     <div class="lx-sec">
       <div class="lx-kicker">Who's behind it</div>
       <div class="lx-h2">Built in Nigeria, for Nigerian gyms</div>
-      <div class="lx-sub">GymPulse AI is built by Emmanuel, a Lagos gym member who watched members disappear without
+      <div class="lx-sub">GymPulse AI is built by Emmanuel Archibong, a gym member who watched members disappear without
         anyone noticing. You deal with a real person, not a call centre.</div>
       <div class="lx-principles">
         <div class="lx-card"><div class="lx-ic">{icon('chat')}</div><h4>Help when you need it</h4>
           <p>Email <a href="mailto:hello@usegympulseai.com"><b>hello@usegympulseai.com</b></a> or
           <a href="mailto:emmanuel@usegympulseai.com"><b>emmanuel@usegympulseai.com</b></a> for help.</p></div>
         <div class="lx-card"><div class="lx-ic">{icon('shield')}</div><h4>Your members' data stays yours</h4>
-          <p>Each gym sees only its own members. We use the data only to run your account, and members can
-          stop messages at any time. See our Privacy Policy and Data Processing Agreement.</p></div>
+          <p>Each gym sees only its own members, protected under Nigeria's Data Protection Act 2023. We use the data
+          only to run your account, and members can stop messages at any time. See our Privacy Policy and Data
+          Processing Agreement.</p></div>
         <div class="lx-card"><div class="lx-ic">{icon('check')}</div><h4>No check-in system? Fine</h4>
           <p>Your front desk taps each member in on a phone, or you upload your list from Excel. No scanners
           or new hardware needed.</p></div>
