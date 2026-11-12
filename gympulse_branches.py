@@ -178,7 +178,7 @@ def render_hq(supabase, owner_id, branches, assess_fn):
         st.caption("A branch is a separate gym with its own members, check-ins, staff and plan, under your login. "
                    "Each new branch starts with the 30-day free trial.")
         with st.form("branch_new", clear_on_submit=True):
-            name = st.text_input("Branch name", placeholder="e.g. i-Fitness Ikeja")
+            name = st.text_input("Branch name", placeholder="e.g. Lekki branch")
             go = st.form_submit_button("Add branch", type="primary", use_container_width=True)
         if go:
             if len(name.strip()) < 2:
