@@ -164,7 +164,10 @@ def _date(value):
     v = gw._text(value).strip()
     if not v:
         return None
-    d = pd.to_datetime(v, errors="coerce", dayfirst=True)
+    if re.match(r"^\d{4}-\d{1,2}-\d{1,2}", v):          # 2026-11-05: year first, never day-first
+        d = pd.to_datetime(v[:10], errors="coerce", format="%Y-%m-%d")
+    else:                                              # 05/11/2026: Nigerian exports put the day first
+        d = pd.to_datetime(v, errors="coerce", dayfirst=True)
     if pd.isna(d):
         return None
     return d.date()
