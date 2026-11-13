@@ -279,7 +279,6 @@ html body .chip { border-radius: 999px; }
     aspect-ratio: 16 / 9; background: #05070D; border: 1px solid var(--gp-line-2);
     box-shadow: 0 40px 90px -36px rgba(0,0,0,0.8), 0 0 80px -30px rgba(183,243,74,0.35); }
 .lx-video video { width: 100%; height: 100%; display: block; object-fit: cover; }
-.lx-video.lx-video-tall { max-width: 380px; aspect-ratio: 9 / 16; }
 .lx-demo-note { color: var(--gp-dim); font-size: 12.5px; margin-top: 10px; }
 .lx-demo-cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 18px; }
 .lx-btn { display: inline-flex; align-items: center; justify-content: center; min-height: 46px; padding: 0 24px;
@@ -734,13 +733,13 @@ def landing_top(lockup_uri, icon):
     </div>
     <div class="lx-demo" id="demo">
       <div class="lx-kicker">See it in action</div>
-      <div class="lx-h2">How GymPulse AI works with GymMaster, in under a minute.</div>
-      <div class="lx-video lx-video-tall">
-        <video src="/app/static/gympulse-explainer.mp4?v=1" poster="/app/static/gympulse-explainer-poster.jpg?v=1"
+      <div class="lx-h2">Every feature, in under a minute.</div>
+      <div class="lx-video">
+        <video src="/app/static/gympulse-demo.mp4?v=5" poster="/app/static/gympulse-demo-poster.jpg?v=5"
                autoplay muted loop playsinline controls preload="metadata"
-               aria-label="GymPulse AI explainer: spotting members who are about to leave and bringing them back"></video>
+               aria-label="GymPulse AI product demo"></video>
       </div>
-      <div class="lx-demo-note">Plays muted. Tap the video for music. Member examples are illustrative.</div>
+      <div class="lx-demo-note">Plays muted. Tap the video for sound.</div>
       <div class="lx-demo-cta">
         <a class="lx-btn lx-btn-primary" href="#get-started">Start your free trial</a>
         <a class="lx-btn" href="?demo=book" target="_self">Book a 15-minute demo</a>
