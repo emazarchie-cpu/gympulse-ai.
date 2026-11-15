@@ -210,6 +210,51 @@ def chain_price(amount, pct):
     return round(float(amount) * (1 - float(pct or 0))) if amount else amount
 
 
+# Founding partners: the first pilot gyms keep a deal for as long as they stay. Admin → Billing → Founding partners
+# sets it per gym: a % off every plan, and/or the plan prices of the day locked (later price rises don't apply).
+# Kept in platform_settings under its own key, which gyms can't read (only "pricing" is readable to them).
+FOUNDING_KEY = "founding_partners"
+FOUNDING_MAX_PCT = 0.5
+
+
+def founding_all(client):
+    try:
+        rows = client.table("platform_settings").select("value").eq("key", FOUNDING_KEY).limit(1).execute().data
+        return dict((rows[0]["value"] or {}).get("gyms") or {}) if rows else {}
+    except Exception:
+        return {}
+
+
+def founding_for(client, gym_id):
+    """This gym's founding-partner deal, or None: {"pct", "prices" (plan → {monthly, yearly}) or None, "since", "note"}."""
+    if client is None or not gym_id:
+        return None
+    return founding_all(client).get(str(gym_id))
+
+
+def quote(plan, period, chain=(0.0, 1), founding=None):
+    """What a gym pays for a plan: the list price, the founding price lock, the branch discount and the founding
+    discount, in that order, rounded to the naira. Returns {full, base, chain_pct, branches, founding_pct, amount}."""
+    full = price_for(plan, period)
+    if not full:
+        return {"full": full, "base": full, "chain_pct": 0.0, "branches": 1, "founding_pct": 0.0, "amount": full}
+    base = float(full)
+    locked = ((founding or {}).get("prices") or {}).get(plan.get("name"), {}).get(period)
+    if locked:
+        base = min(base, float(locked))
+    cpct = min(max(float(chain[0] or 0), 0.0), CHAIN_TIERS[0][1])
+    fpct = min(max(float((founding or {}).get("pct") or 0), 0.0), FOUNDING_MAX_PCT)
+    amount = round(base * (1 - cpct) * (1 - fpct))
+    return {"full": float(full), "base": base, "chain_pct": cpct, "branches": chain[1], "founding_pct": fpct,
+            "amount": amount}
+
+
+def gym_quote(client, gym_id, plan, period):
+    """quote() for this gym, with its branch discount and founding deal looked up (server key)."""
+    sc = client or _service()
+    return quote(plan, period, chain_discount(sc, gym_id) if sc else (0.0, 1), founding_for(sc, gym_id))
+
+
 def _money(x):
     return f"₦{float(x):,.0f}" if x not in (None, "") else "–"
 
@@ -751,8 +796,8 @@ def start_payment(gym_id, plan, period, email, reference=None, invoice_id=None, 
     """Create a Paystack checkout. Returns (url, reference) or (None, error)."""
     import gympulse_email as ge
     sc = _service()
-    pct, _n = chain_discount(sc, gym_id) if sc else (0.0, 1)
-    amount = chain_price(price_for(plan, period), pct)
+    q = gym_quote(sc, gym_id, plan, period)
+    amount, pct = q["amount"], q["chain_pct"]
     if not (paystack_key() and amount and email):
         return None, "Online payment isn't set up yet."
     ref = reference or f"gp-{str(gym_id)[:8]}-{uuid.uuid4().hex[:12]}"
@@ -760,7 +805,8 @@ def start_payment(gym_id, plan, period, email, reference=None, invoice_id=None, 
         "email": email, "amount": int(round(amount * 100)), "currency": "NGN", "reference": ref,
         "callback_url": f"{ge.SITE}/?paystack=1", **({"channels": channels} if channels else {}),
         "metadata": {"source": "gympulse", "gym_id": str(gym_id), "plan": plan["name"], "period": period,
-                     "invoice_id": invoice_id, "chain_pct": pct, "cancel_action": f"{ge.SITE}/"}})
+                     "invoice_id": invoice_id, "chain_pct": pct, "founding_pct": q["founding_pct"],
+                     "cancel_action": f"{ge.SITE}/"}})
     if r.get("status") and (r.get("data") or {}).get("authorization_url"):
         return r["data"]["authorization_url"], ref
     return None, r.get("message") or "Couldn't start the payment. Please try again."
@@ -862,7 +908,8 @@ def apply_payment(reference, sc=None):
         pct = min(max(float(md.get("chain_pct") or 0), 0.0), CHAIN_TIERS[0][1])
     except (TypeError, ValueError):
         pct = 0.0
-    expected = chain_price(price_for(plan, period), pct) if plan else None
+    # the branch discount as it stood at checkout; the founding deal as recorded (gyms can't change either)
+    expected = quote(plan, period, (pct, 1), founding_for(sc, gid))["amount"] if plan else None
     inv = gi.by_reference(sc, reference)
     if d.get("currency") != "NGN" or not expected or paid + 0.5 < expected:
         _email_founder(f"Paystack payment to check: {reference}",
@@ -1021,9 +1068,8 @@ CO_CSS = """
 
 def _summary_html(plan, period, sub_state, ps):
     import gympulse_invoices as gi
-    full = price_for(plan, period)
-    pct, n_branches = st.session_state.get("co_disc") or (0.0, 1)
-    amount = chain_price(full, pct)
+    q = quote(plan, period, st.session_state.get("co_disc") or (0.0, 1), st.session_state.get("co_found"))
+    full, amount, pct, n_branches = q["full"], q["amount"], q["chain_pct"], q["branches"]
     today = gw.today_local()
     if sub_state["status"] == "trial" and sub_state.get("ends"):
         starts = sub_state["ends"] + timedelta(days=1)
@@ -1042,8 +1088,13 @@ def _summary_html(plan, period, sub_state, ps):
             ("Starts", f"{starts:%d %b %Y}"), ("Renews", f"{renews:%d %b %Y}")]
     if saved:
         rows.append(("You save", gi.money(saved)))
+    if q["base"] < full:
+        rows.append(("Founding partner price lock", "−" + gi.money(full - q["base"])))
+    after_chain = round(q["base"] * (1 - pct))
     if pct:
-        rows.append((f"Branch discount ({n_branches} branches, {pct:.0%})", "−" + gi.money(full - amount)))
+        rows.append((f"Branch discount ({n_branches} branches, {pct:.0%})", "−" + gi.money(q["base"] - after_chain)))
+    if q["founding_pct"]:
+        rows.append((f"Founding partner discount ({q['founding_pct']:.0%})", "−" + gi.money(after_chain - amount)))
     return (f'<div class="co-sum"><h4>Order summary</h4><div class="co-name">GymPulse AI {gw._esc(plan["name"])}</div>'
             f'<div class="co-tag">{gw._esc(plan.get("tagline") or plan.get("for_who") or "")}</div>'
             + "".join(f'<div class="co-row"><span>{a}</span><b>{gw._esc(b)}</b></div>' for a, b in rows)
@@ -1124,6 +1175,12 @@ def _render_plans(supabase, gym_id, s, p, ps):
         if best:
             st.caption(f"You have **{n_members:,} members**, so **{best['name']}** fits your gym. Every plan includes "
                        "WhatsApp messages: no extra charges, ever.")
+        fdeal = founding_for(_service(), gym_id)
+        if fdeal:
+            bits = ([f"**{float(fdeal['pct']):.0%} off every plan**"] if fdeal.get("pct") else []) + \
+                   (["**today's prices locked**"] if fdeal.get("prices") else [])
+            st.success("**You're a GymPulse AI founding partner:** " + " and ".join(bits) + ", for as long as you stay "
+                       "with us. Your price shows at checkout.", icon=":material/workspace_premium:")
         pct, n_br = chain_discount(supabase, gym_id)
         if pct:
             st.success(f"**Your branch discount: {pct:.0%} off every plan.** You have {n_br} branches on a paid plan "
@@ -1207,6 +1264,7 @@ def _render_checkout(supabase, gym_id, plan, period, s, p, ps):
     if flash:
         st.warning(flash)
     st.session_state["co_disc"] = chain_discount(supabase, gym_id)
+    st.session_state["co_found"] = founding_for(_service(), gym_id)
     options = [x for x in ("monthly", "yearly") if price_for(plan, x)]
     if len(options) > 1:
         saved = _saving(plan)
@@ -1279,7 +1337,7 @@ def _render_checkout(supabase, gym_id, plan, period, s, p, ps):
                                     f"{glegal.SUBSCRIPTION_VERSION}), the Terms of Service, Privacy Policy and Data "
                                     "Processing Agreement. I am authorised to sign for this business, and I "
                                     "authorise this payment.")
-            go = st.form_submit_button(f"Continue · {_money(chain_price(price_for(plan, period), st.session_state['co_disc'][0]))}", type="primary",
+            go = st.form_submit_button(f"Continue · {_money(quote(plan, period, st.session_state['co_disc'], st.session_state.get('co_found'))['amount'])}", type="primary",
                                        use_container_width=True)
         if go:
             details = {"business_name": biz, "billing_name": name, "billing_phone": phone, "billing_email": email,
@@ -1300,7 +1358,7 @@ def _render_checkout(supabase, gym_id, plan, period, s, p, ps):
             if not sc:
                 st.error("Checkout isn't available right now. Please try again shortly.")
                 return
-            amount = chain_price(price_for(plan, period), chain_discount(sc, gym_id)[0])
+            amount = gym_quote(sc, gym_id, plan, period)["amount"]
             signature = {"signer_name": " ".join(gw._text(signed or name).split()), "signer_role": role,
                          "plan": plan["name"], "period": period, "amount": amount,
                          "signature_image": glegal.png_data_url(drawn) if drawn else None}
@@ -1528,6 +1586,54 @@ def _render_usage_table(sc, gyms, p):
                      "paused. Archie and WhatsApp reset on the 1st.")
 
 
+def _render_founding_admin(sc, gyms, audit, p):
+    st.caption("Your first pilot gyms keep a deal for as long as they stay: a discount on every plan, today's plan "
+               "prices locked (later price rises don't apply to them), or both. It applies at checkout, on invoices "
+               "and when Paystack payments are checked. Give the free pilot months with Extend trial or Free access "
+               "below.")
+    deals = founding_all(sc)
+    names = {str(g["gym"]["id"]): gw._text(g["gym"].get("business_name"), "Gym") for g in gyms}
+    if deals:
+        gw.table([{"Gym": names.get(gid, gid[:8]), "Discount": f"{float(d.get('pct') or 0):.0%}",
+                   "Prices locked": "Yes" if d.get("prices") else "No", "Since": d.get("since") or "–",
+                   "Note": d.get("note") or ""} for gid, d in deals.items()])
+    else:
+        st.caption("No founding partners yet.")
+    with st.form("fp_form"):
+        gid = st.selectbox("Gym", list(names), format_func=names.get, key="fp_gym")
+        c1, c2 = st.columns(2)
+        pct = c1.selectbox("Discount on every plan", [0, 10, 15, 20, 25, 30, 40, 50], index=3, key="fp_pct",
+                           format_func=lambda v: "None" if v == 0 else f"{v}%")
+        lock = c2.checkbox("Lock today's plan prices", value=True, key="fp_lock")
+        note = st.text_input("Note (for you)", placeholder="e.g. Pilot from Nov 2026, feedback calls weekly",
+                             key="fp_note")
+        c3, c4 = st.columns(2)
+        save = c3.form_submit_button("Save founding partner", type="primary", use_container_width=True)
+        remove = c4.form_submit_button("Remove deal", use_container_width=True)
+    if save or remove:
+        new = dict(deals)
+        if remove:
+            new.pop(gid, None)
+        else:
+            if not pct and not lock:
+                st.error("Choose a discount, lock the prices, or both.")
+                return
+            prices = ({x["name"]: {"monthly": x.get("monthly"), "yearly": x.get("yearly")} for x in plans(p)}
+                      if lock else None)
+            new[gid] = {"pct": pct / 100, "prices": prices, "since": gw.today_local().isoformat(),
+                        "note": note.strip()[:200]}
+        sc.table("platform_settings").upsert({"key": FOUNDING_KEY, "value": {"gyms": new},
+                                              "updated_at": datetime.now(timezone.utc).isoformat()},
+                                             on_conflict="key").execute()
+        g = next((x for x in gyms if str(x["gym"]["id"]) == gid), {"gym": {"id": gid}, "name": names.get(gid),
+                                                                     "email": None})
+        audit(sc, "founding_removed" if remove else "founding_set", g,
+              {} if remove else {"pct": pct, "prices_locked": lock})
+        st.session_state["adm_flash"] = (f"Founding deal removed for {names.get(gid)}." if remove else
+                                         f"{names.get(gid)} is a founding partner.")
+        st.rerun()
+
+
 def render_admin_billing(sc, gyms, audit):
     """Admin → Billing: prices, payment details, and each gym's plan."""
     today = gw.today_local()
@@ -1677,6 +1783,9 @@ def render_admin_billing(sc, gyms, audit):
                                                      on_conflict="key").execute()
                 st.session_state["adm_flash"] = "Plans saved. They now show on the website and in the app."
                 st.rerun()
+
+    with st.expander("Founding partners", icon=":material/workspace_premium:"):
+        _render_founding_admin(sc, gyms, audit, p)
 
     with st.expander("Online payments (Paystack)"):
         if paystack_key():
