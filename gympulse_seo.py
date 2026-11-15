@@ -145,6 +145,92 @@ PAGES = [
                 "At the end it shows who actually left, and how many GymPulse flagged in advance",
                 "So you can see how accurate it is for your own gym, with your own members",
             ]),
+            ("Built on the research", [
+                "Most members who quit do so in their first few months, and their visits slow down first",
+                "Days without a visit are one of the strongest signs a member will leave",
+                "Personal contact from staff and a good start keep more members coming",
+                "Read the full summary, with sources: usegympulseai.com/why-gym-members-leave-research.html",
+            ]),
+        ],
+    },
+    {
+        "slug": "why-gym-members-leave-research",
+        "title": "Why gym members leave, and what keeps them: the research · GymPulse AI",
+        "description": "What studies and gym data say about when members quit, the warning signs, and what "
+                       "keeps them coming, with the numbers for Nigerian gyms and the sources.",
+        "h1": "Why gym members leave, and what keeps them",
+        "lead": "A summary of the research on gym member retention: when members are most likely to quit, "
+                "the signs that show up first, and what actually keeps them. Each point lists its source, and "
+                "we say where a figure comes from industry surveys rather than published studies.",
+        "sections": [
+            ("When members leave", [
+                "The first weeks are the riskiest. UK operator The Gym Group reports its highest rate of "
+                "leaving is in the first 45 days, before a habit has formed",
+                "Industry reports put roughly half of the members who quit inside their first 90 days, so the "
+                "first three months decide most of a gym's retention",
+                "New habits take time to become automatic: a University College London study found a median of "
+                "66 days, ranging from 18 to over 200, and exercise tends to sit at the slower end",
+            ]),
+            ("The warning signs come first", [
+                "A study of 5,209 members of a fitness centre in Lisbon used machine learning to predict who "
+                "would drop out. The strongest signals were days without a visit, how long the member had "
+                "been with the gym, and how much they had paid",
+                "In other words, members show they are leaving through their visits weeks before they cancel. "
+                "Comparing each member with their own normal pattern catches that slide early",
+                "Industry studies consistently find that members who visit more often in their first month "
+                "are far more likely to still be members a year later",
+            ]),
+            ("Why members say they cancel", [
+                "Industry surveys most often list cost, and not using the membership enough to justify the "
+                "cost, followed by moving away",
+                "The two are linked: a member who stops coming starts to feel the fee isn't worth it. Getting "
+                "them back in the door early also protects the renewal",
+            ]),
+            ("What keeps members coming", [
+                "A proper start: industry research links an orientation plus a few follow-ups in the first "
+                "weeks to much higher retention at six months",
+                "Personal contact from staff: industry studies suggest that regular, genuine check-ins from "
+                "staff lead to more visits and fewer cancellations",
+                "Classes and people: members who join group classes or have friends at the gym are reported "
+                "to cancel less often than those who train alone",
+                "These figures come from gym-industry research and software companies, not peer-reviewed "
+                "studies, so treat the exact percentages as a guide. The direction is consistent across all of them",
+            ]),
+            ("The picture in Nigeria", [
+                "Nigerians spent about ₦32.8 billion on gym subscriptions in 2025, roughly ₦90 million a day, "
+                "according to Moniepoint transaction data",
+                "Monthly plans are becoming the norm rather than yearly ones, which means a member can leave "
+                "every month, and every renewal counts",
+                "A 2026 market review found that most Nigerian gyms still can't say how many of their members "
+                "are actually still coming",
+                "Large chains are growing fast, which makes keeping members, not just signing them up, the "
+                "difference for independent gyms",
+            ]),
+            ("How GymPulse AI uses this", [
+                "Days since the last visit, compared with each member's own habits, drive the daily risk score, "
+                "the strongest signal in the research",
+                "New members get extra attention in their first weeks, with check-ins while the habit is forming",
+                "Each flagged member comes with a suggested personal step (a trainer call, a WhatsApp message, a "
+                "class invite) because personal contact is what keeps people",
+                "Members who renew soon and are coming less are flagged before the renewal date",
+                "Every outcome is recorded, so each gym sees what actually works for its own members",
+            ]),
+        ],
+        "sources": [
+            ("Predicting Fitness Centre Dropout (study of 5,209 members, PMC)",
+             "https://pmc.ncbi.nlm.nih.gov/articles/PMC8508547/"),
+            ("How long does it take to form a habit? (University College London, Lally et al.)",
+             "https://www.ucl.ac.uk/news/2009/aug/how-long-does-it-take-form-habit"),
+            ("Gym retention statistics and benchmarks (includes The Gym Group's annual report)",
+             "https://blog.jericommerce.com/resources/gyms-fitness-studios-retention-statistics"),
+            ("Gym member engagement and staff interactions (Glofox)",
+             "https://www.glofox.com/blog/gym-member-engagement/"),
+            ("Nigerians spent ₦32.8 billion on gym subscriptions in 2025 (Moniepoint data)",
+             "https://thenotesphere.com/nigerians-spent-%E2%82%A632-8-billion-annually-on-gym-subscriptions-in-2025/"),
+            ("FirstRep H1 2026 Market Pulse: the state of Nigeria's gym industry",
+             "https://www.firstrep.xyz/blog/firstrep-h1-2026-market-pulse-the-state-of-nigeria-s-gym-industry"),
+            ("From one Lagos gym to 30 locations (Forbes Africa)",
+             "https://www.forbesafrica.com/current-affairs/2026/10/03/from-one-lagos-gym-to-30-locations-in-nigeria-how-verod-backed-fitness-firm-is-now-eyeing-accra-and-abidjan"),
         ],
     },
     {
@@ -355,6 +441,10 @@ def page_html(p):
     e = html.escape
     url = f"{SITE}/{p['slug']}.html"
     faq = _faq_html(p["faq"]) if p.get("faq") else ""
+    if p.get("sources"):
+        items = "".join(f'<li><a href="{html.escape(u)}" rel="noopener" target="_blank">{html.escape(t)}</a></li>'
+                        for t, u in p["sources"])
+        faq += f'<div class="card"><h2>Sources</h2><ul>{items}</ul></div>'
     ld = (f'<script type="application/ld+json">{json.dumps(_faq_ld(p["faq"]), ensure_ascii=False)}</script>'
           if p.get("faq") else "")
     return f"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
