@@ -108,3 +108,14 @@ Run `sql/phase20_plan_limits.sql` once.
   benefits and the comparison table.
 - **Admin → Billing → Usage this month**: per gym plan, members against the limit, Archie and WhatsApp used, and who is
   over the limit.
+
+## Founding partners (first pilot gyms)
+
+Admin → Billing → **Founding partners** gives a gym a deal it keeps for as long as it stays:
+- **A discount on every plan** (10–50%), and/or
+- **Today's plan prices locked**: later price rises don't apply to that gym (if prices go down, it pays the lower price).
+
+The deal applies at checkout (shown line by line in the order summary), on the invoice, in the Paystack amount and
+when the payment is checked. It stacks with the branch discount: locked price first, then the branch discount, then
+the founding discount. Stored in `platform_settings` under `founding_partners`, which gyms can't read; every change is
+in the Admin log. The free pilot months themselves are given with **Extend trial** or **Give free access**.
