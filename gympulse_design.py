@@ -945,6 +945,27 @@ def landing_sections(icon, bot_svg):
       </div>
     </div>
 
+    <div class="lx-sec" id="research">
+      <div class="lx-kicker">What the research says</div>
+      <div class="lx-h2">Members don't quit suddenly. They fade, and the signs show early.</div>
+      <div class="lx-sub">GymPulse AI is built on what studies and gym data say about why members leave.
+        <a href="/why-gym-members-leave-research.html" target="_self" style="color:var(--gp-lime)">Read the full summary, with sources</a>.</div>
+      <div class="lx-loop">
+        <div class="lx-card"><div class="lx-num">THE FIRST WEEKS</div><div class="lx-ic">{icon('calendar')}</div>
+          <h4>Most quit early</h4><p>The riskiest time is the first 45 to 90 days, before training becomes a habit. New habits take about two months on average to stick.</p>
+          <div class="lx-out">New-member check-ins</div></div>
+        <div class="lx-card"><div class="lx-num">THE STRONGEST SIGN</div><div class="lx-ic">{icon('pulse')}</div>
+          <h4>Days without a visit</h4><p>A study of 5,209 fitness-centre members found days away from the gym were among the best predictors of who would leave.</p>
+          <div class="lx-out">Daily risk scores</div></div>
+        <div class="lx-card"><div class="lx-num">WHAT KEEPS THEM</div><div class="lx-ic">{icon('chat')}</div>
+          <h4>Personal contact</h4><p>Industry studies link regular, genuine check-ins from staff, a good start and group classes to more visits and fewer cancellations.</p>
+          <div class="lx-out">Action Centre · Follow-ups</div></div>
+        <div class="lx-card"><div class="lx-num">IN NIGERIA</div><div class="lx-ic">{icon('gauge')}</div>
+          <h4>Every month counts</h4><p>Nigerians spent about ₦32.8 billion on gym subscriptions in 2025, and monthly plans are becoming the norm, so a member can leave at any renewal.</p>
+          <div class="lx-out">Renewal watch</div></div>
+      </div>
+    </div>
+
     <div class="lx-sec">
       <div class="lx-kicker">Proof, not promises</div>
       <div class="lx-h2">How we count the money you keep</div>
@@ -992,7 +1013,7 @@ def landing_sections(icon, bot_svg):
         <a class="lx-btn" href="?demo=book" target="_self">Book a 15-minute demo</a>
       </div>
     </div>
-    <div class="lx-foot"><span><a href="/gym-management-software-nigeria.html" target="_self">Member retention platform</a> · <a href="/gym-member-retention.html" target="_self">Keep members from cancelling</a> · <a href="/gym-whatsapp-renewal-reminders.html" target="_self">WhatsApp reminders</a> · <a href="/switch-from-gymmaster-or-excel.html" target="_self">Works with GymMaster</a> · <a href="/gym-hmo-members.html" target="_self">HMO members</a></span></div>
+    <div class="lx-foot"><span><a href="/gym-management-software-nigeria.html" target="_self">Member retention platform</a> · <a href="/gym-member-retention.html" target="_self">Keep members from cancelling</a> · <a href="/why-gym-members-leave-research.html" target="_self">Why members leave: the research</a> · <a href="/gym-whatsapp-renewal-reminders.html" target="_self">WhatsApp reminders</a> · <a href="/switch-from-gymmaster-or-excel.html" target="_self">Works with GymMaster</a> · <a href="/gym-hmo-members.html" target="_self">HMO members</a></span></div>
     <div class="lx-foot"><span>© 2026 GYMPULSE AI LTD · RC 9996401 · Registered in Nigeria</span><span>Calabar, Cross River State · <a href="mailto:hello@usegympulseai.com">hello@usegympulseai.com</a> · <a href="mailto:emmanuel@usegympulseai.com">emmanuel@usegympulseai.com</a></span></div>
     """
 
