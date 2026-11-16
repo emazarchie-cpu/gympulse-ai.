@@ -14,10 +14,11 @@ founder confirms those in Admin.
 Tables: sql/phase10_billing.sql. If the SQL hasn't been run, nothing is locked.
 """
 import json
+import time
 import re
 import uuid
 from datetime import date, datetime, timedelta, timezone
-from urllib.parse import quote
+from urllib.parse import quote as url_quote
 
 import pandas as pd
 import streamlit as st
@@ -232,7 +233,7 @@ def founding_for(client, gym_id):
     return founding_all(client).get(str(gym_id))
 
 
-def quote(plan, period, chain=(0.0, 1), founding=None):
+def price_quote(plan, period, chain=(0.0, 1), founding=None):
     """What a gym pays for a plan: the list price, the founding price lock, the branch discount and the founding
     discount, in that order, rounded to the naira. Returns {full, base, chain_pct, branches, founding_pct, amount}."""
     full = price_for(plan, period)
@@ -250,9 +251,9 @@ def quote(plan, period, chain=(0.0, 1), founding=None):
 
 
 def gym_quote(client, gym_id, plan, period):
-    """quote() for this gym, with its branch discount and founding deal looked up (server key)."""
+    """price_quote() for this gym, with its branch discount and founding deal looked up (server key)."""
     sc = client or _service()
-    return quote(plan, period, chain_discount(sc, gym_id) if sc else (0.0, 1), founding_for(sc, gym_id))
+    return price_quote(plan, period, chain_discount(sc, gym_id) if sc else (0.0, 1), founding_for(sc, gym_id))
 
 
 def _money(x):
@@ -887,7 +888,7 @@ def apply_payment(reference, sc=None):
     sc = sc or _service()
     if not (sc and paystack_key() and reference):
         return False, "We couldn't check the payment right now. If you paid, it will show within a day.", None
-    r = _paystack("GET", f"/transaction/verify/{quote(str(reference), safe='')}")
+    r = _paystack("GET", f"/transaction/verify/{url_quote(str(reference), safe='')}")
     d = r.get("data") or {}
     if not r.get("status") or d.get("status") != "success":
         return False, "That payment hasn't gone through yet. If money left your account, it will show here shortly.", None
@@ -909,7 +910,7 @@ def apply_payment(reference, sc=None):
     except (TypeError, ValueError):
         pct = 0.0
     # the branch discount as it stood at checkout; the founding deal as recorded (gyms can't change either)
-    expected = quote(plan, period, (pct, 1), founding_for(sc, gid))["amount"] if plan else None
+    expected = price_quote(plan, period, (pct, 1), founding_for(sc, gid))["amount"] if plan else None
     inv = gi.by_reference(sc, reference)
     if d.get("currency") != "NGN" or not expected or paid + 0.5 < expected:
         _email_founder(f"Paystack payment to check: {reference}",
@@ -979,6 +980,14 @@ def reconcile_paystack(sc, days=3, log=print):
 
 
 # ------------------------------------------------------------------ the page Paystack returns to
+RETURN_CHECKS, RETURN_WAIT_SECONDS = 24, 5          # up to 2 minutes of checking while the payer waits
+_PENDING = "hasn't gone through yet"
+
+
+def _still_pending(msg):
+    return _PENDING in str(msg)
+
+
 def render_return_page(params):
     """?paystack=1&reference=...: a public confirmation page (works even if the owner isn't signed in)."""
     import gympulse_booking as gb
@@ -986,17 +995,32 @@ def render_return_page(params):
     gb._header()
     ref = params.get("reference") or params.get("trxref")
     key = f"_pay_return_{ref}"
-    if key not in st.session_state:
-        try:
-            st.session_state[key] = apply_payment(ref)
-        except Exception as error:
-            st.session_state[key] = (False, "We couldn't confirm the payment just now. If you paid, your plan will "
-                                            "switch on within a day and your receipt will be emailed.", None)
+    if key not in st.session_state or not st.session_state[key][0]:
+        # Card and USSD payments confirm at once; bank transfers can take a minute or two. Keep checking for up
+        # to two minutes so the plan switches on while the payer waits. After that the 15-minute sync takes over.
+        status = st.empty()
+        result = (False, "We couldn't confirm the payment just now. If you paid, your plan will switch on within "
+                         "15 minutes and your receipt will be emailed.", None)
+        for attempt in range(RETURN_CHECKS):
             try:
-                import gympulse_monitoring as gmon
-                gmon.capture(error, "paystack return")
-            except Exception:
-                pass
+                result = apply_payment(ref)
+            except Exception as error:
+                try:
+                    import gympulse_monitoring as gmon
+                    gmon.capture(error, "paystack return")
+                except Exception:
+                    pass
+            if result[0] or not _still_pending(result[1]):
+                break
+            status.info(f"Waiting for Paystack to confirm your payment… ({(attempt + 1) * RETURN_WAIT_SECONDS}s)",
+                        icon=":material/hourglass_top:")
+            time.sleep(RETURN_WAIT_SECONDS)
+        status.empty()
+        if not result[0] and _still_pending(result[1]):
+            result = (False, "Your bank hasn't confirmed the payment yet. You can close this page: your plan "
+                             "switches on automatically within 15 minutes of the payment arriving, and your receipt "
+                             "will be emailed.", None)
+        st.session_state[key] = result
         st.session_state.pop("_cache", None)
         st.session_state.pop("_upgrade_shown", None)
     ok, msg, inv = st.session_state[key]
@@ -1068,7 +1092,7 @@ CO_CSS = """
 
 def _summary_html(plan, period, sub_state, ps):
     import gympulse_invoices as gi
-    q = quote(plan, period, st.session_state.get("co_disc") or (0.0, 1), st.session_state.get("co_found"))
+    q = price_quote(plan, period, st.session_state.get("co_disc") or (0.0, 1), st.session_state.get("co_found"))
     full, amount, pct, n_branches = q["full"], q["amount"], q["chain_pct"], q["branches"]
     today = gw.today_local()
     if sub_state["status"] == "trial" and sub_state.get("ends"):
@@ -1337,7 +1361,7 @@ def _render_checkout(supabase, gym_id, plan, period, s, p, ps):
                                     f"{glegal.SUBSCRIPTION_VERSION}), the Terms of Service, Privacy Policy and Data "
                                     "Processing Agreement. I am authorised to sign for this business, and I "
                                     "authorise this payment.")
-            go = st.form_submit_button(f"Continue · {_money(quote(plan, period, st.session_state['co_disc'], st.session_state.get('co_found'))['amount'])}", type="primary",
+            go = st.form_submit_button(f"Continue · {_money(price_quote(plan, period, st.session_state['co_disc'], st.session_state.get('co_found'))['amount'])}", type="primary",
                                        use_container_width=True)
         if go:
             details = {"business_name": biz, "billing_name": name, "billing_phone": phone, "billing_email": email,
