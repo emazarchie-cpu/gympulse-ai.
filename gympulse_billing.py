@@ -1658,6 +1658,94 @@ def _render_founding_admin(sc, gyms, audit, p):
         st.rerun()
 
 
+BILL_CSS = """
+.bl-card { border:1px solid var(--gp-line); border-radius:16px; padding:14px 16px; margin:0 0 8px; background:var(--gp-s1); }
+.bl-top { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.bl-name { font-weight:700; font-size:15.5px; color:var(--gp-text); min-width:0; overflow:hidden; text-overflow:ellipsis;
+    white-space:nowrap; }
+.bl-owner { color:var(--gp-muted); font-size:12.5px; margin-top:2px; overflow-wrap:anywhere; }
+.bl-line { font-size:13.5px; color:var(--gp-text); margin-top:8px; line-height:1.5; }
+.bl-line b { color:var(--gp-lime); }
+.bl-line .warn { color:#FFC44D; font-weight:700; }
+.bl-line .bad { color:#FF7A6B; font-weight:700; }
+.bl-tags { margin-top:6px; display:flex; gap:6px; flex-wrap:wrap; }
+"""
+
+
+def _render_billing_overview(sc, ordered, states, subs):
+    """At-a-glance billing: counts, money in, recent payments, and a card per gym grouped by status."""
+    import gympulse_invoices as gi
+    gw._md(f"<style>{BILL_CSS}</style>")
+    today = gw.today_local()
+    by = {k: [g for g in ordered if states[g["gym"]["id"]]["status"] == k] for k in ("active", "trial", "expired", "free")}
+    ending = [g for g in by["trial"] if (states[g["gym"]["id"]].get("days_left") or 0) <= 7]
+    try:
+        paid = sc.table("billing_invoices").select("*").eq("status", "paid").order("paid_at", desc=True) \
+            .limit(200).execute().data or []
+    except Exception:
+        paid = []
+    month_start = today.replace(day=1).isoformat()
+    this_month = sum(float(x.get("amount") or 0) for x in paid if str(x.get("paid_at") or "")[:10] >= month_start)
+    mrr = sum(float(subs.get(g["gym"]["id"], {}).get("price") or 0) for g in by["active"])
+    gw.kpi_row([("Paying gyms", str(len(by["active"])), "lime", f"₦{mrr:,.0f} a month" if mrr else "none yet"),
+                ("On free trial", str(len(by["trial"])), "cyan",
+                 f"{len(ending)} end within 7 days" if ending else "none ending this week"),
+                ("Trial or plan ended", str(len(by["expired"])), "red" if by["expired"] else "grey", "locked until they pay"),
+                ("Paid this month", f"₦{this_month:,.0f}", "amber", f"{today:%B}")])
+
+    names = {g["gym"]["id"]: g["name"] for g in ordered}
+    st.markdown('<div class="section-label">RECENT PAYMENTS</div>', unsafe_allow_html=True)
+    if paid:
+        how = {"paystack": "Paystack", "transfer": "Bank transfer", "admin": "Marked paid"}
+        gw.table([{"Date": str(x.get("paid_at") or x.get("created_at") or "")[:10],
+                   "Gym": names.get(x["gym_id"], x.get("business_name") or "–"),
+                   "Plan": f"{x.get('plan')} · {'Yearly' if x.get('period') == 'yearly' else 'Monthly'}",
+                   "Amount": gi.money(x.get("amount")), "How": how.get(x.get("method"), x.get("method") or "–"),
+                   "Receipt": gi.number(x)} for x in paid[:10]], pills={"How": {"Paystack": "lime", "Bank transfer": "cyan",
+                                                                                "Marked paid": "grey"}})
+    else:
+        st.caption("No payments yet. They appear here the moment a gym pays.")
+
+    deals = founding_all(sc)
+
+    def card(g):
+        gid = g["gym"]["id"]
+        s, sub = states[gid], subs.get(gid, {})
+        tone = {"trial": "cyan", "active": "lime", "free": "grey", "expired": "red"}.get(s["status"], "grey")
+        word = {"trial": "Free trial", "active": "Paying", "free": "Free access", "expired": "Ended", "off": "Pilot"}
+        plan = gw._text(sub.get("plan"), "")
+        if s["status"] == "active":
+            line = (f"{gw._esc(plan or 'Plan')} · <b>{_money(sub.get('price'))}</b> a month · paid until "
+                    f"<b>{s['ends']:%d %b %Y}</b> ({s['days_left']} days)")
+        elif s["status"] == "trial":
+            left = s.get("days_left") or 0
+            cls = "warn" if left <= 7 else ""
+            line = (f"Trial ends <b>{s['ends']:%d %b %Y}</b> · <span class='{cls}'>{left} day{'s' if left != 1 else ''} "
+                    f"left</span>")
+        elif s["status"] == "expired":
+            line = f"<span class='bad'>Ended {s['ends']:%d %b %Y}</span> · locked until they pay"
+        elif s["status"] == "free":
+            line = "Free access (no charge)"
+        else:
+            line = "Billing is off (pilot mode)"
+        tags = []
+        if str(gid) in deals:
+            d = deals[str(gid)]
+            tags.append(gw.chip(f"Founding partner {float(d.get('pct') or 0):.0%}"
+                                + (" · prices locked" if d.get("prices") else ""), "amber"))
+        gw._md(f'<div class="bl-card"><div class="bl-top"><div class="bl-name">{gw._esc(g["name"])}</div>'
+               f'{gw.chip(word.get(s["status"], s["status"]), tone, dot=True)}</div>'
+               f'<div class="bl-owner">{gw._esc(g.get("email") or "–")}</div>'
+               f'<div class="bl-line">{line}</div>'
+               + (f'<div class="bl-tags">{"".join(tags)}</div>' if tags else "") + '</div>')
+
+    for key, label in (("active", "PAYING"), ("trial", "ON FREE TRIAL"), ("expired", "ENDED"), ("free", "FREE ACCESS")):
+        if by[key]:
+            st.markdown(f'<div class="section-label">{label} · {len(by[key])}</div>', unsafe_allow_html=True)
+            for g in by[key]:
+                card(g)
+
+
 def render_admin_billing(sc, gyms, audit):
     """Admin → Billing: prices, payment details, and each gym's plan."""
     today = gw.today_local()
@@ -1856,16 +1944,17 @@ def render_admin_billing(sc, gyms, audit):
             gi.update(sc, pend[pk], status="cancelled")
             st.session_state["adm_flash"] = f"Cancelled {gi.number(pend[pk])}."
             st.rerun()
-    st.markdown('<div class="section-label">ALL GYMS</div>', unsafe_allow_html=True)
-    gw.table([{"Gym": g["name"], "Owner": g.get("email") or "–",
-               "Status": status_word.get(states[g["gym"]["id"]]["status"], "–"),
-               "Plan": gw._text(subs.get(g["gym"]["id"], {}).get("plan"), "–"),
-               "Trial ends": _d_txt(subs.get(g["gym"]["id"], {}).get("trial_ends_on")),
-               "Paid until": _d_txt(subs.get(g["gym"]["id"], {}).get("paid_until")),
-               "Monthly": _money(subs.get(g["gym"]["id"], {}).get("price"))
-               if subs.get(g["gym"]["id"], {}).get("price") else "–"} for g in ordered],
-             pills={"Status": {"Free trial": "cyan", "Paying": "lime", "Free access": "grey", "Ended": "red"}},
-             max_height=460)
+    _render_billing_overview(sc, ordered, states, subs)
+    with st.expander("All gyms as a table", icon=":material/table_rows:"):
+      gw.table([{"Gym": g["name"], "Owner": g.get("email") or "–",
+                 "Status": status_word.get(states[g["gym"]["id"]]["status"], "–"),
+                 "Plan": gw._text(subs.get(g["gym"]["id"], {}).get("plan"), "–"),
+                 "Trial ends": _d_txt(subs.get(g["gym"]["id"], {}).get("trial_ends_on")),
+                 "Paid until": _d_txt(subs.get(g["gym"]["id"], {}).get("paid_until")),
+                 "Monthly": _money(subs.get(g["gym"]["id"], {}).get("price"))
+                 if subs.get(g["gym"]["id"], {}).get("price") else "–"} for g in ordered],
+               pills={"Status": {"Free trial": "cyan", "Paying": "lime", "Free access": "grey", "Ended": "red"}},
+               max_height=460)
     if not ordered:
         return
     ids = [g["gym"]["id"] for g in ordered]
