@@ -77,9 +77,46 @@ def code_box(code):
             f'{code}</div>')
 
 
-def layout(title, body_html, preheader="", footer_html=""):
-    """The full email: header image, title, body, footer."""
+def gym_header(name, logo_url="", color="#B7F34A", dark="#0B1020", light_bg=False):
+    """The gym's own header for emails to its members: logo and name side by side,
+    on the gym's colour, with an accent line. Members see at a glance who wrote."""
+    bg = "#FFFFFF" if light_bg else dark
+    ink = "#0A0F1E" if light_bg else "#FFFFFF"
+    name_html = (f'<div style="font-family:Arial,Helvetica,sans-serif;font-size:19px;line-height:1.25;'
+                 f'font-weight:700;color:{ink}">{esc(name)}</div>')
+    if logo_url:
+        brand = (f'<table role="presentation" cellspacing="0" cellpadding="0"><tr>'
+                 f'<td valign="middle" style="padding-right:14px"><img src="{esc(logo_url)}" alt="{esc(name)}" height="56" '
+                 f'style="display:block;height:56px;max-width:180px;width:auto;border:0"></td>'
+                 f'<td valign="middle">{name_html}</td></tr></table>')
+    else:
+        brand = name_html.replace("font-size:19px", "font-size:22px")
+    return (f'<table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="{bg}" '
+            f'style="background-color:{bg};background-image:linear-gradient({bg},{bg})"><tr>'
+            f'<td style="padding:20px 28px">{brand}</td></tr>'
+            f'<tr><td height="4" bgcolor="{color}" style="height:4px;line-height:4px;font-size:0;'
+            f'background-color:{color};background-image:linear-gradient({color},{color})">&nbsp;</td></tr></table>')
+
+
+def layout(title, body_html, preheader="", footer_html="", gym=None):
+    """The full email: header image, title, body, footer. With gym={"gym", "logo_url",
+    "color", "dark"} it's a letter from that gym to its member: the gym's header,
+    the gym named in the footer, and a small "Sent with GymPulse AI" line."""
     b = BRAND
+    if gym:
+        header = gym_header(gym.get("gym") or "Your gym", gym.get("logo_url"), gym.get("color") or b["lime"],
+                            gym.get("dark") or b["navy"], gym.get("light_bg", False))
+        foot = (f'{footer_html}{"<br><br>" if footer_html else ""}Sent by {esc(gym.get("gym") or "your gym")}. '
+                'Questions? Reply to this email.')
+        after = ('<div style="font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#8A94A6;padding:12px">'
+                 'Sent with GymPulse AI</div>')
+    else:
+        header = (f'<a href="{b["site"]}"><img src="{b["header_img"]}" width="600" alt="{esc(b["name"])}" '
+                  'style="display:block;width:100%;max-width:600px;height:auto;border:0"></a>')
+        foot = (f'{footer_html}{"<br><br>" if footer_html else ""}{esc(b["address_line"])}<br>'
+                f'Questions? Reply to this email or write to <a href="mailto:{b["support"]}" '
+                f'style="color:{b["muted"]}">{b["support"]}</a>.')
+        after = ""
     pre = (f'<div style="display:none;max-height:0;overflow:hidden;opacity:0">{esc(preheader)}</div>'
            if preheader else "")
     return f"""<!doctype html>
@@ -92,15 +129,12 @@ def layout(title, body_html, preheader="", footer_html=""):
 <tr><td align="center" style="padding:24px 12px">
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" class="gp-card"
        style="max-width:600px;background:#FFFFFF;border-radius:16px;overflow:hidden;border:1px solid {b['line']}">
-<tr><td style="padding:0;line-height:0;background:{b['navy']}">
-  <a href="{b['site']}"><img src="{b['header_img']}" width="600" alt="{esc(b['name'])}"
-     style="display:block;width:100%;max-width:600px;height:auto;border:0"></a></td></tr>
+<tr><td style="padding:0;line-height:0;background:{b['navy']}">{header}</td></tr>
 <tr><td style="padding:28px 28px 8px;font-family:Arial,Helvetica,sans-serif;color:{b['ink']}">
   <h1 class="gp-ink" style="margin:0 0 10px;font-size:22px;line-height:1.3;color:{b['ink']}">{esc(title)}</h1>
   <div class="gp-body" style="font-size:15px;line-height:1.6;color:#2B3445">{body_html}</div>
 </td></tr>
 <tr><td class="gp-muted" style="padding:18px 28px 26px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.6;color:{b['muted']}">
-  {footer_html}{'<br><br>' if footer_html else ''}{esc(b['address_line'])}<br>
-  Questions? Reply to this email or write to <a href="mailto:{b['support']}" style="color:{b['muted']}">{b['support']}</a>.
+  {foot}
 </td></tr>
-</table></td></tr></table></body></html>"""
+</table>{after}</td></tr></table></body></html>"""

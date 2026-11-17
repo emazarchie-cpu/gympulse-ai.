@@ -322,10 +322,10 @@ html body .stMain [data-testid="stRadioOption"]:not(.st-key-top_nav *) { min-hei
               mask-image: linear-gradient(90deg, #000 85%, transparent); padding-right: 28px !important; }
   html body .stApp [class*="st-key-dm_time_"] [role="radiogroup"] { -webkit-mask-image: none; mask-image: none; padding-right: 0 !important; }
 }
-/* ---------- full-screen menu (phones and tablets): fades in over the page, rows drift in ---------- */
+/* ---------- full-screen menu (every screen): fades in over the page, rows drift in ---------- */
 @keyframes gpMenuIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes gpRowIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
-@media (max-width: 1000px) {
+@media all {
   html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) {
       position: fixed !important; inset: 72px 0 0 0 !important; transform: none !important; will-change: auto !important;
       filter: none !important; backdrop-filter: none !important;
@@ -358,7 +358,7 @@ html body .stMain [data-testid="stRadioOption"]:not(.st-key-top_nav *) { min-hei
   html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stButton button :is(p, [data-testid="stMarkdownContainer"]) {
       text-align: left !important; width: auto !important; }
   html body:has([data-testid="stPopoverBody"] :is(.st-key-pop_main, .st-key-pop_sub)) :is([data-testid="stToastContainer"], [data-testid="stToast"]) { display: none !important; }
-  /* phones: the ☰ menu holds the account too, so the round profile button is hidden */
+  /* the ☰ menu holds the account too, so there's no separate profile button */
   html body .st-key-top_profile { display: none !important; }
   /* a solid bar under the ✕, so rows scroll beneath it */
   /* the strip above the menu: page colour, with the ✕ on it */
@@ -413,26 +413,34 @@ html body .stMain [data-testid="stRadioOption"]:not(.st-key-top_nav *) { min-hei
   html body .st-key-top_menu [data-testid="stPopoverButton"][aria-expanded="true"]::after {
       content: "✕"; font-size: 24px; font-weight: 500; color: var(--gp-text, #F4F7FB); }
 }
-@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(1) .stButton { animation-delay: 0.03s; } }
-@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(2) .stButton { animation-delay: 0.06s; } }
-@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(3) .stButton { animation-delay: 0.09s; } }
-@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(4) .stButton { animation-delay: 0.12s; } }
-@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(5) .stButton { animation-delay: 0.15s; } }
-@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(6) .stButton { animation-delay: 0.18s; } }
-@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(7) .stButton { animation-delay: 0.21s; } }
-@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(8) .stButton { animation-delay: 0.24s; } }
-@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(9) .stButton { animation-delay: 0.27s; } }
-@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(10) .stButton { animation-delay: 0.30s; } }
-@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(11) .stButton { animation-delay: 0.33s; } }
-@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(12) .stButton { animation-delay: 0.36s; } }
-@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(13) .stButton { animation-delay: 0.39s; } }
-@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(14) .stButton { animation-delay: 0.42s; } }
-@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(15) .stButton { animation-delay: 0.45s; } }
-@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(16) .stButton { animation-delay: 0.48s; } }
-@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(17) .stButton { animation-delay: 0.51s; } }
-@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(18) .stButton { animation-delay: 0.54s; } }
-@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(19) .stButton { animation-delay: 0.57s; } }
-@media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(20) .stButton { animation-delay: 0.60s; } }
+@media all { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(1) .stButton { animation-delay: 0.03s; } }
+@media all { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(2) .stButton { animation-delay: 0.06s; } }
+@media all { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(3) .stButton { animation-delay: 0.09s; } }
+@media all { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(4) .stButton { animation-delay: 0.12s; } }
+@media all { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(5) .stButton { animation-delay: 0.15s; } }
+@media all { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(6) .stButton { animation-delay: 0.18s; } }
+@media all { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(7) .stButton { animation-delay: 0.21s; } }
+@media all { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(8) .stButton { animation-delay: 0.24s; } }
+@media all { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(9) .stButton { animation-delay: 0.27s; } }
+@media all { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(10) .stButton { animation-delay: 0.30s; } }
+@media all { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(11) .stButton { animation-delay: 0.33s; } }
+@media all { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(12) .stButton { animation-delay: 0.36s; } }
+@media all { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(13) .stButton { animation-delay: 0.39s; } }
+@media all { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(14) .stButton { animation-delay: 0.42s; } }
+@media all { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(15) .stButton { animation-delay: 0.45s; } }
+@media all { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(16) .stButton { animation-delay: 0.48s; } }
+@media all { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(17) .stButton { animation-delay: 0.51s; } }
+@media all { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(18) .stButton { animation-delay: 0.54s; } }
+@media all { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(19) .stButton { animation-delay: 0.57s; } }
+@media all { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(20) .stButton { animation-delay: 0.60s; } }
+/* laptops: the same menu, its rows in a readable column instead of stretching across the screen */
+@media (min-width: 1001px) {
+  html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) {
+      padding: 18px max(28px, calc((100vw - 640px) / 2)) 40px !important; }
+  html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stButton button { padding: 0 14px !important; border-radius: 12px !important; }
+  html body .gp-prof-row, html body .gp-prof-back { padding-left: 14px !important; }
+  html body .st-key-top_menu [data-testid="stPopoverButton"][aria-expanded="true"] { top: 12px !important; right: 24px !important; }
+}
 @media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(21) .stButton { animation-delay: 0.63s; } }
 @media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(22) .stButton { animation-delay: 0.66s; } }
 @media (max-width: 1000px) { html body [data-testid="stPopoverBody"]:has(:is(.st-key-pop_main, .st-key-pop_sub)) .stElementContainer:nth-child(23) .stButton { animation-delay: 0.69s; } }

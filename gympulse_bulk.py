@@ -177,11 +177,11 @@ def _send(supabase, gym_id, jobs, ctx):
                 end = m.get("end")
                 ref = (f"end:{end.isoformat()}" if kind == "renewal" and end is not None and not pd.isna(end)
                        else f"last:{last.isoformat()}")
-                ok, why = gwa.send_member(supabase, gym_id, m, kind, ref, f"A note from {ctx['biz']}", text, [])
+                ok, why = gwa.send_member(supabase, gym_id, m, kind, ref, f"A message from {ctx['biz']}", text, [])
                 if not ok and "@" in gw._text(m.get("email")) and gcamp.ready():
                     channel = "Email"                      # WhatsApp didn't go: try email
             if channel == "Email" and not ok:
-                ok, why = gcamp.email_member(supabase, gym_id, m, f"A note from {ctx['biz']}", text)
+                ok, why = gcamp.email_member(supabase, gym_id, m, f"A message from {ctx['biz']}", text)
                 time.sleep(0.55)                          # stay inside the email service's rate limit
         except Exception as error:
             ok, why = False, str(error)
