@@ -47,9 +47,7 @@ jobs:
         run: |
           rm -f "$RUNNER_TEMP/demo_pw"
           src=$(ls demo_out/*.webm | head -1)
-          start=$(cat demo_out/start.txt 2>/dev/null || echo 0)
-          ffmpeg -v error -y -ss "$start" -i "$src" -c:v libx264 -preset slow -crf 24 -pix_fmt yuv420p \
-            -r 30 -movflags +faststart -an GymPulse-AI-Demo.mp4
+          python scripts/cut_demo.py "$src" demo_out/keep.json GymPulse-AI-Demo.mp4
           ffmpeg -v error -y -i GymPulse-AI-Demo.mp4 -vf scale=1280:-2 -c:v libx264 -preset slow -crf 26 \
             -pix_fmt yuv420p -movflags +faststart -an GymPulse-AI-Demo-WhatsApp.mp4
           ls -la *.mp4

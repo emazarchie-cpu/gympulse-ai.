@@ -17,6 +17,32 @@ const W = 1920, H = 1080;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Parts of the take to keep, in seconds from the start of the video. Waiting for a
+// page to load is cut out, so the finished video goes straight from page to page.
+let T0 = 0;
+const keep = [];
+const now = () => (Date.now() - T0) / 1000;
+function pause() { const k = keep[keep.length - 1]; if (k && k[1] === null) k[1] = now(); }
+function resume() { pause(); keep.push([now() + 0.15, null]); }
+
+async function loaded(page, maxMs = 30000) {
+  // Done when nothing is loading and the page has stopped growing for a moment
+  const t = Date.now();
+  let last = -1, still = 0;
+  while (Date.now() - t < maxMs) {
+    const st = await page.evaluate(() => {
+      const busy = document.querySelectorAll('[data-testid="stSkeleton"], [data-testid="stSpinner"], .stSpinner').length;
+      const m = document.querySelector('[data-testid="stMain"]') || document.body;
+      const loading = /Loading your workspace/i.test(document.body.innerText.slice(0, 4000));
+      return { busy: busy + (loading ? 1 : 0), h: m.scrollHeight };
+    }).catch(() => ({ busy: 1, h: 0 }));
+    if (!st.busy && st.h === last) { if (++still >= 3) break; } else still = 0;
+    last = st.h;
+    await sleep(400);
+  }
+  await sleep(600);
+}
+
 async function settle(page, extra = 1500) {
   // Streamlit shows a running indicator while a page builds
   for (let i = 0; i < 60; i++) {
@@ -97,16 +123,19 @@ async function toTop(page) {
 }
 
 async function nav(page, label) {
-  const link = page.locator('.st-key-top_nav [role="radiogroup"] label', { hasText: label }).first();
-  if (await link.count()) {
-    await link.click();
-  } else {                                   // not in the top bar: open the ☰ menu
-    await page.locator('.st-key-top_menu [data-testid="stPopoverButton"]').first().click();
-    await sleep(700);
-    await page.locator('[data-testid="stPopoverBody"] button', { hasText: label }).first().click();
+  await hideCaption(page);
+  await sleep(300);
+  pause();                                   // the click and the loading are cut out
+  if (label === "Follow-ups") {              // the speech-bubble button at the top right
+    await page.locator('.st-key-top_msg button').first().click();
+  } else {
+    await page.locator('.st-key-top_nav [role="radiogroup"] label', { hasText: label }).first().click({ timeout: 8000 });
   }
-  await settle(page, 1800);
+  await sleep(800);
+  await loaded(page);
   await toTop(page);
+  await sleep(300);
+  resume();
 }
 
 async function scene(page, label, title, sub, plan) {
@@ -119,6 +148,8 @@ async function scene(page, label, title, sub, plan) {
     }
   } catch (e) {
     console.log(`Scene "${title}" skipped: ${String(e).split("\n")[0]}`);
+    await page.keyboard.press("Escape").catch(() => {});
+    resume();
     try { await page.screenshot({ path: path.join(OUT, `skip-${label || "start"}.png`) }); } catch (_) {}
   }
 }
@@ -130,7 +161,7 @@ async function scene(page, label, title, sub, plan) {
   const ctx = await browser.newContext({ viewport: { width: W, height: H }, deviceScaleFactor: 1,
                                          recordVideo: { dir: OUT, size: { width: W, height: H } } });
   const page = await ctx.newPage();
-  const t0 = Date.now();                     // the video starts with the page
+  T0 = Date.now();                           // the video starts with the page
 
   // Wake the server first (a sleeping server can take a while), then start the take
   await page.goto(SITE, { waitUntil: "domcontentloaded", timeout: 180000 });
@@ -138,7 +169,7 @@ async function scene(page, label, title, sub, plan) {
   await settle(page, 2500);
 
   // Where the finished video should start (skips the blank loading frames)
-  fs.writeFileSync(path.join(OUT, "start.txt"), String(Math.max(0, (Date.now() - t0) / 1000 - 0.2)));
+  keep.push([Math.max(0, now() - 0.2), null]);
   await card(page, "Keep more of your gym members", "See who's about to leave, and act before they do.", 4200);
   await caption(page, "usegympulseai.com", "Works alongside GymMaster or any gym software.");
   await scroll(page, 900, 3500);
@@ -158,12 +189,16 @@ async function scene(page, label, title, sub, plan) {
     await pw.fill(password);
     await sleep(500);
     await page.getByRole("button", { name: "Sign in with email" }).click();
+    await sleep(1200);
+    pause();
     await page.locator(".st-key-top_nav").first().waitFor({ timeout: 90000 });
-    await settle(page, 2500);
+    await loaded(page, 45000);
     await hideCaption(page);
+    await sleep(400);
+    resume();
 
     await scene(page, null, "Dashboard", "Today's priorities: who to call, renewals due and members drifting away.",
-                [[0, 0, 2500], [700, 3000, 1500], [700, 3000, 2000]]);
+                [[0, 0, 2800], [700, 3000, 1200], [700, 3000, 1500]]);
     await scene(page, "Risk Radar", "Risk Radar", "Every member gets a High, Medium or Low risk of leaving, with the reasons why.",
                 [[0, 0, 2500], [800, 3500, 1500], [700, 3000, 2000]]);
     await scene(page, "Action Centre", "Action Centre", "Turn risk into action: assign a play to your team and track it to done.",
@@ -181,6 +216,8 @@ async function scene(page, label, title, sub, plan) {
     await hideCaption(page);
   }
   await card(page, "Start your 30-day free trial", "usegympulseai.com", 5000);
+  pause();
+  fs.writeFileSync(path.join(OUT, "keep.json"), JSON.stringify(keep.filter((k) => k[1] !== null && k[1] - k[0] > 0.3)));
   await page.close();
   await ctx.close();
   await browser.close();
