@@ -1,0 +1,68 @@
+# Records a fresh walkthrough video of the app (Actions -> Demo video -> Run workflow).
+# Resets the demo gym first (this sets a new demo password and emails it to the founder),
+# signs in to the live site as the demo gym, records each page with captions, and
+# uploads the MP4 as a workflow artifact and to Supabase Storage (link printed in the log).
+name: Demo video
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: seed-demo
+  cancel-in-progress: false
+
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - name: Install
+        run: |
+          pip install -r requirements.txt
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+      - name: Reset the demo gym
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          DEMO_PASSWORD_FILE: ${{ runner.temp }}/demo_pw
+        run: python scripts/seed_demo_gym.py
+      - name: Wake the site after the reset
+        run: curl -s -o /dev/null -m 120 https://usegympulseai.com/ || true
+      - name: Record
+        env:
+          DEMO_PASSWORD_FILE: ${{ runner.temp }}/demo_pw
+        run: node scripts/record_demo.js demo_out
+      - name: Make the MP4
+        run: |
+          rm -f "$RUNNER_TEMP/demo_pw"
+          src=$(ls demo_out/*.webm | head -1)
+          start=$(cat demo_out/start.txt 2>/dev/null || echo 0)
+          ffmpeg -v error -y -ss "$start" -i "$src" -c:v libx264 -preset slow -crf 24 -pix_fmt yuv420p \
+            -r 30 -movflags +faststart -an GymPulse-AI-Demo.mp4
+          ffmpeg -v error -y -i GymPulse-AI-Demo.mp4 -vf scale=1280:-2 -c:v libx264 -preset slow -crf 26 \
+            -pix_fmt yuv420p -movflags +faststart -an GymPulse-AI-Demo-WhatsApp.mp4
+          ls -la *.mp4
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GymPulse-AI-Demo
+          path: |
+            GymPulse-AI-Demo.mp4
+            GymPulse-AI-Demo-WhatsApp.mp4
+            demo_out/*.png
+          if-no-files-found: warn
+      - name: Upload to Supabase Storage
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python scripts/upload_demo_video.py GymPulse-AI-Demo.mp4

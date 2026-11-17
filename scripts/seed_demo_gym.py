@@ -331,6 +331,11 @@ def main():
     log("Building the demo")
     build(sc, gym_id, random.Random(SEED))
     log("Sign-in check: " + check_sign_in(password))
+    out = os.environ.get("DEMO_PASSWORD_FILE")
+    if out:          # for the demo-video job: handed over in a file, never printed
+        with open(out, "w") as f:
+            f.write(password)
+        os.chmod(out, 0o600)
     import gympulse_billing as gbill
     ok = gbill._email_founder(
         "GymPulse AI demo gym is ready",
