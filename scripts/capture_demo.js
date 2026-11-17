@@ -32,12 +32,15 @@ async function loaded(page, maxMs = 30000) {
 }
 
 async function shot(page, name) {
+  await page.setViewportSize({ width: 1440, height: 3200 });
+  await sleep(1500);
   await page.evaluate(() => {
     for (const e of [document.querySelector('[data-testid="stMain"]'), document.scrollingElement]) if (e) e.scrollTop = 0;
     document.querySelectorAll('[data-testid="stToast"]').forEach((t) => t.remove());
   });
   await sleep(400);
   await page.screenshot({ path: path.join(OUT, name + ".png") });
+  await page.setViewportSize({ width: 1440, height: 900 });
   console.log("captured " + name);
 }
 
@@ -52,7 +55,7 @@ async function go(page, label) {
   fs.mkdirSync(OUT, { recursive: true });
   const password = PW_FILE && fs.existsSync(PW_FILE) ? fs.readFileSync(PW_FILE, "utf8").trim() : "";
   const browser = await chromium.launch();
-  const ctx = await browser.newContext({ viewport: { width: 1440, height: 3200 }, deviceScaleFactor: 2 });
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 });
   const page = await ctx.newPage();
   await page.goto(SITE, { waitUntil: "domcontentloaded", timeout: 180000 });
   await page.locator('input[aria-label="Email address"]').first().waitFor({ timeout: 180000 });
@@ -60,10 +63,24 @@ async function go(page, label) {
   await shot(page, "00-landing");
   if (!password) { console.log("No password file: landing only."); await browser.close(); return; }
 
-  await page.locator('input[aria-label="Email address"]').first().fill(EMAIL);
-  await page.locator('input[aria-label="Password"]').first().fill(password);
+  // Same steps as the demo recorder, which signs in reliably
+  const email = page.locator('input[aria-label="Email address"]').first();
+  await email.scrollIntoViewIfNeeded();
+  await email.click();
+  await email.pressSequentially(EMAIL, { delay: 25 });
+  const pw = page.locator('input[aria-label="Password"]').first();
+  await pw.click();
+  await pw.fill(password);
+  await sleep(500);
   await page.getByRole("button", { name: "Sign in with email" }).click();
-  await page.locator(".st-key-top_nav").first().waitFor({ timeout: 90000 });
+  try {
+    await page.locator(".st-key-top_nav").first().waitFor({ timeout: 90000 });
+  } catch (e) {
+    await page.screenshot({ path: path.join(OUT, "zz-sign-in-failed.png") });
+    console.log("Sign-in did not finish; saved zz-sign-in-failed.png");
+    await browser.close();
+    process.exit(1);
+  }
   await loaded(page, 45000);
   await shot(page, "01-dashboard");
 
