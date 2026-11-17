@@ -1,0 +1,53 @@
+# Takes sharp screenshots of every page of the demo gym, for building the demo video
+# (Actions -> Demo screenshots -> Run workflow). Resets the demo gym first, which sets a
+# new demo password and emails it to the founder. The PNGs are saved as an artifact and
+# in Supabase Storage (links printed in the log).
+name: Demo screenshots
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: seed-demo
+  cancel-in-progress: false
+
+jobs:
+  shots:
+    runs-on: ubuntu-24.04          # the browser tool doesn't support newer images yet
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - name: Install
+        run: |
+          pip install -r requirements.txt
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Reset the demo gym
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          DEMO_PASSWORD_FILE: ${{ runner.temp }}/demo_pw
+        run: python scripts/seed_demo_gym.py
+      - name: Capture
+        env:
+          DEMO_PASSWORD_FILE: ${{ runner.temp }}/demo_pw
+        run: |
+          node scripts/capture_demo.js shots
+          rm -f "$RUNNER_TEMP/demo_pw"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GymPulse-AI-Demo-Screenshots
+          path: shots/*.png
+      - name: Upload to Supabase Storage
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python scripts/upload_demo_shots.py shots
