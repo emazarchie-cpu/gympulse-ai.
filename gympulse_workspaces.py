@@ -660,6 +660,10 @@ a.chip:hover { filter: brightness(1.25); }
     font-weight: 800; color: #F4F7FB; }
 .kb-head b { background: var(--tone); color: #10182A; border-radius: 999px;
     padding: 1px 10px; font-size: 12px; }
+/* board columns: cards sit side by side when the column is wide enough */
+[class*="st-key-kb_grid_"] { flex-wrap: wrap !important; align-items: flex-start !important; }
+[class*="st-key-kb_grid_"] > [data-testid="stLayoutWrapper"] { flex: 1 1 270px !important; min-width: 250px !important; max-width: 420px !important;
+    width: auto !important; }
 .kb-empty { border: 1px dashed rgba(255,255,255,0.14); border-radius: 14px;
     padding: 18px; text-align: center; color: #9AA8BD; font-size: 13px; }
 .board-progress { padding: 16px 18px; border-radius: 18px; margin: 4px 0 6px;
@@ -3696,9 +3700,12 @@ PAGE_CARDS = 8                                        # cards per board column b
 
 def _kanban(supabase, actions, names, photos):
     actions = _with_stage(actions)
-    cols = st.columns(len(BOARD_COLUMNS))
-    for col, (title, stages, tone) in zip(cols, BOARD_COLUMNS):
-        sub = actions[actions["stage"].isin(stages)]
+    subs = [actions[actions["stage"].isin(stages)] for _, stages, _ in BOARD_COLUMNS]
+    # Space follows the work: an empty column stays narrow, a busy one widens and lays
+    # its members side by side (up to three across) instead of one long stack.
+    weights = [0.8 if sub.empty else float(min(len(sub), 3)) for sub in subs]
+    cols = st.columns(weights, gap="medium")
+    for i, (col, (title, stages, tone), sub) in enumerate(zip(cols, BOARD_COLUMNS, subs)):
         if "Done" in title and "completed_at" in sub.columns:
             sub = sub.sort_values("completed_at", ascending=False, na_position="last")
         elif "follow" in title:
@@ -3712,8 +3719,9 @@ def _kanban(supabase, actions, names, photos):
                 _md('<div class="kb-empty">Nothing here yet</div>')
             more_key = f"kb_more_{title}"
             limit = 10 if "Done" in title else st.session_state.get(more_key, PAGE_CARDS)
-            for _, a in sub.head(limit).iterrows():
-                _action_card(supabase, a, names, photos, a["status"], "kb")
+            with st.container(key=f"kb_grid_{i}", horizontal=True, gap="small"):
+                for _, a in sub.head(limit).iterrows():
+                    _action_card(supabase, a, names, photos, a["status"], "kb")
             if len(sub) > limit:
                 if "Done" in title:
                     st.caption(f"+{len(sub) - limit} older ones in the List view.")

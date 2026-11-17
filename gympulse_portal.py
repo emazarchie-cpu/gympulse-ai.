@@ -140,11 +140,26 @@ def _gym(sc, gym_id):
 
 
 # ------------------------------------------------------------------ sending the private link
-def _email(to, subject, html, text):
+def _gym_brand(sc, gym_id):
+    """The gym's email look (name, logo, colours) for emails to its members, or None."""
+    try:
+        import gympulse_campaigns as gcamp
+        p = _gym(sc, gym_id)[1]
+        return gcamp.brand(p) if p else None
+    except Exception:
+        return None
+
+
+def _email(to, subject, html, text, from_name=""):
     import requests
+    from email.utils import parseaddr, formataddr
     key, sender = _secret("RESEND_API_KEY"), _secret("EMAIL_FROM")
     if not (key and sender):
         return False
+    if from_name:            # the member sees their gym's name as the sender
+        addr = parseaddr(sender)[1]
+        if addr:
+            sender = formataddr((str(from_name).replace("\n", " ")[:60], addr))
     r = requests.post("https://api.resend.com/emails", timeout=20, headers={"Authorization": f"Bearer {key}"},
                       json={"from": sender, "to": [to], "subject": subject, "html": html, "text": text})
     return r.status_code < 300
@@ -173,8 +188,9 @@ def send_link(sc, member, gym_name, force=False):
                 "Keep it to yourself: it opens your page without a password.")
         try:
             if _email(email, f"Your {gym_name} membership page", ge.layout("Your membership page", body,
-                                                                            f"Your private link from {gym_name}"),
-                      text):
+                                                                            f"Your private link from {gym_name}",
+                                                                            gym=_gym_brand(sc, member.get("gym_id"))),
+                      text, from_name=gym_name):
                 used.append("email")
         except Exception:
             pass
@@ -245,8 +261,11 @@ def send_code(sc, email):
     text = (f"Hi {first},\n\nYour GymPulse AI sign-in code: {code}\n\nIt works for {CODE_MINUTES} minutes. "
             "If you didn't ask for it, ignore this email.")
     try:
-        _email(gw._text(members[0].get("email")).strip(), f"{code} is your sign-in code",
-               ge.layout("Your sign-in code", body, f"Your code for {where}"), text)
+        one = len({m.get("gym_id") for m in members}) == 1
+        _email(gw._text(members[0].get("email")).strip(), f"{code} is your sign-in code for {where}",
+               ge.layout("Your sign-in code", body, f"Your code for {where}",
+                         gym=_gym_brand(sc, members[0].get("gym_id")) if one else None), text,
+               from_name=where if one else "")
     except Exception:
         pass
     return "sent"

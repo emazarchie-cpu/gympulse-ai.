@@ -47,7 +47,7 @@ TEMPLATES = {
                  "and we'll ease you back in at your own pace."],
         "button": "I'm ready to restart", "link": "whatsapp"},
     "WhatsApp check-in": {
-        "subject": "We miss you, {first}",
+        "subject": "{first}, we miss you at {gym}",
         "preheader": "A quick hello from the {gym} team.",
         "headline": "WE MISS\nYOU", "kicker": "your spot is waiting",
         "body": ["We haven't seen you at {gym} for a little while, and we wanted to say hello.",
@@ -55,14 +55,14 @@ TEMPLATES = {
                  "Even one session this week is a great start."],
         "button": "Book my next session", "link": "whatsapp"},
     "Personal call": {
-        "subject": "Can we have a quick chat, {first}?",
+        "subject": "{first}, a quick hello from {gym}",
         "preheader": "Five minutes to help you get the most from {gym}.",
         "headline": "LET'S\nTALK", "kicker": "five minutes, just for you",
         "body": ["I'd love to hear how your training is going{goal_part} and how we can make {gym} work better for you.",
                  "Reply with a good time to call, or tap the button and we'll find one together."],
         "button": "Pick a time to talk", "link": "whatsapp"},
     "Renewal offer": {
-        "subject": "{first}, your membership {renew_when}",
+        "subject": "{first}, your {gym} membership {renew_when}",
         "preheader": "Keep your progress going at {gym}.",
         "headline": "KEEP\nGOING", "kicker": "your progress is worth it",
         "body": ["Your membership at {gym} {renew_when}.",
@@ -70,7 +70,7 @@ TEMPLATES = {
                  "Renewing takes a minute, and if anything could be better, just tell us."],
         "button": "Renew my membership", "link": "whatsapp"},
     "Class invite": {
-        "subject": "{first}, join us for {class_name}",
+        "subject": "{first}, join us for {class_name} at {gym}",
         "preheader": "{class_when} at {gym}.",
         "headline": "SEE YOU\nIN CLASS", "kicker": "{class_name}",
         "body": ["We'd love to see you at <b>{class_name}</b>, {class_when}.",
@@ -85,7 +85,7 @@ TEMPLATES = {
                  "Your friend gets to try {gym}, and you get a training partner who keeps you going."],
         "button": "Invite my friend", "link": "whatsapp"},
     "Trainer intro": {
-        "subject": "Meet {trainer}, {first}",
+        "subject": "{first}, meet {trainer} from {gym}",
         "preheader": "A coach to help you{goal_part}.",
         "headline": "MEET YOUR\nCOACH", "kicker": "{trainer}",
         "body": ["I'd like you to meet <b>{trainer}</b>, one of our coaches at {gym}.",
@@ -93,21 +93,21 @@ TEMPLATES = {
                  "makes all the difference."],
         "button": "Say hello to {trainer}", "link": "whatsapp"},
     "Free PT session": {
-        "subject": "A personal training session for you, {first}",
+        "subject": "{first}, a personal training session at {gym}",
         "preheader": "One-to-one time with a {gym} coach.",
         "headline": "YOUR\nSESSION", "kicker": "one-to-one with a coach",
         "body": ["We'd love to book you a personal training session with {trainer} to fine-tune your plan{goal_part}.",
                  "Tap the button and we'll find a time that suits you."],
         "button": "Book my session", "link": "whatsapp"},
     "Goal review": {
-        "subject": "Let's review your goals, {first}",
+        "subject": "{first}, let's review your goals at {gym}",
         "preheader": "15 minutes to plan your next win.",
         "headline": "YOUR NEXT\nWIN", "kicker": "a 15-minute goal review",
         "body": ["You've been working hard{goal_part}, and we'd love to celebrate your progress.",
                  "Let's take 15 minutes at {gym} to review your goals and plan what's next."],
         "button": "Book my goal review", "link": "whatsapp"},
     "Feedback request": {
-        "subject": "How are we doing, {first}?",
+        "subject": "{first}, how is {gym} doing for you?",
         "preheader": "One minute to help us improve {gym}.",
         "headline": "YOUR\nVOICE", "kicker": "helps us get better",
         "body": ["Your experience at {gym} matters to us.",
@@ -115,21 +115,21 @@ TEMPLATES = {
                  "We read every message."],
         "button": "Share my feedback", "link": "reply"},
     "Group challenge": {
-        "subject": "Join the challenge, {first}",
+        "subject": "{first}, join the {gym} challenge",
         "preheader": "Train together at {gym}.",
         "headline": "TAKE ON\nTHE CHALLENGE", "kicker": "together at {gym}",
         "body": ["We're kicking off a group challenge at {gym} and we'd love you on the team.",
                  "Training together keeps everyone motivated. Reply JOIN and we'll add you."],
         "button": "Count me in", "link": "whatsapp"},
     "Milestone shout-out": {
-        "subject": "Congratulations, {first}!",
+        "subject": "Congratulations, {first}, from everyone at {gym}",
         "preheader": "Your consistency is paying off.",
         "headline": "WELL\nDONE", "kicker": "your hard work shows",
         "body": ["Everyone at {gym} wanted to say congratulations. Your consistency is really paying off.",
                  "Keep it up. We're proud to be part of your journey{goal_part}."],
         "button": "Keep the streak going", "link": "whatsapp"},
     "Welcome-back note": {
-        "subject": "Welcome back, {first}!",
+        "subject": "Welcome back to {gym}, {first}",
         "preheader": "It's great to see you at {gym} again.",
         "headline": "WELCOME\nBACK", "kicker": "it's good to see you",
         "body": ["It's so good to see you back at {gym}. We missed you.",
@@ -496,7 +496,6 @@ def render_email(fields, b, ctx, banner_url, unsub_url=""):
     else:
         hl = ge.esc(fill(fields["headline"], ctx)).replace("\n", "<br>")
         hero = gx(f'<div style="background:{dark};padding:34px 28px;text-align:right;font-family:Arial Black,Arial,Helvetica,sans-serif">'
-                f'<div style="color:#fff;font-size:15px;font-weight:700;margin-bottom:14px">{ge.esc(b["gym"])}</div>'
                 f'<div style="color:#fff;font-size:44px;line-height:1.0;font-weight:900">{hl}</div>'
                 f'<div style="color:{acc};font-size:16px;margin-top:10px;font-family:Arial,Helvetica,sans-serif">'
                 f'{ge.esc(fill(fields.get("kicker", ""), ctx))}</div></div>', P)
@@ -518,6 +517,7 @@ def render_email(fields, b, ctx, banner_url, unsub_url=""):
 <div style="display:none;max-height:0;overflow:hidden;opacity:0">{pre}</div>
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="{P['page']}" style="{bgx(P['page'], P)}"><tr><td align="center" bgcolor="{P['page']}" style="padding:20px 10px;{bgx(P['page'], P)}">
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="{P['card']}" class="gp-card" style="max-width:600px;{bgx(P['card'], P)}border-radius:14px;overflow:hidden;border:1px solid {P['line']}">
+<tr><td style="padding:0">{gx(ge.gym_header(b["gym"], b.get("logo_url"), acc, dark, bool(b.get("logo_url")) and logo_tone(b["logo_url"]) == "dark"), P)}</td></tr>
 <tr><td style="padding:0;line-height:0">{hero}</td></tr>
 <tr><td bgcolor="{P['card']}" class="gp-card" style="padding:30px 30px 8px;{bgx(P['card'], P)}font-family:Arial,Helvetica,sans-serif">
 {gx(f'<p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:{P["text"]}">Hello {ge.esc(ctx["first"])},</p>' + paras, P)}
@@ -638,19 +638,8 @@ def render_message(b, subject, body, unsub_url="", button=None, preheader="", th
         f'<p style="margin:0 0 16px;font-size:16px;line-height:1.7;color:{P["text"]}">'
         f'{ge.esc(p.strip()).replace(chr(10), "<br>")}</p>'
         for p in re.split(r"\n\s*\n", text) if p.strip())
-    if b.get("logo_url") and logo_tone(b["logo_url"]) == "dark":
-        dark = "#FFFFFF"              # dark logo: white header so it stays visible
-    if b.get("logo_url"):
-        brand_html = (f'<img src="{ge.esc(b["logo_url"])}" alt="{ge.esc(b["gym"])}" height="44" '
-                      f'style="display:block;height:44px;max-width:220px;width:auto;border:0">')
-    else:
-        brand_html = (f'<div style="font-family:Arial Black,Arial,Helvetica,sans-serif;font-size:20px;'
-                      f'font-weight:900;color:#FFFFFF;letter-spacing:.5px">{ge.esc(b["gym"])}</div>')
-    header = (f'<table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="{dark}" '
-              f'style="background-color:{dark};background-image:linear-gradient({dark},{dark})"><tr>'
-              f'<td style="padding:22px 28px">{brand_html}</td></tr>'
-              f'<tr><td height="4" bgcolor="{acc}" style="height:4px;line-height:4px;font-size:0;'
-              f'background-color:{acc};background-image:linear-gradient({acc},{acc})">&nbsp;</td></tr></table>')
+    light_bg = bool(b.get("logo_url")) and logo_tone(b["logo_url"]) == "dark"   # dark logo: white header
+    header = gx(ge.gym_header(b["gym"], b.get("logo_url"), acc, dark, light_bg), P)
     btn = ""
     for i, (label, url) in enumerate(_buttons(button)):
         if i == 0:      # main action: filled in the brand colour

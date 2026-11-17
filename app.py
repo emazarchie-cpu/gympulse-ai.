@@ -2435,8 +2435,6 @@ st.markdown("""
         white-space: nowrap !important;
     }
 
-    /* Page list inside the hamburger is mobile only */
-    .st-key-pop_main, .st-key-pop_logout { display: none !important; }
 }
 
 /* ---------- Phone: logo + tagline on the left, hamburger on the right ---------- */
@@ -2854,28 +2852,70 @@ elif page == "Member Management":
         if st.session_state.get("mm_new_member"):
             import gympulse_waiver as gwv
             gwv.render_new_member(supabase, gym_id, st.session_state["mm_new_member"])
-        with st.expander("Membership agreements and waivers: every member signs once",
-                         icon=":material/contract:"):
-            import gympulse_waiver as gwv
-            gwv.render_overview(supabase, gym_id)
-        with st.expander("Bring your members in: import from GymMaster, Excel or any software",
-                         icon=":material/upload_file:",
-                         expanded=bool(st.session_state.get("gm_flash") or st.session_state.get("gm_errors")
-                                       or st.session_state.pop("gm_open", False))):
-            import gympulse_gymmaster as ggm
-            ggm.render_gymmaster_import(supabase, gym_id)
-            st.divider()
-            ggm.render_photo_bulk(supabase, gym_id)
-        with st.expander("Member sign-up link and QR code: members add their own details",
-                         icon=":material/qr_code_2:"):
-            import gympulse_signup as gsign
-            gsign.render_owner(supabase, gym_id)
-        with st.expander("Member app: each member's own page to renew, check in, book classes and message you",
-                         icon=":material/smartphone:"):
-            import gympulse_portal as gportal
-            gportal.render_owner(supabase, gym_id)
-        st.button("Train: workouts, challenges and machine guides for your members", icon=":material/fitness_center:",
-                  key="mm_to_train", on_click=show_page, args=("Train",), type="tertiary")
+        # Member tools: one tidy row of cards; the chosen one opens underneath
+        _MM_TOOLS = [
+            ("import", ":material/upload_file:", "Import members", "From GymMaster, Excel or any software"),
+            ("waivers", ":material/contract:", "Agreements & waivers", "Every member signs once"),
+            ("signup", ":material/qr_code_2:", "Sign-up link & QR", "Members add their own details"),
+            ("app", ":material/smartphone:", "Member app", "Renew, check in, book and message you"),
+            ("train", ":material/fitness_center:", "Train", "Workouts, challenges, machine guides"),
+        ]
+        if (st.session_state.get("gm_flash") or st.session_state.get("gm_errors")
+                or st.session_state.pop("gm_open", False)):
+            st.session_state["mm_tool"] = "import"
+
+        def _mm_pick(k):
+            if k == "train":
+                show_page("Train")
+            else:
+                st.session_state["mm_tool"] = None if st.session_state.get("mm_tool") == k else k
+
+        st.markdown('<div class="section-label">MEMBER TOOLS</div>', unsafe_allow_html=True)
+        _open = st.session_state.get("mm_tool")
+        with st.container(key="mm_tools", horizontal=True, gap="small"):
+            for _k, _ic, _t, _d in _MM_TOOLS:
+                with st.container(border=True, key=f"mm_tile_{_k}{'_sel' if _open == _k else ''}"):
+                    st.button(_t, icon=_ic, key=f"mm_btn_{_k}", on_click=_mm_pick, args=(_k,),
+                              type="tertiary", use_container_width=True)
+                    st.caption(_d)
+        st.markdown("""<style>
+        .st-key-mm_tools { flex-wrap: wrap !important; }
+        .st-key-mm_tools > [data-testid="stLayoutWrapper"] { flex: 1 1 190px !important; min-width: 170px !important; width: auto !important; }
+        .st-key-mm_tools [class*="st-key-mm_tile_"] { height: auto !important; min-height: 92px; gap: 2px !important;
+            border-radius: 16px !important; padding: 12px 14px 10px !important;
+            background: rgba(255,255,255,0.03); transition: border-color .15s, background .15s, transform .15s; }
+        .st-key-mm_tools [class*="st-key-mm_tile_"]:hover { border-color: rgba(183,243,74,0.55) !important;
+            transform: translateY(-1px); }
+        .st-key-mm_tools [class*="st-key-mm_tile_"][class*="_sel"] { border-color: var(--gp-lime, #B7F34A) !important;
+            background: rgba(183,243,74,0.07) !important; }
+        .st-key-mm_tools [class*="st-key-mm_btn_"] button { justify-content: flex-start !important; padding: 0 !important;
+            min-height: 30px !important; }
+        .st-key-mm_tools [class*="st-key-mm_btn_"] button > div { justify-content: flex-start !important; width: 100%; }
+        .st-key-mm_tools [class*="st-key-mm_btn_"] button p { font-weight: 700 !important; font-size: 15px !important; }
+        .st-key-mm_tools [class*="st-key-mm_btn_"] [data-testid="stIconMaterial"] { color: var(--gp-lime, #B7F34A) !important; }
+        .st-key-mm_tools [data-testid="stCaptionContainer"] p { margin: 0 !important; font-size: 12.5px !important; }
+        .st-key-mm_panel { border-radius: 18px !important; margin-top: 4px; }
+        </style>""", unsafe_allow_html=True)
+        if _open:
+            with st.container(border=True, key="mm_panel"):
+                _h1, _h2 = st.columns([1, 0.18], vertical_alignment="center")
+                _h1.markdown(f"#### {dict((k, t) for k, _, t, _ in _MM_TOOLS).get(_open, '')}")
+                _h2.button("Close", icon=":material/close:", key="mm_close", on_click=_mm_pick, args=(_open,),
+                           use_container_width=True)
+                if _open == "import":
+                    import gympulse_gymmaster as ggm
+                    ggm.render_gymmaster_import(supabase, gym_id)
+                    st.divider()
+                    ggm.render_photo_bulk(supabase, gym_id)
+                elif _open == "waivers":
+                    import gympulse_waiver as gwv
+                    gwv.render_overview(supabase, gym_id)
+                elif _open == "signup":
+                    import gympulse_signup as gsign
+                    gsign.render_owner(supabase, gym_id)
+                elif _open == "app":
+                    import gympulse_portal as gportal
+                    gportal.render_owner(supabase, gym_id)
         st.markdown("### Register a New Member")
         import gympulse_billing as _gb_lim
         _can_add, _why_full = _gb_lim.can_add_members(supabase, gym_id)

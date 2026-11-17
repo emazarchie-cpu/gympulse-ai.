@@ -180,6 +180,42 @@ def remove_staff(gym_id, row):
     sc.table("gym_staff").delete().eq("id", row["id"]).eq("gym_id", gym_id).execute()
 
 
+ACCESS_CSS = """<style>
+.acc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; margin: 6px 0 18px; }
+.acc-card { border: 1px solid var(--gp-line, rgba(255,255,255,0.09)); border-radius: 18px; padding: 18px 20px;
+    background: rgba(255,255,255,0.03); border-top: 3px solid var(--tone); }
+.acc-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.acc-head .acc-ic { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center;
+    background: color-mix(in srgb, var(--tone) 16%, transparent); color: var(--tone); font-weight: 800; }
+.acc-head b { font-size: 16px; color: var(--gp-text, #F4F7FB); }
+.acc-head span.acc-sub { display: block; font-size: 12px; color: var(--gp-muted, #93A1B8); font-weight: 500; }
+.acc-row { display: flex; gap: 10px; padding: 9px 0; border-top: 1px solid var(--gp-line, rgba(255,255,255,0.07));
+    font-size: 13.5px; line-height: 1.45; color: var(--gp-muted, #93A1B8); }
+.acc-row:first-of-type { border-top: 0; }
+.acc-row i { font-style: normal; color: var(--tone); font-weight: 800; }
+.acc-row strong { color: var(--gp-text, #F4F7FB); font-weight: 650; }
+</style>"""
+
+
+def _access_cards():
+    def rows(items):
+        out = []
+        for x in items:
+            head, _, tail = str(x).partition(":")
+            text = (f"<strong>{gw._esc(head)}</strong>: {gw._esc(tail.strip())}" if tail
+                    else f"<strong>{gw._esc(head)}</strong>")
+            out.append(f'<div class="acc-row"><i>✓</i><div>{text}</div></div>')
+        return "".join(out)
+    card = ('<div class="acc-card" style="--tone:{tone}"><div class="acc-head"><div class="acc-ic">{ic}</div>'
+            '<div><b>{title}</b><span class="acc-sub">{sub}</span></div></div>{rows}</div>')
+    return (ACCESS_CSS + '<div class="acc-grid">'
+            + card.format(tone="#35D6ED", ic="S", title="Staff can use", sub="Their own login, day-to-day work",
+                          rows=rows(STAFF_CAN))
+            + card.format(tone="#B7F34A", ic="O", title="Only you, the owner", sub="Money, team and settings",
+                          rows=rows(OWNER_ONLY_LIST))
+            + "</div>")
+
+
 def render_team(supabase, gym_id):
     profile = st.session_state.get("user_profile") or {}
     rows = load_staff(supabase, gym_id)
@@ -188,13 +224,7 @@ def render_team(supabase, gym_id):
         return
     gw.intro("Team & access", ":material/badge:", "Give your team their own login. Staff can run the gym day to day, while business numbers, "
                "billing and settings stay with you.")
-    c1, c2 = st.columns(2)
-    with c1.container(border=True):
-        st.markdown("**Staff can use**")
-        st.markdown("\n".join(f"- {x}" for x in STAFF_CAN))
-    with c2.container(border=True):
-        st.markdown("**Only you (the owner)**")
-        st.markdown("\n".join(f"- {x}" for x in OWNER_ONLY_LIST))
+    gw._md(_access_cards())
 
     st.markdown('<div class="section-label">YOUR TEAM</div>', unsafe_allow_html=True)
     gw.table([{"Name": r.get("full_name") or "–", "Email": r.get("email"),
@@ -293,8 +323,22 @@ def render_owner_hub(supabase, gym_id, assess_fn, owner_id):
     gw.page_header("Owner", "Your business at a glance: numbers, team, reports and billing.", "Owner only")
     if "owner_section" not in st.session_state:
         st.session_state["owner_section"] = st.session_state.get("_owner_last", OWNER_SECTIONS[0])
-    section = st.segmented_control("Owner section", OWNER_SECTIONS, key="owner_section",
-                                   label_visibility="collapsed") or OWNER_SECTIONS[0]
+    with st.container(key="owner_tabs"):
+        section = st.segmented_control("Owner section", OWNER_SECTIONS, key="owner_section",
+                                       label_visibility="collapsed") or OWNER_SECTIONS[0]
+    gw._md("""<style>
+    .st-key-owner_tabs .stElementContainer, .st-key-owner_tabs [data-testid="stButtonGroup"] {
+        width: 100% !important; max-width: 100% !important; align-self: stretch !important; }
+    html body .stApp.stApp.stApp.stApp .st-key-owner_tabs [role="radiogroup"] { width: 100% !important; max-width: none !important; }
+    html body .stApp.stApp.stApp.stApp .st-key-owner_tabs [role="radiogroup"] { padding: 5px !important; gap: 6px !important;
+        border: 1px solid var(--gp-line, rgba(255,255,255,0.08)); border-radius: 18px !important; }
+    html body .stApp.stApp.stApp.stApp .st-key-owner_tabs button[data-variant="segmented_control"] {
+        flex: 1 1 0 !important; min-height: 46px !important; border-radius: 13px !important; }
+    html body .stApp.stApp.stApp.stApp .st-key-owner_tabs button[data-variant="segmented_control"][aria-checked="true"] {
+        background: rgba(183,243,74,0.13) !important; box-shadow: inset 0 0 0 1px rgba(183,243,74,0.55) !important; }
+    html body .stApp.stApp.stApp.stApp .st-key-owner_tabs button[data-variant="segmented_control"][aria-checked="true"] p {
+        color: var(--gp-lime, #B7F34A) !important; }
+    </style>""")
     st.session_state["_owner_last"] = section
     if section == "Business insights":
         gw.render_business_insights(supabase, gym_id, assess_fn, header=False)
