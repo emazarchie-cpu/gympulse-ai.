@@ -107,7 +107,10 @@ def ensure_gym(sc, owner_id):
         sc.table("profiles").upsert(prof).execute()
     except Exception as error:
         log(f"  ! profile: {str(error)[:160]}")
-    rows = sc.table("gyms").select("*").eq("owner_id", owner_id).limit(1).execute().data or []
+    # The demo login can own more than one gym (branches): always pick the demo gym itself
+    rows = sc.table("gyms").select("*").eq("owner_id", owner_id).order("created_at").execute().data or []
+    rows = ([g for g in rows if g.get("business_name") == DEMO_GYM]
+            or [g for g in rows if str(g.get("business_name") or "").startswith("Demo")])
     if rows:
         gym = rows[0]
     else:
