@@ -65,7 +65,7 @@ async function go(page, label) {
   await page.goto(SITE, { waitUntil: "domcontentloaded", timeout: 180000 });
   await page.locator('input[aria-label="Email address"]').first().waitFor({ timeout: 180000 });
   await loaded(page);
-  await shot(page, "00-landing");
+
   if (!password) { console.log("No password file: landing only."); await browser.close(); return; }
 
   // Same steps as the demo recorder, which signs in reliably
@@ -77,15 +77,19 @@ async function go(page, label) {
   await pw.click();
   await pw.fill(password);
   await sleep(500);
-  await page.getByRole("button", { name: "Sign in with email" }).click();
-  try {
-    await page.locator(".st-key-top_nav").first().waitFor({ timeout: 90000 });
-  } catch (e) {
-    await page.screenshot({ path: path.join(OUT, "zz-sign-in-failed.png") });
-    console.log("Sign-in did not finish; saved zz-sign-in-failed.png");
-    await browser.close();
-    process.exit(1);
+  // Up to 3 tries: a busy server sometimes drops the first click
+  let ok = false;
+  for (let tryN = 1; tryN <= 3 && !ok; tryN++) {
+    await page.getByRole("button", { name: "Sign in with email" }).click().catch(() => {});
+    ok = await page.locator(".st-key-top_nav").first().waitFor({ timeout: 45000 }).then(() => true).catch(() => false);
+    if (!ok) {
+      console.log(`sign-in try ${tryN} did not finish`);
+      await page.screenshot({ path: path.join(OUT, `zz-sign-in-try${tryN}.png`) });
+      const pw2 = page.locator('input[aria-label="Password"]').first();
+      if (await pw2.count()) { await pw2.click().catch(() => {}); await pw2.fill(password).catch(() => {}); }
+    }
   }
+  if (!ok) { await browser.close(); process.exit(1); }
   await loaded(page, 45000);
   await shot(page, "01-dashboard");
 
