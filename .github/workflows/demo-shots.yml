@@ -43,10 +43,12 @@ jobs:
           node scripts/capture_demo.js shots
           rm -f "$RUNNER_TEMP/demo_pw"
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: GymPulse-AI-Demo-Screenshots
           path: shots/*.png
       - name: Upload to Supabase Storage
+        if: always()
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
