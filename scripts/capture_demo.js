@@ -24,31 +24,28 @@ async function loaded(page, maxMs = 30000) {
       const m = document.querySelector('[data-testid="stMain"]') || document.body;
       return { busy, h: m.scrollHeight };
     }).catch(() => ({ busy: 1, h: 0 }));
-    if (!st.busy && st.h === last) { if (++still >= 4) break; } else still = 0;
+    if (!st.busy && st.h === last) { if (++still >= 8) break; } else still = 0;
     last = st.h;
     await sleep(400);
   }
-  await sleep(1200);
+  await sleep(3000);
 }
 
 async function shot(page, name) {
-  await page.setViewportSize({ width: 1440, height: 3200 });
-  await sleep(1500);
   await page.evaluate(() => {
     for (const e of [document.querySelector('[data-testid="stMain"]'), document.scrollingElement]) if (e) e.scrollTop = 0;
     document.querySelectorAll('[data-testid="stToast"]').forEach((t) => t.remove());
   });
   await sleep(400);
   await page.screenshot({ path: path.join(OUT, name + ".png") });
-  await page.setViewportSize({ width: 1440, height: 900 });
   console.log("captured " + name);
 }
 
 async function go(page, label) {
   if (label === "Follow-ups") await page.locator(".st-key-top_msg button").first().click();
   else await page.locator('.st-key-top_nav [role="radiogroup"] label', { hasText: label }).first().click({ timeout: 10000 });
-  await sleep(800);
-  await loaded(page);
+  await sleep(1500);
+  await loaded(page, 45000);
 }
 
 (async () => {
@@ -81,6 +78,9 @@ async function go(page, label) {
     await browser.close();
     process.exit(1);
   }
+  await loaded(page, 45000);
+  await page.setViewportSize({ width: 1440, height: 3200 });
+  await sleep(2000);
   await loaded(page, 45000);
   await shot(page, "01-dashboard");
 
