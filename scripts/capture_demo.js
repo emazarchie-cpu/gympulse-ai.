@@ -32,12 +32,20 @@ async function loaded(page, maxMs = 30000) {
 }
 
 async function shot(page, name) {
-  await page.evaluate(() => {
-    for (const e of [document.querySelector('[data-testid="stMain"]'), document.scrollingElement]) if (e) e.scrollTop = 0;
-    document.querySelectorAll('[data-testid="stToast"]').forEach((t) => t.remove());
-  });
-  await sleep(400);
-  await page.screenshot({ path: path.join(OUT, name + ".png") });
+  // The page in screen-sized parts: name-a.png (top), name-b.png, name-c.png, name-d.png
+  const scroller = '[data-testid="stMain"]';
+  await page.evaluate((sel) => { document.querySelectorAll('[data-testid="stToast"]').forEach((t) => t.remove());
+    for (const e of [document.querySelector(sel), document.scrollingElement]) if (e) e.scrollTop = 0; }, scroller);
+  for (const [i, y] of [[0, 0], [1, 700], [2, 1400], [3, 2100]]) {
+    const moved = await page.evaluate(([sel, y]) => {
+      const e = [document.querySelector(sel), document.scrollingElement].find((x) => x && x.scrollHeight > x.clientHeight + 10);
+      if (!e) return y === 0;
+      e.scrollTop = y; return y === 0 || Math.abs(e.scrollTop - y) < 650;
+    }, [scroller, y]);
+    if (!moved) break;
+    await sleep(1800);
+    await page.screenshot({ path: path.join(OUT, `${name}-${"abcd"[i]}.png`) });
+  }
   console.log("captured " + name);
 }
 
@@ -78,9 +86,6 @@ async function go(page, label) {
     await browser.close();
     process.exit(1);
   }
-  await loaded(page, 45000);
-  await page.setViewportSize({ width: 1440, height: 3200 });
-  await sleep(2000);
   await loaded(page, 45000);
   await shot(page, "01-dashboard");
 
