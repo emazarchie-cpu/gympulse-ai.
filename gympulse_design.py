@@ -680,9 +680,68 @@ html body .stApp.stApp button[data-variant="segmented_control"]:hover:not([aria-
 """
 
 
+# Final layer: the UI rules in docs/DESIGN.md (one accent, no gradients on controls, 44px tap targets,
+# 16px inputs so iPhone doesn't zoom, flat surfaces that rise by getting lighter, tabular numbers).
+POLISH_CSS = """
+/* canvas: one flat dark grey-navy, no glowing colour blobs behind the content */
+html body .stApp.stApp { background: var(--gp-bg) !important; }
+
+/* one accent colour for actions: solid lime, no gradient, no glow */
+html body .stApp.stApp :is(button[kind="primary"], button[kind="primaryFormSubmit"]) {
+    background: var(--gp-lime) !important; box-shadow: none !important; filter: none !important;
+}
+html body .stApp.stApp :is(button[kind="primary"], button[kind="primaryFormSubmit"]):hover {
+    background: #C6F76A !important; transform: none !important;
+}
+
+/* KPI cards: neutral surfaces; colour lives only in what it means (the risk chips, red for at-risk money) */
+html body .stApp.stApp .kpi::before { display: none !important; }
+html body .stApp.stApp .kpi { background: var(--gp-s1) !important; box-shadow: none !important; }
+html body .stApp.stApp .kpi-value { font-variant-numeric: tabular-nums; letter-spacing: -0.5px; }
+
+/* section labels: no decorative gradient dash */
+html body .stApp.stApp .section-label::before { display: none !important; }
+
+/* avatars: a calm neutral circle with lime initials, not a gradient blob */
+html body .stApp.stApp .avatar:not([style*="background-image"]) {
+    background: var(--gp-s3) !important; color: var(--gp-lime) !important; font-weight: 700;
+    box-shadow: inset 0 0 0 1px var(--gp-line-2) !important;
+}
+
+/* elevation: raise surfaces with a lighter grey, not drop shadows (shadows vanish on dark) */
+html body .stApp.stApp [data-testid="stVerticalBlockBorderWrapper"],
+html body .stApp.stApp [data-testid="stVerticalBlock"][class*="st-key-card_"] { box-shadow: none !important; }
+
+/* numbers line up in tables and stats */
+html body .stApp.stApp :is(.gp-table td, .gp-table th, [data-testid="stMetricValue"], .money) {
+    font-variant-numeric: tabular-nums;
+}
+
+/* body copy: comfortable line height and line length */
+html body .stApp.stApp [data-testid="stMarkdownContainer"] p { line-height: 1.55; }
+html body .stApp.stApp .pg-sub { max-width: 68ch; }
+
+/* links: colour and an underline, so they don't depend on colour alone */
+html body .stApp.stApp [data-testid="stMarkdownContainer"] a { color: var(--gp-cyan) !important;
+    text-decoration: underline !important; text-underline-offset: 2px; }
+
+/* phones: 44px tap targets, and 16px text in inputs so iPhone doesn't zoom in when you tap a field */
+@media (max-width: 768px) {
+  html body .stApp.stApp :is(button[kind="primary"], button[kind="secondary"], button[kind="primaryFormSubmit"],
+      button[kind="secondaryFormSubmit"], button[kind="tertiary"], [data-testid="stPopoverButton"],
+      button[data-variant="segmented_control"], [role="tab"], [data-testid="stBaseLinkButton-secondary"],
+      [data-testid="stBaseLinkButton-primary"]) { min-height: 44px !important; }
+  html body .stApp.stApp.stApp.stApp.stApp button[data-variant="segmented_control"] { min-height: 44px !important; }
+  html body .stApp.stApp :is(input, textarea, select, [data-baseweb="select"] *) { font-size: 16px !important; }
+  html body .stApp.stApp :is([data-baseweb="input"], [data-testid="stTextInputRootElement"],
+      [data-testid="stNumberInputContainer"], [data-baseweb="select"] > div) { min-height: 44px !important; }
+}
+"""
+
+
 def apply():
     from gympulse_reports import DOWNLOAD_CSS
-    st.markdown("<style>" + CSS + DOWNLOAD_CSS + "</style>", unsafe_allow_html=True)
+    st.markdown("<style>" + CSS + DOWNLOAD_CSS + POLISH_CSS + "</style>", unsafe_allow_html=True)
 
 
 PULSE_SVG = ('<svg class="cc-pulse" viewBox="0 0 1200 46" preserveAspectRatio="none">'
