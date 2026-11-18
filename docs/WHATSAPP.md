@@ -49,6 +49,12 @@ the Follow-ups inbox. Delivered and read ticks are tracked.
    Then in the Meta app: WhatsApp → Configuration → Webhook: callback URL
    `https://<project>.supabase.co/functions/v1/whatsapp-webhook`, verify token = `WHATSAPP_VERIFY_TOKEN`,
    and subscribe to **messages**.
+7b. **Real number** (after business verification): add it in WhatsApp Manager, verify it by SMS, add a payment
+   method, and give the system user Full control of that WhatsApp account. Add a GitHub secret `WHATSAPP_PIN`
+   (any 6 digits you choose: the number's two-step verification PIN), then run **Deploy WhatsApp webhook** with the
+   App ID, that account's WhatsApp Business Account ID and the number's Phone number ID. It connects the webhook to
+   the account and registers the number for sending. Update `WHATSAPP_PHONE_ID` and `WHATSAPP_WABA_ID` in Render and
+   GitHub, then submit the templates again (templates belong to each WhatsApp account).
 8. **Templates**: in GymPulse **Admin → WhatsApp**, press *Submit templates to Meta*. Approval usually takes
    minutes to a day; the table shows each status. Send yourself a test from the same page.
 9. Each gym picks its channel in Grow → Automatic messages.
