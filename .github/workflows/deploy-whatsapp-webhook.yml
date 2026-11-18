@@ -26,6 +26,10 @@ on:
         description: "WhatsApp Business Account ID (the 'Messaging account ID' on the WhatsApp setup page)"
         required: false
         default: ""
+      phone_id:
+        description: "Phone number ID of a real number to register for sending (needs the WHATSAPP_PIN secret). Leave empty to skip."
+        required: false
+        default: ""
   push:
     branches: [main]
     paths:
@@ -128,3 +132,23 @@ jobs:
           curl -sS "$G/$WABA_ID/subscribed_apps" -H "Authorization: Bearer $WHATSAPP_TOKEN"; echo
           echo "### Meta is connected" >> "$GITHUB_STEP_SUMMARY"
           echo "Replies, button taps and read ticks now go to the webhook. Send 'Hello' to test." >> "$GITHUB_STEP_SUMMARY"
+      - name: Register the phone number for sending
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.phone_id != '' }}
+        env:
+          PHONE_ID: ${{ inputs.phone_id }}
+          WHATSAPP_TOKEN: ${{ secrets.WHATSAPP_TOKEN }}
+          WHATSAPP_PIN: ${{ secrets.WHATSAPP_PIN }}
+        run: |
+          set -u
+          case "$PHONE_ID" in *[!0-9]*) echo "::error::Phone number ID must be numbers only."; exit 1;; esac
+          case "$WHATSAPP_PIN" in [0-9][0-9][0-9][0-9][0-9][0-9]) ;; *) echo "::error::Add a WHATSAPP_PIN secret: any 6 digits you choose (two-step verification PIN)."; exit 1;; esac
+          G=https://graph.facebook.com/v21.0
+          echo "Registering the number with the WhatsApp Cloud API…"
+          r=$(curl -sS -X POST "$G/$PHONE_ID/register" -H "Authorization: Bearer $WHATSAPP_TOKEN" \
+                -H "Content-Type: application/json" \
+                -d "{\"messaging_product\":\"whatsapp\",\"pin\":\"$WHATSAPP_PIN\"}")
+          echo "   $r"
+          echo "$r" | grep -q '"success":true' || { echo "::error::Meta refused to register the number (see above)."; exit 1; }
+          echo "Status:"
+          curl -sS "$G/$PHONE_ID?fields=display_phone_number,verified_name,name_status,status,quality_rating" -H "Authorization: Bearer $WHATSAPP_TOKEN"; echo
+          echo "### Number registered for sending" >> "$GITHUB_STEP_SUMMARY"
