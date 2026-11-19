@@ -39,5 +39,6 @@ description: Voice, honesty and privacy rules for anything written or designed t
   render frames from HTML and check them before sending.
 
 ## Brand
+Every piece follows the "modern, human-designed, never AI slop" checklist in `CLAUDE.md`.
 Dark navy background, lime `#B7F34A` as the single accent, Bricolage Grotesque + Instrument Sans (fonts in
 `.claude/skills/canvas-design/canvas-fonts`), logo files in the repository root and `static/`.
