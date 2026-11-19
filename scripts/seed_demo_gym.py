@@ -251,14 +251,14 @@ def build(sc, gym_id, rng):
                      "note": "Called, came back the next day and renewed."})
     log(f"  follow-ups: {len(try_insert(sc, 'retention_actions', acts))}")
 
-    # HMO members: two HMOs, plans, weekly limits, codes, last month's claim
+    # HMO members: two made-up HMOs (never real ones, so no one reads it as a partnership), plans, weekly limits, codes, last month's claim
     hmo = [p for p in people if p["kind"] in ("regular", "steady")][:8]
     for j, p in enumerate(hmo):
         rel = j < 5
-        fields = {"hmo_provider": "Reliance HMO" if rel else "Hygeia HMO", "hmo_id": f"{'RL' if rel else 'HY'}-{20391 + j}",
-                  "hmo_employer": rng.choice(["Lekki Tech Ltd", "Zenith Logistics", "Ikeja Foods"]),
+        fields = {"hmo_provider": "Sample Health HMO" if rel else "Demo Care HMO", "hmo_id": f"{'SH' if rel else 'DC'}-{20391 + j}",
+                  "hmo_employer": rng.choice(["Lekki Tech Ltd", "Harbour Logistics", "Ikeja Foods"]),
                   "hmo_valid_until": (TODAY + timedelta(days=rng.choice([20, 60, 120, 200]))).isoformat(),
-                  "hmo_plan": "Emerald" if rel else "HyFit Platinum", "hmo_weekly_limit": 2 if rel else 3}
+                  "hmo_plan": "Gold" if rel else "Platinum", "hmo_weekly_limit": 2 if rel else 3}
         try:
             sc.table("members").update(fields).eq("id", p["id"]).execute()
         except Exception:
@@ -269,17 +269,17 @@ def build(sc, gym_id, rng):
         except Exception:
             pass
     try_insert(sc, "hmo_providers", [
-        {"gym_id": gym_id, "name": "Reliance HMO", "pay_model": "per_visit", "rate": 2500, "weekly_limit": 2,
+        {"gym_id": gym_id, "name": "Sample Health HMO", "pay_model": "per_visit", "rate": 2500, "weekly_limit": 2,
          "needs_code": False, "claim_days": 30},
-        {"gym_id": gym_id, "name": "Hygeia HMO", "pay_model": "per_member", "rate": 8000, "weekly_limit": 3,
+        {"gym_id": gym_id, "name": "Demo Care HMO", "pay_model": "per_member", "rate": 8000, "weekly_limit": 3,
          "needs_code": True, "claim_days": 30}])
     m1 = (TODAY.replace(day=1) - timedelta(days=1)).replace(day=1)
     m2 = (m1 - timedelta(days=1)).replace(day=1)
     try_insert(sc, "hmo_claims", [
-        {"gym_id": gym_id, "provider": "Reliance HMO", "month": m2.isoformat(), "visits": 31, "members": 5,
+        {"gym_id": gym_id, "provider": "Sample Health HMO", "month": m2.isoformat(), "visits": 31, "members": 5,
          "amount": 77500, "status": "paid", "sent_on": (m2 + timedelta(days=36)).isoformat(),
          "paid_on": (m2 + timedelta(days=80)).isoformat(), "amount_paid": 77500},
-        {"gym_id": gym_id, "provider": "Hygeia HMO", "month": m2.isoformat(), "visits": 22, "members": 3,
+        {"gym_id": gym_id, "provider": "Demo Care HMO", "month": m2.isoformat(), "visits": 22, "members": 3,
          "amount": 24000, "status": "sent", "sent_on": (TODAY - timedelta(days=68)).isoformat()}])
     log(f"  HMO members: {len(hmo)}")
 
