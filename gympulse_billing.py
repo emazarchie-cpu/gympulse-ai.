@@ -1193,7 +1193,7 @@ def _render_plans(supabase, gym_id, s, p, ps):
     if s["status"] == "free":
         st.success("Your gym has free access to GymPulse AI. Nothing to pay.")
     else:
-        st.markdown('<div class="section-label">CHOOSE A PLAN</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-label">Choose a plan</div>', unsafe_allow_html=True)
         n_members = billable_members(supabase, gym_id)
         best = fits(ps, n_members) if n_members else None
         if best:
@@ -1249,7 +1249,7 @@ def _render_plans(supabase, gym_id, s, p, ps):
             st.caption(p["note"])
 
     invoices = gi.for_gym(supabase, gym_id)
-    st.markdown('<div class="section-label">BILLING HISTORY</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">Billing history</div>', unsafe_allow_html=True)
     if invoices is None:
         st.caption("Receipts appear here once billing history is switched on.")
     else:
@@ -1694,7 +1694,7 @@ def _render_billing_overview(sc, ordered, states, subs):
                 ("Paid this month", f"₦{this_month:,.0f}", "amber", f"{today:%B}")])
 
     names = {g["gym"]["id"]: g["name"] for g in ordered}
-    st.markdown('<div class="section-label">RECENT PAYMENTS</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">Recent payments</div>', unsafe_allow_html=True)
     if paid:
         how = {"paystack": "Paystack", "transfer": "Bank transfer", "admin": "Marked paid"}
         gw.table([{"Date": str(x.get("paid_at") or x.get("created_at") or "")[:10],
@@ -1739,9 +1739,9 @@ def _render_billing_overview(sc, ordered, states, subs):
                f'<div class="bl-line">{line}</div>'
                + (f'<div class="bl-tags">{"".join(tags)}</div>' if tags else "") + '</div>')
 
-    for key, label in (("active", "PAYING"), ("trial", "ON FREE TRIAL"), ("expired", "ENDED"), ("free", "FREE ACCESS")):
+    for key, label in (("active", "Paying"), ("trial", "On free trial"), ("expired", "Ended"), ("free", "Free access")):
         if by[key]:
-            st.markdown(f'<div class="section-label">{label} · {len(by[key])}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="section-label">{label} ({len(by[key])})</div>', unsafe_allow_html=True)
             for g in by[key]:
                 card(g)
 
@@ -1925,7 +1925,7 @@ def render_admin_billing(sc, gyms, audit):
     pend = gi.pending_transfers(sc)
     names = {g["gym"]["id"]: g["name"] for g in gyms}
     if pend:
-        st.markdown('<div class="section-label">BANK TRANSFERS TO CONFIRM</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-label">Bank transfers to confirm</div>', unsafe_allow_html=True)
         gw.table([{"Invoice": gi.number(x), "Gym": names.get(x["gym_id"], x.get("business_name") or "–"),
                    "Plan": f"{x.get('plan')} · {'Yearly' if x.get('period') == 'yearly' else 'Monthly'}",
                    "Amount": gi.money(x.get("amount")), "Created": str(x.get("created_at"))[:10],

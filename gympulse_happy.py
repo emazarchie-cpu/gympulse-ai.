@@ -166,7 +166,7 @@ def render_happiness(supabase, gym_id):
                 ("Comments", str(int(cur["comment"].fillna("").astype(str).str.len().gt(0).sum())), "grey", "")])
     unhappy = cur[cur["score"] <= 2]
     if len(unhappy):
-        st.markdown('<div class="section-label">REACH OUT TO THESE MEMBERS</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-label">Reach out to these members</div>', unsafe_allow_html=True)
         for _, r in unhappy.iterrows():
             m = names.get(r["member_id"], {})
             name = gw._text(m.get("full_name") if hasattr(m, "get") else None, "Member")

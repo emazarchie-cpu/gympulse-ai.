@@ -226,7 +226,7 @@ def render_team(supabase, gym_id):
                "billing and settings stay with you.")
     gw._md(_access_cards())
 
-    st.markdown('<div class="section-label">YOUR TEAM</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">Your team</div>', unsafe_allow_html=True)
     gw.table([{"Name": r.get("full_name") or "–", "Email": r.get("email"),
                "Role": "Personal trainer" if r.get("role") == "trainer" else "Staff",
                "Access": "Active" if r.get("status") == "active" else "Off",
@@ -282,7 +282,7 @@ def render_team(supabase, gym_id):
             st.error(msg)
 
     if rows:
-        st.markdown('<div class="section-label">MANAGE ACCESS</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-label">Manage access</div>', unsafe_allow_html=True)
         pick = st.selectbox("Team member", range(len(rows)), key="team_pick", label_visibility="collapsed",
                             format_func=lambda i: f"{rows[i].get('full_name') or rows[i]['email']} · {rows[i]['email']}")
         r = rows[pick]

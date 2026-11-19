@@ -2338,7 +2338,7 @@ def render_member_directory(supabase, gym_id):
         st.caption(f"No {view.lower()} members found.")
         return
 
-    st.markdown('<div class="section-label">MEMBERS · CLICK A NAME TO OPEN THEIR PROFILE</div>',
+    st.markdown('<div class="section-label">Members: click a name to open their profile</div>',
                 unsafe_allow_html=True)
     limit = st.session_state.get("mm_limit", 12)
     if _mobile():
@@ -3031,7 +3031,7 @@ def render_risk_radar(supabase, gym_id, assess_fn):
     ])
     data_tools(False)
 
-    st.markdown('<div class="section-label">FILTER</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">Filter</div>', unsafe_allow_html=True)
     f1, f2, f3 = st.columns([2, 2, 3])
     levels = f1.multiselect("Risk level", ["High", "Medium", "Low"], ["High", "Medium", "Low"])
     plans = f2.multiselect("Membership", PLANS, PLANS)
@@ -3043,16 +3043,16 @@ def render_risk_radar(supabase, gym_id, assess_fn):
         st.info("No members match these filters.")
         return
 
-    st.markdown('<div class="section-label">THE RADAR</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">The radar</div>', unsafe_allow_html=True)
     st.caption("Each dot is a member. Further right = longer since their last visit. Higher up = more likely "
                "to leave. Tap or hover a dot to see who it is.")
     _radar_chart(view)
 
-    st.markdown('<div class="section-label">PRIORITY LIST · CLICK A NAME TO OPEN THEIR PROFILE</div>',
+    st.markdown('<div class="section-label">Priority list: click a name to open their profile</div>',
                 unsafe_allow_html=True)
     _priority_rows(view)
 
-    st.markdown('<div class="section-label">QUICK VIEW</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">Quick view</div>', unsafe_allow_html=True)
     pick = st.selectbox("Select a member", view["full_name"], key="radar_pick")
     m = view[view["full_name"] == pick].iloc[0]
     d1, d2, d3 = st.columns(3)
@@ -3508,7 +3508,7 @@ def _log_reminder(supabase, gym_id, member_id, name):
 def render_renewal_reminders(supabase, gym_id, roster):
     ctx = _biz_ctx()
     s = ctx["s"]
-    st.markdown('<div class="section-label">RENEWAL REMINDERS</div>',
+    st.markdown('<div class="section-label">Renewal reminders</div>',
                 unsafe_allow_html=True)
     if not s.get("auto_reminders", True):
         st.caption("Automatic renewal reminders are switched off in Settings → Preferences.")
@@ -3679,7 +3679,7 @@ BOARD_TONES = {"To do": "cyan", "In progress": "amber", "Done": "lime"}
 BOARD_COLUMNS = [
     ("To start", ("Started",), "cyan"),
     ("In progress", ("In progress",), "amber"),
-    ("Contacted · follow up", ("Contacted", "Follow-up due"), "white"),
+    ("Contacted, follow up", ("Contacted", "Follow-up due"), "white"),
     ("Done", ("Resolved", "Unsuccessful"), "lime"),
 ]
 
@@ -3808,7 +3808,7 @@ def _play_details_form(supabase, gym_id, pname):
 
 
 def _pillars_panel(supabase, gym_id, roster, actions):
-    st.markdown('<div class="section-label">RETENTION PILLARS</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">Retention pillars</div>', unsafe_allow_html=True)
     st.caption("Members stay when they feel part of something, know their trainer "
                "and feel looked after. Tap any play to start it.")
     cols = st.columns(len(PILLARS))
@@ -3940,7 +3940,7 @@ def render_action_centre(supabase, gym_id, assess_fn):
     """)
 
     todo = members_to_contact(roster, actions_all)
-    st.markdown('<div class="section-label">SUGGESTED TODAY</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">Suggested today</div>', unsafe_allow_html=True)
     if todo.empty:
         st.success("Everyone who needs a follow-up has one in progress or was "
                    f"contacted in the last {SUGGEST_COOLDOWN_DAYS} days.")
@@ -4001,7 +4001,7 @@ def render_action_centre(supabase, gym_id, assess_fn):
         st.rerun()
     ga.render_workload(visible_actions)
 
-    st.markdown('<div class="section-label">YOUR BOARD</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">Your board</div>', unsafe_allow_html=True)
     if visible_actions.empty:
         st.info("No actions yet. Add one from the suggestions above.")
         return
@@ -4079,7 +4079,7 @@ def render_payments(supabase, gym_id, assess_fn):
          "Recorded on profiles"),
     ])
 
-    st.markdown('<div class="section-label">RENEWAL PIPELINE</div>',
+    st.markdown('<div class="section-label">Renewal pipeline</div>',
                 unsafe_allow_html=True)
     buckets = [
         ("Overdue", lapsed, "red"),
@@ -4100,7 +4100,7 @@ def render_payments(supabase, gym_id, assess_fn):
 
     render_renewal_reminders(supabase, gym_id, roster)
 
-    st.markdown('<div class="section-label">WHO TO COLLECT FROM</div>',
+    st.markdown('<div class="section-label">Who to collect from</div>',
                 unsafe_allow_html=True)
     focus = pd.concat([lapsed, renewing]).drop_duplicates(subset="id")
     focus = focus.sort_values(["risk_category", "_days_left"])
@@ -4149,7 +4149,7 @@ def _insights_charts(roster):
     try:
         import altair as alt
         with left:
-            st.markdown('<div class="section-label">RISK MIX</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-label">Risk mix</div>', unsafe_allow_html=True)
             mix_df = pd.DataFrame({"Risk": mix.index, "Members": mix.values})
             chart = (alt.Chart(mix_df).mark_bar(cornerRadiusTopLeft=8, cornerRadiusTopRight=8)
                      .encode(x=alt.X("Risk:N", sort=["High", "Medium", "Low"],
@@ -4162,7 +4162,7 @@ def _insights_charts(roster):
                      .properties(height=260))
             _show_chart(_style_chart(chart))
         with right:
-            st.markdown('<div class="section-label">REVENUE AT RISK BY PLAN</div>',
+            st.markdown('<div class="section-label">Revenue at risk by plan</div>',
                         unsafe_allow_html=True)
             plan_df = pd.DataFrame({"Plan": by_plan.index,
                                     "Revenue at risk": by_plan.values.round(0)})
@@ -4175,10 +4175,10 @@ def _insights_charts(roster):
             _show_chart(_style_chart(chart))
     except Exception:
         with left:
-            st.markdown('<div class="section-label">RISK MIX</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-label">Risk mix</div>', unsafe_allow_html=True)
             st.bar_chart(mix)
         with right:
-            st.markdown('<div class="section-label">REVENUE AT RISK BY PLAN</div>',
+            st.markdown('<div class="section-label">Revenue at risk by plan</div>',
                         unsafe_allow_html=True)
             st.bar_chart(by_plan)
 
@@ -4224,7 +4224,7 @@ def render_business_insights(supabase, gym_id, assess_fn, header=True):
         pass
     _insights_charts(roster)
 
-    st.markdown('<div class="section-label">RENEWAL PIPELINE</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">Renewal pipeline</div>', unsafe_allow_html=True)
     labels = ["≤7d", "8-14d", "15-30d", "31-60d", "60d+"]
     bins = pd.cut(roster["renewal_due_days"], [-1, 7, 14, 30, 60, 10_000], labels=labels)
     pipe = roster.groupby(bins, observed=False).agg(
@@ -4238,7 +4238,7 @@ def render_business_insights(supabase, gym_id, assess_fn, header=True):
         _md(kpi_card(f"Renews {label}", int(row["members"]), tone,
                      f"{avg:.0%} avg risk · {row['fees']:,.0f}"), col)
 
-    st.markdown('<div class="section-label">WHAT WORKS</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">What works</div>', unsafe_allow_html=True)
     done = actions[actions["status"] == "Done"] if not actions.empty else actions
     if done.empty:
         st.info("Complete some actions with outcomes and this will show which "
@@ -4268,7 +4268,7 @@ def render_business_insights(supabase, gym_id, assess_fn, header=True):
                        "This table counts every completed action, including "
                        "cards that have since been archived from the board.")
 
-    st.markdown('<div class="section-label">TO DO THIS WEEK</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">To do this week</div>', unsafe_allow_html=True)
     need = members_to_contact(roster, actions)
     high = need[need["risk_category"] == "High"]
     if not high.empty:
@@ -4704,7 +4704,7 @@ def render_archie(supabase, gym_id, assess_fn, business_name, owner_name="the gy
         except Exception:
             pass
 
-    st.markdown('<div class="section-label">TRY ASKING</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">Try asking</div>', unsafe_allow_html=True)
     picked = None
     per_row = 2 if _mobile() else 3
     for i in range(0, len(ARCHIE_PROMPTS), per_row):
@@ -5703,7 +5703,7 @@ def render_faqs():
         rows = [(a, b) for a, b in items if not q or q in a.lower() or q in b.lower()]
         if not rows:
             continue
-        st.markdown(f'<div class="section-label">{_esc(title.upper())}</div>',
+        st.markdown(f'<div class="section-label">{_esc(title)}</div>',
                     unsafe_allow_html=True)
         for question, answer in rows:
             with st.expander(question, expanded=bool(q)):
@@ -5725,7 +5725,7 @@ def render_dashboard(supabase, gym_id, assess_fn, greeting, user_name, business_
         roster, actions = pd.DataFrame(), pd.DataFrame()
 
     if roster.empty:
-        st.markdown('<div class="section-label">GET STARTED IN THREE STEPS</div>',
+        st.markdown('<div class="section-label">Get started in three steps</div>',
                     unsafe_allow_html=True)
         _md("""
         <div class="lp-steps">
@@ -5756,7 +5756,7 @@ def render_dashboard(supabase, gym_id, assess_fn, greeting, user_name, business_
                     "Unpaid members get a gentle weekly nudge until they renew.")
             st.button("Open renewal reminders", key="dash_rem", on_click=_go,
                       args=("Payments & Renewals",))
-        st.markdown('<div class="section-label">WHO NEEDS YOU TODAY</div>',
+        st.markdown('<div class="section-label">Who needs you today</div>',
                     unsafe_allow_html=True)
         need = members_to_contact(roster, actions)
         if need.empty:
@@ -5784,7 +5784,7 @@ def render_dashboard(supabase, gym_id, assess_fn, greeting, user_name, business_
             st.button("See everyone on the Risk Radar", key="qa_radar_more", type="tertiary", on_click=_go,
                       args=("Risk Radar",))
 
-    st.markdown('<div class="section-label">QUICK ACTIONS</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">Quick actions</div>', unsafe_allow_html=True)
     tiles = [
         ("Member Management", "Member Management", ":material/group:"),
         ("Action Centre", "Action Centre", ":material/task_alt:"),
@@ -5799,7 +5799,7 @@ def render_dashboard(supabase, gym_id, assess_fn, greeting, user_name, business_
             _ibtn(col, label, icon, key=f"qa_{page}", on_click=_go, args=(page,),
                   use_container_width=True)
 
-    st.markdown('<div class="section-label">HOW IT WORKS</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">How it works</div>', unsafe_allow_html=True)
     _md("""
     <div class="lp-steps">
       <div class="lp-stepcard"><div class="lp-num">01</div><h4>Input</h4>

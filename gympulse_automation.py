@@ -221,7 +221,7 @@ def render_workload(actions):
     if not staff:
         return
     rows = workload(actions, staff)
-    st.markdown('<div class="section-label">TEAM WORKLOAD</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">Team workload</div>', unsafe_allow_html=True)
     cols = st.columns(min(len(rows), 4) or 1)
     for i, r in enumerate(rows):
         tone = "red" if r["overdue"] else "amber" if r["follow_up_due"] else "lime"
@@ -411,7 +411,7 @@ def weekly_report_pdf(supabase, gym_id, roster, actions, business_name, days=7):
 
 def render_report_section(supabase, gym_id, roster, actions, business_name):
     import gympulse_reports as rp
-    st.markdown('<div class="section-label">WEEKLY REPORT</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">Weekly report</div>', unsafe_allow_html=True)
     report = weekly_report(supabase, gym_id, roster, actions, business_name)
     c1, c2 = st.columns(2)
     with c1:

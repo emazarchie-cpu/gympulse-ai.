@@ -110,7 +110,7 @@ def render_celebrate(supabase, gym_id):
     today = gw.today_local()
     biz = gg._biz()[0]
 
-    st.markdown('<div class="section-label">MEMBER OF THE MONTH</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">Member of the month</div>', unsafe_allow_html=True)
     this_month = today.replace(day=1)
     last_month = (this_month - timedelta(days=1)).replace(day=1)
     month = st.radio("Month", [last_month, this_month], horizontal=True, key="cel_month",
@@ -136,7 +136,7 @@ def render_celebrate(supabase, gym_id):
         gg.send_row(k, m, f"cel_mom_send_{m['id']}", f"You're our Member of the Month, {gg._first(m['full_name'])}!",
                     supabase=supabase, gym_id=gym_id)
 
-    st.markdown('<div class="section-label">MILESTONES IN THE LAST 30 DAYS</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">Milestones in the last 30 days</div>', unsafe_allow_html=True)
     found = []
     for _, m in members.iterrows():
         for ref, title, sentence in milestones(m, ck, today, recent=30):

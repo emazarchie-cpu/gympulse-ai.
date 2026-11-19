@@ -378,7 +378,7 @@ def why_counts(sc, gym_id, days=90):
 
 def _why_stop(sc, gym_id):
     cnt = why_counts(sc, gym_id)
-    st.markdown('<div class="section-label">WHY MEMBERS STOP · LAST 90 DAYS</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">Why members stop: last 90 days</div>', unsafe_allow_html=True)
     if not cnt:
         st.caption("When your team records why members stopped, the reasons add up here, so you know what to fix.")
         return

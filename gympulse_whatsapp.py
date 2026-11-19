@@ -400,7 +400,7 @@ def render_admin_setup():
         return
     _render_usage()
     statuses = template_statuses()
-    st.markdown('<div class="section-label">TEMPLATES</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">Templates</div>', unsafe_allow_html=True)
     gw.table([{"Template": n, "Type": t["category"].title(), "Buttons": ", ".join(t["buttons"] + ([t["url_button"]["text"] + " (link)"] if t.get("url_button") else [])),
                "Status": (statuses or {}).get(n, "Not submitted" if statuses is not None else "Unknown").title()}
               for n, t in TEMPLATES.items()],
@@ -446,7 +446,7 @@ def _render_usage():
     if sc is None:
         return
     u = month_usage(sc)
-    st.markdown('<div class="section-label">THIS MONTH</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">This month</div>', unsafe_allow_html=True)
     gw.kpi_row([("WhatsApp messages", f"{u['count']:,}", "cyan", f"{u['utility']:,} utility · {u['marketing']:,} marketing"),
                 ("Estimated Meta cost", f"₦{u['naira']:,.0f}", "amber", f"about ${u['usd']:,.2f}"),
                 ("Gyms using WhatsApp", f"{len(u['by_gym']):,}", "lime", "")])

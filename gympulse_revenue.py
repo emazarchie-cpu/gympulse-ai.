@@ -297,7 +297,7 @@ def renewal_guard(supabase, gym_id, member_id, name, current_end, plan, key):
 
 def render_record_payment(supabase, gym_id, roster):
     """Quick 'record a renewal' form for the Payments page."""
-    st.markdown('<div class="section-label">RECORD A RENEWAL OR PAYMENT</div>',
+    st.markdown('<div class="section-label">Record a renewal or payment</div>',
                 unsafe_allow_html=True)
     if roster.empty:
         st.info("Add members first.")
@@ -383,7 +383,7 @@ PAYMENTS_TABLE_CSS = """
 
 
 def render_recent_payments(supabase, gym_id, roster):
-    st.markdown('<div class="section-label">RECENT PAYMENTS</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">Recent payments</div>', unsafe_allow_html=True)
     pay = load_payments(supabase, gym_id)
     if pay is None:
         st.info("Run sql/phase3_revenue.sql in Supabase to keep a full payment history "
@@ -450,7 +450,7 @@ def render_recent_payments(supabase, gym_id, roster):
 def render_revenue_outcomes(supabase, gym_id, roster):
     """Business Insights: what retention work is worth, from confirmed payments."""
     rev = revenue_summary(supabase, gym_id, roster)
-    st.markdown('<div class="section-label">REVENUE OUTCOMES · LAST 30 DAYS</div>',
+    st.markdown('<div class="section-label">Revenue outcomes: last 30 days</div>',
                 unsafe_allow_html=True)
     rate = "n/a" if rev["renewal_rate"] is None else f"{rev['renewal_rate']:.0%}"
     if rev["source"] == "payments":

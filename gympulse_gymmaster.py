@@ -993,7 +993,7 @@ def render_gymmaster_import(supabase, gym_id):
         prow = [{"Plan in " + ("your file" if origin == "your file" else origin): n, "Plan type": t,
                  "Members": c, "Active": a, "Ended": e}
                 for (n, t), (c, a, e) in sorted(groups.items(), key=lambda x: (gw.PLANS.index(x[0][1]), -x[1][0]))]
-        st.markdown('<div class="section-label">PLANS</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-label">Plans</div>', unsafe_allow_html=True)
         gw.table(prow[:40], max_height=320,
                  caption=("Each member keeps their plan name from your old software and gets the matching plan "
                           "type, so renewals and reminders run on the right dates."
@@ -1114,7 +1114,7 @@ def _render_recent(supabase, gym_id):
     rows = recent_imports(supabase, gym_id)
     if not rows:
         return
-    st.markdown('<div class="section-label">RECENT IMPORTS</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">Recent imports</div>', unsafe_allow_html=True)
     for r in rows[:3]:
         sm = r.get("summary") or {}
         when = str(r.get("created_at") or "")[:16].replace("T", " ")

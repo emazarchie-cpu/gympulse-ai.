@@ -93,7 +93,7 @@ def render_insights(supabase, gym_id):
     """Business Insights: the gym's own retention rate against the industry."""
     s = summary(supabase, gym_id)
     lm, yr = s["last_month"], s["year"]
-    st.markdown('<div class="section-label">RETENTION RATE</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">Retention rate</div>', unsafe_allow_html=True)
     gw.kpi_row([
         (f"Kept in {s['last_month_label']}", _fmt(lm), "lime",
          f"{lm['kept']} of {lm['base']} members" if lm["rate"] is not None else "not enough members yet"),
