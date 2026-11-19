@@ -285,9 +285,8 @@ html body .chip { border-radius: 999px; }
     border-radius: 12px; font-weight: 700; font-size: 15px; text-decoration: none !important;
     color: var(--gp-text) !important; border: 1px solid var(--gp-line-2); background: rgba(255,255,255,0.04); }
 .lx-btn:hover { border-color: rgba(183,243,74,0.6); background: rgba(183,243,74,0.08); }
-.lx-btn-primary { background: var(--gp-grad); color: #0A0F1E !important; border: 0;
-    box-shadow: 0 8px 26px -12px rgba(183,243,74,0.8); }
-.lx-btn-primary:hover { filter: brightness(1.06); background: var(--gp-grad); }
+.lx-btn-primary { background: #B7F34A; color: #0A0F1E !important; border: 0; box-shadow: none; }
+.lx-btn-primary:hover { background: #C6F76A; border: 0; }
 .lx-sec { padding: 64px 0 8px; }
 .lx-kicker { color: var(--gp-lime); font-size: 12px; font-weight: 700; letter-spacing: 1.8px; text-transform: uppercase; text-align: center; }
 .lx-h2 { font-size: 40px; line-height: 1.1; letter-spacing: -1.4px; font-weight: 700; color: var(--gp-text); text-align: center; margin: 10px auto 12px; max-width: 760px; }
@@ -722,7 +721,7 @@ html body .stApp.stApp [data-testid="stMarkdownContainer"] p { line-height: 1.55
 html body .stApp.stApp .pg-sub { max-width: 68ch; }
 
 /* links: colour and an underline, so they don't depend on colour alone */
-html body .stApp.stApp [data-testid="stMarkdownContainer"] a { color: var(--gp-cyan) !important;
+html body .stApp.stApp [data-testid="stMarkdownContainer"] a:not(.lx-btn) { color: var(--gp-cyan) !important;
     text-decoration: underline !important; text-underline-offset: 2px; }
 
 /* phones: 44px tap targets, and 16px text in inputs so iPhone doesn't zoom in when you tap a field */
