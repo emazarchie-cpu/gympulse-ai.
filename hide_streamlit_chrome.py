@@ -33,9 +33,9 @@ CSS = (
     "#gp-splash.plain img{display:none}"
     "@keyframes gp-beat{0%,100%{transform:scale(1);opacity:.9}50%{transform:scale(1.06);opacity:1}}"
     "@media (prefers-reduced-motion:reduce){#gp-splash img{animation:none}}"
-    # gone as soon as the page shows real content (a heading, a button, a field or a picture)
-    'body:has(.stApp [data-testid="stMain"] :is(h1,h2,h3,button,input,img,.lx-nav)) #gp-splash{opacity:0;'
-    "pointer-events:none;visibility:hidden}"
+    # the page stays hidden behind the loading screen until its styles have arrived (no unstyled flash)
+    'html:not(.gp-ready) [data-testid="stMain"]{visibility:hidden}'
+    "html.gp-ready #gp-splash{opacity:0;pointer-events:none;visibility:hidden}"
     "</style>"
     '<meta name="theme-color" content="#0B1020">'
 )
@@ -46,10 +46,16 @@ BRAND = "GymPulse AI"
 SPLASH_MARK = 'id="gp-splash"'
 SPLASH = (
     '<div id="gp-splash" aria-hidden="true"><img src="/gympulse-icon-v4-192.png" alt=""></div>'
-    "<script>(function(){var s=document.getElementById('gp-splash');if(!s)return;"
-    "if(location.search)s.className='plain';"
-    "if(/bot|crawl|spider|slurp|preview|facebookexternalhit|lighthouse/i.test(navigator.userAgent))"
-    "{s.remove();return}setTimeout(function(){s.remove()},30000)})()</script>"
+    "<script>(function(){var d=document,h=d.documentElement,s=d.getElementById('gp-splash'),t=0;"
+    "function ready(){if(h.classList.contains('gp-ready'))return;h.classList.add('gp-ready');"
+    "setTimeout(function(){if(s)s.remove()},400)}"
+    "if(location.search&&s)s.className='plain';"
+    "if(/bot|crawl|spider|slurp|preview|facebookexternalhit|lighthouse/i.test(navigator.userAgent)){ready();return}"
+    # ready when the app's styles are on the page (gympulse_design marks them), or 1.5 s after the
+    # first real content on pages without them; 30 s at most whatever happens
+    "function check(){if(d.querySelector('.gp-css-ready')){ready();return}"
+    "if(!t&&d.querySelector('[data-testid=\"stMain\"] :is(h1,h2,h3,button,input,img)'))t=setTimeout(ready,1500)}"
+    "new MutationObserver(check).observe(h,{childList:true,subtree:true});setTimeout(ready,30000)})()</script>"
 )
 # Site ownership tags read by crawlers in the page <head> (raw HTML, before any script runs).
 # Meta domain verification for usegympulseai.com (Business settings -> Brand safety -> Domains).
@@ -86,7 +92,8 @@ def apply(quiet=False):
             new = _re.sub(r'<style id="gp-early-style">.*?</style><meta name="theme-color" content="#0B1020">', "",
                           new, flags=_re.S)
             new = new.replace("</head>", CSS + "</head>", 1)
-        if SPLASH_MARK not in new:
+        if SPLASH not in new:                                # missing or an older version: put in the latest
+            new = _re.sub(r'<div id="gp-splash".*?</script>', "", new, count=1, flags=_re.S)
             new = _re.sub(r"(<body[^>]*>)", lambda m: m.group(1) + SPLASH, new, count=1)
         new = new.replace("<title>Streamlit</title>", f"<title>{BRAND}</title>")
         new = _re.sub(r'<meta name="facebook-domain-verification"[^>]*>\s*', "", new)   # replace an old code

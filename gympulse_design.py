@@ -774,7 +774,9 @@ def apply_app():
 
 def apply():
     from gympulse_reports import DOWNLOAD_CSS
-    st.markdown("<style>" + CSS + DOWNLOAD_CSS + POLISH_CSS + "</style>", unsafe_allow_html=True)
+    # the empty marker tells the loading screen these styles are on the page (hide_streamlit_chrome)
+    st.markdown("<style>" + CSS + DOWNLOAD_CSS + POLISH_CSS + "</style><span class=\"gp-css-ready\"></span>",
+                unsafe_allow_html=True)
 
 
 PULSE_SVG = ('<svg class="cc-pulse" viewBox="0 0 1200 46" preserveAspectRatio="none">'
