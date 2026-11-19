@@ -44,7 +44,7 @@ This applies to all work: app screens, flyers, posters, videos, decks, social po
 |---|---|
 | Shipping any code change (branch, test, PR, merge, deploy check) | `gympulse-shipping` |
 | Any UI or styling change in the app | `gympulse-ui` (with `frontend-design`) |
-| Posts, flyers, videos, pitches, case studies, emails, WhatsApp messages | `gympulse-content` |
+| Posts, flyers, videos, pitches, case studies, emails, WhatsApp messages | `gympulse-content` (social plan: `docs/social/CONTENT_PLAN.md`) |
 | Walking the founder through Meta, Render, GitHub, Supabase, Paystack, CAC or NDPC | `gympulse-setup-help` |
 | Testing the app in a browser | `webapp-testing` |
 | Posters and print pieces | `canvas-design` |
