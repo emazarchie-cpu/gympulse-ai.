@@ -25,10 +25,32 @@ CSS = (
     '[data-testid="stMainMenu"],[data-testid="stHeader"],'
     '[data-testid="stDecoration"],[data-testid="stAppDeployButton"],'
     "header{display:none !important;}"
+    # the framework's grey placeholder bars look broken: hidden, the GymPulse loading screen shows instead
+    '[data-testid="stAppSkeleton"],[data-testid="stSkeleton"]{display:none !important;}'
+    "#gp-splash{position:fixed;inset:0;z-index:999999;background:#0B1020;display:flex;align-items:center;"
+    "justify-content:center;transition:opacity .25s}"
+    "#gp-splash img{width:56px;height:56px;border-radius:14px;animation:gp-beat 1.4s ease-in-out infinite}"
+    "#gp-splash.plain img{display:none}"
+    "@keyframes gp-beat{0%,100%{transform:scale(1);opacity:.9}50%{transform:scale(1.06);opacity:1}}"
+    "@media (prefers-reduced-motion:reduce){#gp-splash img{animation:none}}"
+    # gone as soon as the page shows real content (a heading, a button, a field or a picture)
+    'body:has(.stApp [data-testid="stMain"] :is(h1,h2,h3,button,input,img,.lx-nav)) #gp-splash{opacity:0;'
+    "pointer-events:none;visibility:hidden}"
     "</style>"
     '<meta name="theme-color" content="#0B1020">'
 )
 BRAND = "GymPulse AI"
+# Loading screen shown from the first moment until the app draws: the GymPulse mark on the dark page.
+# On gym links (anything with ?…, e.g. member portals) it stays plain, without our logo; search
+# engines never see it; and it removes itself after 30 seconds whatever happens.
+SPLASH_MARK = 'id="gp-splash"'
+SPLASH = (
+    '<div id="gp-splash" aria-hidden="true"><img src="/gympulse-icon-v4-192.png" alt=""></div>'
+    "<script>(function(){var s=document.getElementById('gp-splash');if(!s)return;"
+    "if(location.search)s.className='plain';"
+    "if(/bot|crawl|spider|slurp|preview|facebookexternalhit|lighthouse/i.test(navigator.userAgent))"
+    "{s.remove();return}setTimeout(function(){s.remove()},30000)})()</script>"
+)
 # Site ownership tags read by crawlers in the page <head> (raw HTML, before any script runs).
 # Meta domain verification for usegympulseai.com (Business settings -> Brand safety -> Domains).
 # Can be overridden without a code change with the env var FB_DOMAIN_VERIFICATION.
@@ -59,10 +81,14 @@ def apply(quiet=False):
         with open(path, encoding="utf-8") as f:
             html = f.read()
         new = html
-        if MARK not in new:
-            new = new.replace("</head>", CSS + "</head>", 1)
-        new = new.replace("<title>Streamlit</title>", f"<title>{BRAND}</title>")
         import re as _re
+        if CSS not in new:                                   # missing or an older version: put in the latest
+            new = _re.sub(r'<style id="gp-early-style">.*?</style><meta name="theme-color" content="#0B1020">', "",
+                          new, flags=_re.S)
+            new = new.replace("</head>", CSS + "</head>", 1)
+        if SPLASH_MARK not in new:
+            new = _re.sub(r"(<body[^>]*>)", lambda m: m.group(1) + SPLASH, new, count=1)
+        new = new.replace("<title>Streamlit</title>", f"<title>{BRAND}</title>")
         new = _re.sub(r'<meta name="facebook-domain-verification"[^>]*>\s*', "", new)   # replace an old code
         if FB_DOMAIN_VERIFICATION and not FB_DOMAIN_VERIFICATION.startswith("__"):
             new = new.replace("<head>", '<head>\n    <meta name="facebook-domain-verification" '
