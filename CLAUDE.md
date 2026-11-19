@@ -26,6 +26,19 @@ These rules always apply. The skills in `.claude/skills/` hold the detail for ea
   request is genuinely ambiguous, ask one short question.
 - **They/them** for anyone whose pronouns aren't stated.
 
+## Everything visual must look modern and human-designed, never "AI slop"
+This applies to all work: app screens, flyers, posters, videos, decks, social posts, documents and emails.
+- Load `frontend-design` (or `canvas-design` for print and art) before designing anything, and make a short plan:
+  palette, type, layout, and the one memorable element. Then check the plan against the list below.
+- **Avoid:** gradients on buttons, text or bars; glows and colour blobs; ALL-CAPS letter-spaced labels;
+  identical rounded cards with soft shadows; rainbow accents; "A · B · C" strings; "→" on buttons;
+  01/02/03 markers on things that aren't steps; one highlighted word in a headline; emojis as decoration;
+  hover lifts and fade-in on every element; stock phrases ("Unlock", "Elevate", "Seamless", "Revolutionise").
+- **Do:** one accent colour with meaning, sentence case, two typefaces with character (Bricolage Grotesque +
+  Instrument Sans), real content and real numbers, generous spacing, readable on a phone, one bold idea per piece.
+- **Self-critique before sending:** render it, look at the screenshot, remove one thing, fix what reads as
+  generic, and only then send it.
+
 ## Skills to use
 | Task | Skill |
 |---|---|
