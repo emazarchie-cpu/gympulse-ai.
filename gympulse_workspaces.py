@@ -867,46 +867,66 @@ MOBILE_ROWS_CSS = """
 # Payments & Renewals keeps this grid layout (it looks good on phones).
 ALL_ROWS_MOBILE_CSS = """
 @media (max-width: 768px) {
-    [class*="st-key-card_pay_"] [data-testid="stHorizontalBlock"]:has(.row-tight) {
+    /* phone card: avatar | name + renewal date | status chip, then the fee, then a full-width Message button */
+    html body [class*="st-key-card_pay_"] [data-testid="stHorizontalBlock"]:has(.row-tight) {
         display: grid !important;
-        grid-template-columns: 52px minmax(0, 1fr) minmax(0, 1fr) !important;
+        grid-template-columns: 44px minmax(0, 1fr) max-content !important;
         column-gap: 12px !important;
-        row-gap: 6px !important;
-        align-items: center !important;
-        padding: 6px 0 10px !important;
+        row-gap: 4px !important;
+        align-items: start !important;
+        padding: 2px 0 4px !important;
     }
-    [class*="st-key-card_pay_"] [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"] {
+    html body [class*="st-key-card_pay_"] [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"] {
         width: auto !important;
         min-width: 0 !important;
+        max-width: none !important;
         flex: none !important;
     }
-    [class*="st-key-card_pay_"] [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"]:nth-child(1) {
-        grid-column: 1 !important;
-        grid-row: 1 / span 4 !important;
-        align-self: start !important;
+    html body [class*="st-key-card_pay_"] [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"] [data-testid="stMarkdownContainer"] {
+        margin-bottom: 0 !important;
     }
-    [class*="st-key-card_pay_"] [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"]:nth-child(2) {
-        grid-column: 2 / -1 !important;
-        grid-row: 1 !important;
+    html body [class*="st-key-card_pay_"] [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"]:nth-child(1) {
+        grid-column: 1 !important; grid-row: 1 / span 2 !important; padding-top: 2px !important;
+        width: 44px !important; min-width: 0 !important; flex: none !important;
     }
-    [class*="st-key-card_pay_"] [class*="st-key-mrow_"] button {
+    html body [class*="st-key-card_pay_"] [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"]:nth-child(2) {
+        grid-column: 2 !important; grid-row: 1 !important;
+        width: auto !important; min-width: 0 !important; flex: none !important;
+    }
+    html body [class*="st-key-card_pay_"] [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"]:nth-child(2) [data-testid="stVerticalBlock"] {
+        gap: 0 !important;
+    }
+    html body [class*="st-key-card_pay_"] [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"]:nth-child(3) {
+        grid-column: 2 !important; grid-row: 2 !important;
+    }
+    html body [class*="st-key-card_pay_"] [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"]:nth-child(4) {
+        grid-column: 3 !important; grid-row: 1 !important; padding-top: 10px !important;
+    }
+    html body [class*="st-key-card_pay_"] [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"]:nth-child(5) {
+        grid-column: 1 / -1 !important; grid-row: 3 !important; margin-top: 10px !important;
+    }
+    html body [class*="st-key-card_pay_"] [class*="st-key-mrow_"] button {
         justify-content: flex-start !important;
         text-align: left !important;
-        padding-left: 0 !important;
-    }
-    [class*="st-key-card_pay_"] [class*="st-key-mrow_"] button p { text-align: left !important; }
-    [class*="st-key-card_pay_"] .why {
         padding: 0 !important;
+        min-height: 32px !important;
+        height: auto !important;
+        border: 0 !important;
+        background: transparent !important;
+    }
+    html body [class*="st-key-card_pay_"] [class*="st-key-mrow_"] button p {
+        text-align: left !important; font-size: 16px !important; font-weight: 700 !important; line-height: 1.3 !important;
+    }
+    html body [class*="st-key-card_pay_"] .why {
+        padding: 2px 0 0 !important;
         text-align: left !important;
         white-space: normal !important;
+        font-size: 13px !important;
+        color: var(--gp-muted, #94A3B8) !important;
     }
-    [class*="st-key-card_pay_"] [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"]:nth-child(3) { grid-column: 2 !important; grid-row: 2 !important; }
-    [class*="st-key-card_pay_"] [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"]:nth-child(4) { grid-column: 3 !important; grid-row: 2 !important; }
-    [class*="st-key-card_pay_"] [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"]:nth-child(5) { grid-column: 2 / -1 !important; grid-row: 3 !important; }
-    [class*="st-key-card_pay_"] [data-testid="stColumn"] [data-testid="stMarkdownContainer"] {
-        display: flex !important;
-        flex-wrap: wrap !important;
-        gap: 6px !important;
+    html body [class*="st-key-card_pay_"] .money { font-size: 15px !important; font-weight: 700 !important; padding: 0 !important; }
+    html body [class*="st-key-card_pay_"] [data-testid="stColumn"]:nth-child(4) [data-testid="stMarkdownContainer"] {
+        display: flex !important; justify-content: flex-end !important;
     }
 }
 """
