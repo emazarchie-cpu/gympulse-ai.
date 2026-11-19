@@ -47,6 +47,25 @@ async function shot(page, name) {
     await page.screenshot({ path: path.join(OUT, `${name}-${"abcd"[i]}.png`) });
   }
   console.log("captured " + name);
+  if (process.env.PHONE_TOO) {
+    // the same page at phone size (390 x 844): name-m-a.png, name-m-b.png …
+    const big = page.viewportSize();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await sleep(2500);
+    for (const [i, y] of [[0, 0], [1, 700], [2, 1400], [3, 2100], [4, 2800]]) {
+      const moved = await page.evaluate(([sel, y]) => {
+        const e = [document.querySelector(sel), document.scrollingElement].find((x) => x && x.scrollHeight > x.clientHeight + 10);
+        if (!e) return y === 0;
+        e.scrollTop = y; return y === 0 || Math.abs(e.scrollTop - y) < 650;
+      }, [scroller, y]);
+      if (!moved) break;
+      await sleep(1200);
+      await page.screenshot({ path: path.join(OUT, `${name}-m-${"abcde"[i]}.png`) });
+    }
+    await page.setViewportSize(big);
+    await page.evaluate((sel) => { for (const e of [document.querySelector(sel), document.scrollingElement]) if (e) e.scrollTop = 0; }, scroller);
+    await sleep(2000);
+  }
 }
 
 async function go(page, label) {
@@ -94,7 +113,8 @@ async function go(page, label) {
   await shot(page, "01-dashboard");
 
   const pages = [["Risk Radar", "02-risk-radar"], ["Action Centre", "03-action-centre"], ["Renewals", "04-renewals"],
-                 ["Grow", "05-grow"], ["Members", "06-members"], ["Owner", "07-owner"], ["Follow-ups", "08-follow-ups"]];
+                 ["Grow", "05-grow"], ["Members", "06-members"], ["Owner", "07-owner"], ["Follow-ups", "08-follow-ups"],
+                 ["Archie", "10-archie"], ["Train", "11-train"], ["Check-in", "12-check-in"]];
   for (const [label, name] of pages) {
     try { await go(page, label); await shot(page, name); }
     catch (e) { console.log(`skipped ${name}: ${String(e).split("\n")[0]}`); await page.keyboard.press("Escape").catch(() => {}); }

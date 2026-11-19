@@ -6,6 +6,11 @@ name: Demo screenshots
 
 on:
   workflow_dispatch:
+    inputs:
+      phone:
+        description: "Also capture every page at phone size"
+        type: boolean
+        default: true
 
 concurrency:
   group: seed-demo
@@ -14,7 +19,7 @@ concurrency:
 jobs:
   shots:
     runs-on: ubuntu-24.04          # the browser tool doesn't support newer images yet
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -39,6 +44,7 @@ jobs:
       - name: Capture
         env:
           DEMO_PASSWORD_FILE: ${{ runner.temp }}/demo_pw
+          PHONE_TOO: ${{ inputs.phone && '1' || '' }}
         run: |
           node scripts/capture_demo.js shots
           rm -f "$RUNNER_TEMP/demo_pw"
