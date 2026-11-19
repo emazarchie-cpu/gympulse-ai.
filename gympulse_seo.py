@@ -71,7 +71,7 @@ def _faq_ld(faq):
 
 def _faq_html(faq):
     items = "".join(f"<h3>{html.escape(q)}</h3><p>{html.escape(a)}</p>" for q, a in faq)
-    return f'<div class="card"><h2>Questions gym owners ask</h2>{items}</div>'
+    return f'<section class="sec"><h2>Questions gym owners ask</h2><div class="body">{items}</div></section>'
 COMPANY = {"legal": "GYMPULSE AI LTD", "rc": "RC 9996401",
            "city": "Calabar", "state": "Cross River State",
            "email": "hello@usegympulseai.com", "founder_email": "emmanuel@usegympulseai.com"}
@@ -389,18 +389,54 @@ def head_tags():
 
 # ---------------------------------------------------------------- shared look
 CSS = """
-*{box-sizing:border-box}body{margin:0;background:#0B1020;color:#E8ECF5;font:16px/1.6 -apple-system,
-BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}a{color:#B6F23A}.w{max-width:880px;margin:0 auto;padding:0 18px}
-.nav{display:flex;justify-content:space-between;align-items:center;padding:18px 0;gap:12px;flex-wrap:wrap}
-.logo{font-weight:800;letter-spacing:.06em;color:#fff;text-decoration:none}.logo span{color:#B6F23A}
-.btn{display:inline-block;padding:11px 18px;border-radius:999px;font-weight:700;text-decoration:none;
-border:1px solid #2A3350;color:#E8ECF5;margin:4px 8px 4px 0}.btn.p{background:#B6F23A;color:#0B1020;border:0}
-h1{font-size:clamp(28px,5vw,44px);line-height:1.15;margin:34px 0 14px}h2{font-size:22px;margin:34px 0 8px}
-.lead{font-size:18px;color:#B7C0D6}ul,ol{padding-left:20px}li{margin:6px 0}.card{background:#121A30;
-border:1px solid #1F2945;border-radius:16px;padding:6px 22px 14px;margin:18px 0}
-.foot{color:#7F8AA6;font-size:13px;padding:34px 0 40px;border-top:1px solid #1F2945;margin-top:40px}
-.links a{margin-right:14px;display:inline-block}
+*{box-sizing:border-box}
+body{margin:0;background:#0A0F1E;color:#E6EAF2;font:17px/1.65 'Instrument Sans',-apple-system,BlinkMacSystemFont,
+"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#B7F34A;text-underline-offset:3px}
+.w{max-width:1040px;margin:0 auto;padding:0 20px}
+.nav{display:flex;justify-content:space-between;align-items:center;padding:20px 0;gap:12px;flex-wrap:wrap;
+border-bottom:1px solid #1B2338}
+.logo{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:19px;color:#fff;text-decoration:none}
+.logo span{color:#B7F34A}
+.btn{display:inline-block;padding:11px 18px;border-radius:10px;font-weight:600;font-size:15px;text-decoration:none;
+border:1px solid #2A3350;color:#E6EAF2;margin:4px 8px 4px 0}.btn:hover{border-color:#4A5675}
+.btn.p{background:#B7F34A;color:#0A0F1E;border-color:#B7F34A}.btn.p:hover{background:#C6F76A}
+.nav .btn{padding:9px 14px;font-size:14px;margin:0 0 0 8px}
+.eyebrow{color:#8C99B2;font-size:15px;margin:56px 0 0}
+h1,h2,h3{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;color:#F4F6FB}
+h1{font-size:clamp(34px,5.4vw,58px);line-height:1.04;letter-spacing:-.02em;margin:10px 0 18px;max-width:20ch}
+.lead{font-size:clamp(18px,2vw,21px);line-height:1.55;color:#B4BED2;max-width:62ch;margin:0 0 48px}
+h2{font-size:24px;line-height:1.2;margin:0}
+h3{font-size:18px;margin:22px 0 4px}
+.sec{display:grid;grid-template-columns:260px minmax(0,1fr);gap:16px 48px;padding:34px 0;border-top:1px solid #1B2338}
+.sec ul,.sec ol{margin:0;padding:0;list-style:none;counter-reset:n}
+.sec li{padding:12px 0 12px 28px;border-bottom:1px solid #151C2E;position:relative;color:#D3DAE7}
+.sec li:first-child{padding-top:2px}.sec li:last-child{border-bottom:0}
+.sec ul li:before{content:"";position:absolute;left:2px;top:23px;width:12px;height:2px;background:#B7F34A}
+.sec ul li:first-child:before{top:13px}
+.sec ol li{counter-increment:n}
+.sec ol li:before{content:counter(n);position:absolute;left:0;top:12px;font-family:'Bricolage Grotesque',sans-serif;
+font-weight:700;color:#B7F34A;font-size:16px}.sec ol li:first-child:before{top:2px}
+.sec .body > h3:first-child{margin-top:0}
+.sec .body p{margin:0 0 6px;color:#C3CCDC}
+.cta{margin:40px 0 0;padding:40px;background:#121A2E;border-radius:16px;border:1px solid #1F2945}
+.cta h2{font-size:clamp(26px,3.4vw,34px);margin:0 0 8px}.cta p{color:#B4BED2;margin:0 0 20px;max-width:56ch}
+.foot{color:#7F8AA6;font-size:14px;padding:40px 0 48px;margin-top:48px;border-top:1px solid #1B2338}
+.foot h2{font-size:17px;margin:0 0 12px;color:#E6EAF2}
+.links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 32px;margin-bottom:28px}
+.links a{color:#C3CCDC;text-decoration:none;font-size:15px}.links a:hover{color:#B7F34A;text-decoration:underline}
+.foot p a{color:#C3CCDC}
+.card{margin:18px 0}
+@media(max-width:760px){
+ body{font-size:16px}.eyebrow{margin-top:36px}.lead{margin-bottom:32px}
+ .sec{grid-template-columns:1fr;gap:14px;padding:28px 0}
+ .cta{padding:26px 20px}.links{grid-template-columns:1fr}
+ .nav .btn{margin:0 0 0 6px}
+}
 """
+FONTS = ('<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" '
+         'href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/'
+         'css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&family=Instrument+Sans:wght@400;600&display=swap">')
 
 
 def _nav():
@@ -416,7 +452,7 @@ def _links(skip=None):
 
 def _foot():
     c = COMPANY
-    return (f'<div class="foot">{_links()}<p>© {date.today().year} {c["legal"]} · {c["rc"]} · Registered in '
+    return (f'<div class="foot"><h2>More guides for gym owners</h2>{_links()}<p>© {date.today().year} {c["legal"]} · {c["rc"]} · Registered in '
             f'Nigeria · {c["city"]}, {c["state"]} · '
             f'<a href="mailto:{c["email"]}">{c["email"]}</a> · Founder: '
             f'<a href="mailto:{c["founder_email"]}">{c["founder_email"]}</a></p></div>')
@@ -429,15 +465,16 @@ def _sections(sections):
         tag = "ol" if steps else "ul"
         texts = [re.sub(r"^\d+\. ", "", i) for i in items] if steps else items
         lis = "".join(f"<li>{html.escape(t)}</li>" for t in texts)
-        out.append(f'<div class="card"><h2>{html.escape(heading)}</h2><{tag}>{lis}</{tag}></div>')
+        out.append(f'<section class="sec"><h2>{html.escape(heading)}</h2><div class="body"><{tag}>{lis}</{tag}></div>'
+                   f'</section>')
     return "".join(out)
 
 
 def _cta():
-    return (f'<h2>Try it free for 30 days</h2><p>Every feature on every plan, from '
+    return (f'<div class="cta"><h2>Try it free for 30 days</h2><p>Every feature on every plan, from '
             f'{_naira(_lowest_price())} a month by gym size. Setting up takes about a minute.</p>'
             f'<a class="btn p" href="/">Start your free trial</a>'
-            f'<a class="btn" href="/?demo=book">Book a 15-minute demo</a>')
+            f'<a class="btn" href="/?demo=book">Book a 15-minute demo</a></div>')
 
 
 def page_html(p):
@@ -447,7 +484,7 @@ def page_html(p):
     if p.get("sources"):
         items = "".join(f'<li><a href="{html.escape(u)}" rel="noopener" target="_blank">{html.escape(t)}</a></li>'
                         for t, u in p["sources"])
-        faq += f'<div class="card"><h2>Sources</h2><ul>{items}</ul></div>'
+        faq += f'<section class="sec"><h2>Sources</h2><div class="body"><ul>{items}</ul></div></section>'
     ld = (f'<script type="application/ld+json">{json.dumps(_faq_ld(p["faq"]), ensure_ascii=False)}</script>'
           if p.get("faq") else "")
     return f"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
@@ -458,8 +495,8 @@ def page_html(p):
 <meta property="og:description" content="{e(p['description'])}"><meta property="og:url" content="{url}">
 <meta property="og:image" content="{SITE}/apple-touch-icon.png"><meta name="theme-color" content="#0B1020">
 <link rel="icon" href="/favicon.ico" sizes="48x48"><link rel="icon" type="image/png" sizes="192x192" href="/gympulse-icon-v4-192.png"><link rel="apple-touch-icon" sizes="180x180" href="/gympulse-touch-v4.png">
-<style>{CSS}</style>{ld}</head><body><div class="w">{_nav()}
-<h1>{e(p['h1'])}</h1><p class="lead">{e(p['lead'])}</p>{_sections(p['sections'])}{faq}{_cta()}{_foot()}
+{FONTS}<style>{CSS}</style>{ld}</head><body><div class="w">{_nav()}
+<p class="eyebrow">Guide for gym owners</p><h1>{e(p['h1'])}</h1><p class="lead">{e(p['lead'])}</p>{_sections(p['sections'])}{faq}{_cta()}{_foot()}
 </div></body></html>"""
 
 
@@ -506,17 +543,15 @@ CASE = {
 }
 
 CASE_CSS = """
-.facts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:#1F2945;border:1px solid #1F2945;
-border-radius:14px;overflow:hidden;margin:26px 0 8px}.facts div{background:#121A30;padding:14px 16px}
-.facts span{display:block;color:#7F8AA6;font-size:13px}.facts b{font-size:17px}
-.tl{list-style:none;padding:0;margin:8px 0;border-left:2px solid #2A3350}
-.tl li{position:relative;padding:4px 0 14px 22px;margin:0}
-.tl li:before{content:"";position:absolute;left:-7px;top:12px;width:12px;height:12px;border-radius:50%;
-background:#0B1020;border:2px solid #4A5675}.tl li:last-child:before{background:#B6F23A;border-color:#B6F23A}
+.facts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:24px;border-top:1px solid #1B2338;padding:22px 0 30px;margin:0}.facts div{padding:0}
+.facts span{display:block;color:#8C99B2;font-size:14px}.facts b{font-family:'Bricolage Grotesque',sans-serif;font-size:20px;line-height:1.3}
+.sec .tl{list-style:none;padding:0;margin:0;border-left:2px solid #2A3350}
+.sec .tl li{position:relative;padding:4px 0 16px 24px;margin:0;border:0}
+.sec .tl li:before,.sec .tl li:first-child:before{content:"";position:absolute;left:-7px;top:10px;width:12px;height:12px;border-radius:50%;
+background:#0A0F1E;border:2px solid #4A5675}.sec .tl li:last-child:before{background:#B7F34A;border-color:#B7F34A}
 .tl time{display:block;font-weight:700;color:#E8ECF5}.tl p{margin:2px 0 0;color:#B7C0D6}
-.result{border-left:4px solid #B6F23A;background:#121A30;border-radius:0 14px 14px 0;padding:16px 20px;
-font-size:19px;font-weight:700;margin:12px 0}
-.note{color:#7F8AA6;font-size:14px;border-top:1px solid #1F2945;padding-top:16px;margin-top:30px}
+.result{font-family:'Bricolage Grotesque',sans-serif;font-size:clamp(22px,2.6vw,28px);line-height:1.25;font-weight:700;color:#F4F6FB;margin:0}
+.note{color:#7F8AA6;font-size:14px;border-top:1px solid #1B2338;padding-top:20px;margin:0;max-width:72ch}
 @media(max-width:640px){.facts{grid-template-columns:repeat(2,minmax(0,1fr))}}
 """
 
@@ -540,16 +575,16 @@ def case_html():
 <meta property="og:description" content="{e(c['description'])}"><meta property="og:url" content="{url}">
 <meta property="og:image" content="{SITE}/apple-touch-icon.png"><meta name="theme-color" content="#0B1020">
 <link rel="icon" href="/favicon.ico" sizes="48x48"><link rel="icon" type="image/png" sizes="192x192" href="/gympulse-icon-v4-192.png"><link rel="apple-touch-icon" sizes="180x180" href="/gympulse-touch-v4.png">
-<style>{CSS}{CASE_CSS}</style><script type="application/ld+json">{json.dumps(ld, ensure_ascii=False)}</script>
+{FONTS}<style>{CSS}{CASE_CSS}</style><script type="application/ld+json">{json.dumps(ld, ensure_ascii=False)}</script>
 </head><body><div class="w">{_nav()}
-<p style="color:#B6F23A;font-weight:700;margin:34px 0 0">Case study</p>
-<h1 style="margin-top:6px">{e(c['h1'])}</h1><p class="lead">{e(c['lead'])}</p>
+<p class="eyebrow">Case study</p>
+<h1>{e(c['h1'])}</h1><p class="lead">{e(c['lead'])}</p>
 <div class="facts">{facts}</div>
-<h2>The member</h2><p>{e(c['member'])}</p>
-<h2>What happened</h2><p>{e(c['drift'])}</p>
-<h2>Five weeks of check-ins</h2><ol class="tl">{tl}</ol>
-<h2>The result</h2><div class="result">{e(c['result'])}</div>
-<h2>What this means for gym owners</h2><ul>{lessons}</ul>
+<section class="sec"><h2>The member</h2><div class="body"><p>{e(c['member'])}</p></div></section>
+<section class="sec"><h2>What happened</h2><div class="body"><p>{e(c['drift'])}</p></div></section>
+<section class="sec"><h2>Five weeks of check-ins</h2><div class="body"><ol class="tl">{tl}</ol></div></section>
+<section class="sec"><h2>The result</h2><div class="body"><div class="result">{e(c['result'])}</div></div></section>
+<section class="sec"><h2>What this means for gym owners</h2><div class="body"><ul>{lessons}</ul></div></section>
 <p class="note">{e(c['note'])}</p>
 {_cta()}{_foot()}
 </div></body></html>"""
