@@ -309,8 +309,7 @@ PAGES = [
         "description": "Check in HMO enrollees and company-paid members with a QR code and get a monthly "
                        "visits report per HMO for your claims, with no paper register.",
         "h1": "HMO and corporate members at your gym",
-        "lead": "Health plans like Reliance, Hygeia, AXA Mansard and Leadway pay you for their members' gym "
-                "visits. GymPulse AI records every HMO visit for you, so claiming is a download, not a paper "
+        "lead": "Health plans (HMOs) pay you for their members' gym visits. GymPulse AI records every HMO visit for you, so claiming is a download, not a paper "
                 "register.",
         "sections": [
             ("How HMO members check in", [
