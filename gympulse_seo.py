@@ -381,6 +381,9 @@ def head_tags():
     ]
     if GOOGLE_VERIFY:
         tags.append(f'<meta name="google-site-verification" content="{e(GOOGLE_VERIFY)}">')
+    # short link: usegympulseai.com/case-study opens the case study page (the server only serves .html files)
+    tags.append('<script>if(/^\\/case-study\\/?$/.test(location.pathname))'
+                'location.replace("/case-study.html"+location.search)</script>')
     return START + "".join(tags) + _ld_json() + END
 
 
@@ -460,6 +463,98 @@ def page_html(p):
 </div></body></html>"""
 
 
+# ---------------------------------------------------------------- case study (usegympulseai.com/case-study)
+CASE = {
+    "slug": "case-study",
+    "title": "Case study: bringing back a member who went quiet for 33 days · GymPulse AI",
+    "description": "Noah, a personal training client at a gym in Lagos, stopped coming for 33 days without "
+                   "cancelling. Five weeks of check-ins later he walked back in. What happened and what it "
+                   "means for gym owners.",
+    "h1": "Bringing back a member who went quiet for 33 days",
+    "lead": "Noah didn't cancel. He didn't complain. He just stopped coming. This is how he came back.",
+    "facts": [("Member", "Noah"), ("Where", "A gym in Lagos"), ("Days away", "33"),
+              ("Follow-ups", "Calls, voice notes and messages")],
+    "member": "Noah trained on a one-month personal training package, 16 September to 16 October 2026. He was "
+              "one of the most consistent clients and barely missed a session.",
+    "drift": "On 16 October his package ended. Work pressure took over, then life got in the way, and he "
+             "stopped coming. He never cancelled and never complained. He simply drifted, the way most members "
+             "leave a gym: not loudly, just slowly, until the habit is gone.",
+    "timeline": [
+        ("Late Oct", "He said work would leave him too exhausted for sessions for two weeks. His trainer offered "
+                     "to move sessions to the evening and sent his month 1 progress report to keep his results "
+                     "in view."),
+        ("28 Oct", "A call and a voice note. He replied that he was all good, just stressed out."),
+        ("3 to 4 Nov", "He needed more time. His trainer switched him to a lighter plan and told him there was "
+                       "no pressure to rush back."),
+        ("12 to 13 Nov", "Another check-in. He said he could slowly begin his sessions the next week."),
+        ("15 Nov", "A call asking for a specific day. He committed to Wednesday: “Thanks for checking in "
+                   "bro.”"),
+        ("18 Nov", "A call and a voice note: “I will be at the gym today.” He came in and trained."),
+    ],
+    "result": "After 33 days away, Noah walked back in on 18 November and trained.",
+    "lessons": [
+        "Most members who leave never cancel. They fade, and the warning signs show weeks before they're gone.",
+        "One general message isn't enough. Regular, personal check-ins kept the door open.",
+        "A specific day (“See you Wednesday?”) works better than “come back soon”.",
+        "With check-ins recorded live, GymPulse AI flags a drop like this within days, with the reason and the "
+        "next step, while one call is still enough. It works alongside GymMaster, Excel or whatever you use.",
+    ],
+    "note": "A note on the data: this happened while GymPulse AI was still being built. Noah's visits come from "
+            "his trainer's own session records, not live check-ins, and the follow-ups come from the trainer's "
+            "WhatsApp chat with him. It is one member's story, not a statistic. It is shared with his "
+            "first name only.",
+}
+
+CASE_CSS = """
+.facts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:#1F2945;border:1px solid #1F2945;
+border-radius:14px;overflow:hidden;margin:26px 0 8px}.facts div{background:#121A30;padding:14px 16px}
+.facts span{display:block;color:#7F8AA6;font-size:13px}.facts b{font-size:17px}
+.tl{list-style:none;padding:0;margin:8px 0;border-left:2px solid #2A3350}
+.tl li{position:relative;padding:4px 0 14px 22px;margin:0}
+.tl li:before{content:"";position:absolute;left:-7px;top:12px;width:12px;height:12px;border-radius:50%;
+background:#0B1020;border:2px solid #4A5675}.tl li:last-child:before{background:#B6F23A;border-color:#B6F23A}
+.tl time{display:block;font-weight:700;color:#E8ECF5}.tl p{margin:2px 0 0;color:#B7C0D6}
+.result{border-left:4px solid #B6F23A;background:#121A30;border-radius:0 14px 14px 0;padding:16px 20px;
+font-size:19px;font-weight:700;margin:12px 0}
+.note{color:#7F8AA6;font-size:14px;border-top:1px solid #1F2945;padding-top:16px;margin-top:30px}
+@media(max-width:640px){.facts{grid-template-columns:repeat(2,minmax(0,1fr))}}
+"""
+
+
+def case_html():
+    e = html.escape
+    c = CASE
+    url = f"{SITE}/{c['slug']}"
+    facts = "".join(f"<div><span>{e(k)}</span><b>{e(v)}</b></div>" for k, v in c["facts"])
+    tl = "".join(f"<li><time>{e(d)}</time><p>{e(t)}</p></li>" for d, t in c["timeline"])
+    lessons = "".join(f"<li>{e(t)}</li>" for t in c["lessons"])
+    ld = {"@context": "https://schema.org", "@type": "Article", "headline": c["h1"],
+          "description": c["description"], "url": url, "datePublished": "2026-11-19",
+          "author": {"@type": "Person", "name": "Emmanuel Archibong"},
+          "publisher": {"@type": "Organization", "name": NAME, "url": SITE + "/"}}
+    return f"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{e(c['title'])}</title><meta name="description" content="{e(c['description'])}">
+<link rel="canonical" href="{url}"><meta name="robots" content="index, follow">
+<meta property="og:type" content="article"><meta property="og:title" content="{e(c['h1'])}">
+<meta property="og:description" content="{e(c['description'])}"><meta property="og:url" content="{url}">
+<meta property="og:image" content="{SITE}/apple-touch-icon.png"><meta name="theme-color" content="#0B1020">
+<link rel="icon" href="/favicon.ico" sizes="48x48"><link rel="icon" type="image/png" sizes="192x192" href="/gympulse-icon-v4-192.png"><link rel="apple-touch-icon" sizes="180x180" href="/gympulse-touch-v4.png">
+<style>{CSS}{CASE_CSS}</style><script type="application/ld+json">{json.dumps(ld, ensure_ascii=False)}</script>
+</head><body><div class="w">{_nav()}
+<p style="color:#B6F23A;font-weight:700;margin:34px 0 0">Case study</p>
+<h1 style="margin-top:6px">{e(c['h1'])}</h1><p class="lead">{e(c['lead'])}</p>
+<div class="facts">{facts}</div>
+<h2>The member</h2><p>{e(c['member'])}</p>
+<h2>What happened</h2><p>{e(c['drift'])}</p>
+<h2>Five weeks of check-ins</h2><ol class="tl">{tl}</ol>
+<h2>The result</h2><div class="result">{e(c['result'])}</div>
+<h2>What this means for gym owners</h2><ul>{lessons}</ul>
+<p class="note">{e(c['note'])}</p>
+{_cta()}{_foot()}
+</div></body></html>"""
+
+
 def prerender():
     """The homepage words for search engines, shown until the app loads."""
     feats = _sections([
@@ -502,6 +597,7 @@ def llms_txt():
     lines += [f"- **{q}** {a}" for q, a in FAQ]
     lines += ["", "## Pages", "", f"- [Home]({SITE}/)"]
     lines += [f"- [{p['h1']}]({SITE}/{p['slug']}.html): {p['description']}" for p in PAGES]
+    lines += [f"- [Case study: {CASE['h1']}]({SITE}/{CASE['slug']}.html): {CASE['description']}"]
     return "\n".join(lines) + "\n"
 
 
@@ -511,7 +607,8 @@ def robots_txt():
 
 def sitemap_xml():
     today = date.today().isoformat()
-    urls = [(SITE + "/", "1.0")] + [(f"{SITE}/{p['slug']}.html", "0.8") for p in PAGES]
+    urls = ([(SITE + "/", "1.0")] + [(f"{SITE}/{p['slug']}.html", "0.8") for p in PAGES]
+            + [(f"{SITE}/{CASE['slug']}.html", "0.7")])
     rows = "".join(f"<url><loc>{u}</loc><lastmod>{today}</lastmod><priority>{pr}</priority></url>"
                    for u, pr in urls)
     return ('<?xml version="1.0" encoding="UTF-8"?>'
@@ -542,6 +639,7 @@ def write_static(static_dir, ping=True):
              "llms.txt": llms_txt()}
     for p in PAGES:
         files[p["slug"] + ".html"] = page_html(p)
+    files[CASE["slug"] + ".html"] = case_html()
     n, changed = 0, []
     for rel, text in files.items():
         path = os.path.join(static_dir, rel)
