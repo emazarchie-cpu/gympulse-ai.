@@ -211,7 +211,7 @@ def _today(supabase, gym_id, tid, trainer, rows, mine, names, roster, avail):
         ("Working today", f"{clock(hours[0])}–{clock(hours[1])}" if hours else ("Off" if avail else "Not set"),
          "white", "set in Availability"),
     ])
-    st.markdown(f'<div class="section-label">TODAY · {today:%A %d %B}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="section-label">Today, {today:%A %d %B}</div>', unsafe_allow_html=True)
     if not rows:
         st.caption("No sessions booked today.")
     for r in rows:
@@ -381,12 +381,12 @@ def render_owner_view(supabase, gym_id):
         names = dict(zip(members["id"], members["full_name"]))
     except Exception:
         names = {}
-    st.markdown('<div class="section-label">THIS WEEK</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">This week</div>', unsafe_allow_html=True)
     gw.table([{"When": f"{r['_at']:%a %d %b %H:%M}", "Client": names.get(r.get("member_id"), "Client"),
                "Length": f"{int(r.get('minutes') or 60)} min", "Status": STATUS.get(r.get("status"), ("Booked",))[0]}
               for r in rows], pills={"Status": {v[0]: v[1] for v in STATUS.values()}},
              empty="No sessions this week.")
-    st.markdown('<div class="section-label">WEEKLY REPORTS</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">Weekly reports</div>', unsafe_allow_html=True)
     if not reports:
         st.caption("No reports yet.")
     for rep in reports:

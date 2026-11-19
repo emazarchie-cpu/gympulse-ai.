@@ -1650,6 +1650,7 @@ if st.session_state.auth_user is None:
 # =========================================================
 if st.session_state.auth_user is None:
     st.stop()
+gd.apply_app()
 profile = st.session_state.user_profile or {}
 if "theme" not in st.session_state:
     st.session_state["theme"] = "dark"            # light mode was removed: GymPulse AI is always dark
@@ -2870,7 +2871,7 @@ elif page == "Member Management":
             else:
                 st.session_state["mm_tool"] = None if st.session_state.get("mm_tool") == k else k
 
-        st.markdown('<div class="section-label">MEMBER TOOLS</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-label">Member tools</div>', unsafe_allow_html=True)
         _open = st.session_state.get("mm_tool")
         with st.container(key="mm_tools", horizontal=True, gap="small"):
             for _k, _ic, _t, _d in _MM_TOOLS:
@@ -2969,7 +2970,7 @@ elif page == "Member Management":
                     ]
                 )
 
-            st.markdown('<div class="section-label">MEMBERSHIP</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-label">Membership</div>', unsafe_allow_html=True)
             st.caption("Plan, price and end date put the member on the Risk Radar straight away. "
                        "Their check-ins then update it automatically.")
             mcol1, mcol2, mcol3 = st.columns(3)

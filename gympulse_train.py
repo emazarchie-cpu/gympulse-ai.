@@ -269,7 +269,7 @@ def _progress(sc, m):
                 ("This week", str(this_week), "lime", "workouts"),
                 ("Exercises", str(df["exercise"].nunique()), "amber", "tracked")])
     _calendar(sc, m, rows)
-    st.markdown('<div class="section-label">PERSONAL RECORDS</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">Personal records</div>', unsafe_allow_html=True)
     recs = []
     for ex, g in df.groupby("exercise"):
         b = best_of(g.to_dict("records"))
@@ -678,7 +678,7 @@ def _home(sc, m, gym_name):
                 st.rerun()
     _routines(sc, m, rows)
     _challenges(sc, m, gym)
-    st.markdown('<div class="section-label">ACHIEVEMENTS</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">Achievements</div>', unsafe_allow_html=True)
     _achievements(sc, m, rows, days, goal)
 
 
@@ -701,7 +701,7 @@ def _start(name, exercises):
 
 
 def _routines(sc, m, rows):
-    st.markdown('<div class="section-label">MY WORKOUTS</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">My workouts</div>', unsafe_allow_html=True)
     saved = _my_routines(sc, m)
     days = sorted({str(r["performed_on"]) for r in rows}, reverse=True)
     last_day = days[0] if days else None
@@ -811,7 +811,7 @@ def _challenges(sc, m, gym_days):
             .execute().data or []
     except Exception:
         ents = []
-    st.markdown('<div class="section-label">CHALLENGES</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">Challenges</div>', unsafe_allow_html=True)
     for ch in chs:
         mine = next((e for e in ents if e["challenge_id"] == ch["id"] and e["member_id"] == m["id"]), None)
         s, e = (pd.Timestamp(str(ch["starts_on"])).date(), pd.Timestamp(str(ch["ends_on"])).date())
@@ -910,7 +910,7 @@ def _calendar(sc, m, rows):
         if d == today:
             cls += " today"
         cells.append(f'<i class="{cls}" title="{d:%a %d %b}"></i>' if d <= today else '<i style="opacity:.2"></i>')
-    st.markdown('<div class="section-label">LAST 8 WEEKS</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">Last 8 weeks</div>', unsafe_allow_html=True)
     gw._md('<div class="tr-cal">' + "".join(cells) + '</div><div class="tr-sub" style="margin-top:6px">'
            'Green: workout logged · Blue: gym check-in</div>')
 

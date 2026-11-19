@@ -464,7 +464,7 @@ def render_collect(supabase, gym_id, owner_id):
     ])
 
     if pending:
-        st.markdown('<div class="section-label">WAITING FOR PAYMENT</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-label">Waiting for payment</div>', unsafe_allow_html=True)
         by_id = {r["id"]: r for _, r in df.iterrows()}
         for r in pending:
             m = by_id.get(r["member_id"])
@@ -488,7 +488,7 @@ def render_collect(supabase, gym_id, owner_id):
                                          r["reference"], pay, member_story(m, ck), f"grow_rem_{r['id']}",
                                          reminder=True, request=False)
 
-    st.markdown('<div class="section-label">ASK FOR PAYMENT</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">Ask for payment</div>', unsafe_allow_html=True)
     if due.empty:
         st.success("Nobody is due in the next 14 days. 🎉")
         return
@@ -651,7 +651,7 @@ def render_onboarding(supabase, gym_id):
         ("Made it to 90 days", str(sum(p["age"] >= 90 for p in plan)), "lime", "Still with you"),
     ])
     if behind:
-        st.markdown('<div class="section-label">FALLING BEHIND · FOR YOUR TEAM</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-label">Falling behind: for your team</div>', unsafe_allow_html=True)
         st.caption("A friendly word at the front desk, or a call from their trainer, works better than a message "
                    "about numbers. Members never see these counts.")
         for p in sorted(behind, key=lambda x: x["age"]):
@@ -792,7 +792,7 @@ def render_freeze(supabase, gym_id):
                      supabase=supabase, gym_id=gym_id)
 
     if live:
-        st.markdown('<div class="section-label">FROZEN AND SCHEDULED</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-label">Frozen and scheduled</div>', unsafe_allow_html=True)
         for f in live:
             c1, c2 = st.columns([4, 1])
             c1.markdown(f"**{names.get(f['member_id'], 'Member')}** · {date.fromisoformat(f['starts_on']):%d %b} → "
@@ -879,7 +879,7 @@ def render_exit(supabase, gym_id):
     else:
         st.info("No reasons recorded yet. Send the survey to a lapsed member below to start.")
 
-    st.markdown('<div class="section-label">ASK LAPSED MEMBERS</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">Ask lapsed members</div>', unsafe_allow_html=True)
     if not len(lapsed):
         st.success("Everyone who lapsed in the last 120 days already has a reason recorded.")
     for _, m in (lapsed.sort_values("gone").iterrows() if len(lapsed) else []):
@@ -997,14 +997,14 @@ def render_progress(supabase, gym_id):
         if text:
             wins.append((m, text))
     if wins:
-        st.markdown('<div class="section-label">READY TO CELEBRATE</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-label">Ready to celebrate</div>', unsafe_allow_html=True)
         for m, text in wins:
             with st.expander(f"🎉 {m['full_name']}"):
                 _message_box(text, f"grow_pg_sh_{m['id']}")
                 send_row(f"grow_pg_sh_{m['id']}", m, f"grow_pgs_{m['id']}", "Look at your progress",
                          supabase=supabase, gym_id=gym_id)
     if per:
-        st.markdown('<div class="section-label">TRACKED MEMBERS</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-label">Tracked members</div>', unsafe_allow_html=True)
         table = []
         for mid, rows in per.items():
             sm = progress_summary(rows)
@@ -1126,7 +1126,7 @@ def render_referrals(supabase, gym_id, owner_id):
                                                             "rewarded_at": datetime.now(timezone.utc).isoformat()}); st.rerun()
     if joined:
         board = pd.Series([names.get(r["referrer_id"], "Former member") for r in joined]).value_counts()
-        st.markdown('<div class="section-label">TOP REFERRERS</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-label">Top referrers</div>', unsafe_allow_html=True)
         for i, (n, c) in enumerate(board.head(5).items(), 1):
             st.markdown(f"{['🥇', '🥈', '🥉'][i - 1] if i <= 3 else f'{i}.'} **{n}** · {c} friend{'s' if c != 1 else ''} joined")
 
@@ -1698,7 +1698,7 @@ def render_seasons(supabase, gym_id):
             st.link_button("Share on WhatsApp", wa_url("", msg), icon=":material/chat:")
     ck = _checkins(supabase, gym_id, 400)
     if len(ck) >= 30:
-        st.markdown('<div class="section-label">YOUR GYM\'S OWN YEAR</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-label">Your gym\'s own year</div>', unsafe_allow_html=True)
         per = ck.drop_duplicates(["member_id", "day"]).assign(m=lambda d: d["at"].dt.to_period("M")) \
             .groupby("m").size()
         import altair as alt

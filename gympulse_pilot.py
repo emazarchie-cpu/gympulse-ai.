@@ -116,7 +116,7 @@ def _pct(x):
 
 def render_operations(roster, actions):
     k = operations_kpis(roster, actions)
-    st.markdown('<div class="section-label">RETENTION OPERATIONS · LAST 30 DAYS</div>',
+    st.markdown('<div class="section-label">Retention operations: last 30 days</div>',
                 unsafe_allow_html=True)
     speed = ("n/a" if k["hours_to_contact"] is None else
              f"{k['hours_to_contact']:.0f} h" if k["hours_to_contact"] < 48 else
@@ -168,7 +168,7 @@ def _fmt(v, f):
 def render_pilot(supabase, gym_id, roster, actions, save_settings):
     s = dict((st.session_state.get("user_profile") or {}).get("settings") or {})
     pilot = s.get("pilot") or {}
-    st.markdown('<div class="section-label">PILOT SCORECARD</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">Pilot scorecard</div>', unsafe_allow_html=True)
     now = snapshot(supabase, gym_id, roster, actions)
     if not pilot.get("baseline"):
         st.write("Starting a pilot? Save today's numbers as your baseline. GymPulse then shows how "
@@ -281,7 +281,7 @@ def export_tables(supabase, gym_id, roster, actions):
 
 def render_export(supabase, gym_id, roster, actions):
     import gympulse_reports as rp
-    st.markdown('<div class="section-label">EXPORT YOUR DATA</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">Export your data</div>', unsafe_allow_html=True)
     try:
         tables = export_tables(supabase, gym_id, roster, actions)
     except Exception as error:

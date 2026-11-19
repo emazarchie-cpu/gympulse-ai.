@@ -292,12 +292,12 @@ def render(supabase, gym_id, assess_fn):
     ])
     gw._md(f'<div class="panel"><b>The verdict.</b> {gw._esc(verdict(s, finished))}</div>')
 
-    st.markdown('<div class="section-label">BY RISK LEVEL · HIGH SHOULD LEAVE MOST, LOW LEAST</div>',
+    st.markdown('<div class="section-label">By risk level: high should leave most, low least</div>',
                 unsafe_allow_html=True)
     gw.table([{"Risk": x["level"], "Members": x["members"], "Left": x["left"],
                "% left": _pct(x["rate"])} for x in s["levels"]], pills={"Risk": RISK_PILL})
 
-    st.markdown('<div class="section-label">EVERY MEMBER · SCORE AT THE START VS WHAT HAPPENED</div>',
+    st.markdown('<div class="section-label">Every member: score at the start vs what happened</div>',
                 unsafe_allow_html=True)
     view = df.sort_values("probability", ascending=False)
     rows = []

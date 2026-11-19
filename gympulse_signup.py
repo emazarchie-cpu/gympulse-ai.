@@ -224,7 +224,7 @@ def _render_signups(supabase, gym_id):
                             .eq("gym_id", gym_id).eq("joined_via", "link").order("created_at", desc=True))
     except Exception:
         rows = []
-    st.markdown('<div class="section-label">SIGNED UP THROUGH THE LINK</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">Signed up through the link</div>', unsafe_allow_html=True)
     if not rows:
         st.caption("No sign-ups yet. Share your link to get started.")
         return

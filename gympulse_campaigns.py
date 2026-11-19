@@ -911,7 +911,7 @@ def audience(roster, key):
 
 def render_campaigns(supabase, gym_id, roster):
     b = brand()
-    st.markdown('<div class="section-label">EMAIL CAMPAIGN</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">Email campaign</div>', unsafe_allow_html=True)
     st.caption("Send one designed email to a group of members. Each email is personalised with their first "
                "name, and members who unsubscribed or have no email are skipped.")
     flash = st.session_state.pop("camp_flash", None)

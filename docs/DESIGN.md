@@ -17,11 +17,13 @@ new screens should follow them too instead of adding their own styling.
 - Surfaces rise by getting **lighter** (`--gp-s1` → `--gp-s2` → `--gp-s3`), not by drop shadows.
 
 ## Type
-- Two typefaces: the display face for page titles and big numbers, the body face for everything else.
+- Two typefaces (signed-in app): **Bricolage Grotesque** for page titles, section headings and big numbers,
+  **Instrument Sans** for everything else. Set in `APP_CSS` (gympulse_design.py), loaded only after sign-in.
   Use weight, not more fonts, for variety.
 - Body text: 14–16px, line height 1.5–1.6, about 45–75 characters per line.
 - Headings clearly bigger or bolder than body; tighten letter spacing on large headings.
-- CAPITALS only for short labels (eyebrows, column headers, KPI labels), never sentences.
+- Sentence case everywhere: section headings, KPI labels, table headers and eyebrows. No tracked-out ALL CAPS.
+- No "A · B · C" strings in labels; use a comma or a colon.
 - Numbers use tabular figures and are right-aligned in tables.
 
 ## Layout and spacing

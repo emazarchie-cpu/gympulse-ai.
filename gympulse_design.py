@@ -739,6 +739,40 @@ html body .stApp.stApp [data-testid="stMarkdownContainer"] a { color: var(--gp-c
 """
 
 
+# Signed-in app only (never the public website): removes the patterns that make an interface read
+# as AI-generated (see docs/DESIGN.md). Layout, pages and names stay exactly the same.
+APP_CSS = """
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600;700&display=swap');
+:root { --gp-grad: #B7F34A; --gp-display: 'Bricolage Grotesque', 'Inter', sans-serif; }
+
+/* type: a characterful display face for headings and numbers, a calm sans for everything else */
+html body .stApp.stApp :is(p, li, label, button, input, textarea, td, th, a, small, div[data-testid="stMarkdownContainer"],
+    div[data-testid="stCaptionContainer"], [data-baseweb="select"] div, [role="tab"] p) {
+    font-family: 'Instrument Sans', 'Source Sans Pro', sans-serif; }
+html body .stApp.stApp :is(h1, h2, h3, .pg-title, .cc-hello, .kpi-value, .cc-kpi-value, .archie-name, .section-label,
+    .cc-step-v, .bl-name, .profile-name) { font-family: var(--gp-display) !important; }
+
+/* labels in sentence case, not tracked-out capitals */
+html body .stApp.stApp :is(.kpi-label, .cc-eyebrow, .cc-kpi-label, .cc-step-n, .cc-story dt, .gm-sum-k, .pg-eyebrow,
+    .gp-table th, thead th, .th, .pm-label, .gp-tag, .chip, .kb-head, .section-label) {
+    text-transform: none !important; letter-spacing: 0 !important; }
+html body .stApp.stApp .section-label { font-size: 17px !important; font-weight: 700 !important;
+    color: var(--gp-text) !important; margin-top: 20px !important; margin-bottom: 10px !important; }
+html body .stApp.stApp :is(.kpi-label, .cc-kpi-label) { font-size: 13px !important; font-weight: 600 !important; }
+html body .stApp.stApp :is(.pg-eyebrow, .cc-eyebrow) { font-size: 13px !important; font-weight: 600 !important; }
+html body .stApp.stApp :is(thead th, .th) { font-size: 12.5px !important; font-weight: 600 !important; color: var(--gp-muted) !important; }
+
+/* no decorative motion: cards don't float or lift on hover */
+html body .stApp.stApp :is(.kpi, .cc-kpi, .panel, .pillar, [class*="st-key-card_"], [class*="st-key-mm_tile_"]):hover {
+    transform: none !important; }
+"""
+
+
+def apply_app():
+    """After sign-in only: the app's final style layer."""
+    st.markdown("<style>" + APP_CSS + "</style>", unsafe_allow_html=True)
+
+
 def apply():
     from gympulse_reports import DOWNLOAD_CSS
     st.markdown("<style>" + CSS + DOWNLOAD_CSS + POLISH_CSS + "</style>", unsafe_allow_html=True)

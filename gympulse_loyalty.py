@@ -559,7 +559,7 @@ def render_loyalty(supabase, gym_id, owner_id):
         st.caption("Members by level: " + " · ".join(f"{k} {v}" for k, v in counts.items()))
     ready = table[table["ready"].notna()]
     if len(ready):
-        st.markdown('<div class="section-label">CAN GET A GIFT NOW</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-label">Can get a gift now</div>', unsafe_allow_html=True)
         members = {r["id"]: dict(r) for _, r in gg._members(supabase, gym_id).iterrows()}
         for _, r in ready.iterrows():
             with st.expander(f"{r['name']} · {r['balance']:,} points · {r['ready']['name']}"):
@@ -577,7 +577,7 @@ def render_loyalty(supabase, gym_id, owner_id):
                           help="Takes the points for this gift off their total.",
                           on_click=_redeem, args=(supabase, gym_id, r["member_id"], options[pick]))
 
-    st.markdown('<div class="section-label">TOP MEMBERS</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">Top members</div>', unsafe_allow_html=True)
     top = table.head(20)
     for i, (_, r) in enumerate(top.iterrows()):
         medal = ["🥇", "🥈", "🥉"][i] if i < 3 and r["balance"] > 0 else f"{i + 1}."

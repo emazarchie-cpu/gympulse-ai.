@@ -236,7 +236,7 @@ def render_command_centre(supabase, gym_id, assess_fn, greeting, user_name, busi
             st.info(f"{_plural(len(missing), 'member')} registered without a plan or fee. Add their "
                     "membership details on the Risk Radar (Data tools) and they'll be scored.")
         gw._md(f"""<div class="cc-hero"><div class="cc-hero-top"><div>
-            <div class="cc-eyebrow">Retention command centre · {today:%A %d %B}</div>
+            <div class="cc-eyebrow">Retention command centre, {today:%A %d %B}</div>
             <div class="cc-hello">{gw._esc(greeting)}, {gw._esc(user_name)}</div>
             <div class="cc-sub">Let's set up <b>{gw._esc(business_name)}</b>. Three steps and GymPulse AI
               starts telling you who needs you, and why.</div></div></div>{gd.PULSE_SVG}</div>""")
@@ -279,7 +279,7 @@ def render_command_centre(supabase, gym_id, assess_fn, greeting, user_name, busi
         extra.append(f"<b>{res['overdue']}</b> overdue follow-up{'s' if res['overdue'] != 1 else ''}")
     sub = headline + (" · " + " · ".join(extra) if extra else "") + "."
     gw._md(f"""<div class="cc-hero"><div class="cc-hero-top"><div>
-        <div class="cc-eyebrow">Retention command centre · {today:%A %d %B}</div>
+        <div class="cc-eyebrow">Retention command centre, {today:%A %d %B}</div>
         <div class="cc-hello">{gw._esc(greeting)}, {gw._esc(user_name)}</div>
         <div class="cc-sub">{sub}</div></div>
         <div class="cc-meta">{source}<span class="gp-tag">{_plural(len(roster), 'member')} tracked</span></div>
@@ -339,7 +339,7 @@ def render_command_centre(supabase, gym_id, assess_fn, greeting, user_name, busi
     # ---- today's priorities + brief
     left, right = st.columns([1.6, 1], gap="medium")
     with left:
-        st.markdown('<div class="section-label">TODAY\'S PRIORITIES</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-label">Today\'s priorities</div>', unsafe_allow_html=True)
         if need.empty:
             st.success("No one needs a new play right now. Open plays are in the Action Centre.")
         else:
@@ -358,7 +358,7 @@ def render_command_centre(supabase, gym_id, assess_fn, greeting, user_name, busi
                 b.button("Open the Risk Radar", key="cc_radar", type="tertiary",
                          icon=":material/radar:", on_click=gw._go, args=("Risk Radar",))
     with right:
-        st.markdown('<div class="section-label">ARCHIE\'S BRIEF</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-label">Archie\'s brief</div>', unsafe_allow_html=True)
         bullets = "".join(f"<li>{b}</li>" for b in daily_brief(roster, actions, res, watch, need))
         gw._md(f"""<div class="cc-brief"><div class="cc-brief-head"><div class="cc-brief-orb"></div>
             <div><div class="cc-brief-title">Good to know today</div>
@@ -368,7 +368,7 @@ def render_command_centre(supabase, gym_id, assess_fn, greeting, user_name, busi
             st.button(q, key=f"cc_ask_{q[:12]}", icon=":material/auto_awesome:",
                       on_click=_ask_archie, args=(q,), use_container_width=True)
 
-        st.markdown('<div class="section-label">RENEWAL WATCH · 30 DAYS</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-label">Renewal watch: 30 days</div>', unsafe_allow_html=True)
         with st.container(border=True, key="cc_watch"):
             if watch.empty:
                 gw._md('<div class="cc-empty">No at-risk renewals in the next 30 days.</div>')
@@ -387,7 +387,7 @@ def render_command_centre(supabase, gym_id, assess_fn, greeting, user_name, busi
                           on_click=gw._go, args=("Payments & Renewals",))
 
     # ---- the retention loop
-    st.markdown('<div class="section-label">RETENTION LOOP · LAST 30 DAYS</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">Retention loop: last 30 days</div>', unsafe_allow_html=True)
     flagged = int((roster["risk_category"] != "Low").sum())
     started = res["todo"] + res["doing"] + res["resolved_n"]
     steps = [("Detected", flagged, "Members flagged medium or high risk", flagged),
@@ -405,7 +405,7 @@ def render_command_centre(supabase, gym_id, assess_fn, greeting, user_name, busi
     # ---- what works
     a, b = st.columns([1.6, 1], gap="medium")
     with a:
-        st.markdown('<div class="section-label">WHICH PLAYS WORK</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-label">Which plays work</div>', unsafe_allow_html=True)
         perf = play_performance(actions)
         with st.container(border=True, key="cc_perf"):
             if not perf:
@@ -420,7 +420,7 @@ def render_command_centre(supabase, gym_id, assess_fn, greeting, user_name, busi
                 gw._md('<div class="cc-brief-foot">Kept ÷ (kept + cancelled). "No response" is left out '
                        'because the result is unknown. Small samples are early signals only.</div>')
     with b:
-        st.markdown('<div class="section-label">SHORTCUTS</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-label">Shortcuts</div>', unsafe_allow_html=True)
         tiles = [("Front-desk check-in", "Check-in", ":material/how_to_reg:"),
                  ("Action Centre", "Action Centre", ":material/task_alt:"),
                  ("Members", "Member Management", ":material/group:"),
