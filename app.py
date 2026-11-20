@@ -1213,19 +1213,25 @@ if st.session_state.auth_user is None:
     )
 
     # Landing: navigation, hero and live product preview
-    html(gd.landing_top(lockup_data_uri(900), icon))
+    st.markdown("<style>" + gd.LANDING3_CSS + "</style>", unsafe_allow_html=True)
+    html(gd.landing3_top(lockup_data_uri(900)))
+    html(gd.landing3_story())
     try:
         import gympulse_landing as glanding
         glanding.render_calculator()
     except Exception as _calc_error:
         gmon.capture(_calc_error, "landing calculator")
+    try:
+        gbill.render_landing_pricing(icon)
+    except Exception as _price_error:
+        gmon.capture(_price_error, "landing pricing")
     if st.session_state.get("bill_flash"):
         (st.success if st.session_state.get("bill_flash_ok") else st.info)(
             st.session_state["bill_flash"] + " Sign in below to continue.")
     html("""
     <div class="lx-auth-head" id="get-started">
       <div class="lx-kicker">Your workspace</div>
-      <div class="lx-h2" style="font-size:30px;margin-bottom:4px;">Sign in or start your 30-day free trial</div>
+      <div class="lx-h2" style="margin-bottom:4px;">Sign in, or start your 30-day free trial.</div>
     </div>
     """)
 
@@ -1634,14 +1640,7 @@ if st.session_state.auth_user is None:
                         show_dpa()
 
     # LANDING PAGE SECTIONS (pricing goes just before the closing call to action)
-    _sections = gd.landing_sections(icon, gw.ARCHIE_BOT_SVG)
-    _cut = _sections.index('<div class="lx-cta">')
-    html(_sections[:_cut])
-    try:
-        gbill.render_landing_pricing(icon)
-    except Exception as _price_error:
-        gmon.capture(_price_error, "landing pricing")
-    html(_sections[_cut:])
+    html(gd.landing3_end())
     st.session_state["_rendered_page"] = "__landing__"
     st.stop()
 

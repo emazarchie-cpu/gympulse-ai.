@@ -1309,3 +1309,200 @@ html body .stApp.stApp.stApp.stApp.stApp button[data-variant="segmented_control"
 
 def apply_light():
     st.markdown("<style>" + LIGHT_CSS + "</style>", unsafe_allow_html=True)
+
+
+# =====================================================================================================
+# Landing page v3 (approved mockup, 20 Nov 2026): calm, page-like, one idea per section.
+# Signature: the visit strip, 30 dots for 30 days, lime when the member came, hollow when they didn't.
+# Navy and lime stay; Instrument Serif for big titles, Instrument Sans for everything else.
+# LANDING3_CSS is added on the landing page only (app.py), so the signed-in app is untouched.
+# =====================================================================================================
+LANDING3_CSS = """
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Instrument+Sans:wght@400;500;600;700&display=swap');
+html body .stApp.stApp { background: #0A0F1E !important; }
+html body .stApp.stApp :is(p, li, label, button, input, a, span, div[data-testid="stMarkdownContainer"]) {
+    font-family: 'Instrument Sans', 'Inter', sans-serif; }
+html body .stApp.stApp [data-testid="stIconMaterial"] { font-family: 'Material Symbols Rounded' !important; }
+.l3 { --l3-text:#F4F7FB; --l3-muted:#93A1B8; --l3-dim:#66748C; --l3-line:rgba(255,255,255,.08); --l3-lime:#B7F34A;
+      --l3-red:#FF8A80; --l3-amber:#FFC96B; color: var(--l3-text); max-width: 1120px; margin: 0 auto; }
+.l3-serif, html body .stApp.stApp .l3-serif { font-family: 'Instrument Serif', Georgia, serif !important; font-weight: 400 !important;
+      letter-spacing: -0.01em; }
+.l3-nav { display: flex; justify-content: space-between; align-items: center; padding: 14px 0 6px; gap: 16px; }
+.l3-nav img { height: 34px; width: auto; }
+.l3-links { display: flex; gap: 26px; flex-wrap: wrap; }
+html body .stApp.stApp [data-testid="stMarkdownContainer"] .l3-links a { color: var(--l3-muted) !important;
+      text-decoration: none !important; font-size: 15px; }
+html body .stApp.stApp [data-testid="stMarkdownContainer"] .l3-links a:hover { color: var(--l3-text) !important; }
+.l3-hero { padding: 64px 0 24px; max-width: 760px; }
+.l3-k { color: var(--l3-muted); font-size: 15px; margin: 0 0 18px; }
+.l3-h1 { font-size: clamp(48px, 7.4vw, 92px); line-height: .98; margin: 0 0 30px; color: var(--l3-text); }
+.l3-h1 em { font-style: italic; color: var(--l3-muted); }
+.l3-lead { color: var(--l3-muted); font-size: clamp(17px, 1.6vw, 20px); line-height: 1.55; max-width: 34ch; margin: 0 0 30px; }
+.l3-cta { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
+html body .stApp.stApp [data-testid="stMarkdownContainer"] a.l3-btn { display: inline-block; background: var(--l3-lime);
+      color: #0A0F1E !important; text-decoration: none !important; font-weight: 600; font-size: 16px; padding: 13px 22px;
+      border-radius: 8px; }
+html body .stApp.stApp [data-testid="stMarkdownContainer"] a.l3-btn:hover { background: #C6F76A; }
+html body .stApp.stApp [data-testid="stMarkdownContainer"] a.l3-link { color: var(--l3-text) !important; font-size: 16px;
+      text-decoration: none !important; border-bottom: 1px solid rgba(255,255,255,.22); padding-bottom: 2px; }
+.l3-strip { display: grid; grid-template-columns: repeat(30, minmax(0, 1fr)); gap: 5px; max-width: 760px; }
+.l3-strip i { display: block; aspect-ratio: 1; border-radius: 50%; border: 1.5px solid rgba(255,255,255,.18); }
+.l3-strip i.v { background: var(--l3-lime); border-color: var(--l3-lime); }
+.l3-demo { margin: 6px 0 34px; max-width: 760px; }
+.l3-axis { display: flex; justify-content: space-between; font-size: 13px; color: var(--l3-dim); margin-top: 10px; }
+.l3-works { border-top: 1px solid var(--l3-line); margin-top: 56px; padding-top: 18px; display: flex; flex-wrap: wrap;
+      gap: 8px 26px; align-items: baseline; }
+.l3-works small { color: var(--l3-dim); font-size: 13px; width: 100%; }
+.l3-works span { color: var(--l3-text); font-size: 15px; }
+.l3-sec { padding: 88px 0 8px; }
+.l3-n { color: var(--l3-lime); font-size: 15px; margin: 0 0 12px; }
+.l3-h2 { font-size: clamp(38px, 5vw, 60px); line-height: 1.02; margin: 0 0 16px; max-width: 18ch; color: var(--l3-text); }
+.l3-sub { color: var(--l3-muted); font-size: 18px; line-height: 1.55; max-width: 46ch; margin: 0 0 36px; }
+.l3-mem { padding: 20px 0; border-top: 1px solid var(--l3-line); max-width: 760px; }
+.l3-mt { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 12px; }
+.l3-mt b { font-size: 17px; font-weight: 600; }
+.l3-mt small { color: var(--l3-muted); font-size: 14px; }
+.l3-why { color: var(--l3-muted); font-size: 15px; margin: 12px 0 0 !important; }
+.l3-why b { color: var(--l3-text); font-weight: 600; }
+.l3-pill { font-size: 13px; font-weight: 600; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+.l3-red { color: var(--l3-red); background: rgba(255,138,128,.12); }
+.l3-amber { color: var(--l3-amber); background: rgba(255,201,107,.12); }
+.l3-note { color: var(--l3-dim); font-size: 13px; margin: 14px 0 0; }
+.l3-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; border-top: 1px solid var(--l3-line); }
+.l3-steps > div { padding: 24px 28px 8px 0; }
+.l3-steps > div + div { padding-left: 28px; border-left: 1px solid var(--l3-line); }
+.l3-steps .l3-serif { font-size: 44px; line-height: 1; color: var(--l3-lime); display: block; margin-bottom: 14px; }
+.l3-steps b { display: block; font-size: 18px; font-weight: 600; margin-bottom: 6px; }
+.l3-steps p { color: var(--l3-muted); font-size: 15px; line-height: 1.55; margin: 0; }
+.l3-video { max-width: 1040px; aspect-ratio: 16 / 9; border-radius: 12px; overflow: hidden; border: 1px solid var(--l3-line);
+      background: #05070D; }
+.l3-video video { width: 100%; height: 100%; display: block; object-fit: cover; }
+.l3-end { padding: 96px 0 40px; }
+.l3-foot { border-top: 1px solid var(--l3-line); margin-top: 72px; padding: 22px 0 8px; display: flex; flex-wrap: wrap;
+      gap: 10px 22px; font-size: 14px; color: var(--l3-dim); }
+html body .stApp.stApp [data-testid="stMarkdownContainer"] .l3-foot a { color: var(--l3-muted) !important; text-decoration: none !important; }
+.l3-legal { font-size: 13px; color: var(--l3-dim); padding: 6px 0 40px; }
+
+/* the older landing blocks that stay (calculator, sign-in, pricing): same calm voice */
+html body .stApp.stApp :is(.lx-kicker) { text-transform: none !important; letter-spacing: 0 !important; color: #B7F34A !important;
+      font-size: 15px !important; font-weight: 500 !important; text-align: left !important; }
+html body .stApp.stApp :is(.lx-h2) { font-family: 'Instrument Serif', Georgia, serif !important; font-weight: 400 !important;
+      font-size: clamp(38px, 5vw, 60px) !important; line-height: 1.02 !important; letter-spacing: -0.01em !important;
+      text-align: left !important; max-width: 18ch; margin-left: 0 !important; }
+html body .stApp.stApp :is(.lx-sub) { text-align: left !important; margin-left: 0 !important; font-size: 18px !important; }
+html body .stApp.stApp :is(.lx-sec, .lx-auth-head) { text-align: left !important; padding-top: 88px !important; }
+html body .stApp.stApp :is(.lx-tier, .lx-calc-big, .lx-compare) { box-shadow: none !important; background-image: none !important; }
+html body .stApp.stApp :is(.lx-tier-name, .lx-tier-who) { text-transform: none !important; letter-spacing: 0 !important; }
+html body .stApp.stApp .lx-btn-primary { background: #B7F34A !important; box-shadow: none !important; }
+html body .stApp.stApp .lx-auth-head .lx-h2 { max-width: none !important; }
+html body .stApp.stApp :is(.lx-tier, .lx-tier.rec, .lx-calc, .lx-calc-big, [class*="st-key-calc"]) {
+    box-shadow: none !important; background-image: none !important; }
+html body .stApp.stApp .lx-tier.rec::before, html body .stApp.stApp .lx-tier::after { display: none !important; }
+html body .stApp.stApp .lx-tier-who { color: #93A1B8 !important; }
+html body .stApp.stApp .lx-tier-rec { background: transparent !important; color: #B7F34A !important; border: 1px solid rgba(183,243,74,.4) !important; }
+
+@media (max-width: 760px) {
+  .l3-nav .l3-links { display: none; }
+  .l3-hero { padding-top: 34px; }
+  .l3-strip { gap: 3px; }
+  .l3-steps { grid-template-columns: 1fr; }
+  .l3-steps > div, .l3-steps > div + div { padding: 22px 0 6px; border-left: 0; border-top: 1px solid var(--l3-line); }
+  .l3-steps > div:first-child { border-top: 0; }
+  .l3-sec { padding-top: 64px; }
+  html body .stApp.stApp :is(.lx-sec, .lx-auth-head) { padding-top: 64px !important; }
+}
+"""
+
+
+def _l3_strip(pattern):
+    return '<div class="l3-strip" aria-hidden="true">' + "".join(
+        f'<i class="{"v" if c == "1" else ""}"></i>' for c in pattern) + "</div>"
+
+
+def landing3_top(lockup_uri):
+    """Navigation, hero with one member's visit strip, and what GymPulse works alongside."""
+    return f"""
+    <div class="l3">
+      <div class="l3-nav"><img src="{lockup_uri}" alt="GymPulse AI">
+        <div class="l3-links"><a href="#how" target="_self">How it works</a><a href="#calculator" target="_self">Calculator</a>
+        <a href="#pricing" target="_self">Pricing</a><a href="#get-started" target="_self">Sign in</a></div></div>
+      <div class="l3-hero">
+        <p class="l3-k">Member retention for Nigerian gyms</p>
+        <div class="l3-h1 l3-serif" role="heading" aria-level="1">Members don't cancel. <em>They stop coming.</em></div>
+        <div class="l3-demo">{_l3_strip("110101101101101011000000000000")}
+          <div class="l3-axis"><span>1 Oct</span><span>Last visit 18 Oct</span><span>Today</span></div></div>
+        <p class="l3-lead">GymPulse AI spots the gaps in your check-ins and tells you who to call, while one call is still enough.</p>
+        <div class="l3-cta"><a class="l3-btn" href="#get-started" target="_self">Start your free trial</a>
+          <a class="l3-link" href="?demo=book" target="_self">Book a 15-minute demo</a></div>
+      </div>
+      <div class="l3-works"><small>Works alongside what your gym already uses</small>
+        <span>GymMaster</span><span>Excel</span><span>Google Sheets</span><span>QR check-in</span></div>
+    </div>
+    """
+
+
+def landing3_story():
+    """Risk Radar with visit strips, the three steps, and the demo video."""
+    a = _l3_strip("101101011010110100000000000000")
+    b = _l3_strip("110110110101101101000001000000")
+    c = _l3_strip("011011011011010110110110110110")
+    return f"""
+    <div class="l3">
+      <div class="l3-sec">
+        <p class="l3-n">Risk Radar</p>
+        <div class="l3-h2 l3-serif" role="heading" aria-level="2">See the drop before the renewal date.</div>
+        <p class="l3-sub">Each member is compared with their own habit. When their dots thin out, they move up your list,
+          with the reason in plain words.</p>
+        <div class="l3-mem"><div class="l3-mt"><b>Aisha Adebayo</b><span class="l3-pill l3-red">Call today</span></div>{a}
+          <p class="l3-why"><b>From 6 visits a month to 1.</b> Renews 24 Nov, ₦25,000.</p></div>
+        <div class="l3-mem"><div class="l3-mt"><b>Kelechi Ibrahim</b><span class="l3-pill l3-amber">This week</span></div>{b}
+          <p class="l3-why"><b>21 days since last visit.</b> Quarterly plan.</p></div>
+        <div class="l3-mem"><div class="l3-mt"><b>Funke Ekwueme</b><small>Training well</small></div>{c}
+          <p class="l3-why">Steady, 3 visits a week.</p></div>
+        <p class="l3-note">Demo figures from the GymPulse AI demo gym</p>
+      </div>
+      <div class="l3-sec" id="how">
+        <p class="l3-n">How it works</p>
+        <div class="l3-h2 l3-serif" role="heading" aria-level="2">Three steps, no new front desk system.</div>
+        <p class="l3-sub">Keep GymMaster, Excel or whatever you use today. GymPulse AI adds the part they don't do.</p>
+        <div class="l3-steps">
+          <div><span class="l3-serif">1</span><b>Bring your members in</b><p>Connect GymMaster for live check-ins, upload a
+            spreadsheet, or use our QR check-in.</p></div>
+          <div><span class="l3-serif">2</span><b>See who's drifting</b><p>Every member is scored each day, with the reason
+            and the renewal date.</p></div>
+          <div><span class="l3-serif">3</span><b>Call, message, record</b><p>Your team gets one list of who to contact and
+            what to say. Only confirmed renewals count as money kept.</p></div>
+        </div>
+      </div>
+      <div class="l3-sec" id="demo">
+        <p class="l3-n">See it in action</p>
+        <div class="l3-h2 l3-serif" role="heading" aria-level="2">Every feature, in under a minute.</div>
+        <div class="l3-video"><video src="/app/static/gympulse-demo.mp4?v=5" poster="/app/static/gympulse-demo-poster.jpg?v=5"
+          autoplay muted loop playsinline controls preload="metadata" aria-label="GymPulse AI product demo"></video></div>
+        <p class="l3-note">Plays muted. Tap the video for sound.</p>
+      </div>
+    </div>
+    """
+
+
+def landing3_end():
+    """Closing line and footer."""
+    return """
+    <div class="l3">
+      <div class="l3-end">
+        <div class="l3-h2 l3-serif" role="heading" aria-level="2">Call them while one call is still enough.</div>
+        <p class="l3-sub">Every feature free for 30 days. Setting up takes about a minute.</p>
+        <div class="l3-cta"><a class="l3-btn" href="#get-started" target="_self">Start your free trial</a>
+          <a class="l3-link" href="?demo=book" target="_self">Book a 15-minute demo</a></div>
+      </div>
+      <div class="l3-foot"><a href="/gym-management-software-nigeria.html" target="_self">Member retention platform</a>
+        <a href="/gym-member-retention.html" target="_self">Keep members from cancelling</a>
+        <a href="/why-gym-members-leave-research.html" target="_self">Why members leave: the research</a>
+        <a href="/gym-whatsapp-renewal-reminders.html" target="_self">WhatsApp reminders</a>
+        <a href="/switch-from-gymmaster-or-excel.html" target="_self">Works with GymMaster</a>
+        <a href="/gym-hmo-members.html" target="_self">HMO members</a>
+        <a href="/case-study.html" target="_self">Case study</a></div>
+      <div class="l3-legal">© 2026 GYMPULSE AI LTD, RC 9996401, registered in Nigeria. Calabar, Cross River State.
+        hello@usegympulseai.com</div>
+    </div>
+    """
