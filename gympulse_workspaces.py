@@ -123,7 +123,7 @@ def apply_mobile_styles():
 
 TONES = {
     "lime": "#B7F34A", "red": "#FF6B6B", "amber": "#FFC44D",
-    "cyan": "#C9C4B8", "white": "#F2EFE6", "grey": "#9AA8BD",
+    "cyan": "#35D6ED", "white": "#F4F7FB", "grey": "#9AA8BD",
 }
 # Membership plans, shortest first. "Annual" is the old name for Yearly and is
 # still read from existing records.
@@ -599,12 +599,12 @@ UI_CSS = """
 .chip-lime { background: rgba(183,243,74,0.16); color: #B7F34A !important; }
 .chip-red { background: rgba(255,107,107,0.16); color: #FF8A8A !important; }
 .chip-amber { background: rgba(255,196,77,0.16); color: #FFC44D !important; }
-.chip-cyan { background: rgba(201,196,184,0.12); color: #C9C4B8 !important; }
+.chip-cyan { background: rgba(53,214,237,0.14); color: #35D6ED !important; }
 .chip-grey { background: rgba(154,168,189,0.16); color: #D5DDEA !important; }
 a.chip:hover { filter: brightness(1.25); }
 
 .avatar { border-radius: 50%; object-fit: cover; display: grid; place-items: center;
-    background: #B7F34A; color: #0E0F12;
+    background: linear-gradient(145deg, #B7F34A, #35D6ED); color: #10182A;
     font-weight: 800; border: 2px solid rgba(255,255,255,0.12); box-sizing: border-box; }
 .avatar-ring { border: 3px solid #B7F34A;
     box-shadow: 0 0 0 5px rgba(183,243,74,0.14), 0 14px 40px rgba(0,0,0,0.45); }
@@ -1033,7 +1033,7 @@ CHAT_CSS = """
 .chat-tag { font-size: 10px; font-weight: 800; letter-spacing: .6px;
     text-transform: uppercase; padding: 2px 9px; border-radius: 999px;
     background: rgba(183,243,74,0.16); color: #B7F34A; }
-.chat-gym { background: rgba(201,196,184,0.12); color: #C9C4B8; }
+.chat-gym { background: rgba(53,214,237,0.14); color: #35D6ED; }
 [data-testid="stChatInput"] { border-radius: 999px !important;
     background: #111B2D !important; border: 1px solid rgba(255,255,255,0.14) !important; }
 [data-testid="stChatInput"]:focus-within { border-color: #B7F34A !important;

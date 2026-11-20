@@ -389,42 +389,42 @@ def head_tags():
 # ---------------------------------------------------------------- shared look
 CSS = """
 *{box-sizing:border-box}
-body{margin:0;background:#0E0F12;color:#F2EFE6;font:17px/1.65 'IBM Plex Sans',-apple-system,BlinkMacSystemFont,
+body{margin:0;background:#0A0F1E;color:#E6EAF2;font:17px/1.65 'Instrument Sans',-apple-system,BlinkMacSystemFont,
 "Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
 a{color:#B7F34A;text-underline-offset:3px}
 .w{max-width:1040px;margin:0 auto;padding:0 20px}
 .nav{display:flex;justify-content:space-between;align-items:center;padding:20px 0;gap:12px;flex-wrap:wrap;
-border-bottom:1px solid #262A33}
-.logo{font-family:'IBM Plex Sans',sans-serif;font-weight:700;font-size:19px;color:#fff;text-decoration:none}
+border-bottom:1px solid #1B2338}
+.logo{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:19px;color:#fff;text-decoration:none}
 .logo span{color:#B7F34A}
-.btn{display:inline-block;padding:11px 18px;border-radius:4px;font-weight:600;font-size:15px;text-decoration:none;
-border:1px solid #343944;color:#F2EFE6;margin:4px 8px 4px 0}.btn:hover{border-color:#5A5F6A}
-.btn.p{background:#B7F34A;color:#0E0F12;border-color:#B7F34A}.btn.p:hover{background:#C6F76A}
+.btn{display:inline-block;padding:11px 18px;border-radius:10px;font-weight:600;font-size:15px;text-decoration:none;
+border:1px solid #2A3350;color:#E6EAF2;margin:4px 8px 4px 0}.btn:hover{border-color:#4A5675}
+.btn.p{background:#B7F34A;color:#0A0F1E;border-color:#B7F34A}.btn.p:hover{background:#C6F76A}
 .nav .btn{padding:9px 14px;font-size:14px;margin:0 0 0 8px}
-.eyebrow{color:#A3A198;font-size:15px;margin:56px 0 0}
-h1,h2,h3{font-family:'IBM Plex Sans',sans-serif;font-weight:600;color:#F2EFE6}
+.eyebrow{color:#8C99B2;font-size:15px;margin:56px 0 0}
+h1,h2,h3{font-family:'Bricolage Grotesque',sans-serif;font-weight:700;color:#F4F6FB}
 h1{font-size:clamp(34px,5.4vw,58px);line-height:1.04;letter-spacing:-.02em;margin:10px 0 18px;max-width:20ch}
-.lead{font-size:clamp(18px,2vw,21px);line-height:1.55;color:#B9B6AC;max-width:62ch;margin:0 0 48px}
+.lead{font-size:clamp(18px,2vw,21px);line-height:1.55;color:#B4BED2;max-width:62ch;margin:0 0 48px}
 h2{font-size:24px;line-height:1.2;margin:0}
 h3{font-size:18px;margin:22px 0 4px}
-.sec{display:grid;grid-template-columns:260px minmax(0,1fr);gap:16px 48px;padding:34px 0;border-top:1px solid #262A33}
+.sec{display:grid;grid-template-columns:260px minmax(0,1fr);gap:16px 48px;padding:34px 0;border-top:1px solid #1B2338}
 .sec ul,.sec ol{margin:0;padding:0;list-style:none;counter-reset:n}
-.sec li{padding:12px 0 12px 28px;border-bottom:1px solid #1E2128;position:relative;color:#DCD8CD}
+.sec li{padding:12px 0 12px 28px;border-bottom:1px solid #151C2E;position:relative;color:#D3DAE7}
 .sec li:first-child{padding-top:2px}.sec li:last-child{border-bottom:0}
 .sec ul li:before{content:"";position:absolute;left:2px;top:23px;width:12px;height:2px;background:#B7F34A}
 .sec ul li:first-child:before{top:13px}
 .sec ol li{counter-increment:n}
-.sec ol li:before{content:counter(n);position:absolute;left:0;top:12px;font-family:'IBM Plex Mono',monospace;
+.sec ol li:before{content:counter(n);position:absolute;left:0;top:12px;font-family:'Bricolage Grotesque',sans-serif;
 font-weight:700;color:#B7F34A;font-size:16px}.sec ol li:first-child:before{top:2px}
 .sec .body > h3:first-child{margin-top:0}
-.sec .body p{margin:0 0 6px;color:#CFCBC0}
-.cta{margin:40px 0 0;padding:40px;background:#14161B;border-radius:4px;border:1px solid #262A33}
-.cta h2{font-size:clamp(26px,3.4vw,34px);margin:0 0 8px}.cta p{color:#B9B6AC;margin:0 0 20px;max-width:56ch}
-.foot{color:#8E8C85;font-size:14px;padding:40px 0 48px;margin-top:48px;border-top:1px solid #262A33}
-.foot h2{font-size:17px;margin:0 0 12px;color:#F2EFE6}
+.sec .body p{margin:0 0 6px;color:#C3CCDC}
+.cta{margin:40px 0 0;padding:40px;background:#121A2E;border-radius:16px;border:1px solid #1F2945}
+.cta h2{font-size:clamp(26px,3.4vw,34px);margin:0 0 8px}.cta p{color:#B4BED2;margin:0 0 20px;max-width:56ch}
+.foot{color:#7F8AA6;font-size:14px;padding:40px 0 48px;margin-top:48px;border-top:1px solid #1B2338}
+.foot h2{font-size:17px;margin:0 0 12px;color:#E6EAF2}
 .links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 32px;margin-bottom:28px}
-.links a{color:#CFCBC0;text-decoration:none;font-size:15px}.links a:hover{color:#B7F34A;text-decoration:underline}
-.foot p a{color:#CFCBC0}
+.links a{color:#C3CCDC;text-decoration:none;font-size:15px}.links a:hover{color:#B7F34A;text-decoration:underline}
+.foot p a{color:#C3CCDC}
 .card{margin:18px 0}
 @media(max-width:760px){
  body{font-size:16px}.eyebrow{margin-top:36px}.lead{margin-bottom:32px}
@@ -435,7 +435,7 @@ font-weight:700;color:#B7F34A;font-size:16px}.sec ol li:first-child:before{top:2
 """
 FONTS = ('<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" '
          'href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/'
-         'css2?family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@500&display=swap">')
+         'css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&family=Instrument+Sans:wght@400;600&display=swap">')
 
 
 def _nav():
@@ -446,7 +446,6 @@ def _nav():
 
 def _links(skip=None):
     items = [f'<a href="/{p["slug"]}.html">{html.escape(p["h1"])}</a>' for p in PAGES if p["slug"] != skip]
-    items.append('<a href="/case-study.html">Case study: a member back after 33 days</a>')
     return '<div class="links">' + "".join(items) + "</div>"
 
 
@@ -493,7 +492,7 @@ def page_html(p):
 <link rel="canonical" href="{url}"><meta name="robots" content="index, follow">
 <meta property="og:type" content="article"><meta property="og:title" content="{e(p['title'])}">
 <meta property="og:description" content="{e(p['description'])}"><meta property="og:url" content="{url}">
-<meta property="og:image" content="{SITE}/apple-touch-icon.png"><meta name="theme-color" content="#0E0F12">
+<meta property="og:image" content="{SITE}/apple-touch-icon.png"><meta name="theme-color" content="#0B1020">
 <link rel="icon" href="/favicon.ico" sizes="48x48"><link rel="icon" type="image/png" sizes="192x192" href="/gympulse-icon-v4-192.png"><link rel="apple-touch-icon" sizes="180x180" href="/gympulse-touch-v4.png">
 {FONTS}<style>{CSS}</style>{ld}</head><body><div class="w">{_nav()}
 <p class="eyebrow">Guide for gym owners</p><h1>{e(p['h1'])}</h1><p class="lead">{e(p['lead'])}</p>{_sections(p['sections'])}{faq}{_cta()}{_foot()}
@@ -543,15 +542,15 @@ CASE = {
 }
 
 CASE_CSS = """
-.facts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:24px;border-top:1px solid #262A33;padding:22px 0 30px;margin:0}.facts div{padding:0}
-.facts span{display:block;color:#A3A198;font-size:14px}.facts b{font-family:'IBM Plex Sans',sans-serif;font-weight:600;font-size:20px;line-height:1.3}
+.facts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:24px;border-top:1px solid #1B2338;padding:22px 0 30px;margin:0}.facts div{padding:0}
+.facts span{display:block;color:#8C99B2;font-size:14px}.facts b{font-family:'Bricolage Grotesque',sans-serif;font-size:20px;line-height:1.3}
 .sec .tl{list-style:none;padding:0;margin:0;border-left:2px solid #2A3350}
 .sec .tl li{position:relative;padding:4px 0 16px 24px;margin:0;border:0}
 .sec .tl li:before,.sec .tl li:first-child:before{content:"";position:absolute;left:-7px;top:10px;width:12px;height:12px;border-radius:50%;
-background:#0E0F12;border:2px solid #5A5F6A}.sec .tl li:last-child:before{background:#B7F34A;border-color:#B7F34A}
-.tl time{display:block;font-weight:700;color:#F2EFE6}.tl p{margin:2px 0 0;color:#B9B6AC}
-.result{font-family:'IBM Plex Sans',sans-serif;font-size:clamp(22px,2.6vw,28px);line-height:1.25;font-weight:700;color:#F4F6FB;margin:0}
-.note{color:#8E8C85;font-size:14px;border-top:1px solid #262A33;padding-top:20px;margin:0;max-width:72ch}
+background:#0A0F1E;border:2px solid #4A5675}.sec .tl li:last-child:before{background:#B7F34A;border-color:#B7F34A}
+.tl time{display:block;font-weight:700;color:#E8ECF5}.tl p{margin:2px 0 0;color:#B7C0D6}
+.result{font-family:'Bricolage Grotesque',sans-serif;font-size:clamp(22px,2.6vw,28px);line-height:1.25;font-weight:700;color:#F4F6FB;margin:0}
+.note{color:#7F8AA6;font-size:14px;border-top:1px solid #1B2338;padding-top:20px;margin:0;max-width:72ch}
 @media(max-width:640px){.facts{grid-template-columns:repeat(2,minmax(0,1fr))}}
 """
 
@@ -573,7 +572,7 @@ def case_html():
 <link rel="canonical" href="{url}"><meta name="robots" content="index, follow">
 <meta property="og:type" content="article"><meta property="og:title" content="{e(c['h1'])}">
 <meta property="og:description" content="{e(c['description'])}"><meta property="og:url" content="{url}">
-<meta property="og:image" content="{SITE}/apple-touch-icon.png"><meta name="theme-color" content="#0E0F12">
+<meta property="og:image" content="{SITE}/apple-touch-icon.png"><meta name="theme-color" content="#0B1020">
 <link rel="icon" href="/favicon.ico" sizes="48x48"><link rel="icon" type="image/png" sizes="192x192" href="/gympulse-icon-v4-192.png"><link rel="apple-touch-icon" sizes="180x180" href="/gympulse-touch-v4.png">
 {FONTS}<style>{CSS}{CASE_CSS}</style><script type="application/ld+json">{json.dumps(ld, ensure_ascii=False)}</script>
 </head><body><div class="w">{_nav()}

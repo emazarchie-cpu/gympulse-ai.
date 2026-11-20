@@ -209,7 +209,7 @@ def _access_cards():
     card = ('<div class="acc-card" style="--tone:{tone}"><div class="acc-head"><div class="acc-ic">{ic}</div>'
             '<div><b>{title}</b><span class="acc-sub">{sub}</span></div></div>{rows}</div>')
     return (ACCESS_CSS + '<div class="acc-grid">'
-            + card.format(tone="#C9C4B8", ic="S", title="Staff can use", sub="Their own login, day-to-day work",
+            + card.format(tone="#35D6ED", ic="S", title="Staff can use", sub="Their own login, day-to-day work",
                           rows=rows(STAFF_CAN))
             + card.format(tone="#B7F34A", ic="O", title="Only you, the owner", sub="Money, team and settings",
                           rows=rows(OWNER_ONLY_LIST))
