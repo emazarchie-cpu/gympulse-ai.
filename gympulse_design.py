@@ -741,7 +741,7 @@ html body .stApp.stApp [data-testid="stMarkdownContainer"] a:not(.lx-btn) { colo
 # Signed-in app only (never the public website): removes the patterns that make an interface read
 # as AI-generated (see docs/DESIGN.md). Layout, pages and names stay exactly the same.
 APP_CSS = """
-@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600;700&display=swap');
 :root { --gp-grad: #B7F34A; --gp-display: 'Bricolage Grotesque', 'Inter', sans-serif; }
 
 /* type: a characterful display face for headings and numbers, a calm sans for everything else */
@@ -777,10 +777,25 @@ html body .stApp.stApp .cc-hero.cc-hero-calm { background: transparent !importan
     box-shadow: none !important; padding: 8px 0 18px !important; border-radius: 0 !important; overflow: visible; }
 html body .stApp.stApp .cc-hero.cc-hero-calm::before, html body .stApp.stApp .cc-hero.cc-hero-calm::after { display: none !important; }
 html body .stApp.stApp .cc-hero-calm .cc-eyebrow { color: var(--gp-muted) !important; font-size: 15px !important; font-weight: 500 !important; }
-html body .stApp.stApp .cc-hero-calm .cc-hello { font-family: 'Instrument Serif', Georgia, serif !important; font-weight: 400 !important;
-    font-size: clamp(38px, 4.6vw, 56px) !important; line-height: 1.02 !important; letter-spacing: -0.01em !important;
+html body .stApp.stApp .cc-hero-calm .cc-hello { font-family: 'Instrument Sans', 'Inter', sans-serif !important; font-weight: 500 !important;
+    font-size: clamp(38px, 4.6vw, 56px) !important; line-height: 1.02 !important; letter-spacing: -0.035em !important;
     margin: 8px 0 10px !important; }
 html body .stApp.stApp .cc-hero-calm .cc-sub { color: var(--gp-muted) !important; font-size: 16px !important; }
+/* first-run setup steps: four ruled columns, real step numbers */
+html body .stApp.stApp .cc-setup { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+    border-top: 1px solid rgba(255,255,255,0.08); margin: 6px 0 18px; }
+html body .stApp.stApp .cc-setup > div { padding: 18px 20px 6px 0; }
+html body .stApp.stApp .cc-setup > div + div { padding-left: 20px; border-left: 1px solid rgba(255,255,255,0.08); }
+html body .stApp.stApp .cc-setup span { display: block; color: #B7F34A; font-size: 28px; font-weight: 500;
+    letter-spacing: -0.03em; margin-bottom: 10px; }
+html body .stApp.stApp .cc-setup b { display: block; font-size: 17px; font-weight: 600; margin-bottom: 4px; }
+html body .stApp.stApp .cc-setup p { color: var(--gp-muted); font-size: 15px; line-height: 1.5; margin: 0; }
+@media (max-width: 760px) {
+  html body .stApp.stApp .cc-setup { grid-template-columns: 1fr; }
+  html body .stApp.stApp .cc-setup > div, html body .stApp.stApp .cc-setup > div + div { padding: 16px 0 6px;
+      border-left: 0; border-top: 1px solid rgba(255,255,255,0.08); }
+  html body .stApp.stApp .cc-setup > div:first-child { border-top: 0; }
+}
 /* Dashboard numbers: one ruled row instead of four boxes */
 html body .stApp.stApp .cc-kpis { gap: 0 !important; border-top: 1px dashed rgba(255,255,255,0.16);
     border-bottom: 1px dashed rgba(255,255,255,0.16); }
@@ -794,8 +809,8 @@ html body .stApp.stApp .cc-kpi::before, html body .stApp.stApp .cc-kpi::after { 
 }
 /* Risk Radar: serif page title and a ruled number row, like the Dashboard */
 html body .stApp.stApp:has(.st-key-card_priority) .pg-title, html body .stApp.stApp:has([class*="st-key-card_m_prio_"]) .pg-title {
-    font-family: 'Instrument Serif', Georgia, serif !important; font-weight: 400 !important;
-    font-size: clamp(38px, 4.6vw, 56px) !important; line-height: 1.02 !important; letter-spacing: -0.01em !important; }
+    font-family: 'Instrument Sans', 'Inter', sans-serif !important; font-weight: 500 !important;
+    font-size: clamp(38px, 4.6vw, 56px) !important; line-height: 1.02 !important; letter-spacing: -0.035em !important; }
 html body .stApp.stApp:has(.st-key-card_priority) .kpi, html body .stApp.stApp:has([class*="st-key-card_m_prio_"]) .kpi {
     background: transparent !important; border: 0 !important; border-top: 1px dashed rgba(255,255,255,0.16) !important;
     border-radius: 0 !important; box-shadow: none !important; padding-left: 0 !important; }
@@ -803,8 +818,8 @@ html body .stApp.stApp:has(.st-key-card_priority) .kpi::before { display: none !
 
 /* ---- stage 3: the same calm look on every workspace (style only; layout, pages and buttons unchanged) ---- */
 /* page titles in the serif, quiet eyebrow and date */
-html body .stApp.stApp .pg-title { font-family: 'Instrument Serif', Georgia, serif !important; font-weight: 400 !important;
-    font-size: clamp(36px, 4.4vw, 54px) !important; line-height: 1.04 !important; letter-spacing: -0.01em !important; }
+html body .stApp.stApp .pg-title { font-family: 'Instrument Sans', 'Inter', sans-serif !important; font-weight: 500 !important;
+    font-size: clamp(36px, 4.4vw, 54px) !important; line-height: 1.04 !important; letter-spacing: -0.035em !important; }
 html body .stApp.stApp .pg-eyebrow { color: var(--gp-muted) !important; font-size: 14px !important; font-weight: 500 !important; }
 html body .stApp.stApp .pg-date { color: var(--gp-dim) !important; }
 /* number tiles become one ruled row */
@@ -822,10 +837,10 @@ html body .stApp.stApp .kb-head { background: transparent !important; border-top
     border-bottom: 1px solid rgba(255,255,255,0.08) !important; padding: 8px 0 !important; }
 html body .stApp.stApp .kb-head b { background: rgba(255,255,255,0.08) !important; color: var(--gp-text) !important; }
 /* secondary buttons and menus are quiet outlines, never bright white blocks */
-html body .stApp.stApp :is([data-testid="stPopover"] button, [data-testid="stPopoverButton"], button[kind="secondary"]) {
+html body .stApp.stApp :is([data-testid="stPopover"] button, [data-testid="stPopoverButton"], button[kind="secondary"]):not(.st-key-top_nav *) {
     background: transparent !important; color: var(--gp-text) !important; border: 1px solid rgba(255,255,255,0.18) !important;
     box-shadow: none !important; background-image: none !important; }
-html body .stApp.stApp :is([data-testid="stPopover"] button, button[kind="secondary"]):hover { border-color: rgba(255,255,255,0.34) !important; }
+html body .stApp.stApp :is([data-testid="stPopover"] button, button[kind="secondary"]):not(.st-key-top_nav *):hover { border-color: rgba(255,255,255,0.34) !important; }
 html body .stApp.stApp :is([data-testid="stPopover"] button, [data-testid="stPopoverButton"]) p { color: var(--gp-text) !important; }
 html body .stApp.stApp :is(button[kind="primary"], button[kind="primaryFormSubmit"]) { background: #B7F34A !important;
     background-image: none !important; color: #0A0F1E !important; border: 0 !important; box-shadow: none !important; }
@@ -1386,18 +1401,18 @@ def apply_light():
 # =====================================================================================================
 # Landing page v3 (approved mockup, 20 Nov 2026): calm, page-like, one idea per section.
 # Signature: the visit strip, 30 dots for 30 days, lime when the member came, hollow when they didn't.
-# Navy and lime stay; Instrument Serif for big titles, Instrument Sans for everything else.
+# Navy and lime stay; headlines in Instrument Sans Medium with tight tracking, the same face for everything else.
 # LANDING3_CSS is added on the landing page only (app.py), so the signed-in app is untouched.
 # =====================================================================================================
 LANDING3_CSS = """
-@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Instrument+Sans:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap');
 html body .stApp.stApp { background: #0A0F1E !important; }
 html body .stApp.stApp :is(p, li, label, button, input, a, span, div[data-testid="stMarkdownContainer"]) {
     font-family: 'Instrument Sans', 'Inter', sans-serif; }
 html body .stApp.stApp [data-testid="stIconMaterial"] { font-family: 'Material Symbols Rounded' !important; }
 .l3 { --l3-text:#F4F7FB; --l3-muted:#93A1B8; --l3-dim:#66748C; --l3-line:rgba(255,255,255,.08); --l3-lime:#B7F34A;
       --l3-red:#FF8A80; --l3-amber:#FFC96B; color: var(--l3-text); max-width: 1120px; margin: 0 auto; }
-.l3-serif, html body .stApp.stApp .l3-serif { font-family: 'Instrument Serif', Georgia, serif !important; font-weight: 400 !important;
+.l3-serif, html body .stApp.stApp .l3-serif { font-family: 'Instrument Sans', 'Inter', sans-serif !important; font-weight: 500 !important;
       letter-spacing: -0.01em; }
 .l3-nav { display: flex; justify-content: space-between; align-items: center; padding: 14px 0 6px; gap: 16px; }
 .l3-nav img { height: 34px; width: auto; }
@@ -1407,8 +1422,8 @@ html body .stApp.stApp [data-testid="stMarkdownContainer"] .l3-links a { color: 
 html body .stApp.stApp [data-testid="stMarkdownContainer"] .l3-links a:hover { color: var(--l3-text) !important; }
 .l3-hero { padding: 64px 0 24px; max-width: 760px; }
 .l3-k { color: var(--l3-muted); font-size: 15px; margin: 0 0 18px; }
-.l3-h1 { font-size: clamp(48px, 7.4vw, 92px); line-height: .98; margin: 0 0 30px; color: var(--l3-text); }
-.l3-h1 em { font-style: italic; color: var(--l3-muted); }
+.l3-h1 { font-size: clamp(44px, 6.8vw, 84px); line-height: 1.0; margin: 0 0 30px; color: var(--l3-text); }
+.l3-h1 em { font-style: normal; color: var(--l3-muted); }
 .l3-lead { color: var(--l3-muted); font-size: clamp(17px, 1.6vw, 20px); line-height: 1.55; max-width: 34ch; margin: 0 0 30px; }
 .l3-cta { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
 html body .stApp.stApp [data-testid="stMarkdownContainer"] a.l3-btn { display: inline-block; background: var(--l3-lime);
@@ -1458,8 +1473,8 @@ html body .stApp.stApp [data-testid="stMarkdownContainer"] .l3-foot a { color: v
 /* the older landing blocks that stay (calculator, sign-in, pricing): same calm voice */
 html body .stApp.stApp :is(.lx-kicker) { text-transform: none !important; letter-spacing: 0 !important; color: #B7F34A !important;
       font-size: 15px !important; font-weight: 500 !important; text-align: left !important; }
-html body .stApp.stApp :is(.lx-h2) { font-family: 'Instrument Serif', Georgia, serif !important; font-weight: 400 !important;
-      font-size: clamp(38px, 5vw, 60px) !important; line-height: 1.02 !important; letter-spacing: -0.01em !important;
+html body .stApp.stApp :is(.lx-h2) { font-family: 'Instrument Sans', 'Inter', sans-serif !important; font-weight: 500 !important;
+      font-size: clamp(38px, 5vw, 60px) !important; line-height: 1.02 !important; letter-spacing: -0.035em !important;
       text-align: left !important; max-width: 18ch; margin-left: 0 !important; }
 html body .stApp.stApp :is(.lx-sub) { text-align: left !important; margin-left: 0 !important; font-size: 18px !important; }
 html body .stApp.stApp :is(.lx-sec, .lx-auth-head) { text-align: left !important; padding-top: 88px !important; }

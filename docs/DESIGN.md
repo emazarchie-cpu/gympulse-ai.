@@ -18,7 +18,8 @@ new screens should follow them too instead of adding their own styling.
 
 ## The calm look (approved 20 Nov 2026)
 - Page-like, not boxy: left-aligned, lots of space, one idea per section, thin rules instead of nested boxes.
-- Big titles in **Instrument Serif** (landing headlines, page titles, the Dashboard headline).
+- Big titles in **Instrument Sans Medium (500) with tight tracking (-0.035em)**: landing headlines, page titles, the
+  Dashboard headline. No serif (tried and rejected on 20 Nov 2026).
 - Numbers sit in one ruled row with dashed dividers, not in coloured boxes.
 - The **visit strip** (`gw.visit_strip_html`): 30 dots for 30 days, lime when the member checked in. Shown only for
   members with check-in data, never for typed-in attendance.
