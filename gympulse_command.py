@@ -328,7 +328,7 @@ def render_command_centre(supabase, gym_id, assess_fn, greeting, user_name, busi
            + ("" if _staff else _kpi("Revenue retained", kept_value, kept_hint, "#B7F34A", kept_tag))
            + _kpi("Re-engaged", str(res["reengaged_n"]),
                   f"Checked in again after a play · save rate {rate}",
-                  "#35D6ED", '<span class="gp-tag ok">Check-ins</span>')
+                  "#C9C4B8", '<span class="gp-tag ok">Check-ins</span>')
            + _kpi("Follow-ups", str(res["todo"] + res["doing"]),
                   f"{res['overdue']} overdue · {res['followup_due']} follow-ups due",
                   "#FFC44D" if res["overdue"] else "#9AA8BD")
