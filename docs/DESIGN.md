@@ -16,6 +16,14 @@ new screens should follow them too instead of adding their own styling.
   secondary text is `--gp-muted`. Every text colour must reach 4.5:1 contrast on its surface.
 - Surfaces rise by getting **lighter** (`--gp-s1` → `--gp-s2` → `--gp-s3`), not by drop shadows.
 
+## The calm look (approved 20 Nov 2026)
+- Page-like, not boxy: left-aligned, lots of space, one idea per section, thin rules instead of nested boxes.
+- Big titles in **Instrument Serif** (landing headlines, page titles, the Dashboard headline).
+- Numbers sit in one ruled row with dashed dividers, not in coloured boxes.
+- The **visit strip** (`gw.visit_strip_html`): 30 dots for 30 days, lime when the member checked in. Shown only for
+  members with check-in data, never for typed-in attendance.
+- Lime only for the main action; secondary buttons are quiet outlines; cyan has no job.
+
 ## Type
 - Two typefaces (signed-in app): **Bricolage Grotesque** for page titles, section headings and big numbers,
   **Instrument Sans** for everything else. Set in `APP_CSS` (gympulse_design.py), loaded only after sign-in.
