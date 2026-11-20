@@ -741,13 +741,13 @@ html body .stApp.stApp [data-testid="stMarkdownContainer"] a:not(.lx-btn) { colo
 # Signed-in app only (never the public website): removes the patterns that make an interface read
 # as AI-generated (see docs/DESIGN.md). Layout, pages and names stay exactly the same.
 APP_CSS = """
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
-:root { --gp-grad: #B7F34A; --gp-display: 'IBM Plex Sans', 'Inter', sans-serif; }
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600;700&display=swap');
+:root { --gp-grad: #B7F34A; --gp-display: 'Bricolage Grotesque', 'Inter', sans-serif; }
 
 /* type: a characterful display face for headings and numbers, a calm sans for everything else */
 html body .stApp.stApp :is(p, li, label, button, input, textarea, td, th, a, small, div[data-testid="stMarkdownContainer"],
     div[data-testid="stCaptionContainer"], [data-baseweb="select"] div, [role="tab"] p) {
-    font-family: 'IBM Plex Sans', 'Source Sans Pro', sans-serif; }
+    font-family: 'Instrument Sans', 'Source Sans Pro', sans-serif; }
 html body .stApp.stApp :is(h1, h2, h3, .pg-title, .cc-hello, .kpi-value, .cc-kpi-value, .archie-name, .section-label,
     .cc-step-v, .bl-name, .profile-name) { font-family: var(--gp-display) !important; }
 
@@ -766,122 +766,16 @@ html body .stApp.stApp :is(.kpi, .cc-kpi, .panel, .pillar, [class*="st-key-card_
     transform: none !important; }
 """
 
-# "Register" look (chosen 20 Nov 2026): the paper register every gym keeps. Warm paper-white ink on
-# near-black, ruled lines instead of boxes, typewriter numbers, lime only for "do this", red for risk,
-# amber for waiting. Applied last, everywhere (landing, app, member pages), so it wins over older layers.
-REGISTER_CSS = """
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
-:root, html body .stApp.stApp {
-    --gp-bg: #0E0F12; --gp-s1: #14161B; --gp-s2: #1A1D23; --gp-s3: #20242B;
-    --gp-line: #262A33; --gp-line-2: #343944;
-    --gp-text: #F2EFE6; --gp-muted: #A3A198; --gp-dim: #74726B;
-    --gp-lime: #B7F34A; --gp-cyan: #C9C4B8; --gp-red: #FF7A6B; --gp-amber: #E8C25A;
-    --gp-grad: #B7F34A; --gp-r: 4px;
-    --gp-display: 'IBM Plex Sans', system-ui, sans-serif; --gp-mono: 'IBM Plex Mono', ui-monospace, monospace;
-    --line: #262A33; --line-strong: #4A4F5A; --text: #F2EFE6; --text-muted: #A3A198; --accent: #B7F34A;
-}
-/* paper: one flat ground, no glow */
-html body .stApp.stApp, html body .stApp.stApp [data-testid="stAppViewContainer"],
-html body .stApp.stApp [data-testid="stMain"] { background: var(--gp-bg) !important; }
-html body .stApp.stApp { color: var(--gp-text); }
-
-/* type: Plex Sans for words, Plex Mono for numbers, dates and money */
-html body .stApp.stApp :is(p, li, label, button, input, textarea, td, th, a, small, span, div[data-testid="stMarkdownContainer"],
-    div[data-testid="stCaptionContainer"], [data-baseweb="select"] div, [role="tab"] p) {
-    font-family: 'IBM Plex Sans', system-ui, sans-serif; }
-html body .stApp.stApp [data-testid="stIconMaterial"] { font-family: 'Material Symbols Rounded' !important; }
-html body .stApp.stApp :is(h1, h2, h3, .pg-title, .cc-hello, .archie-name, .section-label, .bl-name, .profile-name,
-    .lx-h1, .lx-h2, .lx-tier-name) { font-family: 'IBM Plex Sans', system-ui, sans-serif !important;
-    font-weight: 600 !important; letter-spacing: -0.01em !important; }
-html body .stApp.stApp :is(.kpi-value, .cc-kpi-value, .cc-step-v, .gm-sum-v, .money, .lx-num, .lx-count b, .lx-tier-prices b,
-    .pg-date, .num, [data-testid="stMetricValue"]) {
-    font-family: 'IBM Plex Mono', ui-monospace, monospace !important; font-variant-numeric: tabular-nums; }
-html body .stApp.stApp :is(.kpi-value, .cc-kpi-value) { font-weight: 500 !important; letter-spacing: -0.02em !important; }
-
-/* labels: sentence case, ink grey, never tracked capitals */
-html body .stApp.stApp :is(.lx-kicker, .pg-eyebrow, .cc-eyebrow, .kpi-label, .cc-kpi-label, .lx-tier-who, .lx-show-sub,
-    .gp-tag, .chip, thead th, .th) { text-transform: none !important; letter-spacing: 0 !important; }
-html body .stApp.stApp :is(.pg-eyebrow, .cc-eyebrow) { color: var(--gp-muted) !important; }
-html body .stApp.stApp .lx-kicker { color: var(--gp-muted) !important; font-size: 15px !important; font-weight: 500 !important; }
-
-/* ruled register: boxes become rows on a page; hairlines, 4px corners, no shadows, no gradients */
-html body .stApp.stApp :is(.kpi, .cc-kpi, .panel, .pillar, .lx-card, .lx-tier, .lx-feat, .lx-f, .lx-app, .lx-show,
-    .lx-story, .lx-archie, .lx-strip, .lx-loop > div, .cc-hero, .cc-brief, .cc-play, .cc-step, .gp-tbl-wrap, .lx-video,
-    .lx-compare, [class*="st-key-card_"], [class*="st-key-mm_tile_"], [data-testid="stExpander"] details,
-    [data-testid="stVerticalBlockBorderWrapper"]) {
-    border-radius: 4px !important; box-shadow: none !important; background-image: none !important; }
-html body .stApp.stApp :is(.kpi, .cc-kpi, .panel, .pillar, .lx-card, .lx-tier, .lx-feat, .lx-f, .lx-story, .cc-play,
-    .cc-step, [class*="st-key-card_"], [class*="st-key-mm_tile_"]) {
-    background-color: var(--gp-s1) !important; border-color: var(--gp-line) !important; }
-html body .stApp.stApp :is(.kpi, .cc-kpi)::before, html body .stApp.stApp :is(.kpi, .cc-kpi)::after { display: none !important; }
-html body .stApp.stApp :is(.lx-grad, .lx-count b) { background: none !important; -webkit-text-fill-color: currentColor !important;
-    color: var(--gp-lime) !important; }
-html body .stApp.stApp :is(.cc-step-bar span, .cc-play-bar span, .pbar span) { background: var(--gp-lime) !important; }
-html body .stApp.stApp :is(.lx-video) { box-shadow: none !important; }
-
-/* tables read like a register: ruled rows, ink headers */
-html body .stApp.stApp :is(table, .gp-table, .gp-tbl) { border-collapse: collapse; font-variant-numeric: tabular-nums; }
-html body .stApp.stApp :is(thead th, .th) { color: var(--gp-muted) !important; border-bottom: 1px solid var(--gp-line-2) !important;
-    background: transparent !important; }
-html body .stApp.stApp tbody td { border-bottom: 1px solid var(--gp-line) !important; }
-
-/* buttons: lime means "do this"; everything else is a quiet outline, never a white block */
-html body .stApp.stApp :is(button[kind="primary"], button[kind="primaryFormSubmit"], .lx-btn-primary) {
-    background: var(--gp-lime) !important; color: #0E0F12 !important; border: 1px solid var(--gp-lime) !important;
-    border-radius: 4px !important; box-shadow: none !important; background-image: none !important; }
-html body .stApp.stApp :is(button[kind="secondary"], button[kind="secondaryFormSubmit"], button[kind="tertiary"], .lx-btn:not(.lx-btn-primary)) {
-    background: transparent !important; color: var(--gp-text) !important; border: 1px solid var(--gp-line-2) !important;
-    border-radius: 4px !important; box-shadow: none !important; background-image: none !important; }
-html body .stApp.stApp :is(button[kind="secondary"], .lx-btn:not(.lx-btn-primary)):hover { border-color: #6A6F7A !important; }
-html body .stApp.stApp :is(button[kind="secondary"], button[kind="primary"]) p { font-weight: 600 !important; }
-
-/* inputs: ruled fields */
-html body .stApp.stApp :is([data-baseweb="input"], [data-baseweb="input"] > div, [data-baseweb="input"] input,
-    [data-baseweb="select"] > div, [data-baseweb="textarea"], textarea) {
-    background: var(--gp-s1) !important; border-color: var(--gp-line-2) !important; border-radius: 4px !important; }
-
-/* the remaining small labels: sentence case */
-html body .stApp.stApp :is(.lx-mk span, .lx-num, .lx-pill i, .gp-tag, .kb-head, .lx-tier-rec, .cc-step-n) {
-    text-transform: none !important; letter-spacing: 0 !important; }
-
-/* landing: the same paper, no glow, no rounded blobs */
-html body .stApp.stApp .lx-hero::before { background: linear-gradient(90deg, rgba(14,15,18,0.97) 30%, rgba(14,15,18,0.82) 65%,
-    rgba(14,15,18,0.94)), url('/app/static/landing/hero.jpg') center / cover no-repeat !important; border-radius: 4px !important; }
-html body .stApp.stApp .lx-app { background: var(--gp-s1) !important; }
-html body .stApp.stApp .lx-app::before, html body .stApp.stApp .lx-app::after { display: none !important; }
-html body .stApp.stApp :is(.lx-count > div, .lx-mosaic .ph, .lx-show-ph, .lx-bubble, .lx-mk, .lx-row, .lx-ic, .lx-play, .lx-pill,
-    .lx-q, .lx-msg, .lx-video, .lx-auth-head) { border-radius: 4px !important; box-shadow: none !important; }
-html body .stApp.stApp :is(.lx-count > div) { background: var(--gp-s1) !important; background-image: none !important; }
-html body .stApp.stApp :is(.lx-note, .lx-tier-name, .lx-num) { text-transform: none !important; letter-spacing: 0 !important; }
-html body .stApp.stApp [data-testid="stMarkdownContainer"] :is(.lx-nav-links a, .lx-foot a):not(.lx-btn) {
-    text-decoration: none !important; color: var(--gp-text) !important; }
-html body .stApp.stApp [data-testid="stMarkdownContainer"] .lx-nav-links a:not(.lx-btn):hover { text-decoration: underline !important; }
-
-html body .stApp.stApp .lx-mk em { white-space: nowrap; }
-
-/* chips: small stamps */
-html body .stApp.stApp :is(.chip, .gp-pill, .gp-tag, .lx-pill) { border-radius: 3px !important; }
-html body .stApp.stApp .gp-pill-cyan { color: var(--gp-cyan) !important; background: rgba(201,196,184,0.12) !important; }
-
-/* tabs and segmented controls: an underline, like a tab in a ledger */
-html body .stApp.stApp [data-baseweb="tab-list"] { border-bottom: 1px solid var(--gp-line) !important; }
-html body .stApp.stApp [data-baseweb="tab-highlight"] { background: var(--gp-lime) !important; }
-
-/* section headings sit on a ruled line */
-html body .stApp.stApp .section-label { border-bottom: 1px solid var(--gp-line); padding-bottom: 8px; }
-html body .stApp.stApp .section-label::before { display: none !important; }
-"""
-
 
 def apply_app():
     """After sign-in only: the app's final style layer."""
-    st.markdown("<style>" + APP_CSS + REGISTER_CSS + "</style>", unsafe_allow_html=True)
+    st.markdown("<style>" + APP_CSS + "</style>", unsafe_allow_html=True)
 
 
 def apply():
     from gympulse_reports import DOWNLOAD_CSS
     # the empty marker tells the loading screen these styles are on the page (hide_streamlit_chrome)
-    st.markdown("<style>" + CSS + DOWNLOAD_CSS + POLISH_CSS + REGISTER_CSS + "</style><span class=\"gp-css-ready\"></span>",
+    st.markdown("<style>" + CSS + DOWNLOAD_CSS + POLISH_CSS + "</style><span class=\"gp-css-ready\"></span>",
                 unsafe_allow_html=True)
 
 
@@ -897,7 +791,7 @@ def landing_top(lockup_uri, icon):
     return f"""
     <div class="lx-nav">
       <img src="{lockup_uri}" alt="GymPulse AI">
-      <div class="lx-nav-links"><a href="#demo">How it works</a><a href="#connect">Works with your software</a><a href="#calculator">Calculator</a><a href="#pricing">Pricing</a><a href="#get-started">Sign in</a></div>
+      <div class="lx-nav-links"><a href="#demo">How it works</a><a href="#connect">Works with your software</a><a href="#calculator">Calculator</a><a href="#pricing">Pricing</a></div>
     </div>
     <div class="lx-hero">
       <div>
@@ -918,25 +812,25 @@ def landing_top(lockup_uri, icon):
           <span class="gp-tag live">Today's priorities</span></div>
         <div class="lx-mini-kpis">
           <div class="lx-mk"><span>Revenue at risk</span><b>₦186k</b></div>
-          <div class="lx-mk"><span>Kept, 30 days</span><b>₦75k</b><em>verified</em></div>
+          <div class="lx-mk"><span>Retained · 30d</span><b>₦75k</b><em>verified</em></div>
           <div class="lx-mk"><span>Follow-ups due</span><b>4</b></div>
         </div>
         <div class="lx-row hot"><div class="lx-av" style="background:#FF8A5B">AO</div>
-          <div><div class="lx-row-n">Member A, high risk</div>
-          <div class="lx-row-s">Visits down from 12 to 3 a month. Renews in 10 days.</div></div>
+          <div><div class="lx-row-n">Member A · High risk</div>
+          <div class="lx-row-s">12 → 3 visits a month · 14 days away · renews in 10 days</div></div>
           <div class="lx-play">Trainer check-in</div></div>
         <div class="lx-row"><div class="lx-av" style="background:#FFC44D">KB</div>
-          <div><div class="lx-row-n">Member B, medium risk</div>
+          <div><div class="lx-row-n">Member B · Medium risk</div>
           <div class="lx-row-s">Usually trains every 3 days, now 9 away</div></div>
           <div class="lx-play">Class invite</div></div>
         <div class="lx-row"><div class="lx-av" style="background:#B7F34A">CE</div>
-          <div><div class="lx-row-n">Member C, payment overdue</div>
-          <div class="lx-row-s">Still visiting, but the renewal lapsed 3 days ago</div></div>
+          <div><div class="lx-row-n">Member C · Payment overdue</div>
+          <div class="lx-row-s">Still visiting · renewal lapsed 3 days ago</div></div>
           <div class="lx-play">Renewal reminder</div></div>
         <div class="lx-bubble"><div class="cc-brief-orb"></div>
           <div><b>Archie:</b> 7 of your 18 fading members renew in the next 30 days.
           Start with them: that is ₦175k of monthly fees.</div></div>
-        <div class="lx-note">Illustrative example, not real member data</div>
+        <div class="lx-note">Illustrative example · not real member data</div>
       </div>
     </div>
     <div class="lx-demo" id="demo">
@@ -954,10 +848,10 @@ def landing_top(lockup_uri, icon):
       </div>
     </div>
     <div class="lx-strip">
-      <div><b>From check-ins</b><span>Attendance feeds the risk score automatically</span></div>
-      <div><b>With the reason</b><span>Every flag explains itself</span></div>
+      <div><b>Check-in → Radar</b><span>Attendance feeds risk automatically</span></div>
+      <div><b>Who · Why · Next</b><span>Every flag explains itself</span></div>
       <div><b>One board</b><span>Plays, follow-ups and outcomes together</span></div>
-      <div><b>Only real money</b><span>Only confirmed renewals count as saved</span></div>
+      <div><b>Verified ₦</b><span>Only confirmed renewals count as saved</span></div>
     </div>
     """
 
@@ -965,7 +859,7 @@ def landing_top(lockup_uri, icon):
 SHOWCASE = [
     ("retain", "Keep members", "Know who's about to leave, and do something about it today",
      "Every member is scored every day from their real check-ins, plan and renewal date. You see who is drifting, "
-     "why, and the one thing to do next.", "<b>88%</b> risk: visits down from 12 to 3 a month", [
+     "why, and the one thing to do next.", "<b>88%</b> risk · visits down 12 → 3 a month", [
         ("pulse", "Risk Radar", "Every member scored daily, with the reason behind each flag."),
         ("target", "Action Centre", "One board of plays: call, WhatsApp, renewal offer, trainer intro."),
         ("chat", "Follow-up calls", "No reply to a message? A call with a script is set up for your staff."),
@@ -997,7 +891,7 @@ SHOWCASE = [
     ("trainer", "Keep members coming back", "Give members reasons to stay, and trainers a reason to check in",
      "Members who train with a plan, see their progress and know the gym is quiet stay longer. Members get their "
      "own app with no download, and trainers see which of their clients are going quiet.",
-     "<b>Today</b>: 4 sessions, leg day at 07:00", [
+     "<b>Today</b> · 4 sessions · 07:00 leg day", [
         ("pulse", "Member app", "Renew, check-in code, visits, rewards, classes and messages."),
         ("target", "Train tab", "Log sets, personal records, progress charts and today's workout."),
         ("gauge", "Gym now", "How busy the gym is right now, and the quietest times today."),
@@ -1051,15 +945,15 @@ def CONNECT_HTML(icon):
       <div class="lx-sub">GymPulse AI isn't another system to run your gym. It's the retention layer on top:
         it needs your members, their check-ins and their renewals, and there are three ways in.</div>
       <div class="lx-principles">
-        <div class="lx-card"><div class="lx-num">Use GymMaster?</div><div class="lx-ic">{icon('pulse')}</div>
+        <div class="lx-card"><div class="lx-num">USE GYMMASTER?</div><div class="lx-ic">{icon('pulse')}</div>
           <h4>Connected, live</h4><p>Paste one GymPulse AI link into GymMaster and every check-in comes across as
           it happens. Your doors, billing and front desk stay exactly as they are.</p>
           <div class="lx-out">Set up in about 5 minutes</div></div>
-        <div class="lx-card"><div class="lx-num">Other software or Excel?</div><div class="lx-ic">{icon('upload')}</div>
+        <div class="lx-card"><div class="lx-num">OTHER SOFTWARE OR EXCEL?</div><div class="lx-ic">{icon('upload')}</div>
           <h4>Upload a spreadsheet</h4><p>Export your members and visits from any software and upload them. Do it
           again each week: members are updated, never added twice.</p>
           <div class="lx-out">Any CSV or Excel file</div></div>
-        <div class="lx-card"><div class="lx-num">No software yet?</div><div class="lx-ic">{icon('check')}</div>
+        <div class="lx-card"><div class="lx-num">NO SOFTWARE YET?</div><div class="lx-ic">{icon('check')}</div>
           <h4>Use our check-in</h4><p>Members scan a QR code at the front desk, or staff tap them in on a phone.
           No scanners or new hardware.</p>
           <div class="lx-out">Ready the day you sign up</div></div>
@@ -1076,18 +970,18 @@ def landing_sections(icon, bot_svg):
       <div class="lx-sub">Other systems record what members do. GymPulse AI explains what that
         behaviour means, recommends what to do next, and measures whether it worked.</div>
       <div class="lx-loop">
-        <div class="lx-card"><div class="lx-num">Step 1</div><div class="lx-ic">{icon('users')}</div>
+        <div class="lx-card"><div class="lx-num">01 · DATA</div><div class="lx-ic">{icon('users')}</div>
           <h4>Connect your data</h4><p>Members, renewal dates and every check-in, from GymMaster, a spreadsheet or our own check-in.</p>
-          <div class="lx-out">GymMaster, import or check-in</div></div>
-        <div class="lx-card"><div class="lx-num">Step 2</div><div class="lx-ic">{icon('pulse')}</div>
+          <div class="lx-out">GymMaster · Import · Check-in</div></div>
+        <div class="lx-card"><div class="lx-num">02 · DETECT</div><div class="lx-ic">{icon('pulse')}</div>
           <h4>Spot the drift early</h4><p>Each member is compared with their own habits, so a daily lifter who goes quiet is flagged fast.</p>
-          <div class="lx-out">Risk Radar and drop-off alerts</div></div>
-        <div class="lx-card"><div class="lx-num">Step 3</div><div class="lx-ic">{icon('target')}</div>
+          <div class="lx-out">Risk Radar · Drop-off alerts</div></div>
+        <div class="lx-card"><div class="lx-num">03 · ACT</div><div class="lx-ic">{icon('target')}</div>
           <h4>Run the right play</h4><p>Trainer check-ins, class invites, renewal offers. A ready message in your voice, sent when you approve it.</p>
-          <div class="lx-out">Action Centre and Follow-ups</div></div>
-        <div class="lx-card"><div class="lx-num">Step 4</div><div class="lx-ic">{icon('gauge')}</div>
+          <div class="lx-out">Action Centre · Follow-ups</div></div>
+        <div class="lx-card"><div class="lx-num">04 · MEASURE</div><div class="lx-ic">{icon('gauge')}</div>
           <h4>Prove the revenue</h4><p>Track renewals, recovered payments and which plays work, kept separate from estimates.</p>
-          <div class="lx-out">Payments and Business insights</div></div>
+          <div class="lx-out">Payments · Business Insights</div></div>
       </div>
     </div>
 
@@ -1148,7 +1042,7 @@ def landing_sections(icon, bot_svg):
           <div class="lx-msg ai">You have <b>18 members with falling attendance</b>. <b>7 of them renew
             within 30 days</b>, worth ₦175,000 a month. Start with those seven: a personal renewal call
             from their trainer. Two follow-ups are also overdue.
-            <div class="lx-src">Based on check-ins from the last 60 days. Revenue is an estimate.</div></div>
+            <div class="lx-src">Based on check-ins from the last 60 days · revenue is an estimate</div></div>
         </div>
       </div>
     </div>
@@ -1167,7 +1061,7 @@ def landing_sections(icon, bot_svg):
           <div class="lx-out">Daily risk scores</div></div>
         <div class="lx-card"><div class="lx-num">WHAT KEEPS THEM</div><div class="lx-ic">{icon('chat')}</div>
           <h4>Personal contact</h4><p>Industry studies link regular, genuine check-ins from staff, a good start and group classes to more visits and fewer cancellations.</p>
-          <div class="lx-out">Action Centre and Follow-ups</div></div>
+          <div class="lx-out">Action Centre · Follow-ups</div></div>
         <div class="lx-card"><div class="lx-num">IN NIGERIA</div><div class="lx-ic">{icon('gauge')}</div>
           <h4>Every month counts</h4><p>Nigerians spent about ₦32.8 billion on gym subscriptions in 2025, and monthly plans are becoming the norm, so a member can leave at any renewal.</p>
           <div class="lx-out">Renewal watch</div></div>
@@ -1181,13 +1075,13 @@ def landing_sections(icon, bot_svg):
         point to the renewal. Risk scores come from a model that is still learning from Nigerian gyms, so we label
         them as estimates wherever they appear.</div>
       <div class="lx-loop">
-        <div class="lx-card"><div class="lx-num">Step 1</div><div class="lx-ic">{icon('pulse')}</div>
+        <div class="lx-card"><div class="lx-num">01 · FLAGGED</div><div class="lx-ic">{icon('pulse')}</div>
           <h4>The risk is recorded</h4><p>The day a member is flagged, their score, reason and monthly fee are saved.</p></div>
-        <div class="lx-card"><div class="lx-num">Step 2</div><div class="lx-ic">{icon('chat')}</div>
+        <div class="lx-card"><div class="lx-num">02 · CONTACTED</div><div class="lx-ic">{icon('chat')}</div>
           <h4>The action is logged</h4><p>Who reached out, how (call, WhatsApp, offer) and when.</p></div>
-        <div class="lx-card"><div class="lx-num">Step 3</div><div class="lx-ic">{icon('check')}</div>
+        <div class="lx-card"><div class="lx-num">03 · RENEWED</div><div class="lx-ic">{icon('check')}</div>
           <h4>Only a payment counts</h4><p>Money is counted as kept only when that member renews or pays after being contacted.</p></div>
-        <div class="lx-card"><div class="lx-num">Step 4</div><div class="lx-ic">{icon('gauge')}</div>
+        <div class="lx-card"><div class="lx-num">04 · CHECKED</div><div class="lx-ic">{icon('gauge')}</div>
           <h4>The model is marked</h4><p>Every month we check how many of the members who left were flagged in time.</p></div>
       </div>
       <div class="lx-plan-foot">Results from our first pilot gyms will be shared here, with their permission, once they

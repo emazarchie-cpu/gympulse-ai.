@@ -76,7 +76,7 @@ st.markdown(
         --surface: #151D30;
         --surface-light: #1B263B;
         --lime: #B7F34A;
-        --cyan: #C9C4B8;
+        --cyan: #35D6ED;
         --white: #F4F7FB;
         --muted: #9AA8BD;
         --border: rgba(255,255,255,0.09);
@@ -538,7 +538,7 @@ st.markdown(
         color: var(--white);
     }
     .lp-grad {
-        background: var(--lime);
+        background: linear-gradient(90deg, var(--lime), #35D6ED);
         -webkit-background-clip: text;
         background-clip: text;
         color: transparent;

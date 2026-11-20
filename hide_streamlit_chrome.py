@@ -20,14 +20,14 @@ import streamlit
 MARK = "gp-early-style"
 CSS = (
     '<style id="gp-early-style">'
-    "html,body,#root,.stApp{background:#0E0F12 !important;}"
+    "html,body,#root,.stApp{background:#0B1020 !important;}"
     '[data-testid="stToolbar"],[data-testid="stStatusWidget"],'
     '[data-testid="stMainMenu"],[data-testid="stHeader"],'
     '[data-testid="stDecoration"],[data-testid="stAppDeployButton"],'
     "header{display:none !important;}"
     # the framework's grey placeholder bars look broken: hidden, the GymPulse loading screen shows instead
     '[data-testid="stAppSkeleton"],[data-testid="stSkeleton"]{display:none !important;}'
-    "#gp-splash{position:fixed;inset:0;z-index:999999;background:#0E0F12;display:flex;align-items:center;"
+    "#gp-splash{position:fixed;inset:0;z-index:999999;background:#0B1020;display:flex;align-items:center;"
     "justify-content:center;transition:opacity .25s}"
     "#gp-splash img{width:56px;height:56px;border-radius:14px;animation:gp-beat 1.4s ease-in-out infinite}"
     "#gp-splash.plain img{display:none}"
@@ -37,7 +37,7 @@ CSS = (
     'html:not(.gp-ready) [data-testid="stMain"]{visibility:hidden}'
     "html.gp-ready #gp-splash{opacity:0;pointer-events:none;visibility:hidden}"
     "</style>"
-    '<meta name="theme-color" content="#0E0F12">'
+    '<meta name="theme-color" content="#0B1020">'
 )
 BRAND = "GymPulse AI"
 # Loading screen shown from the first moment until the app draws: the GymPulse mark on the dark page.
@@ -89,7 +89,7 @@ def apply(quiet=False):
         new = html
         import re as _re
         if CSS not in new:                                   # missing or an older version: put in the latest
-            new = _re.sub(r'<style id="gp-early-style">.*?</style><meta name="theme-color" content="#0E0F12">', "",
+            new = _re.sub(r'<style id="gp-early-style">.*?</style><meta name="theme-color" content="#0B1020">', "",
                           new, flags=_re.S)
             new = new.replace("</head>", CSS + "</head>", 1)
         if SPLASH not in new:                                # missing or an older version: put in the latest

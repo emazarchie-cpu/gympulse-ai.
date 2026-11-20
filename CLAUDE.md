@@ -34,9 +34,8 @@ This applies to all work: app screens, flyers, posters, videos, decks, social po
   identical rounded cards with soft shadows; rainbow accents; "A · B · C" strings; "→" on buttons;
   01/02/03 markers on things that aren't steps; one highlighted word in a headline; emojis as decoration;
   hover lifts and fade-in on every element; stock phrases ("Unlock", "Elevate", "Seamless", "Revolutionise").
-- **Do:** one accent colour with meaning, sentence case, the "Register" look (IBM Plex Sans for words, IBM Plex
-  Mono for numbers, dates and money; warm paper-white on near-black; ruled lines, small corners), real content and
-  real numbers, generous spacing, readable on a phone, one bold idea per piece.
+- **Do:** one accent colour with meaning, sentence case, two typefaces with character (Bricolage Grotesque +
+  Instrument Sans), real content and real numbers, generous spacing, readable on a phone, one bold idea per piece.
 - **Self-critique before sending:** render it, look at the screenshot, remove one thing, fix what reads as
   generic, and only then send it.
 
@@ -50,4 +49,4 @@ This applies to all work: app screens, flyers, posters, videos, decks, social po
 | Testing the app in a browser | `webapp-testing` |
 | Posters and print pieces | `canvas-design` |
 | Themes for decks and documents | `theme-factory` |
-| Motion, touch feedback, typography and accessibility details | `apple-design` (GymPulse brand rules above win: keep the Register look and IBM Plex fonts, dark only, no hover lifts) |
+| Motion, touch feedback, typography and accessibility details | `apple-design` (GymPulse brand rules above win: keep Bricolage Grotesque + Instrument Sans, dark only, no hover lifts) |
