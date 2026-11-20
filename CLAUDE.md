@@ -34,8 +34,8 @@ This applies to all work: app screens, flyers, posters, videos, decks, social po
   identical rounded cards with soft shadows; rainbow accents; "A · B · C" strings; "→" on buttons;
   01/02/03 markers on things that aren't steps; one highlighted word in a headline; emojis as decoration;
   hover lifts and fade-in on every element; stock phrases ("Unlock", "Elevate", "Seamless", "Revolutionise").
-- **Do:** one accent colour with meaning, sentence case, **Instrument Serif** for big titles with **Instrument Sans**
-  for everything else (Bricolage Grotesque only where it is already used), navy and lime, real content and real numbers,
+- **Do:** one accent colour with meaning, sentence case, headlines in **Instrument Sans Medium with tight tracking** (no serif) and
+  **Instrument Sans** for everything else (Bricolage Grotesque only where it is already used), navy and lime, real content and real numbers,
   generous spacing, readable on a phone, one bold idea per piece. GymPulse's signature is the **visit strip**: 30 dots,
   one per day, lime on days a member came (only for members with real check-ins).
 - **Self-critique before sending:** render it, look at the screenshot, remove one thing, fix what reads as

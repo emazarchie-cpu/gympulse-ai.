@@ -239,19 +239,19 @@ def render_command_centre(supabase, gym_id, assess_fn, greeting, user_name, busi
         if missing is not None and len(missing):
             st.info(f"{_plural(len(missing), 'member')} registered without a plan or fee. Add their "
                     "membership details on the Risk Radar (Data tools) and they'll be scored.")
-        gw._md(f"""<div class="cc-hero"><div class="cc-hero-top"><div>
-            <div class="cc-eyebrow">Retention command centre, {today:%A %d %B}</div>
-            <div class="cc-hello">{gw._esc(greeting)}, {gw._esc(user_name)}</div>
-            <div class="cc-sub">Let's set up <b>{gw._esc(business_name)}</b>. Three steps and GymPulse AI
-              starts telling you who needs you, and why.</div></div></div>{gd.PULSE_SVG}</div>""")
-        gw._md("""<div class="lx-loop">
-          <div class="lx-card"><div class="lx-num">STEP 1</div><h4>Add your members</h4>
+        gw._md(f"""<div class="cc-hero cc-hero-calm"><div class="cc-hero-top"><div>
+            <div class="cc-eyebrow">{gw._esc(greeting)}, {gw._esc(user_name)}. {today:%A %d %B}</div>
+            <div class="cc-hello">Let's set up {gw._esc(business_name)}.</div>
+            <div class="cc-sub">Three steps and GymPulse AI starts telling you who needs you, and why.</div>
+            </div></div></div>""")
+        gw._md("""<div class="cc-setup">
+          <div><span>1</span><b>Add your members</b>
             <p>Name, plan, fee and renewal date. One at a time or from a spreadsheet.</p></div>
-          <div class="lx-card"><div class="lx-num">STEP 2</div><h4>Check members in</h4>
+          <div><span>2</span><b>Check members in</b>
             <p>Use the front-desk check-in. Each visit feeds the Risk Radar automatically.</p></div>
-          <div class="lx-card"><div class="lx-num">STEP 3</div><h4>Run your first play</h4>
+          <div><span>3</span><b>Run your first play</b>
             <p>Your dashboard ranks who to contact today and drafts the message.</p></div>
-          <div class="lx-card"><div class="lx-num">THEN</div><h4>Watch the revenue</h4>
+          <div><span>Then</span><b>Watch the revenue</b>
             <p>Record outcomes and see the membership revenue your team kept.</p></div></div>""")
         a, b, _ = st.columns([1, 1, 2])
         a.button("Add members", key="cc_start_members", type="primary", icon=":material/group_add:",
