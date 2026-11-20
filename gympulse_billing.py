@@ -677,9 +677,13 @@ def landing_cards_html(ps, icon):
                + (f' · keep {_money(saved)}' if saved else "") + '</span></div>' if plan.get("yearly") else "")
             + "</div></div>")
     head = "".join(f"<th>{gw._esc(x['name'])}</th>" for x in ps)
+    # only the rows that differ between plans; every plan has every feature, so the rest is one line
+    differ = [(f, marks) for f, marks in compare_rows(ps) if len({str(m) for m in marks}) > 1]
     rows = "".join(f"<tr><td>{gw._esc(f)}</td>" + "".join(
         f"<td>{_cell(ok, icon('check', 16)) or '<i>–</i>'}</td>" for ok in marks) + "</tr>"
-        for f, marks in compare_rows(ps))
+        for f, marks in differ)
+    rows += ("<tr><td>Every feature: Risk Radar, Action Centre, follow-ups, payments, member app and more</td>"
+             + "".join("<td>Included</td>" for _ in ps) + "</tr>")
     return (f'<div class="lx-tiers" style="--n:{min(len(ps), 3)}">' + "".join(tiles) + "</div>"
             + f'<div class="lx-compare"><table><thead><tr><th>What you get</th>{head}</tr></thead>'
               f'<tbody>{rows}</tbody></table></div>')
