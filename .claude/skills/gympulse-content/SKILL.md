@@ -40,5 +40,6 @@ description: Voice, honesty and privacy rules for anything written or designed t
 
 ## Brand
 Every piece follows the "modern, human-designed, never AI slop" checklist in `CLAUDE.md`.
-Dark navy background, lime `#B7F34A` as the single accent, Bricolage Grotesque + Instrument Sans (fonts in
+The "Register" look: near-black `#0E0F12` background, warm paper-white `#F2EFE6` text, ruled lines and small corners,
+lime `#B7F34A` as the single accent, IBM Plex Sans for words and IBM Plex Mono for numbers (fonts in
 `.claude/skills/canvas-design/canvas-fonts`), logo files in the repository root and `static/`.

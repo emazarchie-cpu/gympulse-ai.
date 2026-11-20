@@ -18,7 +18,8 @@ description: Rules and procedure for any UI, styling or UX change in the GymPuls
 |---|---|---|
 | `CSS` in `gympulse_design.py` (`apply()`) | Everywhere, including the website | Base tokens; avoid editing |
 | `POLISH_CSS` (in `apply()`) | Everywhere | Accessibility rules: 44px tap targets, 16px inputs on phones |
-| `APP_CSS` (`apply_app()`, called after sign-in) | Signed-in app only | All new look-and-feel changes |
+| `APP_CSS` (`apply_app()`, called after sign-in) | Signed-in app only | App-only tweaks |
+| `REGISTER_CSS` (last in `apply()` and `apply_app()`) | Everywhere | The Register look: colours, fonts, ruled lines. New look-and-feel changes go here |
 
 Use high-specificity selectors (`html body .stApp.stApp ...`) so the layer wins over older rules.
 Never override `[data-testid="stIconMaterial"]` fonts.
