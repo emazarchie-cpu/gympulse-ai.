@@ -857,6 +857,8 @@ html body .stApp.stApp [data-testid="stMarkdownContainer"] :is(.lx-nav-links a, 
     text-decoration: none !important; color: var(--gp-text) !important; }
 html body .stApp.stApp [data-testid="stMarkdownContainer"] .lx-nav-links a:not(.lx-btn):hover { text-decoration: underline !important; }
 
+html body .stApp.stApp .lx-mk em { white-space: nowrap; }
+
 /* chips: small stamps */
 html body .stApp.stApp :is(.chip, .gp-pill, .gp-tag, .lx-pill) { border-radius: 3px !important; }
 html body .stApp.stApp .gp-pill-cyan { color: var(--gp-cyan) !important; background: rgba(201,196,184,0.12) !important; }
@@ -916,7 +918,7 @@ def landing_top(lockup_uri, icon):
           <span class="gp-tag live">Today's priorities</span></div>
         <div class="lx-mini-kpis">
           <div class="lx-mk"><span>Revenue at risk</span><b>₦186k</b></div>
-          <div class="lx-mk"><span>Kept, last 30 days</span><b>₦75k</b><em>verified</em></div>
+          <div class="lx-mk"><span>Kept, 30 days</span><b>₦75k</b><em>verified</em></div>
           <div class="lx-mk"><span>Follow-ups due</span><b>4</b></div>
         </div>
         <div class="lx-row hot"><div class="lx-av" style="background:#FF8A5B">AO</div>
