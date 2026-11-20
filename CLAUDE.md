@@ -49,3 +49,4 @@ This applies to all work: app screens, flyers, posters, videos, decks, social po
 | Testing the app in a browser | `webapp-testing` |
 | Posters and print pieces | `canvas-design` |
 | Themes for decks and documents | `theme-factory` |
+| Motion, touch feedback, typography and accessibility details | `apple-design` (GymPulse brand rules above win: keep Bricolage Grotesque + Instrument Sans, dark only, no hover lifts) |
