@@ -800,6 +800,42 @@ html body .stApp.stApp:has(.st-key-card_priority) .kpi, html body .stApp.stApp:h
     background: transparent !important; border: 0 !important; border-top: 1px dashed rgba(255,255,255,0.16) !important;
     border-radius: 0 !important; box-shadow: none !important; padding-left: 0 !important; }
 html body .stApp.stApp:has(.st-key-card_priority) .kpi::before { display: none !important; }
+
+/* ---- stage 3: the same calm look on every workspace (style only; layout, pages and buttons unchanged) ---- */
+/* page titles in the serif, quiet eyebrow and date */
+html body .stApp.stApp .pg-title { font-family: 'Instrument Serif', Georgia, serif !important; font-weight: 400 !important;
+    font-size: clamp(36px, 4.4vw, 54px) !important; line-height: 1.04 !important; letter-spacing: -0.01em !important; }
+html body .stApp.stApp .pg-eyebrow { color: var(--gp-muted) !important; font-size: 14px !important; font-weight: 500 !important; }
+html body .stApp.stApp .pg-date { color: var(--gp-dim) !important; }
+/* number tiles become one ruled row */
+html body .stApp.stApp .kpi { background: transparent !important; border: 0 !important; box-shadow: none !important;
+    border-top: 1px dashed rgba(255,255,255,0.16) !important; border-radius: 0 !important; padding-left: 0 !important; }
+html body .stApp.stApp .kpi::before, html body .stApp.stApp .kpi::after { display: none !important; }
+/* cards: one quiet surface with a hairline, no shadow, no coloured top bars; no box inside a box */
+html body .stApp.stApp [class*="st-key-card_"] { background: rgba(255,255,255,0.025) !important; box-shadow: none !important;
+    border: 1px solid rgba(255,255,255,0.08) !important; border-radius: 12px !important; }
+html body .stApp.stApp [class*="st-key-card_"] [class*="st-key-card_"] { background: transparent !important; border: 0 !important; }
+html body .stApp.stApp :is(.panel, .pillar, .cc-play, .cc-step) { box-shadow: none !important; background-image: none !important; }
+html body .stApp.stApp :is(.panel, .pillar)::before { display: none !important; }
+/* Action Centre column heads: a plain label and a count, no coloured bar */
+html body .stApp.stApp .kb-head { background: transparent !important; border-top: 0 !important; border-radius: 0 !important;
+    border-bottom: 1px solid rgba(255,255,255,0.08) !important; padding: 8px 0 !important; }
+html body .stApp.stApp .kb-head b { background: rgba(255,255,255,0.08) !important; color: var(--gp-text) !important; }
+/* secondary buttons and menus are quiet outlines, never bright white blocks */
+html body .stApp.stApp :is([data-testid="stPopover"] button, [data-testid="stPopoverButton"], button[kind="secondary"]) {
+    background: transparent !important; color: var(--gp-text) !important; border: 1px solid rgba(255,255,255,0.18) !important;
+    box-shadow: none !important; background-image: none !important; }
+html body .stApp.stApp :is([data-testid="stPopover"] button, button[kind="secondary"]):hover { border-color: rgba(255,255,255,0.34) !important; }
+html body .stApp.stApp :is([data-testid="stPopover"] button, [data-testid="stPopoverButton"]) p { color: var(--gp-text) !important; }
+html body .stApp.stApp :is(button[kind="primary"], button[kind="primaryFormSubmit"]) { background: #B7F34A !important;
+    background-image: none !important; color: #0A0F1E !important; border: 0 !important; box-shadow: none !important; }
+/* cyan has no job: neutral chips instead */
+html body .stApp.stApp .chip-cyan { color: #C9D3E3 !important; background: rgba(255,255,255,0.06) !important; }
+/* tabs: a thin lime underline on the open tab */
+html body .stApp.stApp [data-baseweb="tab-list"] { border-bottom: 1px solid rgba(255,255,255,0.08) !important; }
+html body .stApp.stApp [data-baseweb="tab-highlight"] { background: #B7F34A !important; height: 2px !important; }
+/* faded tool tiles on Members read clearly */
+html body .stApp.stApp [class*="st-key-mm_tile_"] :is(p, span, small) { opacity: 1 !important; color: var(--gp-muted) !important; }
 """
 
 
