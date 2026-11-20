@@ -741,7 +741,7 @@ html body .stApp.stApp [data-testid="stMarkdownContainer"] a:not(.lx-btn) { colo
 # Signed-in app only (never the public website): removes the patterns that make an interface read
 # as AI-generated (see docs/DESIGN.md). Layout, pages and names stay exactly the same.
 APP_CSS = """
-@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap');
 :root { --gp-grad: #B7F34A; --gp-display: 'Bricolage Grotesque', 'Inter', sans-serif; }
 
 /* type: a characterful display face for headings and numbers, a calm sans for everything else */
@@ -764,6 +764,42 @@ html body .stApp.stApp :is(thead th, .th) { font-size: 12.5px !important; font-w
 /* no decorative motion: cards don't float or lift on hover */
 html body .stApp.stApp :is(.kpi, .cc-kpi, .panel, .pillar, [class*="st-key-card_"], [class*="st-key-mm_tile_"]):hover {
     transform: none !important; }
+
+/* ---- stage 2 (approved mockup, 20 Nov 2026): Dashboard and Risk Radar, calm and page-like ---- */
+/* the visit strip: 30 dots, one per day, lime on days the member came */
+html body .stApp.stApp .vstrip { display: grid; grid-template-columns: repeat(30, minmax(0, 1fr)); gap: 3px;
+    max-width: 330px; margin: 10px 0 8px; }
+html body .stApp.stApp .vstrip i { display: block; aspect-ratio: 1; border-radius: 50%;
+    border: 1.5px solid rgba(255,255,255,0.18); }
+html body .stApp.stApp .vstrip i.v { background: #B7F34A; border-color: #B7F34A; }
+/* Dashboard hero: no card, a quiet date line and the headline in the serif */
+html body .stApp.stApp .cc-hero.cc-hero-calm { background: transparent !important; border: 0 !important;
+    box-shadow: none !important; padding: 8px 0 18px !important; border-radius: 0 !important; overflow: visible; }
+html body .stApp.stApp .cc-hero.cc-hero-calm::before, html body .stApp.stApp .cc-hero.cc-hero-calm::after { display: none !important; }
+html body .stApp.stApp .cc-hero-calm .cc-eyebrow { color: var(--gp-muted) !important; font-size: 15px !important; font-weight: 500 !important; }
+html body .stApp.stApp .cc-hero-calm .cc-hello { font-family: 'Instrument Serif', Georgia, serif !important; font-weight: 400 !important;
+    font-size: clamp(38px, 4.6vw, 56px) !important; line-height: 1.02 !important; letter-spacing: -0.01em !important;
+    margin: 8px 0 10px !important; }
+html body .stApp.stApp .cc-hero-calm .cc-sub { color: var(--gp-muted) !important; font-size: 16px !important; }
+/* Dashboard numbers: one ruled row instead of four boxes */
+html body .stApp.stApp .cc-kpis { gap: 0 !important; border-top: 1px dashed rgba(255,255,255,0.16);
+    border-bottom: 1px dashed rgba(255,255,255,0.16); }
+html body .stApp.stApp .cc-kpi { background: transparent !important; border: 0 !important; border-radius: 0 !important;
+    box-shadow: none !important; padding: 16px 18px 16px 0 !important; }
+html body .stApp.stApp .cc-kpi + .cc-kpi { border-left: 1px dashed rgba(255,255,255,0.16) !important; padding-left: 18px !important; }
+html body .stApp.stApp .cc-kpi::before, html body .stApp.stApp .cc-kpi::after { display: none !important; }
+@media (max-width: 760px) {
+  html body .stApp.stApp .cc-kpi:nth-child(odd) { border-left: 0 !important; padding-left: 0 !important; }
+  html body .stApp.stApp .cc-kpi:nth-child(-n+2) { border-bottom: 1px dashed rgba(255,255,255,0.16) !important; }
+}
+/* Risk Radar: serif page title and a ruled number row, like the Dashboard */
+html body .stApp.stApp:has(.st-key-card_priority) .pg-title, html body .stApp.stApp:has([class*="st-key-card_m_prio_"]) .pg-title {
+    font-family: 'Instrument Serif', Georgia, serif !important; font-weight: 400 !important;
+    font-size: clamp(38px, 4.6vw, 56px) !important; line-height: 1.02 !important; letter-spacing: -0.01em !important; }
+html body .stApp.stApp:has(.st-key-card_priority) .kpi, html body .stApp.stApp:has([class*="st-key-card_m_prio_"]) .kpi {
+    background: transparent !important; border: 0 !important; border-top: 1px dashed rgba(255,255,255,0.16) !important;
+    border-radius: 0 !important; box-shadow: none !important; padding-left: 0 !important; }
+html body .stApp.stApp:has(.st-key-card_priority) .kpi::before { display: none !important; }
 """
 
 

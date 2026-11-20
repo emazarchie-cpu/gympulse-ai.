@@ -312,7 +312,7 @@ def chip(text, tone="grey", dot=False, href=None):
 RISK_TONE = {"High": "red", "Medium": "amber", "Low": "lime"}
 
 def risk_chip(level, prob=None):
-    text = str(level).upper() if prob is None else f"{str(level).upper()} · {prob:.0%}"
+    text = str(level).capitalize() if prob is None else f"{str(level).capitalize()} {prob:.0%}"
     return chip(text, RISK_TONE.get(level, "grey"), dot=True)
 
 def kpi_card(label, value, tone="lime", hint=""):
@@ -2964,6 +2964,7 @@ def _radar_chart(view):
         )
 
 PRIORITY_WIDTHS = [0.6, 2.4, 1.0, 1.5, 1.6, 0.9, 1.2]
+_VMAP = ({}, set())   # set by render_risk_radar for the visit strips
 
 def _priority_rows(view):
     if _mobile():
@@ -2972,7 +2973,7 @@ def _priority_rows(view):
             mobile_member_card(
                 r, "prio", why=story_text(r),
                 chips=risk_chip(r["risk_category"]) + chip(r["suggested_action"], "cyan"),
-                bar=prob_bar(r["cancellation_probability"], r["risk_category"]),
+                bar=visit_strip_html(r["id"], *_VMAP) + prob_bar(r["cancellation_probability"], r["risk_category"]),
                 meta=f'<div class="money">{r["monthly_fee"]:,.0f} / mo</div>',
                 actions=[
                     ("Open profile", "mopen_prio", open_profile, (r["id"], "Risk Radar")),
@@ -2983,8 +2984,8 @@ def _priority_rows(view):
                       on_click=_bump, args=("prio_limit", 10, 10))
         return
     head = st.columns(PRIORITY_WIDTHS)
-    for col, label in zip(head, ["", "MEMBER", "RISK", "PROBABILITY",
-                                 "SUGGESTED ACTION", "FEE", "FOLLOW UP"]):
+    for col, label in zip(head, ["", "Member", "Risk", "Probability",
+                                 "Suggested action", "Fee", "Follow up"]):
         _md(f'<div class="th">{label}</div>', col)
 
     limit = st.session_state.get("prio_limit", 10)
@@ -2998,7 +2999,7 @@ def _priority_rows(view):
             c[1].button(str(r["full_name"]), key=f"mrow_prio_{r['id']}",
                         on_click=open_profile, args=(r["id"], "Risk Radar"),
                         use_container_width=True)
-            _md(story_html(r), c[1])
+            _md(story_html(r) + visit_strip_html(r["id"], *_VMAP), c[1])
             _md(risk_chip(r["risk_category"]), c[2])
             _md(prob_bar(r["cancellation_probability"], r["risk_category"]), c[3])
             _md(chip(r["suggested_action"], "cyan"), c[4])
@@ -3040,6 +3041,8 @@ def render_risk_radar(supabase, gym_id, assess_fn):
         data_tools(True)
         return
 
+    global _VMAP
+    _VMAP = visit_map(supabase, gym_id)
     k = kpis(roster, pd.DataFrame())
     low = k["members_scored"] - k["high"] - k["medium"]
     kpi_row([
@@ -4826,6 +4829,38 @@ def checkins_window(supabase, gym_id, days=90):
         return df
     cut = pd.Timestamp(datetime.now(APP_TZ).replace(tzinfo=None) - timedelta(days=int(days)))
     return df[df["at"] >= cut].reset_index(drop=True)
+
+
+# ------------------------------------------------------------------ visit strip
+VISIT_STRIP_DAYS = 30
+
+
+def visit_map(supabase, gym_id, days=VISIT_STRIP_DAYS):
+    """{member_id: set of dates visited in the last `days` days}, and the ids of members who have any
+    check-ins in the last 90 days. Members with no check-in data get no strip (their attendance is typed
+    in), so an empty strip never wrongly suggests they stopped coming."""
+    try:
+        ck = checkins_window(supabase, gym_id, 90)
+    except Exception:
+        return {}, set()
+    if ck is None or ck.empty:
+        return {}, set()
+    ids = set(ck["member_id"])
+    start = today_local() - timedelta(days=days - 1)
+    recent = ck[ck["day"].dt.date >= start]
+    return recent.groupby("member_id")["day"].apply(lambda s: set(s.dt.date)).to_dict(), ids
+
+
+def visit_strip_html(member_id, vmap, ids, days=VISIT_STRIP_DAYS):
+    """30 dots, one per day, filled on the days the member checked in (oldest on the left)."""
+    if member_id not in ids:
+        return ""
+    today, seen = today_local(), vmap.get(member_id, set())
+    dots = "".join(f'<i class="{"v" if today - timedelta(days=days - 1 - k) in seen else ""}"></i>'
+                   for k in range(days))
+    n = len(seen)
+    label = f"{n} visit{'s' if n != 1 else ''} in the last {days} days"
+    return f'<div class="vstrip" role="img" aria-label="{label}" title="{label}">{dots}</div>'
 
 
 def load_checkins(supabase, gym_id):

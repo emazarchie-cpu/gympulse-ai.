@@ -171,8 +171,12 @@ def _kpi(label, value, hint, tone, tag=""):
             f'<div class="cc-kpi-value">{value}</div><div class="cc-kpi-hint">{hint}</div></div>')
 
 
+_VMAP = ({}, set())   # set by render_command_centre for the visit strips
+
+
 def _priority_row(supabase, gym_id, r, i, mobile):
     story = risk_story(r)
+    strip = gw.visit_strip_html(r["id"], *_VMAP)
     chips = (gw.risk_chip(r["risk_category"], r["cancellation_probability"])
              + gw.chip(f"{_money(r['monthly_fee'])}/mo", "grey"))
     body = (f'<dl class="cc-story"><dt>Why</dt><dd>{gw._esc(story["why"])}</dd>'
@@ -185,7 +189,7 @@ def _priority_row(supabase, gym_id, r, i, mobile):
             gw._md('<div style="display:flex;align-items:center;gap:12px;">'
                    + gw.avatar_html(r["full_name"], r.get("photo"), 44)
                    + f'<div style="min-width:0"><div class="cc-pri-name">{gw._esc(r["full_name"])}</div>'
-                   + f'<div class="cc-chips">{chips}</div></div></div>' + body)
+                   + f'<div class="cc-chips">{chips}</div></div></div>' + strip + body)
             a, b = st.columns(2)
             a.button(f"Start {story['play'].lower()}", key=f"cc_play_m_{r['id']}", type="primary",
                      on_click=_start_play, args=args, use_container_width=True)
@@ -196,7 +200,7 @@ def _priority_row(supabase, gym_id, r, i, mobile):
     gw._md(gw.avatar_html(r["full_name"], r.get("photo"), 42, "row-tight"), c[0])
     with c[1]:
         gw._md(f'<div class="cc-pri-name">{i}. {gw._esc(r["full_name"])}</div>'
-               f'<div class="cc-chips" style="margin-top:4px">{chips}</div>{body}')
+               f'<div class="cc-chips" style="margin-top:4px">{chips}</div>{strip}{body}')
     with c[2]:
         st.button("Start play", key=f"cc_play_{r['id']}", type="primary", icon=":material/bolt:",
                   on_click=_start_play, args=args, use_container_width=True,
@@ -277,13 +281,17 @@ def render_command_centre(supabase, gym_id, assess_fn, greeting, user_name, busi
         extra.append(f"<b>{len(watch)}</b> at-risk renewal{'s' if len(watch) != 1 else ''} in the next 30 days")
     if res["overdue"]:
         extra.append(f"<b>{res['overdue']}</b> overdue follow-up{'s' if res['overdue'] != 1 else ''}")
-    sub = headline + (" · " + " · ".join(extra) if extra else "") + "."
-    gw._md(f"""<div class="cc-hero"><div class="cc-hero-top"><div>
-        <div class="cc-eyebrow">Retention command centre, {today:%A %d %B}</div>
-        <div class="cc-hello">{gw._esc(greeting)}, {gw._esc(user_name)}</div>
+    title = (f"{_plural(len(need), 'member')} need{'s' if len(need) == 1 else ''} you today."
+             if len(need) else "Nobody needs urgent attention today.")
+    sub = (" and ".join(extra) + ".") if extra else "Your plays are on track."
+    global _VMAP
+    _VMAP = gw.visit_map(supabase, gym_id)
+    gw._md(f"""<div class="cc-hero cc-hero-calm"><div class="cc-hero-top"><div>
+        <div class="cc-eyebrow">{gw._esc(greeting)}, {gw._esc(user_name)}. {today:%A %d %B}</div>
+        <div class="cc-hello">{title}</div>
         <div class="cc-sub">{sub}</div></div>
         <div class="cc-meta">{source}<span class="gp-tag">{_plural(len(roster), 'member')} tracked</span></div>
-        </div>{gd.PULSE_SVG}</div>""")
+        </div></div>""")
 
     flash = st.session_state.pop("cc_flash", None)
     if flash:
@@ -397,7 +405,7 @@ def render_command_centre(supabase, gym_id, assess_fn, greeting, user_name, busi
              ("Kept", res["retained_n"], f"Members retained · {_money(res['retained_rev'])}/mo", res["retained_n"])]
     top = max(1, flagged, started)
     gw._md('<div class="cc-loop">' + "".join(
-        f'<div class="cc-step"><div class="cc-step-n">{n:02d} · {lab}</div>'
+        f'<div class="cc-step"><div class="cc-step-n">{lab}</div>'
         f'<div class="cc-step-v">{v}</div><div class="cc-step-l">{hint}</div>'
         f'<div class="cc-step-bar"><span style="width:{min(100, round(bar / top * 100))}%"></span></div></div>'
         for n, (lab, v, hint, bar) in enumerate(steps, 1)) + "</div>")
