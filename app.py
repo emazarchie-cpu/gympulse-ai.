@@ -15,6 +15,7 @@ import gympulse_design as gd
 import gympulse_command as gc
 import gympulse_grow as gg
 import gympulse_team as gteam
+import gympulse_agents as gag
 import os
 import textwrap
 
@@ -1061,6 +1062,7 @@ if "supabase_client" not in st.session_state:
     )
 
 supabase = st.session_state.supabase_client
+gag.remember_ref_param()                # ?ref=AGENT-CODE from an agent's link, for the sign-up form
 _trainer_token = st.query_params.get("trainer")
 if _trainer_token:
     gw.render_public_trainer(supabase, _trainer_token)
@@ -1240,7 +1242,7 @@ if st.session_state.auth_user is None:
     # -------------------------
 
     if "auth_mode" not in st.session_state:
-        st.session_state.auth_mode = "login"
+        st.session_state.auth_mode = "signup" if st.session_state.get("ref_code") else "login"
 
     if "reset_email_sent" not in st.session_state:
         st.session_state.reset_email_sent = False
@@ -1418,6 +1420,12 @@ if st.session_state.auth_user is None:
                             "Confirm password",
                             type="password"
                         )
+                        referral_code = st.text_input(
+                            "Referral code (optional)",
+                            value=st.session_state.get("ref_code", ""),
+                            placeholder="e.g. AGENT-TUNDE",
+                            help="If someone from GymPulse AI introduced you, enter their code."
+                        )
                         agree = st.checkbox(
                             "I agree to the Terms of Service, Privacy Policy and Data Processing Agreement"
                         )
@@ -1458,6 +1466,7 @@ if st.session_state.auth_user is None:
                                                 "full_name": full_name.strip(),
                                                 "business_name": business_name.strip(),
                                                 "account_type": "gym_owner",
+                                                "referral_code": gag.clean_code(referral_code) or None,
                                                 "legal": gl.acceptance(signup_email.strip())
                                             }
                                         }
