@@ -5666,12 +5666,21 @@ def render_settings(supabase, owner_id, gym_id, log_out):
         days = st.slider("Start reminding this many days before renewal", 3, 14,
                          int(s.get("remind_days", 7)))
         notify = st.toggle("Notify me of new member replies", value=s.get("notify", True))
+        ow = dict(s.get("owner_weekly") or {})
+        weekly = st.toggle("Monday WhatsApp: the members to call this week", value=bool(ow.get("on")),
+                           help="Every Monday morning, up to 3 members to call, sent to your own WhatsApp.")
+        weekly_phone = st.text_input("Your WhatsApp number for the Monday message", value=ow.get("phone", ""),
+                                     placeholder="e.g. 0803 000 0000", disabled=not weekly)
         if st.button("Save preferences", key="settings_prefs", type="primary"):
+            if weekly and len(whatsapp_digits(weekly_phone)) < 10:
+                st.error("Add your WhatsApp number for the Monday message, or switch it off.")
+                return
             save({"language": lang,
                   "settings": {**s, "language": lang, "tone": tone,
                                "biz_phone": biz_phone.strip(), "signoff": signoff.strip(),
                                "auto_reminders": auto, "remind_days": days,
-                               "notify": notify}},
+                               "notify": notify,
+                               "owner_weekly": {"on": bool(weekly), "phone": weekly_phone.strip()}}},
                  "Preferences saved.")
 
     if section == "Check-in devices":

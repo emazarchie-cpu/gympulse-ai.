@@ -80,6 +80,15 @@ TEMPLATES = {
         "url_button": {"text": "Open my membership", "base": "https://usegympulseai.com/?me=",
                        "example": "https://usegympulseai.com/?me=3f6c1d2e-8a4b-4c1f-9d2e-5b7a8c9d0e1f"},
     },
+    "gp_owner_weekly": {                     # to gym owners who switched it on (gympulse_weekly.py)
+        "category": "UTILITY",
+        "body": "Hi {{1}}, your GymPulse AI list for {{2}} this week. Members to call: {{3}}. Open "
+                "usegympulseai.com to see why each one was flagged and log your calls. You can turn this message "
+                "off in Settings.",
+        "example": ["Emeka", "Pulse Fitness Lekki",
+                    "Ada (14 days since last visit); Tunde (renews in 3 days); Kemi (attendance dropping)"],
+        "buttons": [],
+    },
 }
 KIND_TEMPLATE = {"renewal": "gp_renewal_reminder", "missed": "gp_we_miss_you", "week1": "gp_new_member_checkin",
                  "welcome": "gp_new_member_checkin", "milestone": "gp_celebration", "level": "gp_celebration",
