@@ -1106,6 +1106,12 @@ if st.query_params.get("guide"):
     gtr.render_guide(supabase, st.query_params.get("guide"))
     st.stop()
 
+# A sales agent reads and signs their agreement (private link from Admin → Agents, no sign-in)
+if st.query_params.get(gag.SIGN_PARAM):
+    gd.apply()
+    gag.render_sign(st.query_params.get(gag.SIGN_PARAM))
+    st.stop()
+
 # Public HMO check-in page (the gym's HMO QR code, or a member's one-tap link, no sign-in)
 if st.query_params.get("hmo"):
     import gympulse_hmo as ghmo

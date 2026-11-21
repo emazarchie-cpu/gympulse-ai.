@@ -33,6 +33,7 @@ import gympulse_workspaces as gw
 KEY = "sales_agents"
 FIRST_RATE, LATER_RATE, YEARLY_RATE, WINDOW_DAYS = 0.50, 0.10, 0.15, 365
 REF_PARAM = "ref"
+SIGN_PARAM = "agent"    # usegympulseai.com/?agent=TOKEN: the agent's private link to read and sign the agreement
 SETUP_DAYS = 5          # check-in days needed before set-up can be confirmed
 
 
@@ -41,6 +42,11 @@ def clean_code(value):
     """AGENT-TUNDE style: letters, numbers and dashes, upper case, at most 24 characters."""
     code = re.sub(r"[^A-Z0-9-]", "", gw._text(value).strip().upper().replace(" ", "-"))
     return re.sub(r"-{2,}", "-", code).strip("-")[:24]
+
+
+def new_token():
+    import secrets
+    return secrets.token_urlsafe(12)
 
 
 def remember_ref_param():
@@ -318,7 +324,8 @@ def render_admin(sc, gyms, audit):
     with st.expander("Add or edit an agent", icon=":material/person_add:"):
         with st.form("ag_form"):
             c1, c2 = st.columns(2)
-            name = c1.text_input("Full name", placeholder="e.g. Tunde Bakare")
+            name = c1.text_input("Name (optional)", placeholder="They add their full name when they sign",
+                                 help="Leave blank: the agent types their full legal name when they sign.")
             code_in = c2.text_input("Referral code", placeholder="e.g. AGENT-TUNDE",
                                     help="Letters, numbers and dashes. Use the same code again to edit an agent.")
             c3, c4 = st.columns(2)
@@ -341,37 +348,50 @@ def render_admin(sc, gyms, audit):
                     save(sc, data)
                     st.session_state["adm_flash"] = f"Removed {code}. Their past statements stay in the log."
                     st.rerun()
-            elif not name.strip() and code not in agents:
-                st.error("Enter the agent's name.")
             else:
                 old = agents.get(code, {})
                 agents[code] = {"name": name.strip() or old.get("name", ""), "phone": phone.strip() or old.get("phone", ""),
                                 "email": email.strip() or old.get("email", ""), "note": note.strip()[:200] or old.get("note", ""),
-                                "active": bool(active), "since": old.get("since") or gw.today_local().isoformat()}
+                                "active": bool(active), "since": old.get("since") or gw.today_local().isoformat(),
+                                "token": old.get("token") or new_token(), "signed": old.get("signed")}
                 save(sc, data)
                 audit(sc, "agent_saved", {"gym": {"id": None}, "name": agents[code]["name"] or code, "email": None},
                       {"code": code})
-                st.session_state["adm_flash"] = (f"Saved {code}. Their sign-up link is "
-                                                 f"usegympulseai.com/?{REF_PARAM}={code}")
+                st.session_state["adm_flash"] = (f"Saved {code}. Send them their agreement link from the list "
+                                                 "below: they add their name and sign on their phone.")
                 st.rerun()
         if agents:
-            gw.table([{"Code": c, "Name": a.get("name", ""), "WhatsApp": a.get("phone", ""),
-                       "Since": a.get("since", ""), "Status": "Active" if a.get("active", True) else "Paused",
-                       "Sign-up link": f"usegympulseai.com/?{REF_PARAM}={c}"} for c, a in sorted(agents.items())],
-                     pills=("Status",))
-            c1, c2 = st.columns([2, 1], vertical_alignment="bottom")
-            pick_a = c1.selectbox("Agreement for", sorted(agents), key="ag_doc_code",
+            gw.table([{"Code": c, "Name": a.get("name") or "Adds it when signing", "WhatsApp": a.get("phone", ""),
+                       "Agreement": "Signed" if a.get("signed") else "Not signed yet",
+                       "Status": "Active" if a.get("active", True) else "Paused"} for c, a in sorted(agents.items())],
+                     pills={"Agreement": {"Signed": "lime", "Not signed yet": "amber"},
+                            "Status": {"Active": "lime", "Paused": "amber"}})
+
+    if agents:
+        with st.expander("Agreements", icon=":material/contract:"):
+            pick_a = st.selectbox("Agent", sorted(agents), key="ag_doc_code",
                                   format_func=lambda c: f"{agents[c].get('name') or c} ({c})")
-            since = agents[pick_a].get("since")
+            a = agents[pick_a]
+            if not a.get("token"):                     # agents added before signing links existed
+                a["token"] = new_token()
+                save(sc, data)
+            signed = a.get("signed") or {}
+            if signed:
+                st.success(f"Signed by {signed.get('name')} on {_nice_day(str(signed.get('at'))[:10])}.",
+                           icon=":material/verified:")
+            else:
+                st.caption("Send this link to the agent on WhatsApp. They read the agreement, type their full name "
+                           "and sign on their phone. Your signature is already on it. Keep the link private.")
+            st.code(f"https://usegympulseai.com/?{SIGN_PARAM}={a['token']}", language=None)
+            st.caption(f"Their sign-up link for gyms: usegympulseai.com/?{REF_PARAM}={pick_a}")
+            day = None
             try:
-                day = date.fromisoformat(since) if since else None
+                day = date.fromisoformat(a.get("since")) if a.get("since") else None
             except ValueError:
-                day = None
-            c2.download_button("Download agreement (PDF)", agreement_pdf(pick_a, agents[pick_a], day),
-                               file_name=f"GymPulse-AI-agent-agreement-{pick_a}.pdf", mime="application/pdf",
-                               key="ag_doc", use_container_width=True)
-            st.caption("Already signed for GymPulse AI with your name and signature. Send it to the agent to sign "
-                       "and keep a copy of the signed one.")
+                pass
+            st.download_button("Download signed agreement (PDF)" if signed else "Preview the agreement (PDF)",
+                               agreement_pdf(pick_a, a, day), key="ag_doc", mime="application/pdf",
+                               file_name=f"GymPulse-AI-agent-agreement-{pick_a}.pdf")
 
     with st.expander("Link a gym to an agent", icon=":material/link:"):
         st.caption("For a gym that forgot the code at sign-up, or to correct one. Choose No agent to unlink.")
@@ -481,6 +501,11 @@ def agreement_pdf(code, agent, start=None):
         s = escape(s.replace("₦", "NGN "))
         return _re.sub(r"\*\*(.+?)\*\*", lambda m: f'<font name="{bold}">{m.group(1)}</font>', s)
 
+    if (agent.get("signed") or {}).get("at"):
+        try:
+            start = date.fromisoformat(str(agent["signed"]["at"])[:10])
+        except ValueError:
+            pass
     start = start or gw.today_local()
     details = [("Agent", agent.get("name") or ""), ("Referral code", code),
                ("WhatsApp", agent.get("phone") or ""), ("Start date", f"{start:%-d %B %Y}"),
@@ -549,13 +574,26 @@ def agreement_pdf(code, agent, start=None):
     png = gl.founder_signature_png()
     sig = Image(io.BytesIO(png), width=46 * mm, height=20 * mm, kind="proportional") if png else \
         Paragraph(escape(gl.FOUNDER), ParagraphStyle("sc", parent=body, fontName="Times-BoldItalic", fontSize=22, leading=26))
-    blank = Spacer(1, 20 * mm)
+    signed = agent.get("signed") or {}
+    theirs = Spacer(1, 20 * mm)
+    their_png = gl.data_url_png(signed.get("signature_image"))
+    if their_png:
+        try:
+            theirs = Image(io.BytesIO(their_png), width=46 * mm, height=20 * mm, kind="proportional")
+        except Exception:
+            pass
+    elif signed.get("name"):
+        theirs = Paragraph(escape(signed["name"]), ParagraphStyle("sc2", parent=body, fontName="Times-BoldItalic",
+                                                                 fontSize=22, leading=26))
+    when = _nice_day(str(signed.get("at") or "")[:10]) if signed else ""
+    their_cap = (f"<font name='{bold}'>{escape(signed.get('name') or '')}</font><br/>Agent<br/>"
+                 f"Signed electronically on {escape(when)}" if signed else
+                 "Full name, signature and date")
     sig_tbl = Table([[Paragraph("For GYMPULSE AI LTD", label), "", Paragraph("The agent", label)],
-                     [sig, "", blank],
+                     [sig, "", theirs],
                      [Paragraph(f"<font name='{bold}'>{escape(gl.FOUNDER)}</font><br/>{escape(gl.FOUNDER_TITLE)}<br/>"
                                 f"Signed {start:%-d %B %Y}", cell), "",
-                      Paragraph(f"<font name='{bold}'>{escape(agent.get('name') or '')}</font><br/>"
-                                "Signature and date", cell)]],
+                      Paragraph(their_cap, cell)]],
                     colWidths=[80 * mm, 14 * mm, 80 * mm])
     sig_tbl.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "BOTTOM"), ("LEFTPADDING", (0, 0), (-1, -1), 0),
                                  ("LINEABOVE", (0, 2), (0, 2), 0.7, c(NAVY)), ("LINEABOVE", (2, 2), (2, 2), 0.7, c(NAVY))]))
@@ -590,3 +628,117 @@ def agreement_pdf(code, agent, start=None):
                       bottomMargin=20 * mm, title=f"GymPulse AI sales agent agreement, {code}",
                       author="GYMPULSE AI LTD").build(flow, onFirstPage=page, onLaterPages=page)
     return buf.getvalue()
+
+
+# ------------------------------------------------------------------ the agent signs (public page, no sign-in)
+def _email_signed(code, agent, pdf):
+    """Email the signed agreement to the agent (if they gave an email), with a copy to GymPulse AI."""
+    import base64
+    import requests
+    import gympulse_admin as gadm
+    import gympulse_email as ge
+    key = gadm._env("RESEND_API_KEY")
+    if not key:
+        return False
+    to = [agent["email"]] if "@" in gw._text(agent.get("email")) else []
+    first = gw._text(agent.get("name")).split(" ")[0] or "there"
+    body = (f'<p style="margin:0 0 10px">Hi {ge.esc(first)},</p>'
+            '<p style="margin:0 0 10px">Welcome to GymPulse AI. Your signed sales agent agreement is attached, '
+            "signed by you and by GymPulse AI.</p>"
+            + ge.details([("Agent", ge.esc(agent.get("name"))), ("Referral code", ge.esc(code)),
+                          ("Your sign-up link", ge.esc(f"usegympulseai.com/?{REF_PARAM}={code}"))]))
+    try:
+        r = requests.post("https://api.resend.com/emails", timeout=25, headers={"Authorization": f"Bearer {key}"},
+                          json={"from": gadm._env("BILLING_FROM", "GymPulse AI <billing@usegympulseai.com>"),
+                                "to": to or ["emmanuel@usegympulseai.com"],
+                                **({"bcc": ["emmanuel@usegympulseai.com"]} if to else {}),
+                                "reply_to": "emmanuel@usegympulseai.com",
+                                "subject": f"Your signed GymPulse AI agent agreement ({code})",
+                                "html": ge.layout("Agreement signed", body, preheader="Your signed agreement is attached"),
+                                "text": f"Hi {first},\n\nYour signed GymPulse AI sales agent agreement is attached.\n",
+                                "attachments": [{"filename": f"GymPulse-AI-agent-agreement-{code}.pdf",
+                                                 "content": base64.b64encode(pdf).decode()}]})
+        return r.status_code < 300
+    except Exception as error:
+        import gympulse_monitoring as gmon
+        gmon.capture(error, "agent agreement email")
+        return False
+
+
+def render_sign(token):
+    """usegympulseai.com/?agent=TOKEN: the agent reads the agreement, adds their details and signs."""
+    import gympulse_billing as gbill
+    import gympulse_booking as gb
+    import gympulse_legal as gl
+    gb._header()
+    col = gw.center("agent_sign", 600)
+    with col:
+        sc = gbill._service()
+        data = load(sc) if sc else None
+        code = next((c for c, a in ((data or {}).get("agents") or {}).items()
+                     if a.get("token") and a.get("token") == gw._text(token).strip()), None)
+        if not code:
+            st.error("This agreement link isn't active. Ask GymPulse AI for a new one.")
+            return
+        agent = data["agents"][code]
+        gw._md('<div class="bk-title">Your GymPulse AI agent agreement</div>'
+               f'<div class="bk-sub">Referral code {gw._esc(code)}. Already signed for GymPulse AI by '
+               f'{gw._esc(gl.FOUNDER)}, {gw._esc(gl.FOUNDER_TITLE)}.</div>')
+        signed = agent.get("signed") or {}
+        if signed:
+            st.success(f"Signed by {signed.get('name')} on {_nice_day(str(signed.get('at'))[:10])}. "
+                       "A copy has been sent to you and to GymPulse AI.", icon=":material/verified:")
+            st.download_button("Download your signed agreement (PDF)", agreement_pdf(code, agent),
+                               file_name=f"GymPulse-AI-agent-agreement-{code}.pdf", mime="application/pdf",
+                               type="primary", use_container_width=True, key="as_dl")
+            st.caption(f"Your sign-up link for gyms: usegympulseai.com/?{REF_PARAM}={code}")
+            return
+
+        st.markdown("**How it works:** introduce gyms, set them up during their free trial, and earn 50% of each "
+                    "gym's first paid month once set-up is done, then 10% of each payment for 12 months.")
+        with st.expander("Read the full agreement", icon=":material/contract:"):
+            text = "\n".join(l for l in agreement_text().split("\n") if not l.startswith("# "))
+            st.markdown(text)
+        st.download_button("Or download it to read (PDF)", agreement_pdf(code, agent), key="as_prev",
+                           file_name=f"GymPulse-AI-agent-agreement-{code}.pdf", mime="application/pdf")
+
+        st.markdown("**Sign here**")
+        st.caption("Draw your signature in the box with your finger.")
+        drawn = gl.signature_pad("as_pad")
+        with st.form("as_form", border=False):
+            name = st.text_input("Your full legal name", value=agent.get("name") or "",
+                                 placeholder="As on your ID, e.g. Babatunde Adewale Bakare")
+            c1, c2 = st.columns(2)
+            phone = c1.text_input("WhatsApp number", value=agent.get("phone") or "", placeholder="e.g. 0803 000 0000")
+            email = c2.text_input("Email", value=agent.get("email") or "",
+                                  help="We send your signed copy here.")
+            typed = st.text_input("Type your full name to sign") if drawn is False else None
+            agree = st.checkbox("I have read and agree to the GymPulse AI sales agent agreement. I understand I am an "
+                                "independent agent, not an employee, and that commission is my only payment.")
+            go = st.form_submit_button("Sign the agreement", type="primary", use_container_width=True)
+        if go:
+            full = " ".join(name.split())
+            problems = [m for ok, m in [
+                (len(full.split()) >= 2, "your full name (first and last name)"),
+                (len("".join(ch for ch in phone if ch.isdigit())) >= 10, "your WhatsApp number"),
+                ("@" in email and "." in email.split("@")[-1], "a valid email"),
+                ((drawn is not False and drawn) or (drawn is False and " ".join((typed or "").split()).lower()
+                                                     == full.lower()),
+                 "your signature" + (" (type your full name exactly)" if drawn is False else " (draw it in the box)")),
+                (agree, "a tick to agree")] if not ok]
+            if problems:
+                st.error("Please add " + ", ".join(problems) + ".")
+                return
+            data = load(sc)                                  # fresh copy, then save
+            a = data["agents"].get(code)
+            if not a or a.get("token") != agent.get("token"):
+                st.error("This agreement link has changed. Ask GymPulse AI for a new one.")
+                return
+            if not a.get("signed"):
+                a.update({"name": full, "phone": phone.strip(), "email": email.strip(),
+                          "signed": {"name": full, "at": datetime.now(timezone.utc).isoformat(),
+                                     "signature_image": gl.png_data_url(drawn) if drawn else None,
+                                     "text_sha256": gl.fingerprint(agreement_text())}})
+                save(sc, data)
+                _email_signed(code, a, agreement_pdf(code, a))
+            st.rerun()
