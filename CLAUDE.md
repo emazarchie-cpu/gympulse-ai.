@@ -25,6 +25,9 @@ These rules always apply. The skills in `.claude/skills/` hold the detail for ea
 - **Plain English, short sentences.** The founder often types quickly by voice: work out the intent, and if a
   request is genuinely ambiguous, ask one short question.
 - **They/them** for anyone whose pronouns aren't stated.
+- **Agreements GymPulse AI issues** (agent, partner, supplier) are branded and already signed for the company:
+  "Emmanuel Archibong, Founder and Director", with `assets/founder-signature.png` (see `gympulse_legal.py`).
+  Fill in the other party's name, never send a blank signed copy, and only sign documents the founder asked for.
 
 ## Everything visual must look modern and human-designed, never "AI slop"
 This applies to all work: app screens, flyers, posters, videos, decks, social posts, documents and emails.
