@@ -308,6 +308,7 @@ def render_command_centre(supabase, gym_id, assess_fn, greeting, user_name, busi
                    "Members waiting on you are the easiest to keep.")
         w2.button("Open board", key="cc_late", icon=":material/task_alt:", on_click=gw._go,
                   args=("Action Centre",), use_container_width=True)
+    gw.checkin_gap_notice(supabase, gym_id)
     if missing is not None and len(missing):
         m1, m2 = st.columns([4, 1.2], vertical_alignment="center")
         m1.warning(f"{_plural(len(missing), 'member')} {'has' if len(missing) == 1 else 'have'} no plan or fee "
