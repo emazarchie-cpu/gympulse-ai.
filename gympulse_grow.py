@@ -1769,7 +1769,38 @@ def monthly_data(supabase, gym_id, assess_fn, start, end):
     reasons = _rows(supabase, "exit_reasons", gym_id) or []
     rs = [r["reason"] for r in reasons if s <= pd.Timestamp(str(r["created_at"])[:10]) < e]
     d["top_reason"] = pd.Series(rs).value_counts().index[0] if rs else None
+    d["cost"] = plan_cost(supabase, gym_id)
+    d["value_line"] = value_line(d)
     return d
+
+
+def plan_cost(supabase, gym_id):
+    """What the gym pays GymPulse AI a month: its plan price when it's paying, 0 on a trial, free access or
+    in pilot mode. None when it can't be read."""
+    try:
+        import gympulse_billing as gbill
+        if not gbill.billing_on(gbill.pricing(supabase)):
+            return 0.0
+        rows = supabase.table("gym_subscriptions").select("status, price").eq("gym_id", gym_id).limit(1).execute().data
+        sub = rows[0] if rows else {}
+        return float(sub.get("price") or 0) if sub.get("status") == "active" else 0.0
+    except Exception:
+        return None
+
+
+def value_line(d):
+    """The first line of every monthly report: what the kept members are worth against what GymPulse AI cost.
+    Empty when no member was kept (nothing honest to compare) or the cost can't be read."""
+    if not d.get("kept_n") or d.get("cost") is None:
+        return ""
+    worth = _money(d["credited"]) + (" a month" if d.get("credited_is_fee") else "")
+    who = (f"The {d['kept_n']} members you kept this month are worth {worth}." if d["kept_n"] != 1 else
+           f"The member you kept this month is worth {worth}.")
+    if not d["cost"]:
+        return who + " GymPulse AI cost you nothing this month."
+    times = d["credited"] / d["cost"] if d["cost"] else 0
+    return (who + f" GymPulse AI cost {_money(d['cost'])}."
+            + (f" That's {times:.1f} times what you paid." if times >= 1.1 else ""))
 
 
 def monthly_letter(d):
@@ -1777,6 +1808,8 @@ def monthly_letter(d):
     biz, owner = _biz()
     month = d["start"].strftime("%B %Y")
     lines = [f"Here is {biz}'s retention report for {month}. The full report is attached as a PDF.", ""]
+    if d.get("value_line"):
+        lines += [d["value_line"], ""]
     if d["kept_n"]:
         lines.append(f"Members kept after a retention play: {d['kept_n']}, worth {_money(d['credited'])}"
                      + (" a month." if d.get("credited_is_fee") else "."))
@@ -1796,7 +1829,8 @@ def monthly_letter(d):
 
 def monthly_pdf(d):
     import gympulse_reports as rp
-    blocks = [("kpis", [("Members kept", str(d["kept_n"]), "after a play"),
+    blocks = ([("p", "<b>" + gw._esc(d["value_line"]) + "</b>")] if d.get("value_line") else []) + [
+              ("kpis", [("Members kept", str(d["kept_n"]), "after a play"),
                         ("Money kept", _money(d["credited"]), "per month" if d.get("credited_is_fee") else "credited payments"),
                         ("Collected", _money(d["collected"]), "all payments"),
                         ("New members", str(d["joined"]), "joined this month")]),
@@ -1823,6 +1857,8 @@ def render_monthly(supabase, gym_id, assess_fn, owner_id):
     which = st.radio("Period", ["Last month", "This month so far"], horizontal=True, key="grow_mr_period")
     start, end = month_bounds(today) if which == "Last month" else (today.replace(day=1), today)
     d = monthly_data(supabase, gym_id, assess_fn, start, end)
+    if d.get("value_line"):
+        st.markdown(f"**{d['value_line']}**")
     gw.kpi_row([("Members kept", str(d["kept_n"]), "lime", "after a play"),
                 ("Money kept", _money(d["credited"]), "cyan", "credited payments" if not d.get("credited_is_fee") else "monthly fees"),
                 ("Collected", _money(d["collected"]), "amber", "all payments"),
