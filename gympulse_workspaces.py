@@ -1504,7 +1504,11 @@ def _load_roster_uncached(supabase, gym_id, assess_fn, with_photos=True):
     )
     # Real check-ins override typed-in attendance numbers
     _ck = load_checkins(supabase, gym_id)
-    stats = checkin_stats(_ck, as_of=data_as_of(_ck))
+    _as_of = data_as_of(_ck)
+    if _as_of is None:                               # front desk stopped recording: don't count the missing days
+        _gap = checkin_gap(_ck)
+        _as_of = _gap["as_of"] if _gap else None
+    stats = checkin_stats(_ck, as_of=_as_of)
     if not stats.empty and not activity.empty and "member_id" in activity.columns:
         activity = activity.merge(stats, on="member_id", how="left")
         live = activity["ck_days"].notna()
@@ -1520,7 +1524,30 @@ def _load_roster_uncached(supabase, gym_id, assess_fn, with_photos=True):
         activity["updated_at"] = activity["updated_at"].astype(object)
         activity.loc[live, "updated_at"] = datetime.now(timezone.utc).isoformat()
         activity = activity.drop(columns=["ck_days", "ck_recent", "ck_base"])
-    return build_roster(members, activity, assess_fn)
+    roster, missing = build_roster(members, activity, assess_fn)
+    return too_early_to_judge(roster, _ck), missing
+
+
+def too_early_to_judge(roster, ck, today=None):
+    """A gym that started recording check-ins less than 30 days ago has only a few visits for most members, so
+    a high score is a guess. Those members are never shown as High: at most Medium, with the reason said."""
+    if roster is None or roster.empty or ck is None or ck.empty or "ck_n" not in roster.columns:
+        return roster
+    today = pd.Timestamp(today or today_local())
+    if (today - ck["day"].min()).days >= THIN_HISTORY_DAYS:
+        return roster
+    n = pd.to_numeric(roster["ck_n"], errors="coerce")
+    thin = n.notna() & (n < THIN_VISITS)
+    if not thin.any():
+        return roster
+    roster = roster.copy()
+    roster.loc[thin, "cancellation_probability"] = roster.loc[thin, "cancellation_probability"].clip(upper=0.45)
+    roster.loc[thin & (roster["risk_category"] == "High"), "risk_category"] = "Medium"
+    roster.loc[thin, "revenue_at_risk"] = roster.loc[thin, "cancellation_probability"] * roster.loc[thin, "monthly_fee"]
+    note = lambda k: f"only {int(k)} check-in{'s' if int(k) != 1 else ''} recorded so far, too early to judge"
+    roster.loc[thin, "drivers"] = [note(k) for k in n[thin]]
+    roster["too_early"] = thin
+    return roster.sort_values("cancellation_probability", ascending=False)
 
 def build_roster(members, activity, assess_fn):
     if members.empty:
@@ -2544,6 +2571,23 @@ def render_member_profile(supabase, gym_id, member_id, assess_fn):
     </div>
     """)
 
+    if (scored is not None and not m["archived"] and str(scored.get("risk_category")) in ("High", "Medium")
+            and _num(scored.get("days_since_last_visit"), 0) >= 7):
+        b1, b2 = st.columns([3, 1.3], vertical_alignment="center")
+        b1.caption(f"Flagged partly because no visit has been recorded for {int(_num(scored.get('days_since_last_visit'), 0))} "
+                   "days. If they've been coming and the front desk missed it, log a visit for today and the flag "
+                   "updates.")
+        if b2.button("They've been coming", key="profile_been_coming", icon=":material/how_to_reg:",
+                     use_container_width=True):
+            try:
+                record_checkin(supabase, gym_id, member_id, "front_desk")
+                st.session_state["profile_flash"] = (f"Visit logged for {name.split(' ')[0]} today. Remind the front "
+                                                     "desk to check them in each time.")
+            except Exception as error:
+                st.session_state["profile_flash"] = f"Could not log the visit: {error}"
+            bump_data_version()
+            st.rerun()
+
     tab_overview, tab_plan, tab_photo, tab_ck, tab_edit = st.tabs(
         ["Overview", "Membership", "Photo", "Check-in", "Edit details"])
 
@@ -3024,6 +3068,7 @@ def render_risk_radar(supabase, gym_id, assess_fn):
         with st.expander("Technical details"):
             st.code(str(e))
         return
+    checkin_gap_notice(supabase, gym_id)
 
     def data_tools(expanded):
         with st.expander("Data tools · update activity, import a CSV, archive members",
@@ -4907,6 +4952,46 @@ def data_as_of(ck, today=None):
     return last if 1 <= lag <= 60 else None
 
 
+def checkin_gap(ck, today=None):
+    """A gym-wide drop in check-ins: far fewer visits recorded in the last 7 days than the gym's usual week.
+    That's almost always the front desk not recording (or a public holiday), not every member leaving at once.
+    Returns {"recent", "usual", "as_of"} or None. as_of = the day to count members' absence from, so the missing
+    days don't make everyone look away: the last recorded day if nothing came in this week, else 7 days ago."""
+    if ck is None or ck.empty or "day" not in ck.columns:
+        return None
+    today = pd.Timestamp(today or today_local())
+    d = ck.drop_duplicates(["member_id", "day"])
+    age = (today - d["day"]).dt.days
+    recent = int((age < 7).sum())
+    usual = int(((age >= 7) & (age < 35)).sum()) / 4
+    if usual < 10 or recent >= 0.35 * usual:
+        return None
+    as_of = d["day"].max().date() if recent == 0 else (today - pd.Timedelta(days=7)).date()
+    return {"recent": recent, "usual": int(round(usual)), "as_of": as_of}
+
+
+def gym_checkin_gap(supabase, gym_id):
+    """checkin_gap for a gym whose check-ins are recorded live (not a gym that uploads visit files)."""
+    try:
+        ck = load_checkins(supabase, gym_id)
+        return None if data_as_of(ck) else checkin_gap(ck)
+    except Exception:
+        return None
+
+
+def checkin_gap_notice(supabase, gym_id, target=None):
+    gap = gym_checkin_gap(supabase, gym_id)
+    if gap:
+        (target or st).warning(
+            f"Check-ins are much lower than usual this week ({gap['recent']} visits, usually about {gap['usual']}). "
+            "The front desk may have missed some, so members aren't marked as away for these days. Risk counts "
+            f"visits up to {gap['as_of']:%-d %B} until check-ins pick up.", icon=":material/info:")
+    return gap
+
+
+THIN_HISTORY_DAYS, THIN_VISITS = 30, 3
+
+
 def checkin_stats(ck, as_of=None):
     """Per member, from real check-ins: days since last visit, recent pace (last 14 days,
     scaled to 30), their own earlier baseline pace, and their usual gap between visits.
@@ -4927,6 +5012,7 @@ def checkin_stats(ck, as_of=None):
             "ck_recent": min(20, round(int((ages < 14).sum()) * 30 / 14)),
             "ck_base": min(20, round(base_n * 30 / 46)) if base_n >= 3 else None,
             "usual_gap_days": float(gaps.median()) if len(g) >= 4 and len(gaps) else None,
+            "ck_n": int(len(g)),
         })
     return pd.DataFrame(rows)
 
