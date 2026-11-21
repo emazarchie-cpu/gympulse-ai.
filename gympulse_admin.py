@@ -198,7 +198,8 @@ def report_email(entry, d):
     import gympulse_email as ge
     month = d["start"].strftime("%B %Y")
     hello = f"Hi {gw._text(entry['owner']).split(' ')[0] or 'there'},"
-    lead = (f"GymPulse AI helped {gw._esc(entry['name'])} keep <b>{d['kept_n']} member"
+    lead = (f"<b>{gw._esc(d['value_line'])}</b>" if d.get("value_line") else
+            f"GymPulse AI helped {gw._esc(entry['name'])} keep <b>{d['kept_n']} member"
             f"{'s' if d['kept_n'] != 1 else ''}</b> in {month}, worth <b>{_money(d['credited'])}</b>."
             if d["kept_n"] else f"Here is how {gw._esc(entry['name'])} did in {month}.")
     body = (f"<p style=\"margin:0 0 10px\">{gw._esc(hello)}</p><p style=\"margin:0 0 6px\">{lead}</p>"
@@ -207,7 +208,7 @@ def report_email(entry, d):
               "who needs you this week.</p>"
             + ge.button("Open GymPulse AI", ge.SITE))
     subject = f"{entry['name']}: your {month} retention report"
-    text = (f"{hello}\n\n" + "\n".join(f"{k}: {v}" for k, v in report_rows(d))
+    text = (f"{hello}\n\n" + (d["value_line"] + "\n\n" if d.get("value_line") else "") + "\n".join(f"{k}: {v}" for k, v in report_rows(d))
             + f"\n\nThe full report is attached. Open GymPulse AI: {ge.SITE}")
     return subject, ge.layout(f"Your {month} report", body, preheader=subject), text
 
@@ -216,6 +217,8 @@ def report_whatsapp(entry, d):
     month = d["start"].strftime("%B")
     first = gw._text(entry["owner"]).split(" ")[0] or "there"
     lines = [f"Hi {first}, it's Emmanuel from GymPulse AI. Here's {entry['name']}'s {month} report:"]
+    if d.get("value_line"):
+        lines += ["", d["value_line"], ""]
     lines += [f"- {k}: {v}" for k, v in report_rows(d)]
     lines += ["", "I've emailed you the full PDF too. Open GymPulse AI to see who needs you this week: "
                   "https://usegympulseai.com"]
@@ -595,6 +598,81 @@ def set_suspended(sc, entry, suspend):
     sc.auth.admin.update_user_by_id(entry["gym"]["owner_id"], {"ban_duration": BAN_FOREVER if suspend else "none"})
 
 
+# ------------------------------------------------------------------ gyms at risk
+DEMO_EMAIL = (os.environ.get("DEMO_EMAIL") or "demo@usegympulseai.com").lower()
+
+
+def _kept_count(sc, gym_id):
+    try:
+        r = (sc.table("retention_actions").select("id", count="exact").eq("gym_id", gym_id)
+             .eq("outcome", "Retained").limit(1).execute())
+        return r.count if r.count is not None else len(r.data or [])
+    except Exception:
+        return None
+
+
+def gyms_at_risk(sc, gyms, stats, subs=None, today=None):
+    """The gyms most likely to leave GymPulse AI, worst first: [(entry, [reasons], score)].
+    No owner login for 7+ days; check-ins stopped (none for 5+ days, or none yet 3+ days after sign-up);
+    a free trial ending within 7 days with no member kept yet. The demo gym and suspended gyms are left out."""
+    import gympulse_billing as gb
+    now = pd.Timestamp.now(tz="UTC")
+    today = today or gw.today_local()
+    if subs is None:
+        try:
+            subs = {r["gym_id"]: r for r in sc.table("gym_subscriptions").select("*").execute().data or []}
+        except Exception:
+            subs = {}
+    try:
+        billing = gb.billing_on(gb.pricing(sc))
+    except Exception:
+        billing = False
+    out = []
+    for g in gyms:
+        if (g.get("email") or "").lower() == DEMO_EMAIL or _is_banned(g):
+            continue
+        gid, s = g["gym"]["id"], stats.get(g["gym"]["id"]) or {}
+        signed = pd.to_datetime(g.get("signed_up"), utc=True, errors="coerce")
+        age = (now - signed).days if not pd.isna(signed) else 0
+        reasons, score = [], 0
+        last = pd.to_datetime(g.get("last_login"), utc=True, errors="coerce")
+        idle = (now - last).days if not pd.isna(last) else age
+        if idle >= 7:
+            reasons.append(f"No login for {idle} days" if not pd.isna(last) else "Never signed in")
+            score += 2 + min(idle // 7, 3)
+        last_ck = pd.to_datetime(s.get("last_checkin"), utc=True, errors="coerce")
+        if pd.isna(last_ck):
+            if age >= 3:
+                reasons.append("No check-ins yet")
+                score += 3
+        elif (now - last_ck).days >= 5:
+            reasons.append(f"Check-ins stopped {(now - last_ck).days} days ago")
+            score += 3
+        st_ = gb.state(subs.get(gid) or {}, today) if (subs and billing) else {"status": "off"}
+        if st_.get("status") == "trial" and (st_.get("days_left") or 0) <= 7:
+            kept = _kept_count(sc, gid)
+            if not kept:
+                reasons.append(f"Trial ends in {st_['days_left']} day{'s' if st_['days_left'] != 1 else ''}, "
+                               "no member kept yet")
+                score += 4
+        if reasons:
+            out.append((g, reasons, score))
+    return sorted(out, key=lambda x: -x[2])
+
+
+def render_at_risk(sc, gyms, stats):
+    risky = gyms_at_risk(sc, gyms, stats)
+    st.markdown(f"**Gyms at risk** ({len(risky)})" if risky else "**Gyms at risk**")
+    if not risky:
+        st.caption("None right now: every gym is logging in, recording check-ins, and no trial is ending without "
+                   "a member kept.")
+        return
+    st.caption("Call these owners this week, before they go quiet for good. Worst first.")
+    gw.table([{"Gym": g["name"], "Owner": g["owner"] or "–", "Why": ". ".join(r),
+               "Phone": g.get("phone") or "–", "Last login": _when(g.get("last_login"))} for g, r, _ in risky],
+             wide=("Why",))
+
+
 # ------------------------------------------------------------------ gyms tab
 def render_gyms(sc):
     import gympulse_reports as rp
@@ -616,6 +694,7 @@ def render_gyms(sc):
                 ("Active gyms", str(active), "lime", "check-ins in the last 30 days"),
                 ("Members", f"{total_members:,}", "amber", "across all gyms"),
                 ("Suspended", str(sum(_is_banned(g) for g in gyms)), "grey", "login blocked")])
+    render_at_risk(sc, gyms, stats)
 
     c1, c2 = st.columns([3, 1])
     q = c1.text_input("Search", placeholder="Gym, owner or email", key="adm_q", label_visibility="collapsed")
