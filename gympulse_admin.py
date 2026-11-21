@@ -104,7 +104,8 @@ def _all_gyms(sc):
                     "banned_until": getattr(user, "banned_until", None),
                     "phone": gw._text(s.get("biz_phone") or brand.get("whatsapp")),
                     "name": gw._text(p.get("business_name") or g.get("business_name"), "Gym"),
-                    "owner": gw._text(p.get("full_name"))})
+                    "owner": gw._text(p.get("full_name")),
+                    "ref_code": gw._text((getattr(user, "user_metadata", None) or {}).get("referral_code"))})
     return sorted(out, key=lambda x: x["name"].lower())
 
 
@@ -299,7 +300,8 @@ def render_admin():
     flash = st.session_state.pop("adm_flash", None)
     if flash:
         (st.error if flash.startswith("Could not") else st.success)(flash)
-    section = st.segmented_control("Admin section", ["Gyms", "Billing", "WhatsApp", "Monthly reports", "Admin log"],
+    section = st.segmented_control("Admin section", ["Gyms", "Billing", "Agents", "WhatsApp", "Monthly reports",
+                                                     "Admin log"],
                                    key="adm_section",
                                    default="Gyms", label_visibility="collapsed") or "Gyms"
     if section == "Gyms":
@@ -307,6 +309,9 @@ def render_admin():
     elif section == "Billing":
         import gympulse_billing as gb
         gb.render_admin_billing(sc, all_gyms(sc), audit)
+    elif section == "Agents":
+        import gympulse_agents as gag
+        gag.render_admin(sc, all_gyms(sc), audit)
     elif section == "WhatsApp":
         import gympulse_whatsapp as gwa
         gwa.render_admin_setup()
