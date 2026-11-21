@@ -1504,11 +1504,7 @@ def _load_roster_uncached(supabase, gym_id, assess_fn, with_photos=True):
     )
     # Real check-ins override typed-in attendance numbers
     _ck = load_checkins(supabase, gym_id)
-    _as_of = data_as_of(_ck)
-    if _as_of is None:                               # front desk stopped recording: don't count the missing days
-        _gap = checkin_gap(_ck)
-        _as_of = _gap["as_of"] if _gap else None
-    stats = checkin_stats(_ck, as_of=_as_of)
+    stats = checkin_stats(_ck, as_of=data_as_of(_ck))
     if not stats.empty and not activity.empty and "member_id" in activity.columns:
         activity = activity.merge(stats, on="member_id", how="left")
         live = activity["ck_days"].notna()
@@ -4954,9 +4950,8 @@ def data_as_of(ck, today=None):
 
 def checkin_gap(ck, today=None):
     """A gym-wide drop in check-ins: far fewer visits recorded in the last 7 days than the gym's usual week.
-    That's almost always the front desk not recording (or a public holiday), not every member leaving at once.
-    Returns {"recent", "usual", "as_of"} or None. as_of = the day to count members' absence from, so the missing
-    days don't make everyone look away: the last recorded day if nothing came in this week, else 7 days ago."""
+    Recording check-ins is the gym's job, so scores are NOT adjusted: the owner is only told, so they can get the
+    front desk recording again. Returns {"recent", "usual", "as_of"} or None."""
     if ck is None or ck.empty or "day" not in ck.columns:
         return None
     today = pd.Timestamp(today or today_local())
@@ -4984,8 +4979,8 @@ def checkin_gap_notice(supabase, gym_id, target=None):
     if gap:
         (target or st).warning(
             f"Check-ins are much lower than usual this week ({gap['recent']} visits, usually about {gap['usual']}). "
-            "The front desk may have missed some, so members aren't marked as away for these days. Risk counts "
-            f"visits up to {gap['as_of']:%-d %B} until check-ins pick up.", icon=":material/info:")
+            "Risk is worked out from the check-ins you record, so members not checked in count as away. Make sure "
+            "the front desk checks in every visit.", icon=":material/info:")
     return gap
 
 
