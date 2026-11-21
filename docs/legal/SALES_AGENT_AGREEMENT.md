@@ -1,6 +1,6 @@
 # Sales agent agreement
 
-This agreement lets the agent earn commission for introducing gyms that become paying GymPulse AI customers. There is no salary and no fee to join.
+This agreement lets the agent earn commission for introducing gyms to GymPulse AI and setting them up, so they become paying customers. The agent is independent, not an employee. There is no salary and no fee to join.
 
 ## 1. The parties and the work
 
@@ -11,14 +11,23 @@ This agreement lets the agent earn commission for introducing gyms that become p
 The agent will:
 
 - introduce gym owners and managers to GymPulse AI;
+- show interested gyms the demo, using the agent's own demo login, or book a demo with the founder;
 - share the agent's referral code or link with each gym they introduce;
-- arrange a demo with the GymPulse AI founder for any gym that is interested.
+- set each new gym up during its free trial, as in section 2.
 
-GymPulse AI runs every demo and handles set-up, billing and support. The agent does not sign contracts, collect money or promise discounts on GymPulse AI's behalf.
+GymPulse AI handles billing, support and anything the agent can't fix. The agent does not sign contracts, collect money or promise discounts on GymPulse AI's behalf.
 
-## 2. Commission
+## 2. Set-up and commission
 
-The agent earns 50% of a referred gym's first paid month, then 10% of each later monthly payment, for 12 months from the gym's first payment.
+The agent sets each gym up during its free trial. The agent earns 50% of the gym's first paid month once set-up is done, then 10% of each later monthly payment, for 12 months from the gym's first payment.
+
+**Setting a gym up means:**
+
+- **Day 1:** a set-up visit. The owner's member list is loaded, check-ins are recorded at the front desk, and the owner knows where to find who to call each week.
+- **Day 7:** a check-in. Check-ins are coming in, and the owner has called at least one flagged member.
+- **Day 21:** a review with the owner of who came back and what those members pay.
+
+Set-up counts as done when the gym's members are loaded, check-ins have been recorded on at least 5 different days, and GymPulse AI has confirmed it in its records.
 
 | Plan | Gym pays per month | First paid month (50%) | Each later month (10%) |
 | Starter | ₦20,000 | ₦10,000 | ₦2,000 |
@@ -30,12 +39,13 @@ The agent earns 50% of a referred gym's first paid month, then 10% of each later
 These are today's list prices. The rules below always apply.
 
 1. **Commission is earned only on money GymPulse AI has received.** The 30-day free trial earns nothing. Commission starts with the gym's first payment after the trial.
-2. **It is a share of what the gym actually paid,** after any founding-gym or branch discount. Paystack fees are GymPulse AI's cost and don't reduce it.
-3. **Yearly plans:** when a referred gym pays for a year, the agent earns 15% of that yearly payment, once.
-4. **Commission lasts 12 months** from the gym's first payment. After that, the gym no longer earns the agent commission.
-5. **If the gym stops paying, commission stops.** Nothing is owed for months the gym did not pay.
-6. **Refunds and chargebacks:** if a payment is refunded or reversed, the commission on it is cancelled. If it was already paid, it is taken off the agent's next payment.
-7. **Changing plans:** if a gym moves to a bigger or smaller plan, commission follows the new amount the gym pays.
+2. **The 50% is held until set-up is done.** If the gym pays first, the 50% is paid in the month set-up is confirmed.
+3. **It is a share of what the gym actually paid,** after any founding-gym or branch discount. Paystack fees are GymPulse AI's cost and don't reduce it.
+4. **Yearly plans:** when a referred gym pays for a year, the agent earns 15% of that yearly payment, once.
+5. **Commission lasts 12 months** from the gym's first payment. After that, the gym no longer earns the agent commission.
+6. **If the gym stops paying, commission stops.** Nothing is owed for months the gym did not pay.
+7. **Refunds and chargebacks:** if a payment is refunded or reversed, the commission on it is cancelled. If it was already paid, it is taken off the agent's next payment.
+8. **Changing plans:** if a gym moves to a bigger or smaller plan, commission follows the new amount the gym pays.
 
 ## 3. Referral code and payment
 
@@ -53,11 +63,11 @@ A gym counts as the agent's when it signs up with the agent's referral code. Com
 
 The agent is independent: not an employee, partner or legal representative of GymPulse AI.
 
-1. **No salary, no expenses.** The agent chooses their own hours and pays their own transport, data and phone costs. Commission is the only payment.
+1. **No salary, no expenses.** The agent chooses their own hours and how they do the work, and pays their own transport, data and phone costs. Commission is the only payment.
 2. **Tax:** the agent is responsible for their own tax. GymPulse AI deducts withholding tax where Nigerian law requires it and gives the agent a receipt.
-3. **Honesty.** The agent describes GymPulse AI only as it is today, using the training sheet. The agent must not promise results or numbers; claim partnerships, customers or features that don't exist; or offer discounts, free months or custom features.
+3. **Honesty.** The agent describes GymPulse AI only as it is today, using the training sheet. The agent's demo login shows a demo gym with made-up figures, and the agent says so. The agent must not promise results or numbers; claim partnerships, customers or features that don't exist; or offer discounts, free months or custom features.
 4. **Confidentiality.** Prices not yet published, other gyms' details and anything shown in a demo stay private, during this agreement and after it ends.
-5. **Personal data.** Gym owners' names and phone numbers are used only to introduce GymPulse AI, under the Nigeria Data Protection Act 2023. The agent never asks for or handles any gym's member data, and never adds people to bulk messages without their consent.
+5. **Personal data.** Personal data is handled under the Nigeria Data Protection Act 2023. Gym owners' contact details are used only to introduce and support GymPulse AI. During set-up, the gym owner loads their own member list while the agent guides them. If the owner asks the agent to do it, the agent works only inside the gym's own GymPulse account, with the owner's permission, and never keeps a copy of member data on their own phone, laptop or messages. The agent never adds people to bulk messages without their consent.
 6. **Brand.** The agent may use the GymPulse AI name, flyer and case study page as supplied, and must not make their own logo, pages, social accounts or adverts in GymPulse AI's name without written approval.
 7. **Breaking these rules** lets GymPulse AI end the agreement at once. Commission on any gym won through false claims is cancelled.
 
