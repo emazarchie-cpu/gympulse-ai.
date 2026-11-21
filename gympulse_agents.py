@@ -290,6 +290,19 @@ def render_admin(sc, gyms, audit):
                        "Since": a.get("since", ""), "Status": "Active" if a.get("active", True) else "Paused",
                        "Sign-up link": f"usegympulseai.com/?{REF_PARAM}={c}"} for c, a in sorted(agents.items())],
                      pills=("Status",))
+            c1, c2 = st.columns([2, 1], vertical_alignment="bottom")
+            pick_a = c1.selectbox("Agreement for", sorted(agents), key="ag_doc_code",
+                                  format_func=lambda c: f"{agents[c].get('name') or c} ({c})")
+            since = agents[pick_a].get("since")
+            try:
+                day = date.fromisoformat(since) if since else None
+            except ValueError:
+                day = None
+            c2.download_button("Download agreement (PDF)", agreement_pdf(pick_a, agents[pick_a], day),
+                               file_name=f"GymPulse-AI-agent-agreement-{pick_a}.pdf", mime="application/pdf",
+                               key="ag_doc", use_container_width=True)
+            st.caption("Already signed for GymPulse AI with your name and signature. Send it to the agent to sign "
+                       "and keep a copy of the signed one.")
 
     with st.expander("Link a gym to an agent", icon=":material/link:"):
         st.caption("For a gym that forgot the code at sign-up, or to correct one. Choose No agent to unlink.")
@@ -337,3 +350,174 @@ def render_admin(sc, gyms, audit):
                     save(sc, data)
                     st.session_state["adm_flash"] = f"Added {_money(float(amount))} for {code} in {_month_label(m)}."
                     st.rerun()
+
+
+# ------------------------------------------------------------------ the agreement, as a branded PDF
+NAVY, INK, MUTED, LINE, LIME = "#0B1220", "#111827", "#5B6473", "#D9DEE6", "#B7F34A"
+
+
+def _fonts():
+    import os
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    here = os.path.dirname(os.path.abspath(__file__))
+    try:
+        pdfmetrics.getFont("GP-Sans")
+    except KeyError:
+        try:
+            pdfmetrics.registerFont(TTFont("GP-Sans", os.path.join(here, "assets", "fonts", "InstrumentSans-Regular.ttf")))
+            pdfmetrics.registerFont(TTFont("GP-Bold", os.path.join(here, "assets", "fonts", "InstrumentSans-Bold.ttf")))
+        except Exception:
+            return "Helvetica", "Helvetica-Bold"
+    return "GP-Sans", "GP-Bold"
+
+
+def agreement_text():
+    import os
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "docs", "legal", "SALES_AGENT_AGREEMENT.md")
+    with open(path, encoding="utf-8") as f:
+        return f.read()
+
+
+def agreement_pdf(code, agent, start=None):
+    """The sales agent agreement for one agent: GymPulse AI branding, the agent's details filled in, and the
+    founder's name and signature already applied. The agent signs on the last page."""
+    import io
+    import os
+    import re as _re
+    from xml.sax.saxutils import escape
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.units import mm
+    from reportlab.platypus import (Image, KeepTogether, ListFlowable, ListItem, Paragraph, SimpleDocTemplate,
+                                    Spacer, Table, TableStyle)
+    import gympulse_legal as gl
+
+    reg, bold = _fonts()
+    here = os.path.dirname(os.path.abspath(__file__))
+    c = colors.HexColor
+    body = ParagraphStyle("b", fontName=reg, fontSize=9.6, leading=14, textColor=c(INK), spaceAfter=5)
+    title = ParagraphStyle("t", parent=body, fontName=bold, fontSize=26, leading=29, textColor=c(NAVY),
+                           spaceAfter=8)
+    h2 = ParagraphStyle("h2", parent=body, fontName=bold, fontSize=12.5, leading=16, textColor=c(NAVY),
+                        spaceBefore=12, spaceAfter=6)
+    small = ParagraphStyle("s", parent=body, fontSize=7.8, leading=10.5, textColor=c(MUTED), spaceAfter=0)
+    label = ParagraphStyle("lab", parent=small, fontSize=7.8)
+    value = ParagraphStyle("val", parent=body, fontName=bold, fontSize=10, leading=13, spaceAfter=0)
+    cell = ParagraphStyle("c", parent=body, fontSize=9, leading=12, spaceAfter=0)
+    head = ParagraphStyle("h", parent=cell, fontName=bold, textColor=colors.white)
+
+    def md(s):
+        s = escape(s.replace("₦", "NGN "))
+        return _re.sub(r"\*\*(.+?)\*\*", lambda m: f'<font name="{bold}">{m.group(1)}</font>', s)
+
+    start = start or gw.today_local()
+    details = [("Agent", agent.get("name") or ""), ("Referral code", code),
+               ("WhatsApp", agent.get("phone") or ""), ("Start date", f"{start:%-d %B %Y}"),
+               ("Sign-up link", f"usegympulseai.com/?{REF_PARAM}={code}")]
+
+    flow = [Paragraph("Sales agent agreement", title), Spacer(1, 6)]
+    grid = [[Paragraph(k, label) for k, _ in details[:4]], [Paragraph(md(v), value) for _, v in details[:4]]]
+    t = Table(grid, colWidths=[43.5 * mm] * 4)
+    t.setStyle(TableStyle([("BOX", (0, 0), (-1, -1), 0.6, c(LINE)), ("LINEBEFORE", (1, 0), (-1, -1), 0.6, c(LINE)),
+                           ("TOPPADDING", (0, 0), (-1, 0), 7), ("BOTTOMPADDING", (0, 1), (-1, 1), 8),
+                           ("LEFTPADDING", (0, 0), (-1, -1), 8), ("VALIGN", (0, 0), (-1, -1), "TOP")]))
+    flow += [t, Spacer(1, 4), Paragraph(f"Your sign-up link: {md(details[4][1])}", small), Spacer(1, 6)]
+
+    lines = agreement_text().split("\n")
+    i, items, kind = 0, [], None
+
+    def flush():
+        nonlocal items, kind
+        if items:
+            flow.append(ListFlowable([ListItem(Paragraph(md(x), body), leftIndent=14) for x in items],
+                                     bulletType="1" if kind == "ol" else "bullet", leftIndent=14,
+                                     bulletFontName=bold if kind == "ol" else reg, bulletFontSize=9.6,
+                                     bulletColor=c(NAVY), bulletDedent=14, spaceAfter=4,
+                                     bulletFormat="%s." if kind == "ol" else None,
+                                     start=1 if kind == "ol" else "–"))
+        items, kind = [], None
+
+    while i < len(lines):
+        line = lines[i].rstrip()
+        if line.startswith("# ") or not line.strip():
+            flush()
+        elif line.startswith("## "):
+            flush()
+            flow.append(Paragraph(md(line[3:]), h2))
+        elif line.startswith("| "):
+            flush()
+            rows = []
+            while i < len(lines) and lines[i].startswith("| "):
+                rows.append([x.strip() for x in lines[i].strip().strip("|").split("|")])
+                i += 1
+            data = [[Paragraph(md(x), head) for x in rows[0]]] + [[Paragraph(md(x), cell) for x in r] for r in rows[1:]]
+            tb = Table(data, colWidths=[34 * mm, 42 * mm, 49 * mm, 49 * mm], repeatRows=1)
+            tb.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, 0), c(NAVY)),
+                                    ("LINEBELOW", (0, 1), (-1, -1), 0.5, c(LINE)),
+                                    ("TOPPADDING", (0, 0), (-1, -1), 5), ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                                    ("LEFTPADDING", (0, 0), (-1, -1), 7)]))
+            flow += [Spacer(1, 2), tb, Spacer(1, 8)]
+            continue
+        elif _re.match(r"^\d+\. ", line):
+            if kind != "ol":
+                flush()
+            kind = "ol"
+            items.append(_re.sub(r"^\d+\. ", "", line))
+        elif line.startswith("- "):
+            if kind != "ul":
+                flush()
+            kind = "ul"
+            items.append(line[2:])
+        else:
+            flush()
+            flow.append(Paragraph(md(line), body))
+        i += 1
+    flush()
+
+    # signatures: the founder's is applied; the agent signs by hand or on screen
+    png = gl.founder_signature_png()
+    sig = Image(io.BytesIO(png), width=46 * mm, height=20 * mm, kind="proportional") if png else \
+        Paragraph(escape(gl.FOUNDER), ParagraphStyle("sc", parent=body, fontName="Times-BoldItalic", fontSize=22, leading=26))
+    blank = Spacer(1, 20 * mm)
+    sig_tbl = Table([[Paragraph("For GYMPULSE AI LTD", label), "", Paragraph("The agent", label)],
+                     [sig, "", blank],
+                     [Paragraph(f"<font name='{bold}'>{escape(gl.FOUNDER)}</font><br/>{escape(gl.FOUNDER_TITLE)}<br/>"
+                                f"Signed {start:%-d %B %Y}", cell), "",
+                      Paragraph(f"<font name='{bold}'>{escape(agent.get('name') or '')}</font><br/>"
+                                "Signature and date", cell)]],
+                    colWidths=[80 * mm, 14 * mm, 80 * mm])
+    sig_tbl.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "BOTTOM"), ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                                 ("LINEABOVE", (0, 2), (0, 2), 0.7, c(NAVY)), ("LINEABOVE", (2, 2), (2, 2), 0.7, c(NAVY))]))
+    flow.append(KeepTogether([Spacer(1, 10), Paragraph("Signatures", h2), sig_tbl]))
+
+    logo = os.path.join(here, "gympulse-logo-dark.png")
+
+    def page(canvas, doc):
+        w, h = A4
+        canvas.saveState()
+        canvas.setFillColor(c(NAVY))
+        canvas.rect(0, h - 4 * mm, w, 4 * mm, stroke=0, fill=1)
+        canvas.setFillColor(c(LIME))
+        canvas.rect(0, h - 4 * mm, 38 * mm, 4 * mm, stroke=0, fill=1)
+        try:
+            canvas.drawImage(logo, 18 * mm, h - 20 * mm, width=36 * mm, height=12.9 * mm, mask="auto")
+        except Exception:
+            canvas.setFont(bold, 12)
+            canvas.drawString(18 * mm, h - 15 * mm, "GymPulse AI")
+        canvas.setFont(reg, 8)
+        canvas.setFillColor(c(MUTED))
+        canvas.drawRightString(w - 18 * mm, h - 13 * mm, f"Agent {code}")
+        canvas.setStrokeColor(c(LINE))
+        canvas.setLineWidth(0.6)
+        canvas.line(18 * mm, 14 * mm, w - 18 * mm, 14 * mm)
+        canvas.drawString(18 * mm, 9.5 * mm, "GYMPULSE AI LTD, RC 9996401, Calabar, Cross River State, Nigeria. usegympulseai.com")
+        canvas.drawRightString(w - 18 * mm, 9.5 * mm, f"Page {doc.page}")
+        canvas.restoreState()
+
+    buf = io.BytesIO()
+    SimpleDocTemplate(buf, pagesize=A4, leftMargin=18 * mm, rightMargin=18 * mm, topMargin=27 * mm,
+                      bottomMargin=20 * mm, title=f"GymPulse AI sales agent agreement, {code}",
+                      author="GYMPULSE AI LTD").build(flow, onFirstPage=page, onLaterPages=page)
+    return buf.getvalue()
