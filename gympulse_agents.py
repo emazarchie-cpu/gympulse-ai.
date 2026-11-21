@@ -14,7 +14,12 @@ Everything is kept in platform_settings under "sales_agents", which gyms can't r
   {"agents":  {CODE: {"name", "phone", "email", "since", "active", "note"}},
    "gyms":    {gym_id: {"code", "since", "by"}},             # links set by the founder (override sign-up codes)
    "adjust":  [{"code", "month", "amount", "note", "at"}],   # refunds and corrections, + or -
-   "paid":    {CODE: {"YYYY-MM": {"amount", "on"}}}}          # what has been paid out
+   "paid":    {CODE: {"YYYY-MM": {"amount", "on"}}},          # what has been paid out
+   "setup":   {gym_id: {"done_on", "by"}}}                    # set-up confirmed by the founder
+
+The 50% for the first month is held until the agent has set the gym up (members loaded, check-ins recorded on
+at least SETUP_DAYS different days) and the founder has confirmed it. It then counts in the later of the
+payment month and the month set-up was confirmed.
 """
 import csv
 import io
@@ -28,6 +33,7 @@ import gympulse_workspaces as gw
 KEY = "sales_agents"
 FIRST_RATE, LATER_RATE, YEARLY_RATE, WINDOW_DAYS = 0.50, 0.10, 0.15, 365
 REF_PARAM = "ref"
+SETUP_DAYS = 5          # check-in days needed before set-up can be confirmed
 
 
 # ------------------------------------------------------------------ codes
@@ -55,7 +61,8 @@ def load(sc):
     except Exception:
         v = {}
     return {"agents": dict(v.get("agents") or {}), "gyms": dict(v.get("gyms") or {}),
-            "adjust": list(v.get("adjust") or []), "paid": dict(v.get("paid") or {})}
+            "adjust": list(v.get("adjust") or []), "paid": dict(v.get("paid") or {}),
+            "setup": dict(v.get("setup") or {})}
 
 
 def save(sc, data):
@@ -130,16 +137,44 @@ def statement(sc, gyms, data, invoices=None):
         by_gym.setdefault(str(inv.get("gym_id")), []).append(inv)
     rows = []
     for gid, code in links.items():
-        for inv, day, rate, value in commission_lines(by_gym.get(gid, [])):
-            rows.append({"code": code, "month": f"{day:%Y-%m}", "gym": names.get(gid, "Gym"),
+        done = (data.get("setup") or {}).get(gid, {}).get("done_on")
+        for n, (inv, day, rate, value) in enumerate(commission_lines(by_gym.get(gid, []))):
+            month, held = f"{day:%Y-%m}", False
+            if n == 0:                                       # the first payment waits for set-up
+                if not done:
+                    held, month = True, "held"
+                else:
+                    month = max(month, done[:7])
+            rows.append({"code": code, "month": month, "gym": names.get(gid, "Gym"),
                          "plan": f"{gw._text(inv.get('plan'))} ({gw._text(inv.get('period'))})",
                          "paid_on": day.isoformat(), "amount": float(inv.get("amount") or 0),
-                         "rate": rate, "commission": value})
+                         "rate": rate + (", held until set-up is confirmed" if held else ""),
+                         "commission": value, "held": held})
     for a in data["adjust"]:
         rows.append({"code": a.get("code"), "month": a.get("month"), "gym": "Adjustment",
                      "plan": gw._text(a.get("note")), "paid_on": (a.get("at") or "")[:10], "amount": 0.0,
-                     "rate": "", "commission": float(a.get("amount") or 0)})
+                     "rate": "", "commission": float(a.get("amount") or 0), "held": False})
     return sorted(rows, key=lambda r: (r["month"], r["paid_on"]), reverse=True)
+
+
+def setup_status(sc, gym_id, today=None):
+    """What the set-up checks show for one gym: members loaded and check-in days in the last 30 days."""
+    today = today or gw.today_local()
+    out = {"members": 0, "checkin_days": 0}
+    try:
+        r = sc.table("members").select("id", count="exact").eq("gym_id", gym_id).limit(1).execute()
+        out["members"] = int(getattr(r, "count", None) or len(r.data or []))
+    except Exception:
+        pass
+    try:
+        since = (today - timedelta(days=30)).isoformat()
+        rows = (sc.table("checkins").select("checked_in_at").eq("gym_id", gym_id).gte("checked_in_at", since)
+                .limit(5000).execute().data or [])
+        out["checkin_days"] = len({str(x.get("checked_in_at"))[:10] for x in rows if x.get("checked_in_at")})
+    except Exception:
+        pass
+    out["ready"] = out["members"] > 0 and out["checkin_days"] >= SETUP_DAYS
+    return out
 
 
 def owed(rows, data, code, month):
@@ -183,8 +218,9 @@ def render_admin(sc, gyms, audit):
     names = {str(g["gym"]["id"]): g["name"] for g in gyms}
     month = _last_month()
 
-    st.caption("Agents earn 50% of a gym's first paid month, then 10% of each payment for 12 months. A yearly "
-               "payment earns 15%, once. Only cleared payments count. Pay by the 5th for the month before.")
+    st.caption("Agents set gyms up and earn 50% of a gym's first paid month once set-up is confirmed, then 10% of "
+               "each payment for 12 months. A yearly payment earns 15%, once. Only cleared payments count. Pay by "
+               "the 5th for the month before.")
 
     to_pay = sum(max(owed(rows, data, c, month)[1], 0) for c in agents)
     gw.kpi_row([("Agents", str(sum(1 for a in agents.values() if a.get("active", True))), "lime", "active"),
@@ -198,7 +234,7 @@ def render_admin(sc, gyms, audit):
 
     # ---- this month, per agent
     st.markdown("**What each agent is owed**")
-    months = sorted({r["month"] for r in rows} | {month}, reverse=True)
+    months = sorted({r["month"] for r in rows if r["month"] != "held"} | {month}, reverse=True)
     pick = st.selectbox("Month", months, index=months.index(month), format_func=_month_label, key="ag_month")
     summary = []
     for code, a in sorted(agents.items()):
@@ -223,6 +259,39 @@ def render_admin(sc, gyms, audit):
                   {"code": code, "month": pick, "amount": earned})
             st.session_state["adm_flash"] = f"Marked {_money(earned)} for {_month_label(pick)} as paid to {code}."
             st.rerun()
+
+    # ---- set-up: the first month's 50% is held until the agent has set the gym up
+    if links:
+        st.markdown("**Set-up**")
+        st.caption(f"An agent's 50% for a gym's first month is paid once the gym is set up: members loaded and "
+                   f"check-ins recorded on at least {SETUP_DAYS} different days in the last 30. Confirm it here.")
+        status = {gid: setup_status(sc, gid) for gid in links}
+        held = {r["gym"]: r["commission"] for r in rows if r.get("held")}
+        gw.table([{"Gym": names.get(g, "Gym"), "Agent": c, "Members": f"{status[g]['members']:,}",
+                   "Check-in days": f"{status[g]['checkin_days']} of {SETUP_DAYS}",
+                   "Held": _money(held[names.get(g, "Gym")]) if names.get(g, "Gym") in held else "",
+                   "Set-up": ("Confirmed" if (data["setup"].get(g) or {}).get("done_on") else
+                              "Ready to confirm" if status[g]["ready"] else "In progress")}
+                  for g, c in sorted(links.items(), key=lambda x: names.get(x[0], ""))],
+                 pills={"Set-up": {"Confirmed": "lime", "Ready to confirm": "cyan", "In progress": "amber"}})
+        waiting = [g for g in links if not (data["setup"].get(g) or {}).get("done_on")]
+        if waiting:
+            with st.form("ag_setup"):
+                c1, c2 = st.columns([2, 1], vertical_alignment="bottom")
+                g = c1.selectbox("Gym", waiting, format_func=lambda x: names.get(x, "Gym"), key="ag_setup_gym")
+                ok = c2.form_submit_button("Confirm set-up is done", type="primary", use_container_width=True)
+            if ok:
+                if not status[g]["ready"]:
+                    st.error(f"Not yet: {names.get(g)} needs members loaded and check-ins on {SETUP_DAYS} "
+                             f"different days (it has {status[g]['checkin_days']}).")
+                else:
+                    data["setup"][g] = {"done_on": gw.today_local().isoformat(), "by": "admin"}
+                    save(sc, data)
+                    audit(sc, "agent_setup_confirmed", next((x for x in gyms if str(x["gym"]["id"]) == g),
+                                                            {"gym": {"id": g}, "name": names.get(g), "email": None}),
+                          {"code": links[g]})
+                    st.session_state["adm_flash"] = f"Set-up confirmed for {names.get(g)}. Any held 50% now counts."
+                    st.rerun()
 
     # ---- statement
     if rows:
