@@ -16,6 +16,7 @@ import gympulse_command as gc
 import gympulse_grow as gg
 import gympulse_team as gteam
 import gympulse_agents as gag
+import gympulse_onboard as gonb
 import os
 import textwrap
 
@@ -1399,9 +1400,12 @@ if st.session_state.auth_user is None:
                 elif st.session_state.auth_mode == "signup":
 
                     st.markdown(
-                        '<div class="auth-title">Create your free account</div>',
+                        '<div class="auth-title">Book your demo</div>',
                         unsafe_allow_html=True
                     )
+                    st.caption("Create your account and pick a time for a 15-minute call. We show you around "
+                               "and set up your gym together. Your 30 free days start then.")
+                    demo_slots, demo_cfg = gonb.slot_options(supabase)
 
                     st.button(
                         "Back to sign in",
@@ -1426,6 +1430,12 @@ if st.session_state.auth_user is None:
                             "Confirm password",
                             type="password"
                         )
+                        signup_phone = st.text_input("WhatsApp number", placeholder="e.g. 0803 000 0000")
+                        demo_pick = st.selectbox(
+                            "Your demo time (Lagos time)", demo_slots or [], index=None,
+                            placeholder="Choose a time" if demo_slots else "We'll WhatsApp you to pick a time",
+                            format_func=gonb.slot_label
+                        )
                         referral_code = st.text_input(
                             "Referral code (optional)",
                             value=st.session_state.get("ref_code", ""),
@@ -1438,7 +1448,7 @@ if st.session_state.auth_user is None:
                         members_ok = st.checkbox(gl.CONSENT_TEXT)
 
                         signup_submitted = st.form_submit_button(
-                            "Create free account",
+                            "Create account and book my demo",
                             type="primary",
                             use_container_width=True
                         )
@@ -1460,7 +1470,19 @@ if st.session_state.auth_user is None:
                             st.error("Your passwords do not match.")
                         elif len(signup_password) < 8:
                             st.warning("Your password must contain at least 8 characters.")
+                        elif len(gw.whatsapp_digits(signup_phone)) < 10:
+                            st.warning("Please add your WhatsApp number, so we can reach you about your demo.")
+                        elif demo_slots is not None and not demo_pick:
+                            st.warning("Please choose a time for your demo.")
                         else:
+                            demo_booking, demo_error = (None, None)
+                            if demo_pick:
+                                demo_booking, demo_error = gonb.book(
+                                    supabase, demo_cfg, full_name.strip(), signup_email.strip(),
+                                    signup_phone.strip(), business_name.strip(), demo_pick)
+                            if demo_error:
+                                st.error(demo_error)
+                                st.stop()
                             try:
                                 result = supabase.auth.sign_up(
                                     {
@@ -1473,6 +1495,9 @@ if st.session_state.auth_user is None:
                                                 "business_name": business_name.strip(),
                                                 "account_type": "gym_owner",
                                                 "referral_code": gag.clean_code(referral_code) or None,
+                                                "phone": signup_phone.strip(),
+                                                "demo_first": True,
+                                                "demo_at": demo_pick.isoformat() if demo_pick else None,
                                                 "legal": gl.acceptance(signup_email.strip())
                                             }
                                         }
@@ -1509,8 +1534,10 @@ if st.session_state.auth_user is None:
                                                  "or tap Forgot password.")
                                     else:
                                         st.session_state["pending_confirm_email"] = signup_email.strip()
-                                        st.success("Registration submitted! Check your email (and spam) "
-                                                   "for the confirmation link, then come back and sign in.")
+                                        st.success(("Your demo is booked for " + gonb.slot_label(demo_pick) + ". "
+                                                    if demo_pick else "")
+                                                   + "Check your email (and spam) for the confirmation link, "
+                                                   "then come back and sign in.")
 
                             except Exception as error:
                                 reason = str(error).lower()
@@ -2618,6 +2645,17 @@ try:
         _bill_upsell = True
 except Exception as _bill_error:
     gmon.capture(_bill_error, "billing")
+
+# Signed up through a demo and not set up yet: "Your demo is booked" instead of the app
+try:
+    if not gteam.is_staff() and not gadm.is_admin() and gonb.waiting(st.session_state.get("gym_id")):
+        gonb.render_waiting(log_out)
+        gw.apply_theme(st.session_state.get("theme", "dark"))
+        st.stop()
+except Exception as _onb_error:
+    if type(_onb_error).__name__ in ("StopException", "RerunException"):
+        raise
+    gmon.capture(_onb_error, "onboarding")
 
 if _bill_upsell:
     gbill.render_upsell(supabase, st.session_state.get("gym_id"), page)
