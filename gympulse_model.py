@@ -142,7 +142,8 @@ def assess_members(data):
     features = prepare_member_data(
         data.assign(membership_type=data["membership_type"].map(gw.model_plan)))
 
-    probabilities = model.predict_proba(features)[:, 1]
+    # Never 0% or 100%: an estimate can't be certain, and "100%" reads as a mistake to an owner
+    probabilities = np.clip(model.predict_proba(features)[:, 1], 0.01, 0.99)
 
     results = data.copy()
 

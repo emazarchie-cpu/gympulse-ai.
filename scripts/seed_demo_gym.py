@@ -34,6 +34,9 @@ TODAY = datetime.now(LAGOS).date()
 SEED = 20261111
 PRICES = {"Monthly": 25000, "Quarterly": 65000, "Yearly": 240000}
 DAYS = {"Monthly": 30, "Quarterly": 90, "Yearly": 365}
+# "slipping" members (Medium risk): visit chance before 3 weeks ago, visit chance since, fewest quiet days
+# (last visit 9 to 13 days ago), renewal range in days
+SLIP = (0.35, 0.2, 10, 14, 28)
 FIRST = ["Adaeze", "Tunde", "Chioma", "Emeka", "Funke", "Ibrahim", "Ngozi", "Segun", "Aisha", "Kelechi",
          "Bisi", "Uche", "Zainab", "Femi", "Amaka", "Yusuf", "Kemi", "Obinna", "Halima", "Dayo",
          "Ifeoma", "Musa", "Toyin", "Chidi", "Fatima", "Bayo", "Nneka", "Sani", "Yemi", "Ebuka"]
@@ -155,10 +158,14 @@ def visit_days(rng, kind, joined):
         p = {"regular": 0.45, "steady": 0.3,
              "fading": 0.4 if age > 30 else (0.12 if age > 14 else 0.0),
              "lapsed": 0.35 if age > 45 else 0.0,
+             "slipping": SLIP[0] if age > 21 else SLIP[1],
              "new": 0.5}[kind]
         if rng.random() < p:
             days.append(d)
         d += timedelta(days=1)
+    if kind == "slipping":                       # last visit 9-13 days ago, then nothing
+        quiet = rng.randint(SLIP[2], SLIP[2] + 4)
+        days = [x for x in days if (TODAY - x).days > quiet] + [TODAY - timedelta(days=quiet)]
     if kind in ("regular", "steady", "new") and (not days or (TODAY - days[-1]).days > 5):
         days.append(TODAY - timedelta(days=rng.randint(0, 3)))
     return sorted(set(days))
@@ -174,7 +181,7 @@ def build(sc, gym_id, rng):
          "bio": "One-to-one coaching for beginners."}])
     log(f"  trainers: {len(trainers)}")
 
-    kinds = ["regular"] * 26 + ["steady"] * 12 + ["fading"] * 10 + ["lapsed"] * 6 + ["new"] * 6
+    kinds = ["regular"] * 22 + ["steady"] * 10 + ["slipping"] * 12 + ["fading"] * 7 + ["lapsed"] * 4 + ["new"] * 5
     rng.shuffle(kinds)
     people, used = [], set()
     for i, kind in enumerate(kinds):
@@ -189,6 +196,8 @@ def build(sc, gym_id, rng):
             end = TODAY - timedelta(days=rng.randint(5, 40))
         elif kind == "fading":
             end = TODAY + timedelta(days=rng.randint(2, 12))
+        elif kind == "slipping":                         # coming less than before: the Medium-risk members
+            end = TODAY + timedelta(days=rng.randint(SLIP[3], SLIP[4]))
         else:
             end = TODAY + timedelta(days=rng.randint(3, DAYS[plan]))
         people.append({"kind": kind, "name": name, "plan": plan, "joined": joined, "end": end, "i": i})
