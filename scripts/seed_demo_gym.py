@@ -265,7 +265,7 @@ def build(sc, gym_id, rng):
     for j, p in enumerate(hmo):
         rel = j < 5
         fields = {"hmo_provider": "Sample Health HMO" if rel else "Demo Care HMO", "hmo_id": f"{'SH' if rel else 'DC'}-{20391 + j}",
-                  "hmo_employer": rng.choice(["Lekki Tech Ltd", "Harbour Logistics", "Ikeja Foods"]),
+                  "hmo_employer": rng.choice(["Sample Company Ltd", "Example Logistics Ltd", "Demo Foods Ltd"]),
                   "hmo_valid_until": (TODAY + timedelta(days=rng.choice([20, 60, 120, 200]))).isoformat(),
                   "hmo_plan": "Gold" if rel else "Platinum", "hmo_weekly_limit": 2 if rel else 3}
         try:
@@ -293,7 +293,7 @@ def build(sc, gym_id, rng):
     log(f"  HMO members: {len(hmo)}")
 
     # A corporate plan
-    comp = try_insert(sc, "companies", [{"gym_id": gym_id, "name": "Lekki Tech Ltd", "hr_name": "Ngozi Eze",
+    comp = try_insert(sc, "companies", [{"gym_id": gym_id, "name": "Sample Company Ltd", "hr_name": "Ngozi Eze",
                                           "hr_email": "hr@example.com", "seats": 10, "monthly_fee": 150000,
                                           "billing_cycle": "quarterly",
                                           "next_renewal": (TODAY + timedelta(days=5)).isoformat()}])
@@ -304,7 +304,7 @@ def build(sc, gym_id, rng):
                 sc.table("members").update({"company_id": comp[0]["id"]}).eq("id", p["id"]).execute()
             except Exception:
                 pass
-        log(f"  corporate plan: Lekki Tech Ltd, {len(staff)} staff")
+        log(f"  corporate plan: Sample Company Ltd, {len(staff)} staff")
 
 
 def check_sign_in(password):

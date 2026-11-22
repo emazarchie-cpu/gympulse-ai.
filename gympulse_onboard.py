@@ -271,7 +271,7 @@ def render_start(supabase):
 
             gw._md('<div class="st-sec">Your gym</div>')
             c5, c6 = st.columns(2)
-            gym = c5.text_input("Gym name", placeholder="e.g. Pulse Fitness")
+            gym = c5.text_input("Gym name", placeholder="Your gym's name")
             area = c6.text_input("Area and city", placeholder="e.g. Lekki, Lagos")
             c7, c8 = st.columns(2)
             members = c7.selectbox("How many members?", MEMBERS, index=None, placeholder="Choose")
