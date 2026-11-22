@@ -35,7 +35,7 @@ SEED = 20261111
 PRICES = {"Monthly": 25000, "Quarterly": 65000, "Yearly": 240000}
 DAYS = {"Monthly": 30, "Quarterly": 90, "Yearly": 365}
 # "slipping" members (Medium risk): visit chance before 3 weeks ago, visit chance since, fewest quiet days
-# (last visit 9 to 13 days ago), renewal range in days
+# (last visit 10 to 14 days ago), renewal range in days
 SLIP = (0.35, 0.2, 10, 14, 28)
 FIRST = ["Adaeze", "Tunde", "Chioma", "Emeka", "Funke", "Ibrahim", "Ngozi", "Segun", "Aisha", "Kelechi",
          "Bisi", "Uche", "Zainab", "Femi", "Amaka", "Yusuf", "Kemi", "Obinna", "Halima", "Dayo",
@@ -163,7 +163,7 @@ def visit_days(rng, kind, joined):
         if rng.random() < p:
             days.append(d)
         d += timedelta(days=1)
-    if kind == "slipping":                       # last visit 9-13 days ago, then nothing
+    if kind == "slipping":                       # last visit 10 to 14 days ago, then nothing
         quiet = rng.randint(SLIP[2], SLIP[2] + 4)
         days = [x for x in days if (TODAY - x).days > quiet] + [TODAY - timedelta(days=quiet)]
     if kind in ("regular", "steady", "new") and (not days or (TODAY - days[-1]).days > 5):
