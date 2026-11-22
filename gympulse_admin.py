@@ -108,7 +108,8 @@ def _all_gyms(sc):
                     "ref_code": gw._text((getattr(user, "user_metadata", None) or {}).get("referral_code")),
                     "demo_first": bool((getattr(user, "user_metadata", None) or {}).get("demo_first")),
                     "demo_at": (getattr(user, "user_metadata", None) or {}).get("demo_at"),
-                    "signup_phone": gw._text((getattr(user, "user_metadata", None) or {}).get("phone"))})
+                    "signup_phone": gw._text((getattr(user, "user_metadata", None) or {}).get("phone")),
+                    "onboarding": dict((getattr(user, "user_metadata", None) or {}).get("onboarding") or {})})
     return sorted(out, key=lambda x: x["name"].lower())
 
 

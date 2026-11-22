@@ -699,7 +699,7 @@ def render_landing_pricing(icon):
         whole plan: try your own numbers in the calculator above. Your first 30 days are free, with no card. After that, choose the plan that fits your gym's
         size and pay month by month, or for the whole year and spend less. Chains save up to 20% per branch.</div></div>""")
     gw._md(landing_cards_html(ps, icon)
-           + '<div class="lx-demo-cta" style="margin-top:22px"><a class="lx-btn lx-btn-primary" href="#get-started">'
+           + '<div class="lx-demo-cta" style="margin-top:22px"><a class="lx-btn lx-btn-primary" href="?start=1" target="_self">'
              'Start your free month</a></div>'
            + f'<div class="lx-plan-foot">All prices in naira. Card, bank transfer or USSD through Paystack. '
              f'{gw._esc(p.get("note") or "")}</div>')

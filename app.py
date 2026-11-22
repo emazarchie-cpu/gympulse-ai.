@@ -1107,6 +1107,13 @@ if st.query_params.get("guide"):
     gtr.render_guide(supabase, st.query_params.get("guide"))
     st.stop()
 
+# "Get started": create an account by booking the set-up demo (agent links ?ref=CODE land here too)
+if ((st.query_params.get(gonb.START_PARAM) or st.query_params.get(gag.REF_PARAM))
+        and not st.session_state.get("auth_user")):
+    gd.apply()
+    gonb.render_start(supabase)
+    st.stop()
+
 # A sales agent reads and signs their agreement (private link from Admin → Agents, no sign-in)
 if st.query_params.get(gag.SIGN_PARAM):
     gd.apply()
@@ -1249,7 +1256,7 @@ if st.session_state.auth_user is None:
     # -------------------------
 
     if "auth_mode" not in st.session_state:
-        st.session_state.auth_mode = "signup" if st.session_state.get("ref_code") else "login"
+        st.session_state.auth_mode = "login"
 
     if "reset_email_sent" not in st.session_state:
         st.session_state.reset_email_sent = False
@@ -1306,8 +1313,7 @@ if st.session_state.auth_user is None:
                         st.success("Password updated. Sign in with your new password.")
                     st.button(
                         "Sign up",
-                        on_click=set_auth_mode,
-                        args=("signup",),
+                        on_click=lambda: st.query_params.update({gonb.START_PARAM: "1"}),
                         key="to_signup"
                     )
 
@@ -1398,158 +1404,10 @@ if st.session_state.auth_user is None:
                 # ---------------- SIGNUP PAGE ----------------
 
                 elif st.session_state.auth_mode == "signup":
-
-                    st.markdown(
-                        '<div class="auth-title">Book your demo</div>',
-                        unsafe_allow_html=True
-                    )
-                    st.caption("Create your account and pick a time for a 15-minute call. We show you around "
-                               "and set up your gym together. Your 30 free days start then.")
-                    demo_slots, demo_cfg = gonb.slot_options(supabase)
-
-                    st.button(
-                        "Back to sign in",
-                        on_click=set_auth_mode,
-                        args=("login",),
-                        key="back_to_login_from_signup"
-                    )
-
-                    with st.form("signup_form", border=False):
-                        full_name = st.text_input("Your full name")
-                        business_name = st.text_input(
-                            "Gym or company name",
-                            placeholder="e.g. Nuelarch Gym"
-                        )
-                        signup_email = st.text_input("Email address", key="signup_email")
-                        signup_password = st.text_input(
-                            "Create password",
-                            type="password",
-                            key="signup_password"
-                        )
-                        confirm_password = st.text_input(
-                            "Confirm password",
-                            type="password"
-                        )
-                        signup_phone = st.text_input("WhatsApp number", placeholder="e.g. 0803 000 0000")
-                        demo_pick = st.selectbox(
-                            "Your demo time (Lagos time)", demo_slots or [], index=None,
-                            placeholder="Choose a time" if demo_slots else "We'll WhatsApp you to pick a time",
-                            format_func=gonb.slot_label
-                        )
-                        referral_code = st.text_input(
-                            "Referral code (optional)",
-                            value=st.session_state.get("ref_code", ""),
-                            placeholder="e.g. AGENT-TUNDE",
-                            help="If someone from GymPulse AI introduced you, enter their code."
-                        )
-                        agree = st.checkbox(
-                            "I agree to the Terms of Service, Privacy Policy and Data Processing Agreement"
-                        )
-                        members_ok = st.checkbox(gl.CONSENT_TEXT)
-
-                        signup_submitted = st.form_submit_button(
-                            "Create account and book my demo",
-                            type="primary",
-                            use_container_width=True
-                        )
-
-                    if signup_submitted:
-                        if not all([
-                            full_name.strip(),
-                            business_name.strip(),
-                            signup_email.strip(),
-                            signup_password,
-                            confirm_password
-                        ]):
-                            st.warning("Please complete every field.")
-                        elif not agree or not members_ok:
-                            st.warning(
-                                "Please tick both boxes: the terms, and that you have your members' permission."
-                            )
-                        elif signup_password != confirm_password:
-                            st.error("Your passwords do not match.")
-                        elif len(signup_password) < 8:
-                            st.warning("Your password must contain at least 8 characters.")
-                        elif len(gw.whatsapp_digits(signup_phone)) < 10:
-                            st.warning("Please add your WhatsApp number, so we can reach you about your demo.")
-                        elif demo_slots is not None and not demo_pick:
-                            st.warning("Please choose a time for your demo.")
-                        else:
-                            demo_booking, demo_error = (None, None)
-                            if demo_pick:
-                                demo_booking, demo_error = gonb.book(
-                                    supabase, demo_cfg, full_name.strip(), signup_email.strip(),
-                                    signup_phone.strip(), business_name.strip(), demo_pick)
-                            if demo_error:
-                                st.error(demo_error)
-                                st.stop()
-                            try:
-                                result = supabase.auth.sign_up(
-                                    {
-                                        "email": signup_email.strip(),
-                                        "password": signup_password,
-                                        "options": {
-                                            "email_redirect_to": "https://usegympulseai.com",
-                                            "data": {
-                                                "full_name": full_name.strip(),
-                                                "business_name": business_name.strip(),
-                                                "account_type": "gym_owner",
-                                                "referral_code": gag.clean_code(referral_code) or None,
-                                                "phone": signup_phone.strip(),
-                                                "demo_first": True,
-                                                "demo_at": demo_pick.isoformat() if demo_pick else None,
-                                                "legal": gl.acceptance(signup_email.strip())
-                                            }
-                                        }
-                                    }
-                                )
-
-                                if result.session and result.user:
-                                    st.session_state.auth_user = {
-                                        "id": str(result.user.id),
-                                        "email": result.user.email
-                                    }
-
-                                    profile_result = (
-                                        supabase.table("profiles")
-                                        .select("*")
-                                        .eq("id", str(result.user.id))
-                                        .execute()
-                                    )
-
-                                    if profile_result.data:
-                                        st.session_state.user_profile = profile_result.data[0]
-                                    else:
-                                        st.session_state.user_profile = {
-                                            "full_name": full_name.strip(),
-                                            "business_name": business_name.strip()
-                                        }
-
-                                    gw.show_boot_overlay()
-                                    st.rerun()
-
-                                else:
-                                    if result.user and not (result.user.identities or []):
-                                        st.error("This email is already registered. Sign in instead, "
-                                                 "or tap Forgot password.")
-                                    else:
-                                        st.session_state["pending_confirm_email"] = signup_email.strip()
-                                        st.success(("Your demo is booked for " + gonb.slot_label(demo_pick) + ". "
-                                                    if demo_pick else "")
-                                                   + "Check your email (and spam) for the confirmation link, "
-                                                   "then come back and sign in.")
-
-                            except Exception as error:
-                                reason = str(error).lower()
-                                if "rate" in reason:
-                                    st.session_state["pending_confirm_email"] = signup_email.strip()
-                                    st.error("Several emails were sent to this address recently. "
-                                             "Wait a few minutes, then tap Resend below.")
-                                elif "already" in reason:
-                                    st.error("This email is already registered. Sign in instead.")
-                                st.error("Registration failed. Please check your details and try again.")
-
-                    resend_block()
+                    # Sign-up lives on its own page now (?start=1): details, a few questions and the demo time
+                    st.session_state.auth_mode = "login"
+                    st.query_params[gonb.START_PARAM] = "1"
+                    st.rerun()
 
                 # ---------------- FORGOT PASSWORD PAGE ----------------
 
