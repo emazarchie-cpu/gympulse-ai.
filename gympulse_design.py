@@ -1519,7 +1519,7 @@ def landing3_top(lockup_uri):
         <div class="l3-demo">{_l3_strip("110101101101101011000000000000")}
           <div class="l3-axis"><span>1 Oct</span><span>Last visit 18 Oct</span><span>Today</span></div></div>
         <p class="l3-lead">GymPulse AI spots the gaps in your check-ins and tells you who to call, while one call is still enough.</p>
-        <div class="l3-cta"><a class="l3-btn" href="#get-started" target="_self">Start your free trial</a>
+        <div class="l3-cta"><a class="l3-btn" href="?start=1" target="_self">Start your free trial</a>
           <a class="l3-link" href="?demo=book" target="_self">Book a 15-minute demo</a></div>
       </div>
       <div class="l3-works"><small>Works alongside what your gym already uses</small>
@@ -1579,7 +1579,7 @@ def landing3_end():
       <div class="l3-end">
         <div class="l3-h2 l3-serif" role="heading" aria-level="2">Call them while one call is still enough.</div>
         <p class="l3-sub">Every feature free for 30 days. Setting up takes about a minute.</p>
-        <div class="l3-cta"><a class="l3-btn" href="#get-started" target="_self">Start your free trial</a>
+        <div class="l3-cta"><a class="l3-btn" href="?start=1" target="_self">Start your free trial</a>
           <a class="l3-link" href="?demo=book" target="_self">Book a 15-minute demo</a></div>
       </div>
       <div class="l3-foot"><a href="/gym-management-software-nigeria.html" target="_self">Member retention platform</a>

@@ -41,41 +41,41 @@ TEMPLATES = {
         "category": "UTILITY",
         "body": "Hi {{1}}, your {{2}} membership at {{3}} {{4}}. Tap Renew now to see how to pay, or Talk to us "
                 "if you have a question.",
-        "example": ["Ada", "monthly", "Pulse Fitness Lekki", "ends on Fri 14 Nov"],
+        "example": ["Ada", "monthly", "Demo Fitness Lagos", "ends on Fri 14 Nov"],
         "buttons": ["Renew now", "Talk to us"],
     },
     "gp_we_miss_you": {
         "category": "MARKETING",
         "body": "Hi {{1}}, we've missed you at {{2}}! It's been {{3}} days since your last visit. Shall we see you "
                 "this week?",
-        "example": ["Ada", "Pulse Fitness Lekki", "12"],
+        "example": ["Ada", "Demo Fitness Lagos", "12"],
         "buttons": ["Yes, I'll come in", "Pause my membership"],
     },
     "gp_new_member_checkin": {
         "category": "MARKETING",
         "body": "Hi {{1}}, how are your first weeks at {{2}} going? If there's anything we can help with, from your "
                 "programme to class times, just tap below.",
-        "example": ["Ada", "Pulse Fitness Lekki"],
+        "example": ["Ada", "Demo Fitness Lagos"],
         "buttons": ["Going great", "I'd like some help"],
     },
     "gp_celebration": {
         "category": "MARKETING",
         "body": "Hi {{1}}, a quick note from {{2}}: {{3}} Keep up the great work! 🎉",
-        "example": ["Ada", "Pulse Fitness Lekki", "you trained 14 times in October."],
+        "example": ["Ada", "Demo Fitness Lagos", "you trained 14 times in October."],
         "buttons": ["Thank you!"],
     },
     "gp_happiness_check": {
         "category": "MARKETING",
         "body": "Hi {{1}}, one quick question from {{2}}: how happy are you with the gym at the moment? Tap an "
                 "answer, it goes straight to the team.",
-        "example": ["Ada", "Pulse Fitness Lekki"],
+        "example": ["Ada", "Demo Fitness Lagos"],
         "buttons": ["Love it", "Happy", "It's okay", "Not happy"],
     },
     "gp_member_portal": {
         "category": "UTILITY",
         "body": "Hi {{1}}, here is your private link to your {{2}} membership page: renew, see your check-in code, "
                 "visits, rewards and classes. Tap the button below to open it.",
-        "example": ["Ada", "Pulse Fitness Lekki"],
+        "example": ["Ada", "Demo Fitness Lagos"],
         "buttons": [],
         "url_button": {"text": "Open my membership", "base": "https://usegympulseai.com/?me=",
                        "example": "https://usegympulseai.com/?me=3f6c1d2e-8a4b-4c1f-9d2e-5b7a8c9d0e1f"},
@@ -85,7 +85,7 @@ TEMPLATES = {
         "body": "Hi {{1}}, your GymPulse AI list for {{2}} this week. Members to call: {{3}}. Open "
                 "usegympulseai.com to see why each one was flagged and log your calls. You can turn this message "
                 "off in Settings.",
-        "example": ["Emeka", "Pulse Fitness Lekki",
+        "example": ["Emeka", "Demo Fitness Lagos",
                     "Ada (14 days since last visit); Tunde (renews in 3 days); Kemi (attendance dropping)"],
         "buttons": [],
     },

@@ -105,7 +105,11 @@ def _all_gyms(sc):
                     "phone": gw._text(s.get("biz_phone") or brand.get("whatsapp")),
                     "name": gw._text(p.get("business_name") or g.get("business_name"), "Gym"),
                     "owner": gw._text(p.get("full_name")),
-                    "ref_code": gw._text((getattr(user, "user_metadata", None) or {}).get("referral_code"))})
+                    "ref_code": gw._text((getattr(user, "user_metadata", None) or {}).get("referral_code")),
+                    "demo_first": bool((getattr(user, "user_metadata", None) or {}).get("demo_first")),
+                    "demo_at": (getattr(user, "user_metadata", None) or {}).get("demo_at"),
+                    "signup_phone": gw._text((getattr(user, "user_metadata", None) or {}).get("phone")),
+                    "onboarding": dict((getattr(user, "user_metadata", None) or {}).get("onboarding") or {})})
     return sorted(out, key=lambda x: x["name"].lower())
 
 
@@ -694,6 +698,8 @@ def render_gyms(sc):
                 ("Active gyms", str(active), "lime", "check-ins in the last 30 days"),
                 ("Members", f"{total_members:,}", "amber", "across all gyms"),
                 ("Suspended", str(sum(_is_banned(g) for g in gyms)), "grey", "login blocked")])
+    import gympulse_onboard as gonb
+    gonb.render_admin(sc, gyms, audit)
     render_at_risk(sc, gyms, stats)
 
     c1, c2 = st.columns([3, 1])

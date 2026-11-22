@@ -425,7 +425,7 @@ def render_collect(supabase, gym_id, owner_id):
         c1, c2, c3 = st.columns(3)
         bank = c1.text_input("Bank", pay.get("bank_name", ""), placeholder="e.g. GTBank")
         acct = c2.text_input("Account number", pay.get("bank_account", ""), placeholder="0123456789")
-        holder = c3.text_input("Account name", pay.get("bank_holder", ""), placeholder="e.g. Nuelarch Fitness Ltd")
+        holder = c3.text_input("Account name", pay.get("bank_holder", ""), placeholder="Your business name, as on the bank account")
         link = st.text_input("Paystack payment page (optional)", pay.get("paystack_link", ""),
                              placeholder="e.g. https://paystack.com/pay/your-gym",
                              help="Create a payment page in your Paystack dashboard (Payments → Payment pages) and paste its link.")
@@ -1448,7 +1448,7 @@ def render_corporate(supabase, gym_id):
     with st.expander("Add a company", expanded=not comps):
         with st.form("grow_co_new", clear_on_submit=True):
             c1, c2 = st.columns(2)
-            name = c1.text_input("Company name", placeholder="e.g. Lekki Tech Ltd")
+            name = c1.text_input("Company name", placeholder="The company that pays for its staff")
             seats = c2.number_input("Seats on the plan", 0, 5000, 10)
             c3, c4, c5 = st.columns(3)
             hr = c3.text_input("HR contact name")
