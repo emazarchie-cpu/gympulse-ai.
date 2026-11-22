@@ -1230,8 +1230,9 @@ html body .st-key-brand_home button {
     padding: 0 !important; display: block !important; }
 html body .st-key-brand_home button > * { display: none !important; }
 html body .st-key-brand_home button:hover { opacity: .9; }
-html body .st-key-top_nav .nav-tagline { text-align: left !important; margin: 6px 0 0 !important;
-    font-size: 11px !important; white-space: normal !important; }
+html body .st-key-top_nav .nav-tagline { text-align: left !important; margin: -2px 0 0 4px !important;
+    font-size: 10.5px !important; line-height: 1.35 !important; white-space: nowrap !important;
+    color: #8A96AB !important; letter-spacing: .01em; }
 html body .st-key-top_nav { padding-bottom: 14px; margin-bottom: 20px; }
 @media (max-width: 640px) { html body .gp-lockup { padding-top: 20px; } }
 

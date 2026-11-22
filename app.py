@@ -2411,7 +2411,7 @@ with st.container(key="top_nav"):
         st.button("GymPulse AI", on_click=go_home, key="brand_home",
                   help="Go to Dashboard")
         st.markdown(
-            '<div class="nav-tagline">Smarter insights. Stronger member retention.</div>',
+            '<div class="nav-tagline">Smarter insights.<br>Stronger member retention.</div>',
             unsafe_allow_html=True
         )
 
