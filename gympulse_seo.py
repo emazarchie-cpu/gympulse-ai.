@@ -689,6 +689,24 @@ def write_static(static_dir, ping=True):
         n += 1
         if rel.endswith(".html"):
             changed.append(f"{SITE}/{rel}")
+    # Files served as they are, e.g. usegympulseai.com/partner-proposal.pdf (kept in assets/public/)
+    pub = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "public")
+    for name in (os.listdir(pub) if os.path.isdir(pub) else []):
+        src, dst = os.path.join(pub, name), os.path.join(static_dir, name)
+        try:
+            with open(src, "rb") as f:
+                data = f.read()
+            try:
+                with open(dst, "rb") as f:
+                    if f.read() == data:
+                        continue
+            except OSError:
+                pass
+            with open(dst, "wb") as f:
+                f.write(data)
+            n += 1
+        except OSError:
+            pass
     if changed and ping:
         indexnow([SITE + "/"] + changed)
     return n
