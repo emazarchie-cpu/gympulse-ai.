@@ -228,7 +228,9 @@ def due_messages(supabase, gym_id, profile=None, today=None):
             if ref:
                 plan, amount = gg.plan_price(m)
                 subject, body = gg.renewal_email(m["full_name"], amount, plan, end, pay, gg.member_story(md, ck))
-                out.append(("renewal", md, ref, subject, body, gg.renewal_buttons(pay)))
+                import gympulse_memberpay as gmp
+                out.append(("renewal", md, ref, subject, body,
+                            gg.renewal_buttons(gmp.with_member_link(pay, gym_id, m["id"]))))
         if auto["missed"]["on"] and end is not None and end >= today and m["id"] in last.index:
             lv = last[m["id"]].date()
             away = (today - lv).days
