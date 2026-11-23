@@ -785,9 +785,20 @@ def paystack_key():
 
 
 def _paystack(method, path, **kw):
+    """Call the Paystack API. Reads (GET) are retried up to 3 times when Paystack is slow or the connection
+    drops; anything that creates or changes something is sent once."""
+    import time
     import requests
-    r = requests.request(method, PAYSTACK_API + path, timeout=25,
-                         headers={"Authorization": f"Bearer {paystack_key()}"}, **kw)
+    tries = 3 if method == "GET" else 1
+    for n in range(tries):
+        try:
+            r = requests.request(method, PAYSTACK_API + path, timeout=25,
+                                 headers={"Authorization": f"Bearer {paystack_key()}"}, **kw)
+            break
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+            if n == tries - 1:
+                raise
+            time.sleep(3 * (n + 1))
     try:
         return r.json()
     except Exception:

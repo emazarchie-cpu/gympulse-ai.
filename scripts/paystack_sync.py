@@ -26,7 +26,17 @@ def main():
     if not gbill.paystack_key():
         print("PAYSTACK_SECRET_KEY not set: skipped")
         return 0
-    n = gbill.reconcile_paystack(sc, days=3)
+    try:
+        n = gbill.reconcile_paystack(sc, days=3)
+    except Exception as error:
+        import requests
+        if not isinstance(error, (requests.exceptions.Timeout, requests.exceptions.ConnectionError)):
+            raise
+        # Paystack was slow or unreachable 3 times in a row. Nothing is lost: every run looks back over the
+        # last 3 days, so the next run (in 15 minutes) applies anything missed. Reported, not failed.
+        gmon.capture(error, "paystack sync: Paystack not reachable")
+        print(f"Paystack didn't answer this time ({type(error).__name__}). The next run will catch up.")
+        return 0
     print(f"Paystack payments: {n} switched on")
     return 0
 
