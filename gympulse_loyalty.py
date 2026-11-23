@@ -50,7 +50,7 @@ LOYALTY_DEFAULTS = {
                {"name": "Gold", "points": 3000, "perk": "A free personal training session every quarter"}],
 }
 AUTO_DEFAULTS = {
-    "renewal": {"on": False, "days": 3},
+    "renewal": {"on": False, "days": 3, "on_day": True, "lapsed": True, "lapsed_days": 3},
     "missed": {"on": False, "days": 10, "pause": True},
     "reward": {"on": False},
     "week1": {"on": False},
@@ -214,12 +214,21 @@ def due_messages(supabase, gym_id, profile=None, today=None):
                     out.append(("hmo_cover", md, ref) + hmo_cover_letter(md, cover))
         if auto["renewal"]["on"] and end is not None and not hmo and not gw.is_company(md) and not side_by_side:   # HR is reminded
             left = (end - today).days
-            if 0 <= left <= int(auto["renewal"]["days"]):
-                ref = f"end:{end.isoformat()}"
-                if (m["id"], "renewal", ref) not in sent:
-                    plan, amount = gg.plan_price(m)
-                    subject, body = gg.renewal_email(m["full_name"], amount, plan, end, pay, gg.member_story(md, ck))
-                    out.append(("renewal", md, ref, subject, body, gg.renewal_buttons(pay)))
+            first_ref = f"end:{end.isoformat()}"
+            ref = None
+            if 0 <= left <= int(auto["renewal"]["days"]) and (m["id"], "renewal", first_ref) not in sent:
+                ref = first_ref                                   # the first reminder, N days before
+            elif (left == 0 and auto["renewal"].get("on_day", True)
+                  and (m["id"], "renewal", f"today:{end.isoformat()}") not in sent):
+                ref = f"today:{end.isoformat()}"                   # a second one on the day it ends
+            elif (auto["renewal"].get("lapsed", True)
+                  and -int(auto["renewal"].get("lapsed_days", 3)) - 3 <= left <= -int(auto["renewal"].get("lapsed_days", 3))
+                  and (m["id"], "renewal", f"lapsed:{end.isoformat()}") not in sent):
+                ref = f"lapsed:{end.isoformat()}"                  # one more a few days after it lapsed (not renewed)
+            if ref:
+                plan, amount = gg.plan_price(m)
+                subject, body = gg.renewal_email(m["full_name"], amount, plan, end, pay, gg.member_story(md, ck))
+                out.append(("renewal", md, ref, subject, body, gg.renewal_buttons(pay)))
         if auto["missed"]["on"] and end is not None and end >= today and m["id"] in last.index:
             lv = last[m["id"]].date()
             away = (today - lv).days
@@ -627,6 +636,12 @@ def render_auto(supabase, gym_id, owner_id):
                                   "cover is ending instead. Staff on a corporate plan aren't asked either: "
                                   "their HR contact gets one reminder a week before the company plan renews.")
             r_days = c2.number_input("Days before it ends", 1, 14, int(auto["renewal"]["days"]))
+            c7, c8 = st.columns([1.3, 1])
+            r_day = c7.checkbox("Remind them again on the day it ends", value=bool(auto["renewal"].get("on_day", True)))
+            r_lap = c8.checkbox("And if it lapses", value=bool(auto["renewal"].get("lapsed", True)),
+                                help="One more message a few days after the plan ended, if they haven't renewed.")
+            r_lap_days = st.number_input("Days after it lapses", 1, 14, int(auto["renewal"].get("lapsed_days", 3)),
+                                         disabled=not r_lap)
             c3, c4 = st.columns([1.3, 1])
             m_on = c3.toggle("\"We missed you\"", value=auto["missed"]["on"],
                              help="Only for members whose membership is still running.")
@@ -670,7 +685,8 @@ def render_auto(supabase, gym_id, owner_id):
                                   help="A limit so you don't send too many at once. The free email plan allows 100 a day.")
         if st.form_submit_button("Save", type="primary"):
             gg._save_settings(supabase, owner_id, {"auto_messages": {
-                "renewal": {"on": bool(r_on), "days": int(r_days)},
+                "renewal": {"on": bool(r_on), "days": int(r_days), "on_day": bool(r_day), "lapsed": bool(r_lap),
+                            "lapsed_days": int(r_lap_days)},
                 "missed": {"on": bool(m_on), "days": int(m_days), "pause": bool(pause_on)},
                 "welcome": {"on": bool(w_on)}, "progress": {"on": bool(pr_on)},
                 "week1": {"on": bool(wk_on)}, "milestone": {"on": bool(ms_on)}, "level": {"on": bool(lv_on)},
