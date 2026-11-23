@@ -822,15 +822,16 @@ span[data-baseweb="tag"] span { color: #B7F34A !important; }
     [data-testid="stHorizontalBlock"]:has(.kpi) { flex-wrap: wrap !important; gap: .6rem !important; }
     [data-testid="stHorizontalBlock"]:has(.kpi) > [data-testid="stColumn"] {
         flex: 1 1 calc(50% - .6rem) !important; min-width: calc(50% - .6rem) !important; }
-    [data-testid="stHorizontalBlock"]:has(.row-tight) { flex-wrap: nowrap !important; }
-    [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"] { min-width: 0 !important; }
+    /* a row that starts with an avatar (.row-tight) stays one row; only that row, not a layout around it */
+    [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"] > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] .row-tight) { flex-wrap: nowrap !important; }
+    [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"] > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] .row-tight) > [data-testid="stColumn"] { min-width: 0 !important; }
     /* Dashboard priorities in a narrow window: avatar and name on top, the buttons underneath */
-    html body [data-testid="stHorizontalBlock"]:has(.cc-pri-name):has(.row-tight) { flex-wrap: wrap !important; }
-    html body [data-testid="stHorizontalBlock"]:has(.cc-pri-name):has(.row-tight) > [data-testid="stColumn"]:nth-child(1) {
+    html body [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"] > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] .row-tight):has(.cc-pri-name) { flex-wrap: wrap !important; }
+    html body [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"] > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] .row-tight):has(.cc-pri-name) > [data-testid="stColumn"]:nth-child(1) {
         flex: 0 0 48px !important; min-width: 48px !important; }
-    html body [data-testid="stHorizontalBlock"]:has(.cc-pri-name):has(.row-tight) > [data-testid="stColumn"]:nth-child(2) {
+    html body [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"] > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] .row-tight):has(.cc-pri-name) > [data-testid="stColumn"]:nth-child(2) {
         flex: 1 1 calc(100% - 64px) !important; min-width: 0 !important; }
-    html body [data-testid="stHorizontalBlock"]:has(.cc-pri-name):has(.row-tight) > [data-testid="stColumn"]:nth-child(3) {
+    html body [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"] > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] .row-tight):has(.cc-pri-name) > [data-testid="stColumn"]:nth-child(3) {
         flex: 1 1 100% !important; min-width: 100% !important; }
 }
 """
@@ -841,22 +842,22 @@ MOBILE_ROWS_CSS = """
 @media (max-width: 640px) {
     [data-testid="stHorizontalBlock"]:has(.th) { display: none !important; }
 
-    [data-testid="stHorizontalBlock"]:has(.row-tight):not(:has(.kb-head)) {
+    [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"] > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] .row-tight):not(:has(.kb-head)) {
         flex-wrap: wrap !important;
         gap: 0.4rem 0.6rem !important;
         align-items: center !important;
     }
-    [data-testid="stHorizontalBlock"]:has(.row-tight):not(:has(.kb-head)) > [data-testid="stColumn"] {
+    [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"] > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] .row-tight):not(:has(.kb-head)) > [data-testid="stColumn"] {
         flex: 1 1 calc(50% - 0.6rem) !important;
         width: auto !important;
         min-width: calc(50% - 0.6rem) !important;
     }
-    [data-testid="stHorizontalBlock"]:has(.row-tight):not(:has(.kb-head)) > [data-testid="stColumn"]:nth-child(1) {
+    [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"] > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] .row-tight):not(:has(.kb-head)) > [data-testid="stColumn"]:nth-child(1) {
         flex: 0 0 56px !important;
         width: 56px !important;
         min-width: 56px !important;
     }
-    [data-testid="stHorizontalBlock"]:has(.row-tight):not(:has(.kb-head)) > [data-testid="stColumn"]:nth-child(2) {
+    [data-testid="stHorizontalBlock"]:has(> [data-testid="stColumn"] > [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"] .row-tight):not(:has(.kb-head)) > [data-testid="stColumn"]:nth-child(2) {
         flex: 1 1 calc(100% - 72px) !important;
         width: calc(100% - 72px) !important;
         min-width: 0 !important;
