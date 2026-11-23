@@ -69,7 +69,7 @@ def render_class_invites(supabase, gym_id):
                 ("Classes in the next 10 days", str(len(upcoming)), "cyan",
                  "add more on the Check-in page" if not upcoming else "")])
     if not rows:
-        st.success("Everyone who trains regularly has been to a class. 👏")
+        st.success("Everyone who trains regularly has been to a class.")
         return
     biz, owner = gg._biz()
     for r in rows[:40]:

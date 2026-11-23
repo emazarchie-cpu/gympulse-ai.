@@ -338,6 +338,10 @@ def render_owner_hub(supabase, gym_id, assess_fn, owner_id):
         background: rgba(183,243,74,0.13) !important; box-shadow: inset 0 0 0 1px rgba(183,243,74,0.55) !important; }
     html body .stApp.stApp.stApp.stApp .st-key-owner_tabs button[data-variant="segmented_control"][aria-checked="true"] p {
         color: var(--gp-lime, #B7F34A) !important; }
+    @media (max-width: 640px) {   /* phones: two tabs per row so every name fits */
+        html body .stApp.stApp.stApp.stApp .st-key-owner_tabs [role="radiogroup"] { flex-wrap: wrap !important; }
+        html body .stApp.stApp.stApp.stApp .st-key-owner_tabs button[data-variant="segmented_control"] {
+            flex: 1 1 calc(50% - 6px) !important; min-width: calc(50% - 6px) !important; } }
     </style>""")
     st.session_state["_owner_last"] = section
     if section == "Business insights":

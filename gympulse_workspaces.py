@@ -824,6 +824,14 @@ span[data-baseweb="tag"] span { color: #B7F34A !important; }
         flex: 1 1 calc(50% - .6rem) !important; min-width: calc(50% - .6rem) !important; }
     [data-testid="stHorizontalBlock"]:has(.row-tight) { flex-wrap: nowrap !important; }
     [data-testid="stHorizontalBlock"]:has(.row-tight) > [data-testid="stColumn"] { min-width: 0 !important; }
+    /* Dashboard priorities in a narrow window: avatar and name on top, the buttons underneath */
+    html body [data-testid="stHorizontalBlock"]:has(.cc-pri-name):has(.row-tight) { flex-wrap: wrap !important; }
+    html body [data-testid="stHorizontalBlock"]:has(.cc-pri-name):has(.row-tight) > [data-testid="stColumn"]:nth-child(1) {
+        flex: 0 0 48px !important; min-width: 48px !important; }
+    html body [data-testid="stHorizontalBlock"]:has(.cc-pri-name):has(.row-tight) > [data-testid="stColumn"]:nth-child(2) {
+        flex: 1 1 calc(100% - 64px) !important; min-width: 0 !important; }
+    html body [data-testid="stHorizontalBlock"]:has(.cc-pri-name):has(.row-tight) > [data-testid="stColumn"]:nth-child(3) {
+        flex: 1 1 100% !important; min-width: 100% !important; }
 }
 """
 
