@@ -135,7 +135,7 @@ def ensure_gym(sc, owner_id):
     return gym["id"]
 
 
-WIPE = ["hmo_claims", "hmo_providers", "payments", "retention_actions", "auto_messages", "checkins",
+WIPE = ["prediction_snapshots", "hmo_claims", "hmo_providers", "payments", "retention_actions", "auto_messages", "checkins",
         "member_activity", "members", "companies", "trainers"]
 
 

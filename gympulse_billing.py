@@ -1059,11 +1059,11 @@ CO_CSS = """
 .co-plan { border:1px solid var(--gp-line); border-radius:20px; padding:22px; background:var(--gp-s1); }
 .co-status { display:flex; gap:28px; flex-wrap:wrap; border:1px solid var(--gp-line); border-radius:20px;
     padding:20px 24px; background:var(--gp-s1); margin:4px 0 22px; }
-.co-status div span { display:block; font-size:11px; letter-spacing:1px; text-transform:uppercase; color:var(--gp-muted);
-    font-weight:700; }
+.co-status div > span { display:block; font-size:12.5px; color:var(--gp-muted); font-weight:600; }
+.co-status .gp-pill { display:inline-block; text-transform:none; letter-spacing:0; }
 .co-status div b { display:block; font-size:20px; margin-top:4px; color:var(--gp-text); }
 .co-sum { border:1px solid var(--gp-line); border-radius:20px; padding:24px; background:var(--gp-s1); position:sticky; top:12px; }
-.co-sum h4 { margin:0 0 2px; font-size:13px; letter-spacing:1px; text-transform:uppercase; color:var(--gp-muted); }
+.co-sum h4 { margin:0 0 2px; font-size:13.5px; font-weight:600; color:var(--gp-muted); }
 .co-sum .co-name { font-size:24px; font-weight:800; color:var(--gp-text); margin:6px 0 2px; }
 .co-sum .co-tag { color:var(--gp-muted); font-size:13.5px; margin-bottom:16px; }
 .co-row { display:flex; justify-content:space-between; gap:12px; padding:10px 0; border-top:1px solid var(--gp-line);
@@ -1076,8 +1076,7 @@ CO_CSS = """
 .co-note { color:var(--gp-muted); font-size:12.5px; line-height:1.6; margin-top:12px; }
 .co-feat { margin-top:14px; padding-top:12px; border-top:1px solid var(--gp-line); font-size:13px; color:var(--gp-muted); }
 .co-feat div { padding:3px 0; } .co-feat div::before { content:"✓  "; color:var(--gp-lime); font-weight:800; }
-.co-sec { font-size:12px; font-weight:800; letter-spacing:1.4px; text-transform:uppercase; color:var(--gp-muted);
-    margin:6px 0 2px; }
+.co-sec { font-size:14px; font-weight:700; color:var(--gp-text); margin:6px 0 2px; }
 .co-done { text-align:center; padding:26px 0 6px; }
 .co-tick { width:64px; height:64px; border-radius:50%; margin:0 auto 14px; display:grid; place-items:center; font-size:30px;
     font-weight:800; color:#0A0F1E; background:var(--gp-grad); }

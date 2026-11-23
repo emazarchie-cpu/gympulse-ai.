@@ -111,7 +111,7 @@ def render_insights(supabase, gym_id):
                    "membership ended and hasn't been renewed count as lost. This month is counted up to today.")
     if lm["rate"] is not None:
         if lm["rate"] >= INDUSTRY_MONTH:
-            st.caption(f"In {s['last_month_label']} you kept members better than the industry average. 👏")
+            st.caption(f"In {s['last_month_label']} you kept members better than the industry average.")
         else:
             st.caption(f"In {s['last_month_label']} you kept fewer members than the industry average. "
                        "The Risk Radar and New members pages show who to reach first.")
