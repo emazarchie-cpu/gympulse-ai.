@@ -62,6 +62,13 @@ def main():
     print("Trial and renewal reminders")
     n = gbill.trial_reminders(sc, gadm.all_gyms(sc, fresh=True), dry_run=args.dry_run)
     print(f"  {n} {'would send' if args.dry_run else 'sent'}")
+    print("Automatic card renewals")
+    try:
+        import gympulse_memberpay as gmp
+        c, f = gmp.charge_due(sc, dry_run=args.dry_run)
+        print(f"  {c} renewed, {f} card charges didn't go through")
+    except Exception as error:
+        print(f"  failed: {error}")
     if not args.dry_run:
         print("Paystack payments")
         try:

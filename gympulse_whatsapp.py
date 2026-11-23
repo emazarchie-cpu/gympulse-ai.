@@ -321,6 +321,9 @@ def send_member(supabase, gym_id, m, kind, ref, subject, body, buttons, profile=
     import gympulse_grow as gg
     biz, owner = gg._biz()
     pay = dict(((profile or st.session_state.get("user_profile") or {}).get("settings") or {}).get("collect") or {})
+    if kind == "renewal":
+        import gympulse_memberpay as gmp
+        pay = gmp.with_member_link(pay, gym_id, m.get("id"))
     name, params, payloads, actions = build(kind, m, ref, subject, body, buttons, biz, owner, pay)
     try:
         wamid = send_template(digits, name, params, payloads)

@@ -1108,6 +1108,20 @@ if st.query_params.get("guide"):
     gtr.render_guide(supabase, st.query_params.get("guide"))
     st.stop()
 
+# A member renews online from their own link (?pay=...), and Paystack sends them back to ?pay_done=1
+if st.query_params.get("pay") or st.query_params.get("pay_done"):
+    import gympulse_memberpay as gmp
+    gonb.hold()
+    gd.apply()
+    try:
+        if st.query_params.get("pay_done"):
+            gmp.render_done(dict(st.query_params))
+        else:
+            gmp.render_pay(st.query_params.get("pay"))
+    finally:
+        gonb.done()
+    st.stop()
+
 # "Get started": create an account by booking the set-up demo (agent links ?ref=CODE land here too)
 if ((st.query_params.get(gonb.START_PARAM) or st.query_params.get(gag.REF_PARAM))
         and not st.session_state.get("auth_user")):

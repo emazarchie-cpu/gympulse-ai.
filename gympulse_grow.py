@@ -296,7 +296,9 @@ def renewal_buttons(pay):
     out = []
     if come:
         out.append(("Tell us when you're coming", come))
-    if pay.get("paystack_link"):
+    if pay.get("member_pay_url"):                  # their own link: pay and renew online (gympulse_memberpay)
+        out.append(("Pay and renew online", pay["member_pay_url"]))
+    elif pay.get("paystack_link"):
         out.append(("Pay securely with Paystack", pay["paystack_link"]))
     return out
 
@@ -316,7 +318,9 @@ def renewal_text(name, amount, plan, end, pay, ref, story=None, reminder=False):
     lines.append("\nCome in this week and renew at the front desk, it only takes two minutes"
                  + (f", and you'll get {perk}." if perk else ".") + " Which day works for you?")
     extra = []
-    if pay.get("paystack_link"):
+    if pay.get("member_pay_url"):
+        extra.append(f"Pay online (card, transfer or USSD), and you're renewed straight away: {pay['member_pay_url']}")
+    elif pay.get("paystack_link"):
         extra.append(f"Pay online: {pay['paystack_link']}")
     if pay.get("bank_account"):
         extra.append(f"Or transfer: {pay.get('bank_name', '')} · {pay['bank_account']} · {pay.get('bank_holder', '')}"
@@ -343,6 +347,8 @@ def renewal_composer(supabase, gym_id, m, amount, plan, ref, pay, story, key, re
     import zlib
     key = f"{key}_{zlib.crc32(repr(sorted(pay.items())).encode()) % 100000}"   # redraft when payment details change
     subject, body = renewal_email(m["full_name"], amount, plan, m.get("end"), pay, story, reminder)
+    import gympulse_memberpay as gmp
+    pay = gmp.with_member_link(pay, gym_id, m.get("id"))
     buttons = renewal_buttons(pay)
     t_email, t_wa = st.tabs(["Email (recommended)", "WhatsApp"])
     log = (supabase, gym_id, m["id"], amount, plan, ref)
@@ -442,6 +448,9 @@ def render_collect(supabase, gym_id, owner_id):
                                                            "perk": perk.strip(), "bank_in_email": bool(in_email)}},
                            "Payment details saved.")
             st.rerun()
+
+    import gympulse_memberpay as gmp
+    gmp.render_setup(supabase, gym_id, _biz()[0])
 
     df = _members(supabase, gym_id)
     if df.empty:

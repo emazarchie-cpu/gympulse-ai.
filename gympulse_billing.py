@@ -986,6 +986,13 @@ def reconcile_paystack(sc, days=3, log=print):
                 md = json.loads(md)
             except Exception:
                 md = {}
+        if md.get("source") == "gympulse_member":          # a member paying their gym (gympulse_memberpay)
+            if f"member:{t.get('reference')}" not in done:
+                import gympulse_memberpay as gmp
+                ok, msg, _ = gmp.apply(t.get("reference"), sc)
+                log(f"  member {t.get('reference')}: {msg}")
+                n += ok
+            continue
         if md.get("source") != "gympulse" or f"paystack:{t.get('reference')}" in done:
             continue
         ok, msg, _ = apply_payment(t.get("reference"), sc)
