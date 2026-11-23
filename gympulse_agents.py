@@ -7,6 +7,8 @@ links the gym to the agent in Admin → Agents.
 Commission (the agent agreement):
   * 50% of the gym's first paid month, then 10% of each later payment, for 12 months from the first payment.
   * A yearly payment earns 15% of that payment, once.
+  * 5-gym bonus: a one-off NGN 50,000 when 5 of the agent's gyms have been set up and made their first payment,
+    counted in the month the fifth gym qualifies.
   * Only paid invoices count (billing_invoices.status = 'paid'), so the free trial earns nothing and a
     cancelled invoice earns nothing. A refund is entered as a negative adjustment.
 
@@ -32,6 +34,7 @@ import gympulse_workspaces as gw
 
 KEY = "sales_agents"
 FIRST_RATE, LATER_RATE, YEARLY_RATE, WINDOW_DAYS = 0.50, 0.10, 0.15, 365
+BONUS_GYMS, BONUS_AMOUNT = 5, 50000      # one-off bonus when 5 of an agent's gyms are set up and have paid
 REF_PARAM = "ref"
 SIGN_PARAM = "agent"    # usegympulseai.com/?agent=TOKEN: the agent's private link to read and sign the agreement
 SETUP_DAYS = 5          # check-in days needed before set-up can be confirmed
@@ -141,10 +144,16 @@ def statement(sc, gyms, data, invoices=None):
     by_gym = {}
     for inv in invoices:
         by_gym.setdefault(str(inv.get("gym_id")), []).append(inv)
-    rows = []
+    rows, qualified = [], {}
     for gid, code in links.items():
         done = (data.get("setup") or {}).get(gid, {}).get("done_on")
-        for n, (inv, day, rate, value) in enumerate(commission_lines(by_gym.get(gid, []))):
+        lines = commission_lines(by_gym.get(gid, []))
+        if done and lines:                               # set up and paid: counts towards the 5-gym bonus
+            try:
+                qualified.setdefault(code, []).append(max(lines[0][1], date.fromisoformat(done[:10])))
+            except ValueError:
+                pass
+        for n, (inv, day, rate, value) in enumerate(lines):
             month, held = f"{day:%Y-%m}", False
             if n == 0:                                       # the first payment waits for set-up
                 if not done:
@@ -156,6 +165,12 @@ def statement(sc, gyms, data, invoices=None):
                          "paid_on": day.isoformat(), "amount": float(inv.get("amount") or 0),
                          "rate": rate + (", held until set-up is confirmed" if held else ""),
                          "commission": value, "held": held})
+    for code, days in qualified.items():
+        if len(days) >= BONUS_GYMS:
+            d = sorted(days)[BONUS_GYMS - 1]
+            rows.append({"code": code, "month": f"{d:%Y-%m}", "gym": f"{BONUS_GYMS}-gym bonus",
+                         "plan": f"{BONUS_GYMS} gyms set up and paid", "paid_on": d.isoformat(), "amount": 0.0,
+                         "rate": "one-off bonus", "commission": float(BONUS_AMOUNT), "held": False})
     for a in data["adjust"]:
         rows.append({"code": a.get("code"), "month": a.get("month"), "gym": "Adjustment",
                      "plan": gw._text(a.get("note")), "paid_on": (a.get("at") or "")[:10], "amount": 0.0,
@@ -225,7 +240,8 @@ def render_admin(sc, gyms, audit):
     month = _last_month()
 
     st.caption("Agents set gyms up and earn 50% of a gym's first paid month once set-up is confirmed, then 10% of "
-               "each payment for 12 months. A yearly payment earns 15%, once. Only cleared payments count. Pay by "
+               "each payment for 12 months. A yearly payment earns 15%, once. 5 gyms set up and paid earn a one-off "
+               "₦50,000 bonus. Only cleared payments count. Pay by "
                "the 5th for the month before.")
 
     to_pay = sum(max(owed(rows, data, c, month)[1], 0) for c in agents)

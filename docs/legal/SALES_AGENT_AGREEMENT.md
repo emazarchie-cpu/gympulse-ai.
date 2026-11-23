@@ -19,7 +19,7 @@ GymPulse AI handles billing, support and anything the agent can't fix. The agent
 
 ## 2. Set-up and commission
 
-The agent sets each gym up during its free trial. The agent earns 50% of the gym's first paid month once set-up is done, then 10% of each later monthly payment, for 12 months from the gym's first payment.
+The agent sets each gym up during its free trial. The agent earns 50% of the gym's first paid month once set-up is done, then 10% of every payment after that, for the gym's first 12 months. When 5 of the agent's gyms have been set up and paid, the agent also earns a one-off ₦50,000 bonus.
 
 **Setting a gym up means:**
 
@@ -41,11 +41,12 @@ These are today's list prices. The rules below always apply.
 1. **Commission is earned only on money GymPulse AI has received.** The 30-day free trial earns nothing. Commission starts with the gym's first payment after the trial.
 2. **The 50% is held until set-up is done.** If the gym pays first, the 50% is paid in the month set-up is confirmed.
 3. **It is a share of what the gym actually paid,** after any founding-gym or branch discount. Paystack fees are GymPulse AI's cost and don't reduce it.
-4. **Yearly plans:** when a referred gym pays for a year, the agent earns 15% of that yearly payment, once.
-5. **Commission lasts 12 months** from the gym's first payment. After that, the gym no longer earns the agent commission.
-6. **If the gym stops paying, commission stops.** Nothing is owed for months the gym did not pay.
-7. **Refunds and chargebacks:** if a payment is refunded or reversed, the commission on it is cancelled. If it was already paid, it is taken off the agent's next payment.
-8. **Changing plans:** if a gym moves to a bigger or smaller plan, commission follows the new amount the gym pays.
+4. **Yearly plans:** when a referred gym pays for a year, the agent earns 15% of that yearly payment, once, instead of the 50% and 10%.
+5. **5-gym bonus:** a one-off ₦50,000 when 5 gyms the agent brought in have each been set up (as above) and made their first payment. It is paid with the commission for the month the fifth gym qualifies. Each agent can earn it once.
+6. **Commission lasts 12 months** from the gym's first payment. After that, the gym no longer earns the agent commission.
+7. **If the gym stops paying, commission stops.** Nothing is owed for months the gym did not pay.
+8. **Refunds and chargebacks:** if a payment is refunded or reversed, the commission on it is cancelled. If it was already paid, it is taken off the agent's next payment. If a refund means fewer than 5 gyms qualify, a bonus already paid is taken off too.
+9. **Changing plans:** if a gym moves to a bigger or smaller plan, commission follows the new amount the gym pays.
 
 ## 3. Referral code and payment
 
