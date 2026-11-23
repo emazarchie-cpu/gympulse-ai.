@@ -735,6 +735,10 @@ html body .stApp.stApp [data-testid="stMarkdownContainer"] a:not(.lx-btn) { colo
   html body .stApp.stApp :is([data-baseweb="input"], [data-testid="stTextInputRootElement"],
       [data-testid="stNumberInputContainer"], [data-baseweb="select"] > div) { min-height: 44px !important; }
 }
+
+/* link buttons styled as primary: navy text on lime, like every other primary button */
+html body .stApp [data-testid="stBaseLinkButton-primary"], html body .stApp [data-testid="stBaseLinkButton-primary"] * {
+    color: #0B1220 !important; font-weight: 700 !important; }
 """
 
 

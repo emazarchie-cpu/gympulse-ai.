@@ -3324,7 +3324,10 @@ def render_public_trainer(supabase, token):
     if isinstance(data, list):
         data = data[0] if data else None
     if not data:
-        st.error("This profile link is not valid or has been switched off.")
+        import gympulse_booking as gb
+        gb._header()
+        gw_col = center("trainer_bad", 760)
+        gw_col.error("This profile link is not valid or has been switched off.")
         return
     import gympulse_billing as gbill
     if gbill.gym_locked(gbill.gym_by("trainers", "share_token", token)):

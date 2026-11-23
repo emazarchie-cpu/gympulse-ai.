@@ -442,7 +442,7 @@ FONTS = ('<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="
 def _nav():
     return (f'<div class="nav"><a class="logo" href="/">GYM<span>PULSE</span> AI</a>'
             f'<div><a class="btn" href="/?demo=book">Book a demo</a>'
-            f'<a class="btn p" href="/">Start free trial</a></div></div>')
+            f'<a class="btn p" href="/?start=1">Start free trial</a></div></div>')
 
 
 def _links(skip=None):
@@ -473,7 +473,7 @@ def _sections(sections):
 def _cta():
     return (f'<div class="cta"><h2>Try it free for 30 days</h2><p>Every feature on every plan, from '
             f'{_naira(_lowest_price())} a month by gym size. Setting up takes about a minute.</p>'
-            f'<a class="btn p" href="/">Start your free trial</a>'
+            f'<a class="btn p" href="/?start=1">Start your free trial</a>'
             f'<a class="btn" href="/?demo=book">Book a 15-minute demo</a></div>')
 
 
