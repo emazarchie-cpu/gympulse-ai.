@@ -19,12 +19,29 @@ KEY = "gym_setup"
 DAYS_OFFERED = 10
 
 
+# ------------------------------------------------------------------ page loading
+def hold():
+    """Keep the page behind the loading screen until done() (see hide_streamlit_chrome: .gp-hold/.gp-done)."""
+    st.markdown('<span class="gp-hold"></span>', unsafe_allow_html=True)
+
+
+def done():
+    st.markdown('<span class="gp-done"></span>', unsafe_allow_html=True)
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def _bookable_cached(_supabase, cfg_key):
+    import gympulse_booking as gb
+    return gb.bookable(_supabase, gb.config())
+
+
 # ------------------------------------------------------------------ demo times for the sign-up form
 def slot_options(supabase):
-    """Free demo times over the next open days as one flat list (None when booking isn't set up)."""
+    """Free demo times over the next open days as one flat list (None when booking isn't set up).
+    Kept for a minute, so the page doesn't wait on the booking calendar every time it opens."""
     import gympulse_booking as gb
     cfg = gb.config()
-    avail = gb.bookable(supabase, cfg)
+    avail = _bookable_cached(supabase, str(sorted((k, str(v)) for k, v in cfg.items())))
     if avail is None:
         return None, cfg
     out = []
@@ -58,6 +75,7 @@ def book(supabase, cfg, name, email, phone, gym, start, notes="", members=""):
         if "bad_email" in msg:
             return None, "Please check your email address."
         return None, "We couldn't book the demo right now. Please try again in a minute."
+    _bookable_cached.clear()                         # that time is taken now
     row = rows[0] if rows else {}
     token = row.get("cancel_token") or str(uuid.uuid4())
     b = {"id": row.get("booking_id") or token, "name": name, "email": email.lower(), "phone": phone, "gym": gym,
@@ -237,7 +255,16 @@ def answers_text(a):
 
 def render_start(supabase):
     """usegympulseai.com/?start=1: create the account and book the set-up demo, with a few questions that
-    prepare the founder for the call."""
+    prepare the founder for the call. The page stays behind the loading screen until the form is complete."""
+    hold()
+    _style()
+    try:
+        _render_start(supabase)
+    finally:
+        done()
+
+
+def _render_start(supabase):
     import gympulse_agents as gag
     import gympulse_booking as gb
     import gympulse_legal as gl
@@ -291,7 +318,6 @@ def render_start(supabase):
             consent = st.checkbox(gl.CONSENT_TEXT)
             go = st.form_submit_button("Book my demo", type="primary", use_container_width=True)
         st.caption("Already have an account? Sign in on the main page.")
-        _style()
         if not go:
             return
         full = " ".join(name.split())

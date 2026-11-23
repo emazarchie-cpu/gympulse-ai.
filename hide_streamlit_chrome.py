@@ -52,8 +52,10 @@ SPLASH = (
     "if(location.search&&s)s.className='plain';"
     "if(/bot|crawl|spider|slurp|preview|facebookexternalhit|lighthouse/i.test(navigator.userAgent)){ready();return}"
     # ready when the app's styles are on the page (gympulse_design marks them), or 1.5 s after the
-    # first real content on pages without them; 30 s at most whatever happens
-    "function check(){if(d.querySelector('.gp-css-ready')){ready();return}"
+    # first real content on pages without them; 30 s at most whatever happens. A page that marks itself
+    # .gp-hold (a form still being built) stays hidden until it adds .gp-done.
+    "function check(){if(d.querySelector('.gp-hold')&&!d.querySelector('.gp-done'))return;"
+    "if(d.querySelector('.gp-css-ready')){ready();return}"
     "if(!t&&d.querySelector('[data-testid=\"stMain\"] :is(h1,h2,h3,button,input,img)'))t=setTimeout(ready,1500)}"
     "new MutationObserver(check).observe(h,{childList:true,subtree:true});setTimeout(ready,30000)})()</script>"
 )

@@ -1066,6 +1066,7 @@ supabase = st.session_state.supabase_client
 gag.remember_ref_param()                # ?ref=AGENT-CODE from an agent's link, for the sign-up form
 _trainer_token = st.query_params.get("trainer")
 if _trainer_token:
+    gd.apply()
     gw.render_public_trainer(supabase, _trainer_token)
     st.stop()
 
@@ -1116,8 +1117,12 @@ if ((st.query_params.get(gonb.START_PARAM) or st.query_params.get(gag.REF_PARAM)
 
 # A sales agent reads and signs their agreement (private link from Admin → Agents, no sign-in)
 if st.query_params.get(gag.SIGN_PARAM):
+    gonb.hold()
     gd.apply()
-    gag.render_sign(st.query_params.get(gag.SIGN_PARAM))
+    try:
+        gag.render_sign(st.query_params.get(gag.SIGN_PARAM))
+    finally:
+        gonb.done()
     st.stop()
 
 # Public HMO check-in page (the gym's HMO QR code, or a member's one-tap link, no sign-in)
@@ -1137,8 +1142,12 @@ if st.query_params.get("fb"):
 # Public "Book a demo" page and its cancel link (no sign-in needed)
 if st.query_params.get("demo") or st.query_params.get("demo_cancel"):
     import gympulse_booking as gb
+    gonb.hold()
     gd.apply()
-    gb.render_router(supabase)
+    try:
+        gb.render_router(supabase)
+    finally:
+        gonb.done()
     st.stop()
 
 # Paystack sends payers back here (?paystack=1&reference=...): check and apply the payment

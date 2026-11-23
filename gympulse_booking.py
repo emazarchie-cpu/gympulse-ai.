@@ -268,7 +268,9 @@ PAGE_CSS = """
 .bk-wrap { max-width: 760px; margin: 0 auto; }
 .bk-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 6px 0 22px; }
 .bk-head img { height: 42px; }
-.bk-head a { color: #93A1B8 !important; font-size: 13.5px; font-weight: 600; text-decoration: none !important; }
+html body .stApp .bk-head a, html body .stApp .bk-head a:visited { color: #93A1B8 !important; font-size: 13.5px;
+    font-weight: 600; text-decoration: none !important; border: 0 !important; }
+html body .stApp .bk-head a:hover { color: #E6EAF0 !important; }
 .bk-title { font-family: 'Space Grotesk', 'Inter', sans-serif; font-size: 40px; font-weight: 700;
     letter-spacing: -1.3px; line-height: 1.08; color: #F4F7FB; }
 .bk-sub { color: #93A1B8; font-size: 15.5px; line-height: 1.6; margin: 10px 0 18px; }

@@ -31,7 +31,20 @@ async function loaded(page, maxMs = 30000) {
   await sleep(3000);
 }
 
+async function problems(page, name) {
+  // Error boxes, Python error text or a page wider than the screen: printed so the run log lists them
+  const r = await page.evaluate(() => ({
+    exc: document.querySelectorAll('[data-testid="stException"]').length,
+    err: /Traceback|KeyError|TypeError|AttributeError|ValueError|NameError|IndexError/.test(document.body.innerText),
+    alerts: Array.from(document.querySelectorAll('[data-testid="stAlertContentError"]')).map((e) => e.innerText.slice(0, 120)),
+    wide: document.documentElement.scrollWidth > window.innerWidth + 2,
+  })).catch(() => null);
+  if (r && (r.exc || r.err || r.alerts.length || r.wide))
+    console.log(`PROBLEM on ${name} (${page.viewportSize().width}px): ${JSON.stringify(r)}`);
+}
+
 async function shot(page, name) {
+  await problems(page, name);
   // The page in screen-sized parts: name-a.png (top), name-b.png, name-c.png, name-d.png
   const scroller = '[data-testid="stMain"]';
   await page.evaluate((sel) => { document.querySelectorAll('[data-testid="stToast"]').forEach((t) => t.remove());
@@ -52,6 +65,7 @@ async function shot(page, name) {
     const big = page.viewportSize();
     await page.setViewportSize({ width: 390, height: 844 });
     await sleep(2500);
+    await problems(page, name + "-phone");
     for (const [i, y] of [[0, 0], [1, 700], [2, 1400], [3, 2100], [4, 2800]]) {
       const moved = await page.evaluate(([sel, y]) => {
         const e = [document.querySelector(sel), document.scrollingElement].find((x) => x && x.scrollHeight > x.clientHeight + 10);
@@ -118,6 +132,18 @@ async function go(page, label) {
   for (const [label, name] of pages) {
     try { await go(page, label); await shot(page, name); }
     catch (e) { console.log(`skipped ${name}: ${String(e).split("\n")[0]}`); await page.keyboard.press("Escape").catch(() => {}); }
+  }
+  // Pages in the menu (top right)
+  for (const [label, name] of [["Settings", "13-settings"], ["Subscription", "14-subscription"],
+                               ["Prediction check", "15-prediction-check"], ["FAQs", "16-faqs"]]) {
+    try {
+      await page.locator(".st-key-top_menu button").first().click({ timeout: 8000 });
+      await sleep(1200);
+      await page.getByRole("button", { name: label, exact: true }).first().click({ timeout: 8000 });
+      await sleep(1500);
+      await loaded(page, 45000);
+      await shot(page, name);
+    } catch (e) { console.log(`skipped ${name}: ${String(e).split("\n")[0]}`); await page.keyboard.press("Escape").catch(() => {}); }
   }
   // One member's profile, opened from the Dashboard's priorities
   try {
