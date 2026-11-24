@@ -67,7 +67,8 @@ jobs:
           if [ -z "$key" ]; then echo "Using the server key for this test copy of the app"; key="$SUPABASE_SERVICE_ROLE_KEY"; fi
           echo "::add-mask::$key"
           mkdir -p .streamlit
-          printf 'SUPABASE_URL = "%s"\nSUPABASE_KEY = "%s"\n' "$SUPABASE_URL" "$key" > .streamlit/secrets.toml
+          url=$(python -c "import os,re;print(re.sub(r'/(rest|auth)/v1/?.*$', '', os.environ['SUPABASE_URL'].strip()).rstrip('/'))")
+          printf 'SUPABASE_URL = "%s"\nSUPABASE_KEY = "%s"\n' "$url" "$key" > .streamlit/secrets.toml
       - name: Start the app with timing
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
