@@ -928,7 +928,7 @@ def landing_top(lockup_uri, icon):
       <div class="lx-kicker">See it in action</div>
       <div class="lx-h2">Every feature, in under a minute.</div>
       <div class="lx-video">
-        <video src="/app/static/gympulse-demo.mp4?v=5" poster="/app/static/gympulse-demo-poster.jpg?v=5"
+        <video src="/app/static/gympulse-demo.mp4?v=6" poster="/app/static/gympulse-demo-poster.jpg?v=6"
                autoplay muted loop playsinline controls preload="metadata"
                aria-label="GymPulse AI product demo"></video>
       </div>
@@ -1568,7 +1568,7 @@ def landing3_story():
       <div class="l3-sec" id="demo">
         <p class="l3-n">See it in action</p>
         <div class="l3-h2 l3-serif" role="heading" aria-level="2">Every feature, in under a minute.</div>
-        <div class="l3-video"><video src="/app/static/gympulse-demo.mp4?v=5" poster="/app/static/gympulse-demo-poster.jpg?v=5"
+        <div class="l3-video"><video src="/app/static/gympulse-demo.mp4?v=6" poster="/app/static/gympulse-demo-poster.jpg?v=6"
           autoplay muted loop playsinline controls preload="metadata" aria-label="GymPulse AI product demo"></video></div>
         <p class="l3-note">Plays muted. Tap the video for sound.</p>
       </div>
