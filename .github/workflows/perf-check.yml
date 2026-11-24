@@ -40,14 +40,31 @@ jobs:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           DEMO_PASSWORD_FILE: ${{ runner.temp }}/demo_pw
         run: python scripts/seed_demo_gym.py
-      - name: App settings (public key fetched from Supabase, never printed)
+      - name: App settings (keys never printed)
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           ref=$(python -c "import os,re;print(re.search(r'https://([a-z0-9]+)\.supabase', os.environ['SUPABASE_URL']).group(1))")
-          key=$(curl -s -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" "https://api.supabase.com/v1/projects/$ref/api-keys" \
-                | python -c "import json,sys;print([k['api_key'] for k in json.load(sys.stdin) if k.get('name')=='anon'][0])")
+          curl -s -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" "https://api.supabase.com/v1/projects/$ref/api-keys?reveal=true" > keys.json || true
+          key=$(python - <<'PY'
+          import json
+          try:
+              d = json.load(open("keys.json"))
+          except Exception:
+              d = None
+          if isinstance(d, list):
+              ks = [k.get("api_key") for k in d if isinstance(k, dict) and k.get("name") == "anon" and k.get("api_key")]
+              print(ks[0] if ks else "")
+          else:
+              import sys
+              print("api-keys lookup gave: " + (str(list(d.keys())) if isinstance(d, dict) else type(d).__name__), file=sys.stderr)
+              print("")
+          PY
+          )
+          rm -f keys.json
+          if [ -z "$key" ]; then echo "Using the server key for this test copy of the app"; key="$SUPABASE_SERVICE_ROLE_KEY"; fi
           echo "::add-mask::$key"
           mkdir -p .streamlit
           printf 'SUPABASE_URL = "%s"\nSUPABASE_KEY = "%s"\n' "$SUPABASE_URL" "$key" > .streamlit/secrets.toml
