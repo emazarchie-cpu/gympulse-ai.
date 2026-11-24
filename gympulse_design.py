@@ -1523,8 +1523,7 @@ def landing3_top(lockup_uri):
         <div class="l3-demo">{_l3_strip("110101101101101011000000000000")}
           <div class="l3-axis"><span>1 Oct</span><span>Last visit 18 Oct</span><span>Today</span></div></div>
         <p class="l3-lead">GymPulse AI spots the gaps in your check-ins and tells you who to call, while one call is still enough.</p>
-        <div class="l3-cta"><a class="l3-btn" href="?start=1" target="_self">Start your free trial</a>
-          <a class="l3-link" href="?demo=book" target="_self">Book a 15-minute demo</a></div>
+        <div class="l3-cta"><a class="l3-btn" href="?start=1" target="_self">Start your free trial</a></div>
       </div>
       <div class="l3-works"><small>Works alongside what your gym already uses</small>
         <span>GymMaster</span><span>Excel</span><span>Google Sheets</span><span>QR check-in</span></div>
@@ -1567,10 +1566,9 @@ def landing3_story():
       </div>
       <div class="l3-sec" id="demo">
         <p class="l3-n">See it in action</p>
-        <div class="l3-h2 l3-serif" role="heading" aria-level="2">Every feature, in under a minute.</div>
+        <div class="l3-h2 l3-serif" role="heading" aria-level="2">See the whole app in two minutes.</div>
         <div class="l3-video"><video src="/app/static/gympulse-demo.mp4?v=6" poster="/app/static/gympulse-demo-poster.jpg?v=6"
           autoplay muted loop playsinline controls preload="metadata" aria-label="GymPulse AI product demo"></video></div>
-        <p class="l3-note">Plays muted. Tap the video for sound.</p>
       </div>
     </div>
     """
@@ -1583,8 +1581,7 @@ def landing3_end():
       <div class="l3-end">
         <div class="l3-h2 l3-serif" role="heading" aria-level="2">Call them while one call is still enough.</div>
         <p class="l3-sub">Every feature free for 30 days. Setting up takes about a minute.</p>
-        <div class="l3-cta"><a class="l3-btn" href="?start=1" target="_self">Start your free trial</a>
-          <a class="l3-link" href="?demo=book" target="_self">Book a 15-minute demo</a></div>
+        <div class="l3-cta"><a class="l3-btn" href="?start=1" target="_self">Start your free trial</a></div>
       </div>
       <div class="l3-foot"><a href="/gym-management-software-nigeria.html" target="_self">Member retention platform</a>
         <a href="/gym-member-retention.html" target="_self">Keep members from cancelling</a>
