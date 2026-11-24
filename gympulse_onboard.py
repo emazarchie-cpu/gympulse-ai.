@@ -42,7 +42,10 @@ def slot_options(supabase):
     import gympulse_booking as gb
     cfg = gb.config()
     avail = _bookable_cached(supabase, str(sorted((k, str(v)) for k, v in cfg.items())))
-    if avail is None:
+    if avail is None:                                # a failed lookup isn't kept: try again now
+        _bookable_cached.clear()
+        avail = gb.bookable(supabase, cfg)
+    if not avail:                                    # still failing, or every time is taken
         return None, cfg
     out = []
     for day in list(avail)[:DAYS_OFFERED]:
@@ -308,8 +311,13 @@ def _render_start(supabase):
             worry = st.selectbox("What worries you most?", WORRIES, index=None, placeholder="Choose (optional)")
 
             gw._md('<div class="st-sec">Your demo</div>')
-            pick = st.selectbox("Pick a time (Lagos time)", slots or [], index=None, format_func=slot_label,
-                                placeholder="Choose a time" if slots else "We'll WhatsApp you to pick a time")
+            if slots:
+                pick = st.selectbox("Pick a time (Lagos time)", slots, index=None, format_func=slot_label,
+                                    placeholder="Choose a time")
+            else:
+                pick = None
+                gw._md('<div class="st-sub">We\'ll WhatsApp you within one working day to agree a time '
+                       'for your demo.</div>')
             notes = st.text_input("Anything else we should know? (optional)",
                                   placeholder="e.g. we're opening a second branch in January")
             ref = st.text_input("Referral code (optional)", value=st.session_state.get("ref_code", ""),
