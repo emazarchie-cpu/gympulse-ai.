@@ -25,12 +25,31 @@ const now = () => (Date.now() - T0) / 1000;
 function pause() { const k = keep[keep.length - 1]; if (k && k[1] === null) k[1] = now(); }
 function resume() { pause(); keep.push([now() + 0.15, null]); }
 
+// While a page loads, a small magenta square sits in the bottom-right corner.
+// cut_demo.py drops every frame that shows it, so the video never shows loading.
+let marking = false;
+async function mark(page, on) {
+  marking = on;
+  await page.evaluate((on) => {
+    let el = document.getElementById("gp-cut");
+    if (on && !el) {
+      el = document.createElement("div");
+      el.id = "gp-cut";
+      el.style.cssText = "position:fixed;right:0;bottom:0;width:32px;height:32px;background:#FF00FF;z-index:2147483647;pointer-events:none";
+      document.body.appendChild(el);
+    }
+    if (!on && el) el.remove();
+  }, on).catch(() => {});
+  if (!on) await sleep(250);
+}
+
 async function loaded(page, maxMs = 45000) {
   // Done when Streamlit has stopped running, nothing is loading or stale, the page
   // has real content, and its height has held still for about two seconds.
   const t = Date.now();
   let last = -1, still = 0;
   while (Date.now() - t < maxMs) {
+    if (marking) await mark(page, true);
     const st = await page.evaluate(() => {
       const q = (s) => document.querySelectorAll(s).length;
       const busy = q('[data-testid="stSkeleton"], [data-testid="stSpinner"], .stSpinner') +
@@ -132,6 +151,7 @@ async function nav(page, label) {
   await hideCaption(page);
   await sleep(300);
   pause();                                   // the click and the loading are cut out
+  await mark(page, true);
   if (label === "Follow-ups") {              // the speech-bubble button at the top right
     await page.locator('.st-key-top_msg button').first().click();
   } else {
@@ -141,6 +161,7 @@ async function nav(page, label) {
   await loaded(page);
   await toTop(page);
   await sleep(300);
+  await mark(page, false);
   resume();
 }
 
@@ -155,6 +176,7 @@ async function scene(page, label, title, sub, plan) {
   } catch (e) {
     console.log(`Scene "${title}" skipped: ${String(e).split("\n")[0]}`);
     await page.keyboard.press("Escape").catch(() => {});
+    await mark(page, false);
     resume();
     try { await page.screenshot({ path: path.join(OUT, `skip-${label || "start"}.png`) }); } catch (_) {}
   }
@@ -195,12 +217,14 @@ async function scene(page, label, title, sub, plan) {
     await pw.fill(password);
     await sleep(500);
     await page.getByRole("button", { name: "Sign in with email" }).click();
-    await sleep(1200);
     pause();
+    await mark(page, true);
+    await sleep(1200);
     await page.locator(".st-key-top_nav").first().waitFor({ timeout: 90000 });
     await loaded(page, 45000);
     await hideCaption(page);
     await sleep(400);
+    await mark(page, false);
     resume();
 
     await scene(page, null, "Dashboard", "Today's priorities: who to call, renewals due and members drifting away.",
