@@ -52,11 +52,13 @@ PLATES = [25, 20, 15, 10, 5, 2.5, 1.25]
 
 
 def ready(sc):
-    try:
-        sc.table("workout_sets").select("id").limit(1).execute()
-        return True
-    except Exception:
-        return False
+    def check():
+        try:
+            sc.table("workout_sets").select("id").limit(1).execute()
+            return True
+        except Exception:
+            return False
+    return gw._cached(("train_ready",), check, ttl=3600)
 
 
 def e1rm(w, r):
@@ -959,11 +961,13 @@ def render_owner(supabase, gym_id):
         st.success(flash)
     gym_name = gw._text((st.session_state.get("user_profile") or {}).get("business_name"), "Your gym")
     week = (gw.today_local() - timedelta(days=7)).isoformat()
-    try:
-        sets = supabase.table("workout_sets").select("member_id, weight_kg, reps").eq("gym_id", gym_id) \
-            .gte("performed_on", week).limit(20000).execute().data or []
-    except Exception:
-        sets = []
+    def week_sets():
+        try:
+            return supabase.table("workout_sets").select("member_id, weight_kg, reps").eq("gym_id", gym_id) \
+                .gte("performed_on", week).limit(20000).execute().data or []
+        except Exception:
+            return []
+    sets = gw._cached(("train_week", gym_id, week), week_sets, ttl=60)
     gw.kpi_row([("Members logging", str(len({s['member_id'] for s in sets})), "lime", "last 7 days"),
                 ("Sets logged", f"{len(sets):,}", "cyan", "last 7 days"),
                 ("Kg lifted", f"{sum(float(s['weight_kg']) * int(s['reps']) for s in sets):,.0f}", "amber", "last 7 days")])
@@ -1051,13 +1055,16 @@ def _owner_challenges(sc, gym_id):
                     st.session_state["cmo_flash"] = ("Challenges need a one-time setup: run "
                                                      "sql/phase24_community_engage.sql in Supabase.")
                 st.rerun()
-    try:
-        chs = sc.table("community_challenges").select("*").eq("gym_id", gym_id).order("ends_on", desc=True) \
-            .limit(10).execute().data or []
-        ents = sc.table("community_challenge_entries").select("*").in_("challenge_id", [c["id"] for c in chs]) \
-            .execute().data or [] if chs else []
-    except Exception:
-        chs, ents = [], []
+    def load():
+        try:
+            chs = sc.table("community_challenges").select("*").eq("gym_id", gym_id).order("ends_on", desc=True) \
+                .limit(10).execute().data or []
+            ents = sc.table("community_challenge_entries").select("*").in_("challenge_id", [c["id"] for c in chs]) \
+                .execute().data or [] if chs else []
+        except Exception:
+            chs, ents = [], []
+        return chs, ents
+    chs, ents = gw._cached(("train_challenges", gym_id), load, ttl=60)
     gw.table([{"Challenge": f"{c.get('badge') or ''} {c['title']}", "Goal": f"{c['goal_visits']} visits",
                "Dates": f"{pd.Timestamp(str(c['starts_on'])):%d %b} – {pd.Timestamp(str(c['ends_on'])):%d %b}",
                "Joined": sum(1 for e in ents if e["challenge_id"] == c["id"]),
@@ -1067,11 +1074,13 @@ def _owner_challenges(sc, gym_id):
 
 def _owner_insights(sc, gym_id):
     since = (gw.today_local() - timedelta(days=30)).isoformat()
-    try:
-        sets = gw.fetch_all(sc.table("workout_sets").select("member_id, exercise, weight_kg, reps, performed_on")
-                            .eq("gym_id", gym_id).gte("performed_on", since).order("id"))
-    except Exception:
-        sets = []
+    def load():
+        try:
+            return gw.fetch_all(sc.table("workout_sets").select("member_id, exercise, weight_kg, reps, performed_on")
+                                .eq("gym_id", gym_id).gte("performed_on", since).order("id"))
+        except Exception:
+            return []
+    sets = gw._cached(("train_insights", gym_id, since), load, ttl=60)
     if not sets:
         st.info("When members log workouts in their Train tab, you'll see what they train and who's most "
                 "consistent here.")

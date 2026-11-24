@@ -58,6 +58,14 @@ const nav = (page, label) => async () => {
   else await page.locator('.st-key-top_nav [role="radiogroup"] label', { hasText: label }).first().click({ timeout: 10000 });
 };
 
+const tab = (page, label) => async () => {
+  // st.tabs, segmented controls and radio pills all count as tabs here
+  const cands = [page.getByRole("tab", { name: label }), page.locator('[data-testid="stMain"] [role="radiogroup"] label', { hasText: label }),
+                 page.locator('[data-testid="stMain"] button', { hasText: new RegExp("^\\s*" + label.replace(/[&]/g, "\\$&") + "\\s*$") })];
+  for (const c of cands) if (await c.count()) { await c.first().click({ timeout: 6000 }); return; }
+  throw new Error("no tab called " + label);
+};
+
 const menu = (page, label) => async () => {
   await page.locator(".st-key-top_menu button").first().click({ timeout: 8000 });
   await sleep(600);
@@ -103,9 +111,9 @@ const menu = (page, label) => async () => {
   // Tabs inside pages (each is a rerun in some places)
   await step(page, "Grow (tabs)", nav(page, "Grow"));
   for (const t of ["Engagement", "New & leaving", "Growth", "Team & reports", "Renewals & messages"])
-    await step(page, `Grow tab ${t}`, async () => page.getByRole("tab", { name: t }).first().click({ timeout: 6000 }));
+    await step(page, `Grow tab ${t}`, tab(page, t));
   await step(page, "Owner (tabs)", nav(page, "Owner"));
   for (const t of ["Team & access", "Trainers", "Monthly report", "Subscription & billing", "Business insights"])
-    await step(page, `Owner tab ${t}`, async () => page.getByRole("tab", { name: t }).first().click({ timeout: 6000 }));
+    await step(page, `Owner tab ${t}`, tab(page, t));
   await browser.close();
 })();

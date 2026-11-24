@@ -18,6 +18,7 @@ Each Paystack payment is applied once (billing_events ref "member:<reference>").
 """
 import hashlib
 import hmac
+import time
 import uuid
 from datetime import date, datetime, timedelta, timezone
 from urllib.parse import quote as url_quote
@@ -60,15 +61,25 @@ def parse_token(token):
     return mid if mid and sig and hmac.compare_digest(sig, _sign(mid)) else None
 
 
+_MEMO = {}            # key -> (time, gyms): one read serves a whole page, not one per member card
+_MEMO_TTL = 30
+
+
 def _load(sc, key):
+    hit = _MEMO.get(key)
+    if hit and time.time() - hit[0] < _MEMO_TTL:
+        return dict(hit[1])
     try:
         rows = sc.table("platform_settings").select("value").eq("key", key).limit(1).execute().data
-        return dict((rows[0]["value"] or {}).get("gyms") or {}) if rows else {}
+        gyms = dict((rows[0]["value"] or {}).get("gyms") or {}) if rows else {}
     except Exception:
         return {}
+    _MEMO[key] = (time.time(), gyms)
+    return dict(gyms)
 
 
 def _save(sc, key, gyms):
+    _MEMO.pop(key, None)
     sc.table("platform_settings").upsert({"key": key, "value": {"gyms": gyms},
                                           "updated_at": datetime.now(timezone.utc).isoformat()},
                                          on_conflict="key").execute()

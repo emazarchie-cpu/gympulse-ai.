@@ -1310,6 +1310,11 @@ def _current_gym():
         return None
 
 
+# Writes to these only record history; nothing on screen comes from them, so they don't clear the kept
+# copies of members and scores (which would make the next page download everything again).
+LOG_ONLY_TABLES = {"prediction_snapshots", "platform_reports", "billing_events"}
+
+
 class _TrackedTable:
     def __init__(self, table, name=""):
         self._t = table
@@ -1319,7 +1324,8 @@ class _TrackedTable:
         scoped = self._name in GYM_SCOPED_TABLES
         if name in ("insert", "upsert"):
             def write(payload, *args, **kwargs):
-                bump_data_version()
+                if self._name not in LOG_ONLY_TABLES:
+                    bump_data_version()
                 gid = _current_gym() if scoped else None
                 if gid:
                     rows = payload if isinstance(payload, list) else [payload]
@@ -1332,7 +1338,7 @@ class _TrackedTable:
             return write
         if name in ("update", "delete", "select"):
             def scoped_query(*args, **kwargs):
-                if name != "select":
+                if name != "select" and self._name not in LOG_ONLY_TABLES:
                     bump_data_version()
                 query = attr(*args, **kwargs)
                 gid = _current_gym() if scoped else None
@@ -1432,6 +1438,21 @@ def fetch_all_fast(make_query, page=1000, workers=8, cap=300000):
             start += workers * page
     return rows[:cap]
 
+def run_parallel(*fns):
+    """Run independent loads at the same time (each database call waits on the network, so three calls
+    take about as long as one). Returns their results in order; an error in one is raised here."""
+    from concurrent.futures import ThreadPoolExecutor
+    try:
+        from streamlit.runtime.scriptrunner import add_script_run_ctx, get_script_run_ctx
+        ctx = get_script_run_ctx()
+        init = (lambda: add_script_run_ctx(_threading.current_thread(), ctx)) if ctx else None
+    except Exception:
+        init = None
+    with ThreadPoolExecutor(max_workers=len(fns), initializer=init) as pool:
+        futures = [pool.submit(f) for f in fns]
+        return [f.result() for f in futures]
+
+
 def show_boot_overlay():
     st.markdown('<div class="boot-overlay"><div class="boot-spin"></div>'
                 '<div>Loading your workspace…</div></div>', unsafe_allow_html=True)
@@ -1499,7 +1520,10 @@ def _fetch_members_uncached(supabase, gym_id, archived=None, include_photo=True)
     return df, features
 
 def _load_roster_uncached(supabase, gym_id, assess_fn, with_photos=True):
-    members_all, _ = fetch_members(supabase, gym_id, archived=False, include_photo=with_photos)
+    (members_all, _), activity_rows, _ck = run_parallel(
+        lambda: fetch_members(supabase, gym_id, archived=False, include_photo=with_photos),
+        lambda: fetch_all(supabase.table("member_activity").select("*").eq("gym_id", gym_id).order("member_id")),
+        lambda: load_checkins(supabase, gym_id))
     members = members_all[~members_all["suspended"]]
 
     keep = ["id", "full_name", "email", "phone", "fitness_goal",
@@ -1509,11 +1533,8 @@ def _load_roster_uncached(supabase, gym_id, assess_fn, with_photos=True):
         keep.append("photo")
     members = members[[c for c in keep if c in members.columns]].reset_index(drop=True)
 
-    activity = pd.DataFrame(
-        fetch_all(supabase.table("member_activity").select("*").eq("gym_id", gym_id).order("member_id"))
-    )
+    activity = pd.DataFrame(activity_rows)
     # Real check-ins override typed-in attendance numbers
-    _ck = load_checkins(supabase, gym_id)
     stats = checkin_stats(_ck, as_of=data_as_of(_ck))
     if not stats.empty and not activity.empty and "member_id" in activity.columns:
         activity = activity.merge(stats, on="member_id", how="left")
@@ -1597,8 +1618,26 @@ def fetch_members(supabase, gym_id, archived=None, include_photo=True):
     return shared_cached(("members", gym_id, archived, include_photo), gym_id,
                          lambda: _fetch_members_uncached(supabase, gym_id, archived, include_photo))
 
+def _peek_shared(key, gym_id, ttl=SHARED_TTL):
+    """The kept copy for this account, if there is a fresh one (never downloads)."""
+    who = _account()
+    if not who:
+        return None
+    hit = _SHARED.get((who,) + tuple(key))
+    if hit and hit[1] == _GYM_VERSION.get(gym_id, 0) and time.time() - hit[0] < ttl:
+        return _clone(hit[2])
+    return None
+
+
 def load_roster(supabase, gym_id, assess_fn, with_photos=True):
-    return shared_cached(("roster", gym_id, with_photos, today_local().isoformat()), gym_id,
+    day = today_local().isoformat()
+    if not with_photos:                       # reuse the full roster when a page already loaded it
+        full = _peek_shared(("roster", gym_id, True, day), gym_id)
+        if full is not None:
+            roster, missing = full
+            drop = lambda df: df.drop(columns=["photo"], errors="ignore") if isinstance(df, pd.DataFrame) else df
+            return drop(roster), drop(missing)
+    return shared_cached(("roster", gym_id, with_photos, day), gym_id,
                          lambda: _load_roster_uncached(supabase, gym_id, assess_fn, with_photos))
 
 def load_actions(supabase, gym_id, include_archived=False):

@@ -2437,6 +2437,13 @@ with st.container(key="top_nav"):
             @_fragment(run_every=None if page == "Archie" else 20)
             def _watch_inbox():
                 import time as _t
+                try:
+                    from streamlit.runtime.scriptrunner import get_script_run_ctx as _ctx
+                    _timer_run = bool(getattr(_ctx(), "fragment_ids_this_run", None))
+                except Exception:
+                    _timer_run = True
+                if not _timer_run and st.session_state.get("_watch_at"):
+                    return                       # a tap: the 20-second timer does the checking, so taps stay quick
                 if _t.time() - st.session_state.get("_watch_at", 0) < 15:
                     return                       # checked moments ago: don't slow down this tap
                 st.session_state["_watch_at"] = _t.time()
@@ -2548,11 +2555,6 @@ if page == "Dashboard":
         gg.render_month_banner(supabase, st.session_state.get("gym_id"), assess_members, owner_id)
     except Exception:
         pass
-    try:                                   # this month's prediction check starts by itself
-        import gympulse_predcheck as gpc
-        gpc.ensure_monthly(supabase, st.session_state.get("gym_id"), assess_members)
-    except Exception:
-        pass
     st.markdown('<div style="height:6px"></div>', unsafe_allow_html=True)
     gc.render_command_centre(
         supabase,
@@ -2562,6 +2564,11 @@ if page == "Dashboard":
         user_name,
         business_name
     )
+    try:                                   # this month's prediction check starts by itself, after the
+        import gympulse_predcheck as gpc   # Dashboard is on screen, reusing the scores it just loaded
+        gpc.ensure_monthly(supabase, st.session_state.get("gym_id"), assess_members)
+    except Exception:
+        pass
 
 # =========================================================
 # 8. WORKSPACE PAGES
