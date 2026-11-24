@@ -1,0 +1,74 @@
+# Finds slow pages and errors: runs the app here with timing switched on, signs in to the demo
+# gym and clicks through every page (Actions -> Speed check -> Run workflow). Resets the demo gym
+# first, which sets a new demo password and emails it to the founder. No email or WhatsApp keys
+# are given to this copy of the app, so nothing is sent to anyone.
+name: Speed check
+
+on:
+  workflow_dispatch:
+    inputs:
+      width:
+        description: "Browser width in pixels (390 for a phone)"
+        default: "1440"
+
+concurrency:
+  group: seed-demo
+  cancel-in-progress: false
+
+jobs:
+  perf:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - name: Install
+        run: |
+          pip install -r requirements.txt
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Reset the demo gym
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          DEMO_PASSWORD_FILE: ${{ runner.temp }}/demo_pw
+        run: python scripts/seed_demo_gym.py
+      - name: App settings (public key fetched from Supabase, never printed)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          ref=$(python -c "import os,re;print(re.search(r'https://([a-z0-9]+)\.supabase', os.environ['SUPABASE_URL']).group(1))")
+          key=$(curl -s -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" "https://api.supabase.com/v1/projects/$ref/api-keys" \
+                | python -c "import json,sys;print([k['api_key'] for k in json.load(sys.stdin) if k.get('name')=='anon'][0])")
+          echo "::add-mask::$key"
+          mkdir -p .streamlit
+          printf 'SUPABASE_URL = "%s"\nSUPABASE_KEY = "%s"\n' "$SUPABASE_URL" "$key" > .streamlit/secrets.toml
+      - name: Start the app with timing
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          PERF_LOG: perf.jsonl
+        run: |
+          nohup python scripts/perf_server.py > server.log 2>&1 &
+          for i in $(seq 1 60); do curl -s -o /dev/null http://localhost:8501/ && break; sleep 2; done
+      - name: Click through every page
+        env:
+          DEMO_PASSWORD_FILE: ${{ runner.temp }}/demo_pw
+          WALK_WIDTH: ${{ inputs.width }}
+        run: |
+          node scripts/perf_walk.js http://localhost:8501 > walk.jsonl || true
+          rm -f "$RUNNER_TEMP/demo_pw" .streamlit/secrets.toml
+      - name: Report
+        if: always()
+        run: |
+          python scripts/perf_report.py walk.jsonl perf.jsonl || true
+          echo "---- server log (errors) ----"
+          grep -iE "error|traceback|exception" -A8 server.log | head -150 || true
