@@ -25,22 +25,28 @@ const now = () => (Date.now() - T0) / 1000;
 function pause() { const k = keep[keep.length - 1]; if (k && k[1] === null) k[1] = now(); }
 function resume() { pause(); keep.push([now() + 0.15, null]); }
 
-async function loaded(page, maxMs = 30000) {
-  // Done when nothing is loading and the page has stopped growing for a moment
+async function loaded(page, maxMs = 45000) {
+  // Done when Streamlit has stopped running, nothing is loading or stale, the page
+  // has real content, and its height has held still for about two seconds.
   const t = Date.now();
   let last = -1, still = 0;
   while (Date.now() - t < maxMs) {
     const st = await page.evaluate(() => {
-      const busy = document.querySelectorAll('[data-testid="stSkeleton"], [data-testid="stSpinner"], .stSpinner').length;
+      const q = (s) => document.querySelectorAll(s).length;
+      const busy = q('[data-testid="stSkeleton"], [data-testid="stSpinner"], .stSpinner') +
+        q('[data-testid="stStatusWidget"]') + q('[data-stale="true"]') +
+        (q('.gp-hold') && !q('.gp-done') ? 1 : 0);
+      const text = document.body.innerText.slice(0, 6000);
+      const loading = /Loading your workspace|Loading\.\.\.|Please wait/i.test(text);
       const m = document.querySelector('[data-testid="stMain"]') || document.body;
-      const loading = /Loading your workspace/i.test(document.body.innerText.slice(0, 4000));
-      return { busy: busy + (loading ? 1 : 0), h: m.scrollHeight };
-    }).catch(() => ({ busy: 1, h: 0 }));
-    if (!st.busy && st.h === last) { if (++still >= 3) break; } else still = 0;
+      const blocks = q('[data-testid="stMain"] [data-testid="stElementContainer"]');
+      return { busy: busy + (loading ? 1 : 0), h: m.scrollHeight, blocks };
+    }).catch(() => ({ busy: 1, h: 0, blocks: 0 }));
+    if (!st.busy && st.blocks >= 6 && st.h === last) { if (++still >= 5) break; } else still = 0;
     last = st.h;
     await sleep(400);
   }
-  await sleep(600);
+  await sleep(900);
 }
 
 async function settle(page, extra = 1500) {
