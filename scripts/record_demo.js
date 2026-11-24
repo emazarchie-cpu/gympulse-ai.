@@ -211,7 +211,7 @@ async function scene(page, label, title, sub, plan) {
                 [[0, 0, 3000], [700, 3000, 2000]]);
     await scene(page, "Owner", "Owner", "Your business at a glance: retention, revenue, team access and monthly reports.",
                 [[0, 0, 2500], [800, 3500, 2000]]);
-    await scene(page, "Follow-ups", "Follow-ups", "Message members by email in your gym's name and logo, and see their replies.",
+    await scene(page, "Follow-ups", "Follow-ups", "Message members by WhatsApp or email in your gym's name, and see their replies in one place.",
                 [[0, 0, 2500], [600, 3000, 2000]]);
     await hideCaption(page);
   }
