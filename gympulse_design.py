@@ -846,6 +846,12 @@ html body .stApp.stApp :is([data-testid="stPopover"] button, [data-testid="stPop
     box-shadow: none !important; background-image: none !important; }
 html body .stApp.stApp :is([data-testid="stPopover"] button, button[kind="secondary"]):not(.st-key-top_nav *):hover { border-color: rgba(255,255,255,0.34) !important; }
 html body .stApp.stApp :is([data-testid="stPopover"] button, [data-testid="stPopoverButton"]) p { color: var(--gp-text) !important; }
+/* member names read as plain text links: no outline box, not even on hover */
+html body .stApp.stApp.stApp.stApp :is([class*="st-key-mrow_"], [class*="st-key-cc_w_"]) button,
+html body .stApp.stApp.stApp.stApp :is([class*="st-key-mrow_"], [class*="st-key-cc_w_"]) button:hover,
+html body .stApp.stApp.stApp.stApp :is([class*="st-key-mrow_"], [class*="st-key-cc_w_"]) button:active,
+html body .stApp.stApp.stApp.stApp :is([class*="st-key-mrow_"], [class*="st-key-cc_w_"]) button:focus:not(:focus-visible) {
+    border: 0 !important; box-shadow: none !important; outline: none !important; background: transparent !important; }
 html body .stApp.stApp :is(button[kind="primary"], button[kind="primaryFormSubmit"]) { background: #B7F34A !important;
     background-image: none !important; color: #0A0F1E !important; border: 0 !important; box-shadow: none !important; }
 /* cyan has no job: neutral chips instead */
