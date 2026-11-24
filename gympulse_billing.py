@@ -13,6 +13,7 @@ the subscription switches on by itself. Bank transfer stays as a fallback; the
 founder confirms those in Admin.
 Tables: sql/phase10_billing.sql. If the SQL hasn't been run, nothing is locked.
 """
+import copy
 import json
 import time
 import re
@@ -261,14 +262,34 @@ def _money(x):
 
 
 # ------------------------------------------------------------------ data
+_PRICES = {}           # one copy of the prices for every visitor and gym (they're the same for all)
+PRICES_TTL = 60
+
+
+def _shared_prices(fetch):
+    hit = _PRICES.get("p")
+    if hit and time.time() - hit[0] < PRICES_TTL:
+        return copy.deepcopy(hit[1])
+    value = fetch()
+    if value.get("_ok"):
+        value.pop("_ok", None)
+        _PRICES["p"] = (time.time(), copy.deepcopy(value))
+    value.pop("_ok", None)
+    return value
+
+
+def clear_prices_cache():
+    _PRICES.clear()
+
+
 def pricing(supabase):
     def fetch():
         try:
             rows = supabase.table("platform_settings").select("value").eq("key", "pricing").limit(1).execute().data
-            return {**DEFAULT_PRICING, **(rows[0]["value"] if rows else {})}
+            return {**DEFAULT_PRICING, **(rows[0]["value"] if rows else {}), "_ok": True}
         except Exception:
             return dict(DEFAULT_PRICING)
-    return gw._cached(("billing_pricing",), fetch, ttl=300)
+    return _shared_prices(fetch)
 
 
 def billing_on(p):
@@ -652,11 +673,13 @@ def public_pricing():
     def fetch():
         try:
             sc = _service()
-            rows = sc.table("platform_settings").select("value").eq("key", "pricing").limit(1).execute().data if sc else []
-            return {**DEFAULT_PRICING, **(rows[0]["value"] if rows else {})}
+            if not sc:
+                return dict(DEFAULT_PRICING)
+            rows = sc.table("platform_settings").select("value").eq("key", "pricing").limit(1).execute().data
+            return {**DEFAULT_PRICING, **(rows[0]["value"] if rows else {}), "_ok": True}
         except Exception:
             return dict(DEFAULT_PRICING)
-    return gw._cached(("public_pricing",), fetch, ttl=300)
+    return _shared_prices(fetch)
 
 
 def landing_cards_html(ps, icon):
@@ -1791,6 +1814,7 @@ def render_admin_billing(sc, gyms, audit):
                                                                          "billing_on": bool(new)},
                                                   "updated_at": datetime.now(timezone.utc).isoformat()},
                                                  on_conflict="key").execute()
+            clear_prices_cache()
             audit(sc, "billing_switched_on" if new else "pilot_mode_on", {"gym": {"id": None}, "name": "All gyms",
                                                                           "email": None})
             st.session_state.pop("_cache", None)
@@ -1836,6 +1860,7 @@ def render_admin_billing(sc, gyms, audit):
             sc.table("platform_settings").upsert({"key": "pricing", "value": value,
                                                   "updated_at": datetime.now(timezone.utc).isoformat()},
                                                  on_conflict="key").execute()
+            clear_prices_cache()
             st.session_state["adm_flash"] = "Recommended plans saved. Check the prices below and adjust if you like."
             st.rerun()
         b.caption("Starter ≤150 · Growth ≤500 · Pro ≤1,500 · Business ≤5,000 · Enterprise ≤20,000 members, "
@@ -1914,6 +1939,7 @@ def render_admin_billing(sc, gyms, audit):
                 sc.table("platform_settings").upsert({"key": "pricing", "value": value,
                                                       "updated_at": datetime.now(timezone.utc).isoformat()},
                                                      on_conflict="key").execute()
+                clear_prices_cache()
                 st.session_state["adm_flash"] = "Plans saved. They now show on the website and in the app."
                 st.rerun()
 

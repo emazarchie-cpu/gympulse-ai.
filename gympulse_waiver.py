@@ -73,13 +73,16 @@ def member_terms(client, gym_id, member):
 
 
 def house_rules(client, gym_id):
-    """The gym's own extra rules (Member Management -> Membership agreements), one per line."""
-    try:
-        g = client.table("gyms").select("owner_id").eq("id", gym_id).limit(1).execute().data
-        prof = client.table("profiles").select("settings").eq("id", g[0]["owner_id"]).limit(1).execute().data
-        return gw._text(dict(dict((prof[0] if prof else {}).get("settings") or {}).get("waiver") or {}).get("rules"))
-    except Exception:
-        return ""
+    """The gym's own extra rules (Member Management -> Membership agreements), one per line.
+    Kept for two minutes (saving settings clears it sooner), so opening a profile doesn't wait on two reads."""
+    def load():
+        try:
+            g = client.table("gyms").select("owner_id").eq("id", gym_id).limit(1).execute().data
+            prof = client.table("profiles").select("settings").eq("id", g[0]["owner_id"]).limit(1).execute().data
+            return gw._text(dict(dict((prof[0] if prof else {}).get("settings") or {}).get("waiver") or {}).get("rules"))
+        except Exception:
+            return ""
+    return gw._cached(("house_rules", gym_id), load, ttl=120)
 
 
 def agreement_text(gym_name, member, terms, rules=""):
