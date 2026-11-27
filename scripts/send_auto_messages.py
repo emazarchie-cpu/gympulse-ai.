@@ -41,6 +41,8 @@ def main():
         if gadm._is_banned(entry):
             print(f"{entry['name']}: suspended, skipped")
             continue
+        if (entry.get("email") or "").lower() == gadm.DEMO_EMAIL:     # sample members: never message them
+            continue
         print(entry["name"])
         try:
             with gadm.as_gym(entry):
