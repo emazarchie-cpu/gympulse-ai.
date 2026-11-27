@@ -51,6 +51,8 @@ def main():
         gid = entry["gym"]["id"]
         if gid not in gyms or gid in locked or gadm._is_banned(entry):
             continue
+        if (entry.get("email") or "").lower() == gadm.DEMO_EMAIL:      # sample members: never message them
+            continue
         print(entry["name"])
         try:
             with gadm.as_gym(entry):
