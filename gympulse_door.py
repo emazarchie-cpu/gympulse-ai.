@@ -153,7 +153,8 @@ def render_settings(supabase, gym_id):
                "Each entry also counts as a check-in. You need a reader at the door, and an electric lock with a "
                "relay fitted by your electrician if you want the door to open by itself.")
     c1, c2 = st.columns(2)
-    enabled = c1.toggle("Door access on", value=cfg["enabled"], key="door_on")
+    enabled = c1.toggle("Door access on", value=cfg["enabled"], key="door_on",
+                        help="Off: devices and the door screen only record visits, and nobody is stopped.")
     grace = c2.number_input("Grace days after a plan ends", 0, 30, cfg["grace_days"], key="door_grace",
                             help="Members whose plan ended up to this many days ago still get in. 0 means none.")
     opener = st.text_input("Door opener link (optional)", value=cfg["opener_url"], key="door_opener",
