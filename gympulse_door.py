@@ -219,7 +219,8 @@ def bridge_config(key):
     link = controller_url(key).split("&code=")[0]
     return json.dumps({"gympulse_link": link, "mode": "sync", "sync_minutes": 3, "listen_port": 8099,
                        "terminals": [{"ip": "192.168.1.64", "user": "admin", "password": "TERMINAL PASSWORD",
-                                      "door": "Main door"}]}, indent=2)
+                                      "door": "Main door"}],
+                       "staff": [{"name": "Front desk", "pin": "CHOOSE A PIN"}]}, indent=2)
 
 
 def _render_hikvision(key):
@@ -241,6 +242,9 @@ def _render_hikvision(key):
                     "Your members appear on the terminal by name within a minute.\n"
                     "5. **Scan faces.** On the terminal, find each member by name and add their face, finger or "
                     "card. Only members who agreed (see Face and fingerprint consent).")
+        st.markdown("**Staff open the door from their phone, even with no internet.** Set staff PINs in the "
+                    "config file. On the gym's Wi-Fi, staff open the computer's address with `:8099/open`, "
+                    "enter their PIN and tap Open door. Each opening shows below as \"Opened by staff\".")
         c1, c2, c3 = st.columns(3)
         try:
             code = open(os.path.join(BRIDGE_DIR, "gympulse_hikvision_bridge.py"), encoding="utf-8").read()
@@ -253,7 +257,8 @@ def _render_hikvision(key):
                            use_container_width=True, key="door_dl_cfg")
         c3.download_button("Setup guide", guide, "GymPulse door bridge guide.md", "text/markdown",
                            use_container_width=True, key="door_dl_guide", disabled=not guide)
-        st.caption("Keep the config file private: it holds your door link. Give the setup guide to your installer.")
+        st.caption("Keep the config file private: it holds your door link and staff PINs. Give the setup guide to "
+                   "your installer.")
 
 
 # ------------------------------------------------------------------ face or fingerprint: consent first
@@ -367,13 +372,23 @@ def _render_log(supabase, gym_id):
         return
     members, _ = gw.fetch_members(supabase, gym_id, archived=None, include_photo=False)
     names = dict(zip(members["id"], members["full_name"])) if not members.empty else {}
-    left = sum(1 for r in rows if r["reason"] == "Left the gym")
-    let_in = sum(1 for r in rows if r["allowed"]) - left
-    st.caption(f"{let_in} let in · {len(rows) - let_in - left} stopped · {left} left")
+    def kind(r):
+        reason = str(r.get("reason") or "")
+        if reason == "Left the gym":
+            return "Left"
+        if reason.startswith("Opened by staff"):
+            return "Opened by staff"
+        return "Let in" if r["allowed"] else "Stopped"
+
+    kinds = [kind(r) for r in rows]
+    counts = [f"{kinds.count(k)} {k.lower()}" for k in ("Let in", "Stopped", "Left", "Opened by staff")
+              if kinds.count(k) or k in ("Let in", "Stopped")]
+    st.caption(", ".join(counts))
     gw.table([{"Time": f'{pd.Timestamp(r["at"]).tz_convert(gw.APP_TZ):%H:%M}',
-               "Member": names.get(r.get("member_id"), "Unknown code"),
-               "Result": "Left" if r["reason"] == "Left the gym" else "Let in" if r["allowed"] else "Stopped",
-               "Reason": r["reason"]} for r in rows[:50]])
+               "Member": ("Staff" if k == "Opened by staff" else names.get(r.get("member_id"), "Unknown code")),
+               "Result": k,
+               "Reason": (str(r["reason"]).replace("Opened by staff: ", "") if k == "Opened by staff"
+                          else r["reason"])} for r, k in list(zip(rows, kinds))[:50]])
 
 
 # ------------------------------------------------------------------ the member's door pass (any phone)

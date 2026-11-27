@@ -11,7 +11,8 @@
 // For terminals that decide by themselves (offline sync, sql/phase47_door_offline.sql):
 //   ?key=...&action=roster   -> every current member's code, card, name and paid-until date
 //   POST ?key=...&action=record  {"events": [{"code": "...", "door": "...", "allowed": true, "at": "<ISO time>"}]}
-//                             -> logs entries the terminal already decided, including ones held while offline When the member is let in and
+//                             -> logs entries the terminal already decided, including ones held while offline
+//                                an event with "staff": "<name>" instead of "code" logs a door opened by staff When the member is let in and
 // the gym has saved a door opener link, this function also calls that link to release the lock.
 // Deploy with JWT verification OFF (controllers can't send a Supabase login):
 // .github/workflows/deploy-door-access.yml.
@@ -58,10 +59,13 @@ async function record(key: string) {
   const events = Array.isArray(BODY.events) ? (BODY.events as Record<string, unknown>[]).slice(0, 500) : [];
   let logged = 0;
   for (const e of events) {
-    const { data, error } = await sb.rpc("door_record", {
-      p_device_key: key, p_code: String(e.code ?? ""), p_door: String(e.door ?? "Main door"),
-      p_allowed: e.allowed === true, p_at: e.at ? String(e.at) : null,
-    });
+    const at = e.at ? String(e.at) : null;
+    const door = String(e.door ?? "Main door");
+    const { data, error } = e.staff
+      ? await sb.rpc("door_staff_open", { p_device_key: key, p_staff: String(e.staff), p_door: door, p_at: at })
+      : await sb.rpc("door_record", {
+          p_device_key: key, p_code: String(e.code ?? ""), p_door: door, p_allowed: e.allowed === true, p_at: at,
+        });
     if (error) {
       console.error("door_record failed", error.message);
       return json({ ok: false, error: "unavailable", logged }, 500);

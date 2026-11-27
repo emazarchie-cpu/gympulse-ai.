@@ -34,7 +34,10 @@ Open `bridge_config.json` in Notepad. For each terminal, change:
 - `"door"`: a name for the door, for example `Main door`. If you also have a terminal on the way out,
   call it **Exit**: everyone can always leave.
 
-Save the file. The passwords stay on this computer. They are never sent to GymPulse AI.
+Then set the staff PINs under `"staff"`: one line per person, with their name and a PIN of 4 to 8 digits,
+for example `{"name": "Front desk", "pin": "…"}`. Choose PINs that aren't birthdays or 1234.
+
+Save the file. The passwords and PINs stay on this computer. They are never sent to GymPulse AI.
 
 ## Step 3: Set up the terminal
 Open the terminal's web page (type its IP address in a browser) or use iVMS-4200.
@@ -60,18 +63,33 @@ Only for members who agreed (GymPulse AI → Door access → Face and fingerprin
 New members appear on the terminal by themselves within a few minutes of being added in GymPulse AI.
 Cards linked to a member in GymPulse AI are copied to the terminal too.
 
+## Step 6: Open the door from a phone (works with no internet)
+For a guest, a delivery, or a member whose face won't read.
+1. Connect the phone to the **gym's Wi-Fi**.
+2. Open `http://<the computer's IP address>:8099/open`, for example `http://192.168.1.20:8099/open`.
+   Add it to the home screen so it's one tap next time.
+3. Enter your staff PIN, then tap **Open door**.
+
+The phone stays signed in for 12 hours. Tap **Lock this phone** to sign out.
+After 5 wrong PINs, the page waits 5 minutes.
+Each opening shows in GymPulse AI under **Door access → At the door today** as "Opened by staff", with the
+person's name (sent when the internet is up).
+
+If you can, put members on a separate guest Wi-Fi, so only staff phones can reach this page.
+
 ## Check it works
 1. Ask a paid member to try the door. It should open.
 2. Ask a member whose plan has expired to try. It should stay shut.
 3. In GymPulse AI, **Door access → At the door today** shows both, within a minute.
-4. Unplug the internet and try again. The door still opens for the paid member. Plug it back in: the entry
-   appears in GymPulse AI within a minute.
+4. Unplug the internet and try again. The door still opens for the paid member, and **Open door** on a staff
+   phone still works. Plug it back in: both appear in GymPulse AI within a minute.
 
 ## Good to know
 - **The computer must stay on** to send new dates and entries. If it's off, the terminal keeps using the
   last dates it had, so the door still works.
 - **Renewals during an internet outage** reach the terminal when the internet is back. Until then, staff
-  can let the member in with the exit button.
+  let the member in with **Open door** on their phone.
+- **No power to the router or the computer:** the phone page can't reach the door. Use the exit button.
 - **If the door ever won't open** (power cut, fault), the lock releases when the power goes off. Keep the
   break-glass release by the door.
 - **Live check instead** (needs internet on every tap): set `"mode": "remote"` in the config file and turn
