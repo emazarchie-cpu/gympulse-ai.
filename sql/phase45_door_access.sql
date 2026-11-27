@@ -86,6 +86,17 @@ begin
     if length(code) < 4 then
         return json_build_object('ok', true, 'allow', false, 'reason', 'Code not recognised');
     end if;
+    -- Leaving: an exit reader always opens (fire safety) and only logs who left
+    if lower(coalesce(p_door, '')) like '%exit%' then
+        select * into m from members
+         where gym_id = g and (upper(left(replace(id::text, '-', ''), 8)) = code
+                               or upper(regexp_replace(coalesce(door_card, ''), '[^A-Za-z0-9]', '', 'g')) = code)
+         limit 1;
+        insert into door_events (gym_id, member_id, code, door, allowed, reason)
+        values (g, m.id, left(code, 40), left(p_door, 60), true, 'Left the gym');
+        return json_build_object('ok', true, 'allow', true, 'reason', 'Left the gym',
+                                 'name', m.full_name, 'opener', cfg.opener_url);
+    end if;
 
     select * into m from members
      where gym_id = g and (upper(left(replace(id::text, '-', ''), 8)) = code
