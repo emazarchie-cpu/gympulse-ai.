@@ -82,11 +82,24 @@ begin
     select id into g from gyms where device_key = p_device_key;
     if g is null then return json_build_object('ok', false, 'error', 'invalid key'); end if;
     select * into cfg from door_config where gym_id = g;
-    if found and not cfg.enabled then
-        return json_build_object('ok', true, 'allow', false, 'reason', 'Door access is switched off');
-    end if;
     if length(code) < 4 then
         return json_build_object('ok', true, 'allow', false, 'reason', 'Code not recognised');
+    end if;
+    -- Door access switched off: the link only records visits (check-in devices without a door), no membership check
+    if cfg.gym_id is not null and not cfg.enabled then
+        select * into m from members
+         where gym_id = g and coalesce(archived, false) = false
+           and (upper(left(replace(id::text, '-', ''), 8)) = code
+                or upper(regexp_replace(coalesce(door_card, ''), '[^A-Za-z0-9]', '', 'g')) = code)
+         limit 1;
+        if m.id is null then
+            return json_build_object('ok', true, 'allow', false, 'reason', 'Code not recognised');
+        end if;
+        if not exists (select 1 from checkins c where c.member_id = m.id
+                         and c.checked_in_at > now() - interval '10 minutes') then
+            insert into checkins (gym_id, member_id, source) values (g, m.id, 'device');
+        end if;
+        return json_build_object('ok', true, 'allow', true, 'reason', 'Checked in', 'name', m.full_name);
     end if;
     -- Leaving: an exit reader always opens (fire safety) and only logs who left
     if lower(coalesce(p_door, '')) like '%exit%' then

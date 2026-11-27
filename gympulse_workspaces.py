@@ -5738,36 +5738,12 @@ def render_settings(supabase, owner_id, gym_id, log_out):
     if section == "Check-in devices":
         st.markdown("**How members can check in**")
         st.write(
-            "- **QR code:** every member has one on their profile, Check-in tab. "
-            "Print it on a card or show it on their phone.\n"
-            "- **Barcode scanners, RFID or NFC readers, card readers and key fobs:** "
-            "these usually type the member code and press Enter, so they work on the "
-            "Front Desk Check-in page with no setup. Put the member code on the card or fob.\n"
-            "- **Self-service kiosk:** open the Check-in page on a touchscreen tablet.\n"
-            "- **Biometric and other systems with an HTTP or webhook option:** use the "
-            "device key below.")
-        key = ""
-        try:
-            row = (supabase.table("gyms").select("device_key").eq("id", gym_id)
-                   .limit(1).execute().data or [])
-            key = (row[0].get("device_key") if row else "") or ""
-        except Exception:
-            key = ""
-        if key:
-            url = ""
-            try:
-                url = st.secrets["SUPABASE_URL"]
-            except Exception:
-                url = "YOUR_SUPABASE_URL"
-            st.caption("Your device key. Keep it private, it lets a device check members in:")
-            st.code(key)
-            st.caption("A device can send a check-in with this request:")
-            st.code(f'POST {url}/rest/v1/rpc/device_checkin\n'
-                    f'apikey: YOUR_SUPABASE_ANON_KEY\n'
-                    f'Content-Type: application/json\n\n'
-                    f'{{"p_device_key": "{key}", "p_member_code": "A1B2C3D4"}}', language="text")
-        else:
-            st.info("Run the check-in devices SQL to create your device key.")
+            "- **Front desk:** open Check-in and type a name or phone number, or scan the member's code. "
+            "Barcode, card, fob and RFID readers that type the code and press Enter work here with no setup.\n"
+            "- **QR code:** every member has one on their profile and in their member app (Save my door pass).\n"
+            "- **Self-service kiosk:** open the Check-in page on a tablet by the entrance.\n"
+            "- **Doors, face and fingerprint terminals, and any device that calls a web address:** "
+            "see Door access below. With door access off, the same link just records the visit.")
         st.divider()
         import gympulse_door as _gdoor
         _gdoor.render_settings(supabase, gym_id)
@@ -5798,10 +5774,9 @@ FAQS = [
          "code, and taps Check in. Their attendance and risk update straight away."),
         ("Which check-in methods are supported?",
          "Typing a name or phone, QR codes, and any barcode, RFID, NFC, card or key-fob reader that "
-         "types a code and presses Enter. A tablet works as a self-service kiosk. Systems that can "
-         "send a web request, such as some biometric or access-control systems, can use the device "
-         "key under Settings → Check-in devices. Phone wallet passes and built-in face or "
-         "fingerprint recognition are not included."),
+         "types a code and presses Enter. A tablet works as a self-service kiosk. Door terminals with "
+         "face or fingerprint recognition (Hikvision, with remote verification) and other devices that "
+         "can call a web address connect under Settings → Check-in devices → Door access."),
         ("Where do I find a member's QR code?",
          "Open the member's profile and go to the Check-in tab. It shows their QR code and member "
          "code, which you can print on a card or fob."),
