@@ -31,6 +31,8 @@ create table if not exists public.door_config (
     opener_url    text,
     updated_at    timestamptz not null default now()
 );
+-- Send the renewal message (WhatsApp/email, with the pay link) to members stopped because their plan expired
+alter table public.door_config add column if not exists renew_message boolean not null default true;
 
 create table if not exists public.door_events (
     id            uuid primary key default gen_random_uuid(),
