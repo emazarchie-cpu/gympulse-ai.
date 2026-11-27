@@ -104,6 +104,27 @@ def apply(quiet=False):
                                         f'content="{FB_DOMAIN_VERIFICATION}" />', 1)
         for old, rep in TEXT:
             new = new.replace(old, rep)
+        # Icons: start downloading the icon font at once, and show icons only when it has arrived, so slow
+        # phones never see icon names ("arrow_back", "forum") as words
+        fonts = sorted(glob.glob(os.path.join(static, "static", "media", "MaterialSymbols-Rounded*.woff2")))
+        new = _re.sub(r'<link rel="preload" id="gp-icon-font"[^>]*>(<script id="gp-icon-ready">.*?</script>)?'
+                      r'(<style id="gp-icon-style">.*?</style>)?', "", new, flags=_re.S)
+        if fonts:
+            font = os.path.basename(fonts[0])
+            new = new.replace("</head>",
+                              f'<link rel="preload" id="gp-icon-font" href="./static/media/{font}" as="font" '
+                              'type="font/woff2" crossorigin>'
+                              '<script id="gp-icon-ready">(function(){var d=document.documentElement,F=document.fonts;'
+                              'if(!F||!F.load){d.classList.add("gp-icons");return}'
+                              'var t,chk=function(){var ok=false;F.forEach(function(f){if(f.family.replace(/["\']/g,"")'
+                              '==="Material Symbols Rounded"&&f.status==="loaded")ok=true});'
+                              'if(ok){d.classList.add("gp-icons");clearInterval(t)}};'
+                              'F.load(\'24px "Material Symbols Rounded"\').then(chk,chk);'
+                              'F.addEventListener&&F.addEventListener("loadingdone",chk);t=setInterval(chk,1000)})();</script>'
+                              '<style id="gp-icon-style">[data-testid="stIconMaterial"]{display:inline-block;'
+                              'max-width:1.05em;overflow:hidden;white-space:nowrap;vertical-align:middle}'
+                              'html:not(.gp-icons) [data-testid="stIconMaterial"]{visibility:hidden!important}'
+                              '</style></head>', 1)
         try:                                       # search engines: description, structured data,
             sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))   # readable homepage
             import gympulse_seo
