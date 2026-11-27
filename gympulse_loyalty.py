@@ -50,7 +50,7 @@ LOYALTY_DEFAULTS = {
                {"name": "Gold", "points": 3000, "perk": "A free personal training session every quarter"}],
 }
 AUTO_DEFAULTS = {
-    "renewal": {"on": True, "days": 0, "on_day": True, "lapsed": True, "lapsed_days": 3},   # 8:30am on the day it ends
+    "renewal": {"on": False, "days": 3, "on_day": True, "lapsed": True, "lapsed_days": 3},
     "missed": {"on": False, "days": 10, "pause": True},
     "reward": {"on": False},
     "week1": {"on": False},
@@ -91,10 +91,20 @@ def level_for(earned, cfg):
     return cur, nxt
 
 
+# Gyms that join from this date get the renewal reminder on by default: 8:30am on the morning a plan ends.
+# Gyms that joined earlier keep it off until the owner switches it on, so nobody's members get a surprise batch.
+RENEWAL_ON_FROM = "2026-11-28"
+NEW_GYM_RENEWAL = {"on": True, "days": 0, "on_day": True, "lapsed": True, "lapsed_days": 3}
+
+
 def auto_cfg(profile=None):
     raw = dict(_settings(profile).get("auto_messages") or {})
+    p = profile or st.session_state.get("user_profile") or {}
+    joined = str((p or {}).get("created_at") or "")[:10]
     out = {}
     for k, v in AUTO_DEFAULTS.items():
+        if k == "renewal" and joined and joined >= RENEWAL_ON_FROM:
+            v = NEW_GYM_RENEWAL
         out[k] = {**v, **dict(raw.get(k) or {})} if isinstance(v, dict) else raw.get(k, v)
     return out
 
