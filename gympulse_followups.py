@@ -242,7 +242,7 @@ def _compose(supabase, gym_id, members, owner, gym):
     theme = st.selectbox("Message idea", themes,
                          index=themes.index(open_action) if open_action in themes else 0,
                          key=f"fu_theme_{mid}",
-                         help="Archie drafts an excited message for the idea you pick.")
+                         help="Archie drafts a warm, personal message for the idea you pick.")
     options = [c for c in CHANNELS]
     default_channel = "Email" if email else "WhatsApp"
     if st.session_state.get("fu_channel") not in options:
@@ -436,7 +436,7 @@ def _sent(supabase, gym_id, members):
 
 def render_followups(supabase, gym_id, assess_fn, owner_name, gym_name):
     gw.page_header("Follow-ups",
-                   "Send your members an excited message in one click and see every reply, "
+                   "Message your members in one click and see every reply, "
                    "from WhatsApp and email, in one place.", "Stay connected")
     flash = st.session_state.pop("fu_flash", None)
     if flash:
