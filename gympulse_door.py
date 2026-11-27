@@ -192,14 +192,56 @@ def render_settings(supabase, gym_id):
             "Cheapest, and it works with the door screen today.\n"
             "- **No phone:** a card or key fob, linked to the member below. Card readers work with the door screen "
             "today.\n"
-            "- **Fingerprint or face:** a door terminal (for example ZKTeco or Hikvision) that can send the "
-            "member's ID to a web link, or ask a platform before opening (Hikvision calls this remote "
-            "verification). Tell us the exact model before you buy, and we'll connect it.\n"
+            "- **Fingerprint or face:** a Hikvision terminal with remote verification is connected (see "
+            "Hikvision terminals below). For other brands, tell us the exact model before you buy.\n"
             "- **Leaving:** name a reader \"Exit\" and it always opens, for fire safety, and records who left.")
         st.caption("Phone tap (NFC or Bluetooth, like some imported systems) needs that brand's own readers "
                    "and app, and isn't connected yet.")
+    if key:
+        _render_hikvision(key)
     _render_cards(supabase, gym_id)
     _render_log(supabase, gym_id)
+
+
+BRIDGE_DIR = __import__("os").path.join(__import__("os").path.dirname(__import__("os").path.abspath(__file__)),
+                                       "door_bridge")
+
+
+def bridge_config(key):
+    import json
+    link = controller_url(key).split("&code=")[0]
+    return json.dumps({"gympulse_link": link, "listen_port": 8099, "when_offline": "deny",
+                       "terminals": [{"ip": "192.168.1.64", "user": "admin", "password": "TERMINAL PASSWORD",
+                                      "door": "Main door"},
+                                     {"ip": "192.168.1.65", "user": "admin", "password": "TERMINAL PASSWORD",
+                                      "door": "Exit"}]}, indent=2)
+
+
+def _render_hikvision(key):
+    import os
+    with st.expander("Hikvision terminals (fingerprint, face or card)"):
+        st.caption("The terminal reads the finger, face or card and asks GymPulse before it opens: paid members "
+                   "get in, others see the reason on the screen. A small bridge runs on an always-on computer "
+                   "inside the gym, because Hikvision terminals only talk to computers on their own network.")
+        st.markdown("1. Download both files into one folder on that computer.\n"
+                    "2. In the config file, add each terminal's IP address, admin password and door name "
+                    "(name the inside reader **Exit**). Passwords stay on that computer.\n"
+                    "3. On each terminal: HTTP Listening to the computer's IP, port 8099; switch on **Remote "
+                    "Verification**; set each member's **Employee No.** to their member code.\n"
+                    "4. Start it: `python3 gympulse_hikvision_bridge.py`. Full steps are in the guide.")
+        c1, c2, c3 = st.columns(3)
+        try:
+            code = open(os.path.join(BRIDGE_DIR, "gympulse_hikvision_bridge.py"), encoding="utf-8").read()
+            guide = open(os.path.join(BRIDGE_DIR, "README.md"), encoding="utf-8").read()
+        except OSError:
+            code, guide = "", ""
+        c1.download_button("Bridge program", code, "gympulse_hikvision_bridge.py", "text/x-python",
+                           use_container_width=True, key="door_dl_bridge", disabled=not code)
+        c2.download_button("Config file", bridge_config(key), "bridge_config.json", "application/json",
+                           use_container_width=True, key="door_dl_cfg")
+        c3.download_button("Setup guide", guide, "GymPulse door bridge guide.md", "text/markdown",
+                           use_container_width=True, key="door_dl_guide", disabled=not guide)
+        st.caption("The config file contains your door link: keep it private.")
 
 
 def _render_cards(supabase, gym_id):
