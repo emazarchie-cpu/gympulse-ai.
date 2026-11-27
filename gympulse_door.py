@@ -220,15 +220,19 @@ def bridge_config(key):
 def _render_hikvision(key):
     import os
     with st.expander("Hikvision terminals (fingerprint, face or card)"):
-        st.caption("The terminal reads the finger, face or card and asks GymPulse before it opens: paid members "
-                   "get in, others see the reason on the screen. A small bridge runs on an always-on computer "
-                   "inside the gym, because Hikvision terminals only talk to computers on their own network.")
-        st.markdown("1. Download both files into one folder on that computer.\n"
-                    "2. In the config file, add each terminal's IP address, admin password and door name "
-                    "(name the inside reader **Exit**). Passwords stay on that computer.\n"
-                    "3. On each terminal: HTTP Listening to the computer's IP, port 8099; switch on **Remote "
-                    "Verification**; set each member's **Employee No.** to their member code.\n"
-                    "4. Start it: `python3 gympulse_hikvision_bridge.py`. Full steps are in the guide.")
+        st.markdown("**How it works:** a member puts their finger, face or card on the terminal. GymPulse checks "
+                    "their membership. Paid members get in. Others see why on the screen.")
+        st.markdown("**You need:** a Hikvision terminal with *Remote Verification*, an electric lock fitted by your "
+                    "installer, and one computer at the gym that stays on.")
+        st.markdown("**Set it up in 4 steps**\n\n"
+                    "1. **Download** the 3 files below onto that computer. Put them in one folder.\n"
+                    "2. **Open the config file.** Type each terminal's IP address and password. Call the door "
+                    "people leave through **Exit**: it always opens.\n"
+                    "3. **On each terminal**, turn on *Remote Verification*. Under *HTTP Listening*, enter the "
+                    "computer's IP address and port **8099**.\n"
+                    "4. **Start the bridge** by double-clicking it, or run `python3 gympulse_hikvision_bridge.py`.")
+        st.markdown("**Add members to the terminal:** use their GymPulse member code (on their profile) as the "
+                    "*Employee No.*, then scan their finger, face or card.")
         c1, c2, c3 = st.columns(3)
         try:
             code = open(os.path.join(BRIDGE_DIR, "gympulse_hikvision_bridge.py"), encoding="utf-8").read()
@@ -241,7 +245,7 @@ def _render_hikvision(key):
                            use_container_width=True, key="door_dl_cfg")
         c3.download_button("Setup guide", guide, "GymPulse door bridge guide.md", "text/markdown",
                            use_container_width=True, key="door_dl_guide", disabled=not guide)
-        st.caption("The config file contains your door link: keep it private.")
+        st.caption("Keep the config file private: it holds your door link. Give the setup guide to your installer.")
 
 
 def _render_cards(supabase, gym_id):

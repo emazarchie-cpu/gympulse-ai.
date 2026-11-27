@@ -1,47 +1,61 @@
-# GymPulse AI door bridge for Hikvision terminals
+# GymPulse AI door setup (Hikvision)
 
-Lets a Hikvision face, fingerprint or card terminal open the gym door only for members with an active
-membership in GymPulse AI. The terminal reads the finger, face or card, asks the bridge, the bridge asks
-GymPulse AI, and the terminal opens or shows the reason (for example "Membership expired 02 Nov 2026").
+## What this does
+A member puts their finger, face or card on the terminal at the door.
+GymPulse AI checks their membership.
+- **Paid:** the door opens, and the screen says "Welcome".
+- **Not paid:** the door stays shut, and the screen says why, for example "Membership expired 02 Nov 2026".
 
-The bridge runs on any always-on computer inside the gym, on the same network as the terminals. This is
-needed because Hikvision's remote verification has the platform call back into the terminal, and the
-terminal sits inside the gym's network.
+Every entry also counts as a check-in in GymPulse AI.
 
 ## What you need
-- A Hikvision access terminal with **remote verification** (for example the DS-K1T341, DS-K1T343, DS-K1T670
-  or DS-K1T673 series, on recent firmware). Check the model's settings before buying.
-- An electric lock wired to the terminal's lock relay (your installer does this).
-- An always-on computer on the same network: a mini PC, or the front-desk laptop if it stays on. Windows,
-  Mac or Linux with Python 3.8 or newer. Give it a fixed IP address on the router.
+1. **A Hikvision terminal** that has *Remote Verification*. For example the DS-K1T341, DS-K1T343, DS-K1T670 or
+   DS-K1T673 series. Check this before you buy.
+2. **An electric lock** wired to the terminal. Your installer does this.
+3. **One computer at the gym that stays on.** A mini PC or the front-desk laptop. It needs Python 3.8 or newer
+   (free from python.org). Ask your installer to give it a fixed IP address on the router.
 
-## 1. Get the bridge
-In GymPulse AI: **Settings → Check-in devices → Door access → Hikvision terminals**, download both files
-into one folder: `gympulse_hikvision_bridge.py` and `bridge_config.json` (your door link is already filled in).
+## Step 1: Download the files
+In GymPulse AI, go to **Settings → Check-in devices → Door access → Hikvision terminals**.
+Download all 3 files and put them in one folder on the computer:
+- `gympulse_hikvision_bridge.py` (the bridge)
+- `bridge_config.json` (your settings, with your door link already in it)
+- this guide
 
-## 2. Add your terminals
-Open `bridge_config.json` and, for each terminal, set its IP address, its admin user and password, and the
-door name. Name a terminal on the inside of the door `Exit`: it always opens (fire safety) and records who
-left. The passwords stay on this computer and are never sent to GymPulse AI.
+## Step 2: Fill in the config file
+Open `bridge_config.json` in Notepad. For each terminal, change:
+- `"ip"`: the terminal's IP address, for example `192.168.1.64`
+- `"password"`: the terminal's admin password
+- `"door"`: a name for the door. Use **Exit** for the door people leave through. It always opens.
 
-## 3. Set up each terminal (web page or iVMS-4200)
-1. **Network → Advanced → HTTP Listening** (sometimes "Event → Alarm server"): add the bridge computer's IP,
-   port `8099`, URL `/`, protocol HTTP. Use **Test**: the bridge answers "running".
-2. **Access Control → Parameter Settings → Terminal Parameters**: switch on **Remote Verification**. Set the
-   timeout to 3–5 seconds. Leave "offline remote verifying unlocking" **off**, so unpaid members aren't let
-   in when the internet is down.
-3. **Person management**: for each member, set **Employee No.** to their GymPulse member code (8 letters
-   and numbers, on their profile, Check-in tab), then enroll their fingerprint, face or card on the terminal.
-   A card can also be linked in GymPulse instead (Door access → Give a member a card or key fob).
+Save the file. The passwords stay on this computer. They are never sent to GymPulse AI.
 
-## 4. Start the bridge
+## Step 3: Set up each terminal
+Open the terminal's settings (on its web page or in iVMS-4200).
+1. Find **HTTP Listening** (sometimes called *Alarm Server*).
+   Enter the computer's IP address and port **8099**. Press **Test**.
+2. Find **Remote Verification** (under *Access Control → Terminal Parameters*). Turn it **on**.
+   Set the wait time to 3–5 seconds.
+   Leave *offline remote verifying unlocking* **off**.
+
+## Step 4: Start the bridge
+Double-click `gympulse_hikvision_bridge.py`, or open a terminal in the folder and type:
 ```
 python3 gympulse_hikvision_bridge.py
 ```
-Leave it running (on Windows, add it to Task Scheduler "At startup"; on Linux, a systemd service). Each tap
-shows a line such as `Main door 192.168.1.64 code=10D22DB8 -> OPEN (Welcome Yemi)`, and appears in
-GymPulse AI under **At the door today**.
+Keep it running. To start it by itself when the computer turns on, ask your installer to add it to
+*Task Scheduler* (Windows) or as a service (Linux).
 
-## If the internet goes down
-With `"when_offline": "deny"` (the default), the door stays shut for everyone except the Exit terminal. Keep a
-manual key or override at the front desk. Set it to `"allow"` to let everyone in while offline instead.
+## Step 5: Add members to the terminal
+For each member:
+1. Open their profile in GymPulse AI and copy their **member code** (8 letters and numbers).
+2. On the terminal, add a person. Put the member code in **Employee No.**
+3. Scan their finger, face or card.
+
+## Check it works
+Ask a paid member to tap in. The door should open.
+In GymPulse AI, **Door access → At the door today** shows every entry, and every refusal with the reason.
+
+## If the internet is down
+The door stays shut, except the Exit door. Keep a key or a manual switch at the front desk.
+To let everyone in when the internet is down, change `"when_offline"` to `"allow"` in the config file.
