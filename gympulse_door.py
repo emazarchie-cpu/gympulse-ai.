@@ -288,3 +288,48 @@ def _render_log(supabase, gym_id):
                "Member": names.get(r.get("member_id"), "Unknown code"),
                "Result": "Left" if r["reason"] == "Left the gym" else "Let in" if r["allowed"] else "Stopped",
                "Reason": r["reason"]} for r in rows[:50]])
+
+
+# ------------------------------------------------------------------ the member's door pass (any phone)
+def door_pass_png(name, gym, code):
+    """A phone-sized picture with the member's QR code: saved in their photos, it works on any phone,
+    even with no internet. The QR holds the member code, like the one on their profile."""
+    import io
+    import os
+    import qrcode
+    from PIL import Image, ImageDraw, ImageFont
+
+    W, H = 1080, 1920
+    NAVY, TEXT, MUTED, LIME = (10, 15, 30), (244, 247, 251), (147, 161, 184), (183, 243, 74)
+    img = Image.new("RGB", (W, H), NAVY)
+    d = ImageDraw.Draw(img)
+    base = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "fonts")
+
+    def font(bold, size):
+        for f in (("InstrumentSans-Bold.ttf" if bold else "InstrumentSans-Regular.ttf"), "DejaVuSans.ttf"):
+            try:
+                return ImageFont.truetype(os.path.join(base, f) if "Instrument" in f else f, size)
+            except OSError:
+                continue
+        return ImageFont.load_default()
+
+    def centre(y, text, f, fill):
+        w = d.textlength(text, font=f)
+        d.text(((W - w) / 2, y), text, font=f, fill=fill)
+
+    centre(170, (gym or "Your gym")[:30], font(False, 46), MUTED)
+    centre(240, "Door pass", font(True, 92), TEXT)
+    q = qrcode.QRCode(border=2, box_size=10, error_correction=qrcode.constants.ERROR_CORRECT_M)
+    q.add_data(code)
+    q.make(fit=True)
+    qr = q.make_image(fill_color="black", back_color="white").convert("RGB").resize((760, 760), Image.NEAREST)
+    d.rounded_rectangle((140, 440, 940, 1240), radius=28, fill=(255, 255, 255))
+    img.paste(qr, (160, 460))
+    centre(1300, (name or "Member")[:28], font(True, 64), TEXT)
+    centre(1390, f"Code {code}", font(False, 48), LIME)
+    centre(1560, "Hold this to the reader at the door.", font(False, 40), MUTED)
+    centre(1615, "Turn your screen brightness up.", font(False, 40), MUTED)
+    centre(1800, "GymPulse AI", font(False, 34), MUTED)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG", optimize=True)
+    return buf.getvalue()

@@ -921,6 +921,15 @@ def _home(sc, m, gym_name, prof):
     uri = gw.qr_data_uri(code)
     gw._md(f'<div class="mp2-ci"><div><b>Check in</b><span>Show this at the front desk</span>'
            f'<div class="code">{code}</div></div>' + (f'<img src="{uri}" alt="Check-in code">' if uri else "") + '</div>')
+    try:
+        import gympulse_door as _gdoor
+        st.download_button("Save my door pass", _gdoor.door_pass_png(m.get("full_name"), gym_name, code),
+                           f"door-pass-{code}.png", "image/png", use_container_width=True,
+                           icon=":material/download:", key="mp2_door_pass")
+        st.caption("Saves a picture of your code to your phone. Show it at the door or front desk, "
+                   "even with no internet.")
+    except Exception:
+        pass
 
     # 3 · renewal alert (from the week planner)
     pay = dict((prof.get("settings") or {}).get("collect") or {})
