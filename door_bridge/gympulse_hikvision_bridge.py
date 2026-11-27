@@ -16,6 +16,10 @@ Two ways of working ("mode" in bridge_config.json):
   "remote" (live check on every tap, needs internet)
     The terminal asks the bridge on every tap ("remote verification"), and the bridge asks GymPulse AI.
 
+Staff can also open the door from their phone on the gym's Wi-Fi, with no internet: open
+http://<this computer's IP>:8099/open and enter a staff PIN (set in "staff" below). Each opening is recorded
+and sent to GymPulse AI.
+
 Each member's Employee No. on the terminal is their GymPulse member code (8 letters/numbers, shown on their
 profile). In sync mode the bridge creates these for you.
 
@@ -27,14 +31,18 @@ Setup: see door_bridge/README.md. Settings live in bridge_config.json next to th
   "listen_port": 8099,
   "terminals": [
     {"ip": "192.168.1.64", "user": "admin", "password": "<terminal password>", "door": "Main door"}
-  ]
+  ],
+  "staff": [{"name": "Front desk", "pin": "<4 to 8 digits>"}]
 }
 The terminal passwords stay on this computer. They are never sent to GymPulse AI.
 """
+import hmac
+import html
 import json
 import logging
 import os
 import re
+import secrets
 import sys
 import threading
 import time
@@ -117,14 +125,17 @@ def tell_terminal(term, serial, allow, info):
 
 
 # ------------------------------------------------------------------ talking to a terminal (digest login)
-def isapi(term, method, path, payload=None, timeout=6):
+def isapi(term, method, path, payload=None, timeout=6, xml=None):
     """(status, json reply or {}) for one ISAPI call. status 0 means the terminal didn't answer."""
     url = f"http://{term['ip']}{path}"
     pm = urllib.request.HTTPPasswordMgrWithDefaultRealm()
     pm.add_password(None, f"http://{term['ip']}/", term.get("user", "admin"), term.get("password", ""))
     opener = urllib.request.build_opener(urllib.request.HTTPDigestAuthHandler(pm))
-    data = json.dumps(payload).encode() if payload is not None else None
-    req = urllib.request.Request(url, data=data, method=method, headers={"Content-Type": "application/json"})
+    if xml is not None:
+        data, ctype = xml.encode(), "application/xml"
+    else:
+        data, ctype = (json.dumps(payload).encode() if payload is not None else None), "application/json"
+    req = urllib.request.Request(url, data=data, method=method, headers={"Content-Type": ctype})
     try:
         with opener.open(req, timeout=timeout) as r:
             raw = r.read().decode("utf-8", "ignore")
@@ -305,6 +316,146 @@ def send_loop():
                 _write_json(PENDING_FILE, rest)
 
 
+# ------------------------------------------------------------------ staff open the door from their phone (gym Wi-Fi)
+SESSIONS = {}                                   # token -> (staff name, expires at)
+FAILS = {}                                      # phone IP -> [times of wrong PINs]
+LAST_OPEN = {}                                  # door name -> (time, staff name)
+STAFF_LOCK = threading.Lock()
+SESSION_HOURS = 12
+
+OPEN_XML = ('<RemoteControlDoor version="2.0" xmlns="http://www.isapi.org/ver20/XMLSchema">'
+            '<cmd>open</cmd></RemoteControlDoor>')
+
+
+def staff_list():
+    out = []
+    for s in CFG.get("staff") or []:
+        pin = str(s.get("pin") or "")
+        if pin.isdigit() and 4 <= len(pin) <= 8:
+            out.append({"name": str(s.get("name") or "Staff")[:40], "pin": pin})
+    return out
+
+
+def entry_doors():
+    return [t for t in CFG["terminals"] if "exit" not in t.get("door", "").lower()] or CFG["terminals"]
+
+
+def open_door(term, staff_name):
+    status, _ = isapi(term, "PUT", "/ISAPI/AccessControl/RemoteControl/door/1", xml=OPEN_XML, timeout=4)
+    if not 200 <= status < 300:
+        status, _ = isapi(term, "PUT", "/ISAPI/AccessControl/RemoteControl/door/1?format=json",
+                          {"RemoteControlDoor": {"cmd": "open"}}, timeout=4)
+    ok = 200 <= status < 300
+    door = term.get("door", "Main door")
+    if ok:
+        LAST_OPEN[door] = (time.time(), staff_name)
+        with PENDING_LOCK:
+            pending = _read_json(PENDING_FILE, [])
+            pending.append({"staff": staff_name, "door": door, "at": time.strftime("%Y-%m-%dT%H:%M:%S%z")})
+            _write_json(PENDING_FILE, pending[-20000:])
+    log.info("%s opened by staff (%s) -> %s", door, staff_name, "OPEN" if ok else "terminal did not answer")
+    return ok
+
+
+def check_pin(ip, pin):
+    """The staff member's name, None for a wrong PIN, or 'LOCKED' after 5 wrong PINs in 5 minutes."""
+    now = time.time()
+    with STAFF_LOCK:
+        recent = [t for t in FAILS.get(ip, []) if now - t < 300]
+        FAILS[ip] = recent
+        if len(recent) >= 5:
+            return "LOCKED"
+        for s in staff_list():
+            if hmac.compare_digest(s["pin"], str(pin or "")):
+                FAILS.pop(ip, None)
+                return s["name"]
+        recent.append(now)
+    return None
+
+
+def session_name(cookie_header):
+    m = re.search(r"gp_staff=([A-Za-z0-9_\-]+)", cookie_header or "")
+    if not m:
+        return None
+    with STAFF_LOCK:
+        name, until = SESSIONS.get(m.group(1), (None, 0))
+    return name if until > time.time() else None
+
+
+PAGE_CSS = """
+:root{--bg:#0E1A2B;--ink:#E8EDF3;--muted:#8C9AAD;--line:#22324A;--lime:#C6F432;--red:#FF6B5E}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--ink)}
+body{font:17px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100dvh;
+display:flex;flex-direction:column;padding:28px 20px calc(20px + env(safe-area-inset-bottom))}
+main{flex:1;max-width:520px;width:100%}
+.who{color:var(--muted);font-size:15px;margin:0 0 40px}
+h1{font-size:40px;line-height:1.05;letter-spacing:-.02em;font-weight:600;margin:0 0 10px}
+.state{color:var(--muted);margin:0 0 28px}.state b{color:var(--ink);font-weight:600}
+.err{color:var(--red);margin:0 0 20px}.ok{color:var(--lime);margin:0 0 20px}.state .now{color:var(--lime)}
+label{display:block;color:var(--muted);font-size:15px;margin:0 0 8px}
+input{width:100%;font:600 28px/1 system-ui,sans-serif;letter-spacing:.3em;padding:16px;border-radius:10px;
+border:1px solid var(--line);background:#0A1422;color:var(--ink)}
+input:focus,button:focus-visible,a:focus-visible{outline:3px solid var(--lime);outline-offset:2px}
+.foot{max-width:520px;width:100%;display:grid;gap:12px}
+button{width:100%;border:0;border-radius:14px;font:700 22px/1 system-ui,sans-serif;padding:30px 20px;
+background:var(--lime);color:#0E1A2B;cursor:pointer}
+button:active{transform:scale(.985)}
+.door+.door{margin-top:12px}
+.quiet{color:var(--muted);font-size:15px;text-decoration:none;justify-self:start;padding:8px 0}
+@media (prefers-reduced-motion:reduce){button:active{transform:none}}
+"""
+
+
+def page(body, foot=""):
+    return ("<!doctype html><html lang='en'><head><meta charset='utf-8'>"
+            "<meta name='viewport' content='width=device-width,initial-scale=1,viewport-fit=cover'>"
+            "<meta name='robots' content='noindex'><title>Open door</title>"
+            f"<style>{PAGE_CSS}</style></head><body><main>{body}</main>"
+            f"<div class='foot'>{foot}</div></body></html>").encode("utf-8")
+
+
+def pin_page(msg="", err=True):
+    if not staff_list():
+        return page("<p class='who'>GymPulse AI</p><h1>Open door</h1>"
+                    "<p class='err'>No staff PIN is set yet. Add one under staff in bridge_config.json on "
+                    "the gym computer, then restart the bridge.</p>")
+    note = f"<p class='{'err' if err else 'ok'}'>{html.escape(msg)}</p>" if msg else ""
+    body = ("<p class='who'>GymPulse AI</p><h1>Open door</h1>"
+            "<p class='state'>Works on the gym's Wi-Fi, even when the internet is down.</p>" + note +
+            "<form id='f' method='post' action='/open/pin'><label for='pin'>Staff PIN</label>"
+            "<input id='pin' name='pin' type='password' inputmode='numeric' autocomplete='off' "
+            "pattern='[0-9]*' maxlength='8' required autofocus></form>")
+    return page(body, "<button form='f' type='submit'>Unlock</button>")
+
+
+def door_page(name, msg="", err=False):
+    rows = []
+    for i, t in enumerate(entry_doors()):
+        door = t.get("door", "Main door")
+        last = LAST_OPEN.get(door)
+        if last and time.time() - last[0] < 15:
+            state = f"<span class='now'>Open now, by {html.escape(last[1])}</span>"
+        elif last:
+            state = f"Last opened {time.strftime('%H:%M', time.localtime(last[0]))} by <b>{html.escape(last[1])}</b>"
+        else:
+            state = "Locked"
+        rows.append((i, door, state))
+    note = f"<p class='{'err' if err else 'ok'}'>{html.escape(msg)}</p>" if msg else ""
+    if len(rows) == 1:
+        i, door, state = rows[0]
+        body = (f"<p class='who'>Signed in as {html.escape(name)}</p><h1>{html.escape(door)}</h1>"
+                f"<p class='state'>{state}</p>{note}")
+        foot = (f"<form method='post' action='/open/door'><input type='hidden' name='d' value='{i}'>"
+                "<button type='submit'>Open door</button></form>")
+    else:
+        body = f"<p class='who'>Signed in as {html.escape(name)}</p><h1>Open a door</h1>{note}" + "".join(
+            f"<p class='state'>{html.escape(door)}: {state}</p>" for _, door, state in rows)
+        foot = "".join(f"<form class='door' method='post' action='/open/door'><input type='hidden' name='d' "
+                       f"value='{i}'><button type='submit'>Open {html.escape(door)}</button></form>"
+                       for i, door, _ in rows)
+    return page(body, foot + "<a class='quiet' href='/open/lock'>Lock this phone</a>")
+
+
 def handle(term, ev):
     if not ev.get("remoteCheck"):
         return                                           # an ordinary event, nothing to decide
@@ -341,8 +492,53 @@ class Handler(BaseHTTPRequestHandler):
         ip = self.client_address[0]
         return next((t for t in CFG["terminals"] if str(t.get("ip", "")).split(":")[0] == ip), None)
 
+    def _html(self, data, status=200, headers=()):
+        self.send_response(status)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        for k, v in headers:
+            self.send_header(k, v)
+        self.end_headers()
+        self.wfile.write(data)
+
+    def _go(self, where, headers=()):
+        self.send_response(303)
+        self.send_header("Location", where)
+        for k, v in headers:
+            self.send_header(k, v)
+        self.end_headers()
+
+    def _staff_post(self, body):
+        form = urllib.parse.parse_qs(body.decode("utf-8", "ignore"))
+        ip = self.client_address[0]
+        if self.path.startswith("/open/pin"):
+            who = check_pin(ip, (form.get("pin") or [""])[0])
+            if who == "LOCKED":
+                return self._html(pin_page("Too many wrong PINs. Try again in 5 minutes."))
+            if not who:
+                return self._html(pin_page("That PIN is not right."))
+            token = secrets.token_urlsafe(24)
+            with STAFF_LOCK:
+                SESSIONS[token] = (who, time.time() + SESSION_HOURS * 3600)
+            return self._go("/open", [("Set-Cookie", f"gp_staff={token}; Max-Age={SESSION_HOURS * 3600}; "
+                                                     "Path=/open; HttpOnly; SameSite=Strict")])
+        who = session_name(self.headers.get("Cookie"))
+        if not who:
+            return self._go("/open")
+        doors = entry_doors()
+        try:
+            term = doors[int((form.get("d") or ["0"])[0])]
+        except (ValueError, IndexError):
+            return self._go("/open")
+        if open_door(term, who):
+            return self._go("/open")                     # a page refresh won't open the door again
+        return self._html(door_page(who, "The door terminal didn't answer. Check it has power and is on the "
+                                         "Wi-Fi, or use the exit button.", err=True))
+
     def do_POST(self):
         body = self.rfile.read(int(self.headers.get("Content-Length") or 0))
+        if self.path.startswith("/open/"):
+            return self._staff_post(body)
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.end_headers()
@@ -367,6 +563,15 @@ class Handler(BaseHTTPRequestHandler):
             queue_event(term, ev)
 
     def do_GET(self):
+        if self.path.startswith("/open/lock"):
+            m = re.search(r"gp_staff=([A-Za-z0-9_\-]+)", self.headers.get("Cookie") or "")
+            if m:
+                with STAFF_LOCK:
+                    SESSIONS.pop(m.group(1), None)
+            return self._go("/open", [("Set-Cookie", "gp_staff=; Max-Age=0; Path=/open; HttpOnly; SameSite=Strict")])
+        if self.path.startswith("/open"):
+            who = session_name(self.headers.get("Cookie"))
+            return self._html(door_page(who) if who else pin_page())
         self.send_response(200)
         self.end_headers()
         self.wfile.write(b"GymPulse AI door bridge is running")
@@ -383,7 +588,9 @@ def main():
     port = int(CFG["listen_port"])
     if CFG["mode"] != "remote":
         threading.Thread(target=sync_loop, daemon=True).start()
-        threading.Thread(target=send_loop, daemon=True).start()
+    threading.Thread(target=send_loop, daemon=True).start()        # entries and staff openings
+    if staff_list():
+        log.info("Staff can open the door at http://<this computer's IP>:%s/open on the gym's Wi-Fi", port)
     log.info("GymPulse AI door bridge (%s mode) listening on port %s for %d terminal(s)", CFG["mode"], port,
              len(CFG["terminals"]))
     ThreadingHTTPServer(("0.0.0.0", port), Handler).serve_forever()
