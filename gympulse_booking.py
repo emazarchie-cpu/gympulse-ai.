@@ -55,9 +55,6 @@ def meet_url(raw):
     return m.group(0).rstrip(".,)") if m else ""
 
 
-PROPOSAL_URL = "https://usegympulseai.com/gympulse-ai-proposal.pdf"   # assets/public/gympulse-ai-proposal.pdf
-
-
 def config():
     days = [d.strip()[:3].title() for d in _setting("DEMO_DAYS", "Mon,Tue,Wed,Thu,Fri").split(",") if d.strip()]
     hours = _setting("DEMO_HOURS", "10:00-16:30").split("-")
@@ -242,17 +239,14 @@ def send_confirmations(b, cfg):
     client_html = _email_html(
         f"Your GymPulse AI demo is booked, {b['name'].split(' ')[0]}",
         [("When", gw._esc(when)), ("Length", "15 minutes"), ("Where", "Google Meet"),
-         ("Join", join), ("Gym", gw._esc(b["gym"])),
-         ("Before the call", f'<a href="{PROPOSAL_URL}" style="color:#0B8F5A">Read our 2-page proposal</a> '
-                             '(how it works, what it costs)')],
+         ("Join", join), ("Gym", gw._esc(b["gym"]))],
         [("Join Google Meet", meet)] * bool(meet) + [("Add to Google Calendar", cal)],
         f"Can't make it? <a href=\"{gw._esc(b['cancel_url'])}\" style=\"color:#5B6678\">Cancel this booking</a>. "
         "Reply to this email to pick another time.",
         intro="Thanks for booking. Here are your details. The calendar invite is attached.",
         preheader=f"{when} on Google Meet")
     client_text = (f"Your GymPulse AI demo is booked.\n\nWhen: {when}\nLength: 15 minutes\n"
-                   f"Join: {meet or 'Google Meet link to follow by email'}\nAdd to Google Calendar: {cal}\n"
-                   f"Before the call, our 2-page proposal: {PROPOSAL_URL}\n\n"
+                   f"Join: {meet or 'Google Meet link to follow by email'}\nAdd to Google Calendar: {cal}\n\n"
                    f"Cancel: {b['cancel_url']}\n")
     owner_html = _email_html(
         f"New demo booked: {b['gym']}",
