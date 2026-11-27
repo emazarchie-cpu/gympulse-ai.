@@ -493,8 +493,8 @@ color:var(--ink);font-family:inherit;font-size:15px;font-weight:600;line-height:
 
 PAGE_JS = """
 document.querySelectorAll('.nojs').forEach(function(e){e.style.display='none'});
-var pin=document.getElementById('pin'),dots=document.querySelectorAll('.dots i');
-function draw(){dots.forEach(function(d,i){d.classList.toggle('on',i<pin.value.length)})}
+var pin=document.getElementById('pin'),dotbox=document.querySelector('.dots');
+function draw(){if(!dotbox)return;var n=pin.value.length,h='';for(var i=0;i<Math.max(4,n);i++){h+='<i'+(i<n?' class="on"':'')+'></i>'}dotbox.innerHTML=h}
 document.querySelectorAll('.pad [data-k]').forEach(function(b){b.addEventListener('click',function(){
  var k=b.dataset.k;if(k==='c'){pin.value=''}else if(k==='go'){if(pin.value.length>=4)pin.form.submit();return}
  else if(pin.value.length<8){pin.value+=k}draw()})});
@@ -535,7 +535,7 @@ def pin_page(msg="", err=True):
             "<form method='post' action='/open/pin'>"
             "<input id='pin' name='pin' type='password' inputmode='numeric' autocomplete='off' maxlength='8' "
             "aria-label='Staff PIN'>"
-            "<div class='dots' aria-hidden='true'>" + "<i></i>" * 8 + "</div>"
+            "<div class='dots' aria-hidden='true'>" + "<i></i>" * 4 + "</div>"
             "<div class='pad'>" + keys +
             "<button type='button' class='fn' data-k='c'>Clear</button><button type='button' data-k='0'>0</button>"
             "<button type='button' class='go' data-k='go'>Enter</button></div>"
