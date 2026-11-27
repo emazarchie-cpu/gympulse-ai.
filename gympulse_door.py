@@ -205,6 +205,7 @@ def render_settings(supabase, gym_id):
                    "and app, and isn't connected yet.")
     if key:
         _render_hikvision(key)
+    _render_consent(supabase, gym_id)
     _render_cards(supabase, gym_id)
     _render_log(supabase, gym_id)
 
@@ -237,8 +238,9 @@ def _render_hikvision(key):
                     "3. **On each terminal**, turn on *Remote Verification*. Under *HTTP Listening*, enter the "
                     "computer's IP address and port **8099**.\n"
                     "4. **Start the bridge** by double-clicking it, or run `python3 gympulse_hikvision_bridge.py`.")
-        st.markdown("**Add members to the terminal:** use their GymPulse member code (on their profile) as the "
-                    "*Employee No.*, then scan their finger, face or card.")
+        st.markdown("**Add members to the terminal:** only members who agreed (see Face and fingerprint consent). "
+                    "Use their GymPulse member code (on their profile) as the *Employee No.*, then scan their "
+                    "finger, face or card.")
         c1, c2, c3 = st.columns(3)
         try:
             code = open(os.path.join(BRIDGE_DIR, "gympulse_hikvision_bridge.py"), encoding="utf-8").read()
@@ -252,6 +254,84 @@ def _render_hikvision(key):
         c3.download_button("Setup guide", guide, "GymPulse door bridge guide.md", "text/markdown",
                            use_container_width=True, key="door_dl_guide", disabled=not guide)
         st.caption("Keep the config file private: it holds your door link. Give the setup guide to your installer.")
+
+
+# ------------------------------------------------------------------ face or fingerprint: consent first
+CONSENT_TEXT = ("You can use your face or fingerprint to open the gym door instead of a card or QR code. "
+                "Your face or fingerprint is stored only on the gym's door terminal, not in GymPulse AI, and "
+                "is used only to let you in. You can withdraw at any time, and the gym will delete it from "
+                "the terminal. You can always use your QR code or a card instead.")
+
+
+def consent_state(m):
+    """'agreed', 'withdrawn' or 'none' for a member row."""
+    agreed, withdrawn = m.get("biometric_consent_at"), m.get("biometric_withdrawn_at")
+    if agreed and (not withdrawn or str(withdrawn) < str(agreed)):
+        return "agreed"
+    return "withdrawn" if withdrawn else "none"
+
+
+def set_consent(client, member_id, agree):
+    now = datetime.utcnow().isoformat() + "Z"
+    client.table("members").update({"biometric_consent_at": now, "biometric_withdrawn_at": None} if agree
+                                   else {"biometric_withdrawn_at": now}).eq("id", member_id).execute()
+
+
+def render_member_consent(sc, m):
+    """In the member app: agree to (or withdraw from) face or fingerprint at the door."""
+    state = consent_state(m)
+    with st.expander("Face or fingerprint at the door", icon=":material/fingerprint:"):
+        st.write(CONSENT_TEXT)
+        try:
+            if state == "agreed":
+                st.caption("You agreed. Ask the front desk to add your face or fingerprint to the door.")
+                if st.button("Withdraw my consent", key="mp2_bio_no", use_container_width=True):
+                    set_consent(sc, m["id"], False)
+                    st.success("Done. The gym will delete your face or fingerprint from the door.")
+            elif st.button("I agree", key="mp2_bio_yes", type="primary", use_container_width=True):
+                set_consent(sc, m["id"], True)
+                st.success("Thanks. Ask the front desk to add your face or fingerprint to the door.")
+        except Exception:
+            st.caption("This isn't set up for your gym yet. Ask the front desk.")
+
+
+def _render_consent(supabase, gym_id):
+    with st.expander("Face and fingerprint consent"):
+        st.caption("Under the Nigeria Data Protection Act, a face or fingerprint is sensitive data. Only add "
+                   "members who agreed. They agree in their member app, or you record it here after reading "
+                   "them this:")
+        st.info(CONSENT_TEXT)
+        members, _ = gw.fetch_members(supabase, gym_id, archived=False, include_photo=False)
+        try:
+            rows = (supabase.table("members").select("id, full_name, biometric_consent_at, biometric_withdrawn_at")
+                    .eq("gym_id", gym_id).or_("biometric_consent_at.not.is.null,biometric_withdrawn_at.not.is.null")
+                    .limit(2000).execute().data or [])
+        except Exception:
+            st.caption(SQL_HINT)
+            return
+        agreed = [r for r in rows if consent_state(r) == "agreed"]
+        withdrawn = [r for r in rows if consent_state(r) == "withdrawn"]
+        st.markdown(f"**{len(agreed)} agreed**: add only these members to the terminal.")
+        if agreed:
+            gw.table([{"Member": r["full_name"], "Agreed": f'{pd.Timestamp(r["biometric_consent_at"]):%d %b %Y}'}
+                      for r in agreed])
+        if withdrawn:
+            st.markdown(f"**{len(withdrawn)} withdrew**: delete their face or fingerprint from the terminal.")
+            gw.table([{"Member": r["full_name"], "Withdrew": f'{pd.Timestamp(r["biometric_withdrawn_at"]):%d %b %Y}'}
+                      for r in withdrawn])
+        if not members.empty:
+            names = dict(zip(members["id"], members["full_name"]))
+            mid = st.selectbox("Record consent given in person", list(names), index=None,
+                               format_func=lambda i: names.get(i, ""), placeholder="Choose a member",
+                               key="door_bio_member")
+            ok = st.checkbox("I read them the text above and they agreed", key="door_bio_ok")
+            c1, c2 = st.columns(2)
+            if c1.button("Save consent", key="door_bio_save", disabled=not (mid and ok), use_container_width=True):
+                set_consent(supabase, mid, True)
+                st.success(f"Consent saved for {names.get(mid)}.")
+            if c2.button("Record withdrawal", key="door_bio_withdraw", disabled=not mid, use_container_width=True):
+                set_consent(supabase, mid, False)
+                st.success(f"Withdrawal saved for {names.get(mid)}. Delete them from the terminal.")
 
 
 def _render_cards(supabase, gym_id):

@@ -22,6 +22,9 @@ alter table public.gyms add column if not exists device_key text;
 update public.gyms set device_key = replace(gen_random_uuid()::text, '-', '') where device_key is null;
 
 alter table public.members add column if not exists door_card text;
+-- Face or fingerprint at the door: when the member agreed, and when they withdrew (NDPA: sensitive data)
+alter table public.members add column if not exists biometric_consent_at timestamptz;
+alter table public.members add column if not exists biometric_withdrawn_at timestamptz;
 create index if not exists members_door_card on public.members (gym_id, upper(door_card)) where door_card is not null;
 
 create table if not exists public.door_config (
