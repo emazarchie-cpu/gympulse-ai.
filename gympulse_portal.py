@@ -930,6 +930,11 @@ def _home(sc, m, gym_name, prof):
                    "even with no internet.")
     except Exception:
         pass
+    try:
+        import gympulse_door as _gdoor
+        _gdoor.render_member_consent(sc, m)
+    except Exception:
+        pass
 
     # 3 · renewal alert (from the week planner)
     pay = dict((prof.get("settings") or {}).get("collect") or {})
