@@ -50,7 +50,7 @@ LOYALTY_DEFAULTS = {
                {"name": "Gold", "points": 3000, "perk": "A free personal training session every quarter"}],
 }
 AUTO_DEFAULTS = {
-    "renewal": {"on": False, "days": 3, "on_day": True, "lapsed": True, "lapsed_days": 3},
+    "renewal": {"on": True, "days": 0, "on_day": True, "lapsed": True, "lapsed_days": 3},   # 8:30am on the day it ends
     "missed": {"on": False, "days": 10, "pause": True},
     "reward": {"on": False},
     "week1": {"on": False},
@@ -690,7 +690,8 @@ def render_auto(supabase, gym_id, owner_id):
                              help="HMO members aren't asked to pay. They get a short note that their HMO "
                                   "cover is ending instead. Staff on a corporate plan aren't asked either: "
                                   "their HR contact gets one reminder a week before the company plan renews.")
-            r_days = c2.number_input("Days before it ends", 1, 14, int(auto["renewal"]["days"]))
+            r_days = c2.number_input("Days before it ends", 0, 14, int(auto["renewal"]["days"]),
+                                     help="0 sends it on the morning the plan ends (8:30am).")
             c7, c8 = st.columns([1.3, 1])
             r_day = c7.checkbox("Remind them again on the day it ends", value=bool(auto["renewal"].get("on_day", True)))
             r_lap = c8.checkbox("And if it lapses", value=bool(auto["renewal"].get("lapsed", True)),
