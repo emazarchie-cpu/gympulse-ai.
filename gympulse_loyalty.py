@@ -50,7 +50,7 @@ LOYALTY_DEFAULTS = {
                {"name": "Gold", "points": 3000, "perk": "A free personal training session every quarter"}],
 }
 AUTO_DEFAULTS = {
-    "renewal": {"on": True, "days": 0, "on_day": True, "lapsed": True, "lapsed_days": 3},   # 8:30am on the day it ends
+    "renewal": {"on": False, "days": 3, "on_day": True, "lapsed": True, "lapsed_days": 3},
     "missed": {"on": False, "days": 10, "pause": True},
     "reward": {"on": False},
     "week1": {"on": False},
