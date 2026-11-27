@@ -1,7 +1,8 @@
 # GymPulse AI: rules for Claude
 
-GymPulse AI (GYMPULSE AI LTD, Calabar) is a **member retention platform for Nigerian gyms**. It is not gym
-management software: it works alongside GymMaster, Excel or whatever a gym already uses. Built with
+GymPulse AI (GYMPULSE AI LTD, Calabar) is a **member retention platform for Nigerian gyms**. It works alongside
+GymMaster, Excel or whatever a gym already uses, or on its own for gyms that don't want to pay for two apps
+(check-ins, renewals and door access). Built with
 Streamlit, Supabase (Frankfurt) and Render, with Paystack billing and the WhatsApp Cloud API.
 
 These rules always apply. The skills in `.claude/skills/` hold the detail for each kind of task.

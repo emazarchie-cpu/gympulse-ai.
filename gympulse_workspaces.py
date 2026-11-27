@@ -5768,6 +5768,9 @@ def render_settings(supabase, owner_id, gym_id, log_out):
                     f'{{"p_device_key": "{key}", "p_member_code": "A1B2C3D4"}}', language="text")
         else:
             st.info("Run the check-in devices SQL to create your device key.")
+        st.divider()
+        import gympulse_door as _gdoor
+        _gdoor.render_settings(supabase, gym_id)
 
     if section == "Account":
         st.caption("Signing out ends your session on this device.")
