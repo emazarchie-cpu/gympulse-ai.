@@ -2616,6 +2616,12 @@ def render_member_profile(supabase, gym_id, member_id, assess_fn):
     </div>
     """)
 
+    try:
+        import gympulse_door as gdoor
+        gdoor.render_let_in(supabase, gym_id, member_id, name, archived=bool(m["archived"]))
+    except Exception:
+        pass
+
     if (scored is not None and not m["archived"] and str(scored.get("risk_category")) in ("High", "Medium")
             and _num(scored.get("days_since_last_visit"), 0) >= 7):
         b1, b2 = st.columns([3, 1.3], vertical_alignment="center")
