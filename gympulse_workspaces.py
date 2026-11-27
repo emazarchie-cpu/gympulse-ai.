@@ -5775,7 +5775,7 @@ FAQS = [
         ("Which check-in methods are supported?",
          "Typing a name or phone, QR codes, and any barcode, RFID, NFC, card or key-fob reader that "
          "types a code and presses Enter. A tablet works as a self-service kiosk. Door terminals with "
-         "face or fingerprint recognition (Hikvision, with remote verification) and other devices that "
+         "face or fingerprint recognition (Hikvision, works without internet) and other devices that "
          "can call a web address connect under Settings → Check-in devices → Door access."),
         ("Where do I find a member's QR code?",
          "Open the member's profile and go to the Check-in tab. It shows their QR code and member "

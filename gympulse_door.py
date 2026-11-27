@@ -198,7 +198,7 @@ def render_settings(supabase, gym_id):
             "Cheapest, and it works with the door screen today.\n"
             "- **No phone:** a card or key fob, linked to the member below. Card readers work with the door screen "
             "today.\n"
-            "- **Fingerprint or face:** a Hikvision terminal with remote verification is connected (see "
+            "- **Fingerprint or face:** a Hikvision face terminal is connected, and it works without internet (see "
             "Hikvision terminals below). For other brands, tell us the exact model before you buy.\n"
             "- **Leaving:** name a reader \"Exit\" and it always opens, for fire safety, and records who left.")
         st.caption("Phone tap (NFC or Bluetooth, like some imported systems) needs that brand's own readers "
@@ -217,30 +217,30 @@ BRIDGE_DIR = __import__("os").path.join(__import__("os").path.dirname(__import__
 def bridge_config(key):
     import json
     link = controller_url(key).split("&code=")[0]
-    return json.dumps({"gympulse_link": link, "listen_port": 8099, "when_offline": "deny",
+    return json.dumps({"gympulse_link": link, "mode": "sync", "sync_minutes": 3, "listen_port": 8099,
                        "terminals": [{"ip": "192.168.1.64", "user": "admin", "password": "TERMINAL PASSWORD",
-                                      "door": "Main door"},
-                                     {"ip": "192.168.1.65", "user": "admin", "password": "TERMINAL PASSWORD",
-                                      "door": "Exit"}]}, indent=2)
+                                      "door": "Main door"}]}, indent=2)
 
 
 def _render_hikvision(key):
     import os
     with st.expander("Hikvision terminals (fingerprint, face or card)"):
-        st.markdown("**How it works:** a member puts their finger, face or card on the terminal. GymPulse checks "
-                    "their membership. Paid members get in. Others see why on the screen.")
-        st.markdown("**You need:** a Hikvision terminal with *Remote Verification*, an electric lock fitted by your "
+        st.markdown("**How it works:** a member shows their face, finger or card. Paid members get in. "
+                    "Expired, suspended or frozen members don't.")
+        st.markdown("**Works without internet.** Every few minutes GymPulse copies each member's paid-until date "
+                    "onto the terminal, so it decides by itself. Entries made offline are sent when the "
+                    "internet is back.")
+        st.markdown("**You need:** a Hikvision face terminal, an electric lock and exit button fitted by your "
                     "installer, and one computer at the gym that stays on.")
-        st.markdown("**Set it up in 4 steps**\n\n"
+        st.markdown("**Set it up in 5 steps**\n\n"
                     "1. **Download** the 3 files below onto that computer. Put them in one folder.\n"
-                    "2. **Open the config file.** Type each terminal's IP address and password. Call the door "
-                    "people leave through **Exit**: it always opens.\n"
-                    "3. **On each terminal**, turn on *Remote Verification*. Under *HTTP Listening*, enter the "
-                    "computer's IP address and port **8099**.\n"
-                    "4. **Start the bridge** by double-clicking it, or run `python3 gympulse_hikvision_bridge.py`.")
-        st.markdown("**Add members to the terminal:** only members who agreed (see Face and fingerprint consent). "
-                    "Use their GymPulse member code (on their profile) as the *Employee No.*, then scan their "
-                    "finger, face or card.")
+                    "2. **Open the config file.** Type the terminal's IP address and password.\n"
+                    "3. **On the terminal**, under *HTTP Listening*, enter the computer's IP address and port "
+                    "**8099**. Leave *Remote Verification* off.\n"
+                    "4. **Start the bridge** by double-clicking it, or run `python3 gympulse_hikvision_bridge.py`. "
+                    "Your members appear on the terminal by name within a minute.\n"
+                    "5. **Scan faces.** On the terminal, find each member by name and add their face, finger or "
+                    "card. Only members who agreed (see Face and fingerprint consent).")
         c1, c2, c3 = st.columns(3)
         try:
             code = open(os.path.join(BRIDGE_DIR, "gympulse_hikvision_bridge.py"), encoding="utf-8").read()
