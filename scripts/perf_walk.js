@@ -54,8 +54,14 @@ async function step(page, name, action) {
 }
 
 const nav = (page, label) => async () => {
-  if (label === "Follow-ups") await page.locator(".st-key-top_msg button").first().click({ timeout: 10000 });
-  else await page.locator('.st-key-top_nav [role="radiogroup"] label', { hasText: label }).first().click({ timeout: 10000 });
+  if (label === "Follow-ups") return page.locator(".st-key-top_msg button").first().click({ timeout: 10000 });
+  const tabLink = page.locator('.st-key-top_nav [role="radiogroup"] label', { hasText: label }).first();
+  if (await tabLink.isVisible().catch(() => false)) return tabLink.click({ timeout: 10000 });
+  // phones: the pages are in the menu
+  await page.locator(".st-key-top_menu button").first().click({ timeout: 8000 });
+  await sleep(700);
+  await page.locator('[class*="st-key-pop_main"] button, [class*="st-key-pop_more"] button',
+                     { hasText: new RegExp("^\\s*" + label + "\\s*$") }).first().click({ timeout: 8000 });
 };
 
 const tab = (page, label) => async () => {
@@ -100,10 +106,10 @@ const menu = (page, label) => async () => {
   // Member profiles: from the Dashboard priorities, the Risk Radar list and the Members directory
   await step(page, "Dashboard (back)", nav(page, "Dashboard"));
   await step(page, "Profile from Dashboard", async () =>
-    page.locator('[data-testid="stMain"] button', { hasText: /Profile$/ }).first().click({ timeout: 8000 }));
+    page.locator('[data-testid="stMain"] button', { hasText: /profile$/i }).first().click({ timeout: 8000 }));
   await step(page, "Risk Radar (back)", nav(page, "Risk Radar"));
   await step(page, "Profile from Risk Radar name", async () =>
-    page.locator('[class*="st-key-mrow_prio_"] button').first().click({ timeout: 8000 }));
+    page.locator('[class*="st-key-mrow_prio_"] button, [class*="st-key-mopen_prio"] button').first().click({ timeout: 8000 }));
   await step(page, "Members (back)", nav(page, "Members"));
   await step(page, "Profile from Members name", async () =>
     page.locator('[class*="st-key-mrow_dir_"] button').first().click({ timeout: 8000 }));
