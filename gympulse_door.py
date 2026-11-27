@@ -186,6 +186,18 @@ def render_settings(supabase, gym_id):
                        '{"allow": true or false, "reason": …}. Add &format=text to get just OPEN or DENY.')
             st.code(controller_url(key), language="text")
 
+    with st.expander("Which door hardware?"):
+        st.markdown(
+            "- **Phone:** members open their QR code in the member app and hold it to a QR reader at the door. "
+            "Cheapest, and it works with the door screen today.\n"
+            "- **No phone:** a card or key fob, linked to the member below. Card readers work with the door screen "
+            "today.\n"
+            "- **Fingerprint or face:** a door terminal (for example ZKTeco or Hikvision) that can send the "
+            "member's ID to a web link, or ask a platform before opening (Hikvision calls this remote "
+            "verification). Tell us the exact model before you buy, and we'll connect it.\n"
+            "- **Leaving:** name a reader \"Exit\" and it always opens, for fire safety, and records who left.")
+        st.caption("Phone tap (NFC or Bluetooth, like some imported systems) needs that brand's own readers "
+                   "and app, and isn't connected yet.")
     _render_cards(supabase, gym_id)
     _render_log(supabase, gym_id)
 
@@ -223,9 +235,10 @@ def _render_log(supabase, gym_id):
         return
     members, _ = gw.fetch_members(supabase, gym_id, archived=None, include_photo=False)
     names = dict(zip(members["id"], members["full_name"])) if not members.empty else {}
-    let_in = sum(1 for r in rows if r["allowed"])
-    st.caption(f"{let_in} let in · {len(rows) - let_in} stopped")
+    left = sum(1 for r in rows if r["reason"] == "Left the gym")
+    let_in = sum(1 for r in rows if r["allowed"]) - left
+    st.caption(f"{let_in} let in · {len(rows) - let_in - left} stopped · {left} left")
     gw.table([{"Time": f'{pd.Timestamp(r["at"]).tz_convert(gw.APP_TZ):%H:%M}',
                "Member": names.get(r.get("member_id"), "Unknown code"),
-               "Result": "Let in" if r["allowed"] else "Stopped",
+               "Result": "Left" if r["reason"] == "Left the gym" else "Let in" if r["allowed"] else "Stopped",
                "Reason": r["reason"]} for r in rows[:50]])
