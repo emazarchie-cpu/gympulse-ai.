@@ -214,13 +214,33 @@ BRIDGE_DIR = __import__("os").path.join(__import__("os").path.dirname(__import__
                                        "door_bridge")
 
 
+def public_key():
+    """GymPulse's public (anon) Supabase key, for the bridge's "Open door and check in" polling. Never a
+    service key: anything else returns ""."""
+    import base64
+    import json
+    try:
+        k = str(st.secrets["SUPABASE_KEY"])
+    except Exception:
+        return ""
+    if k.startswith("sb_publishable_"):
+        return k
+    try:
+        part = k.split(".")[1]
+        claims = json.loads(base64.urlsafe_b64decode(part + "=" * (-len(part) % 4)))
+    except Exception:
+        return ""
+    return k if claims.get("role") == "anon" else ""
+
+
 def bridge_config(key):
     import json
     link = controller_url(key).split("&code=")[0]
     return json.dumps({"gympulse_link": link, "mode": "sync", "sync_minutes": 3, "listen_port": 8099,
                        "terminals": [{"ip": "192.168.1.64", "user": "admin", "password": "TERMINAL PASSWORD",
                                       "door": "Main door"}],
-                       "staff": [{"name": "Front desk", "pin": "CHOOSE A PIN"}]}, indent=2)
+                       "staff": [{"name": "Front desk", "pin": "CHOOSE A PIN"}],
+                       "public_key": public_key()}, indent=2)
 
 
 def _render_hikvision(key):
@@ -242,9 +262,11 @@ def _render_hikvision(key):
                     "Your members appear on the terminal by name within a minute.\n"
                     "5. **Scan faces.** On the terminal, find each member by name and add their face, finger or "
                     "card. Only members who agreed (see Face and fingerprint consent).")
+        st.markdown("**Let members in from their profile.** While the bridge is running, staff and the owner "
+                    "see *Open door and check in* on each member's profile. Members never see it.")
         st.markdown("**Staff open the door from their phone, even with no internet.** Set staff PINs in the "
                     "config file. On the gym's Wi-Fi, staff open the computer's address with `:8099/open`, "
-                    "enter their PIN and tap Open door. Each opening shows below as \"Opened by staff\".")
+                    "enter their PIN, then tap Open door, or find a member and tap Let in.")
         c1, c2, c3 = st.columns(3)
         try:
             code = open(os.path.join(BRIDGE_DIR, "gympulse_hikvision_bridge.py"), encoding="utf-8").read()
@@ -434,3 +456,70 @@ def door_pass_png(name, gym, code):
     buf = io.BytesIO()
     img.save(buf, format="PNG", optimize=True)
     return buf.getvalue()
+
+
+# ------------------------------------------------------------------ "Open door and check in" (staff, member profile)
+def bridge_online(supabase, gym_id):
+    """True when the gym's door bridge asked for door taps in the last 2 minutes."""
+    def fetch():
+        try:
+            rows = (supabase.table("door_config").select("bridge_seen_at").eq("gym_id", gym_id).limit(1)
+                    .execute().data or [])
+        except Exception:
+            return None
+        return rows[0].get("bridge_seen_at") if rows else None
+    seen = gw._cached(f"door_bridge_seen_{gym_id}", fetch, ttl=30)
+    if not seen:
+        return False
+    return pd.Timestamp.now(tz="UTC") - pd.Timestamp(seen) < pd.Timedelta(minutes=2)
+
+
+def _who():
+    import gympulse_team as gteam
+    if gteam.is_staff():
+        return gteam.staff_name()
+    prof = st.session_state.get("user_profile") or {}
+    return gw._text(prof.get("full_name"), "Owner")
+
+
+def let_in(supabase, gym_id, member_id, name):
+    """Ask the gym's door to open for this member and check them in. Returns (ok, message)."""
+    import time
+    first = (name or "").split(" ")[0] or "The member"
+    try:
+        row = (supabase.table("door_commands").insert({"gym_id": gym_id, "member_id": member_id,
+                                                        "door": "Main door", "requested_by": _who()})
+               .execute().data or [{}])[0]
+    except Exception as error:
+        return False, f"Could not reach the door: {error}"
+    cid = row.get("id")
+    for _ in range(16):                                   # about 8 seconds
+        time.sleep(0.5)
+        try:
+            r = (supabase.table("door_commands").select("done_at, ok").eq("id", cid).limit(1).execute().data
+                 or [{}])[0]
+        except Exception:
+            continue
+        if r.get("done_at"):
+            gw.bump_data_version()
+            if r.get("ok"):
+                return True, f"Door open. {first} is checked in."
+            return False, ("The gym computer got it, but the door terminal didn't answer. Check the terminal has "
+                           "power, or use the exit button.")
+    return False, ("The gym computer didn't answer, so the door stayed shut. Check it's on and the bridge is "
+                   "running. Staff can still open the door from the phone page on the gym's Wi-Fi.")
+
+
+def render_let_in(supabase, gym_id, member_id, name, archived=False):
+    """The staff button on a member's profile. Shown only when the gym's door bridge is connected."""
+    if archived or not bridge_online(supabase, gym_id):
+        return
+    if st.button("Open door and check in", key=f"door_let_in_{member_id}", type="primary",
+                 icon=":material/door_open:"):
+        with st.spinner("Opening the door…"):
+            ok, msg = let_in(supabase, gym_id, member_id, name)
+        if not ok:
+            st.error(msg)
+            return
+        st.session_state["profile_flash"] = msg
+        st.rerun()

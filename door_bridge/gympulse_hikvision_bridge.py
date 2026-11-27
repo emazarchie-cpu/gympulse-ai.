@@ -17,8 +17,10 @@ Two ways of working ("mode" in bridge_config.json):
     The terminal asks the bridge on every tap ("remote verification"), and the bridge asks GymPulse AI.
 
 Staff can also open the door from their phone on the gym's Wi-Fi, with no internet: open
-http://<this computer's IP>:8099/open and enter a staff PIN (set in "staff" below). Each opening is recorded
-and sent to GymPulse AI.
+http://<this computer's IP>:8099/open and enter a staff PIN (set in "staff" below). They can open the door, or
+find a member and let them in (door opens and the member is checked in). Each opening is recorded and sent to
+GymPulse AI. With internet, "Open door and check in" on a member's profile in GymPulse AI does the same: the
+bridge collects it within 2 seconds ("public_key" below is GymPulse's public key, safe to keep here).
 
 Each member's Employee No. on the terminal is their GymPulse member code (8 letters/numbers, shown on their
 profile). In sync mode the bridge creates these for you.
@@ -32,7 +34,8 @@ Setup: see door_bridge/README.md. Settings live in bridge_config.json next to th
   "terminals": [
     {"ip": "192.168.1.64", "user": "admin", "password": "<terminal password>", "door": "Main door"}
   ],
-  "staff": [{"name": "Front desk", "pin": "<4 to 8 digits>"}]
+  "staff": [{"name": "Front desk", "pin": "<4 to 8 digits>"}],
+  "public_key": "<GymPulse public key, filled in by the download>"
 }
 The terminal passwords stay on this computer. They are never sent to GymPulse AI.
 """
@@ -157,6 +160,7 @@ def _ok(status, reply):
 
 # ------------------------------------------------------------------ sync mode: paid-until dates on the terminal
 STATE_FILE = os.path.join(HERE, "sync_state.json")
+ROSTER_FILE = os.path.join(HERE, "roster_cache.json")       # the member list, for the staff page offline
 PENDING_FILE = os.path.join(HERE, "pending_events.json")
 PENDING_LOCK = threading.Lock()
 BLOCKED_END = "2020-01-01T23:59:59"           # a date in the past: the terminal refuses this person
@@ -265,6 +269,7 @@ def sync_loop():
     while True:
         members = fetch_roster()
         if members is not None:
+            _write_json(ROSTER_FILE, {"saved": time.strftime("%d %b, %H:%M"), "members": members})
             all_state = _read_json(STATE_FILE, {})
             if time.time() - last_full > full_every:      # once a day, write everyone again
                 all_state, last_full = {}, time.time()
@@ -340,7 +345,9 @@ def entry_doors():
     return [t for t in CFG["terminals"] if "exit" not in t.get("door", "").lower()] or CFG["terminals"]
 
 
-def open_door(term, staff_name):
+def open_door(term, staff_name, member=None, record=True):
+    """Open the door. member: {"code", "name"} when staff let a member in (they're checked in too).
+    record=False when GymPulse AI already logs it (commands from a member's profile)."""
     status, _ = isapi(term, "PUT", "/ISAPI/AccessControl/RemoteControl/door/1", xml=OPEN_XML, timeout=4)
     if not 200 <= status < 300:
         status, _ = isapi(term, "PUT", "/ISAPI/AccessControl/RemoteControl/door/1?format=json",
@@ -348,13 +355,61 @@ def open_door(term, staff_name):
     ok = 200 <= status < 300
     door = term.get("door", "Main door")
     if ok:
-        LAST_OPEN[door] = (time.time(), staff_name)
-        with PENDING_LOCK:
-            pending = _read_json(PENDING_FILE, [])
-            pending.append({"staff": staff_name, "door": door, "at": time.strftime("%Y-%m-%dT%H:%M:%S%z")})
-            _write_json(PENDING_FILE, pending[-20000:])
-    log.info("%s opened by staff (%s) -> %s", door, staff_name, "OPEN" if ok else "terminal did not answer")
+        LAST_OPEN[door] = (time.time(), staff_name, (member or {}).get("name"))
+        if record:
+            at = time.strftime("%Y-%m-%dT%H:%M:%S%z")
+            event = ({"code": member["code"], "door": door, "allowed": True, "at": at, "by": staff_name}
+                     if member else {"staff": staff_name, "door": door, "at": at})
+            with PENDING_LOCK:
+                pending = _read_json(PENDING_FILE, [])
+                pending.append(event)
+                _write_json(PENDING_FILE, pending[-20000:])
+    who = f"{member.get('name')} let in by {staff_name}" if member else f"opened by staff ({staff_name})"
+    log.info("%s %s -> %s", door, who, "OPEN" if ok else "terminal did not answer")
     return ok
+
+
+# ------------------------------------------------------------------ "Open door and check in" from GymPulse AI
+def _rest(fn, body):
+    base = CFG["gympulse_link"].split("/functions/v1/")[0]
+    key = CFG.get("public_key") or ""
+    req = urllib.request.Request(f"{base}/rest/v1/rpc/{fn}", data=json.dumps(body).encode(), method="POST",
+                                 headers={"Content-Type": "application/json", "apikey": key,
+                                          "Authorization": f"Bearer {key}"})
+    with urllib.request.urlopen(req, timeout=8) as r:
+        return json.loads(r.read().decode("utf-8"))
+
+
+def device_key():
+    q = urllib.parse.parse_qs(urllib.parse.urlparse(CFG["gympulse_link"]).query)
+    return (q.get("key") or [""])[0]
+
+
+def command_loop():
+    """Every 2 seconds: any "Open door and check in" taps from GymPulse AI? Open the door and report back."""
+    key = device_key()
+    quiet_until = 0
+    while True:
+        time.sleep(2)
+        try:
+            res = _rest("door_commands_take", {"p_device_key": key})
+        except Exception as e:
+            if time.time() > quiet_until:
+                log.info("Can't reach GymPulse AI for door taps (%s). Staff can use the phone page.", e)
+                quiet_until = time.time() + 600
+            time.sleep(8)
+            continue
+        for cmd in (res or {}).get("commands") or []:
+            doors = entry_doors()
+            term = next((t for t in doors if t.get("door") == cmd.get("door")), doors[0] if doors else None)
+            ok = bool(term) and open_door(term, cmd.get("by") or "Staff",
+                                          {"code": "", "name": cmd.get("name")} if cmd.get("name") else None,
+                                          record=False)
+            try:
+                _rest("door_command_done", {"p_device_key": key, "p_id": cmd["id"], "p_ok": ok,
+                                            "p_note": None if ok else "The door terminal didn't answer"})
+            except Exception as e:
+                log.warning("Opened the door but couldn't tell GymPulse AI (%s)", e)
 
 
 def check_pin(ip, pin):
@@ -402,6 +457,12 @@ background:var(--lime);color:#0E1A2B;cursor:pointer}
 button:active{transform:scale(.985)}
 .door+.door{margin-top:12px}
 .quiet{color:var(--muted);font-size:15px;text-decoration:none;justify-self:start;padding:8px 0}
+.find{margin:8px 0 12px}.find input{font:500 18px/1.2 system-ui,sans-serif;letter-spacing:0;padding:14px}
+.hit{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+.hit div{flex:1;min-width:0;display:grid}.hit span{color:var(--muted);font-size:15px}.hit .warn{color:var(--red)}
+.letin{width:auto;padding:14px 18px;font-size:17px;border-radius:10px;background:transparent;color:var(--lime);
+border:1.5px solid var(--lime)}
+.hint{color:var(--muted);font-size:14px;margin:12px 0 0}
 @media (prefers-reduced-motion:reduce){button:active{transform:none}}
 """
 
@@ -428,15 +489,61 @@ def pin_page(msg="", err=True):
     return page(body, "<button form='f' type='submit'>Unlock</button>")
 
 
-def door_page(name, msg="", err=False):
+def _status(m, today):
+    until = m.get("until")
+    if not until:
+        return "On hold or suspended", False
+    if until >= today:
+        return f"Paid until {time.strftime('%d %b', time.strptime(until, '%Y-%m-%d'))}", True
+    return f"Expired {time.strftime('%d %b', time.strptime(until, '%Y-%m-%d'))}", False
+
+
+def find_members(q, limit=8):
+    q = (q or "").strip().lower()
+    if len(q) < 2:
+        return []
+    members = (_read_json(ROSTER_FILE, {}) or {}).get("members") or []
+    words = q.split()
+    hits = [m for m in members if all(w in (m.get("name") or "").lower() or w in (m.get("code") or "").lower()
+                                      for w in words)]
+    return sorted(hits, key=lambda m: (not (m.get("name") or "").lower().startswith(q), m.get("name") or ""))[:limit]
+
+
+def search_block(q):
+    roster = _read_json(ROSTER_FILE, {}) or {}
+    if not roster.get("members"):
+        return ""
+    today = time.strftime("%Y-%m-%d")
+    out = ["<form class='find' method='get' action='/open'><label for='q'>Let a member in</label>"
+           f"<input id='q' name='q' type='search' value='{html.escape(q or '')}' placeholder='Name or member code' "
+           "autocomplete='off'></form>"]
+    if q:
+        hits = find_members(q)
+        if not hits:
+            out.append("<p class='state'>No member found. Check the spelling, or add them in GymPulse AI.</p>")
+        for m in hits:
+            label, ok = _status(m, today)
+            out.append("<form class='hit' method='post' action='/open/member'>"
+                       f"<input type='hidden' name='c' value='{html.escape(m.get('code') or '')}'>"
+                       f"<div><b>{html.escape(m.get('name') or m.get('code') or '')}</b>"
+                       f"<span class='{'' if ok else 'warn'}'>{html.escape(label)}</span></div>"
+                       "<button class='letin' type='submit'>Let in</button></form>")
+        out.append(f"<p class='hint'>Let in opens the door and checks them in. Member list updated "
+                   f"{html.escape(roster.get('saved') or '')}.</p>")
+    return "".join(out)
+
+
+def door_page(name, msg="", err=False, q=""):
     rows = []
     for i, t in enumerate(entry_doors()):
         door = t.get("door", "Main door")
         last = LAST_OPEN.get(door)
+        let_in = f"{html.escape(last[2])} let in by " if last and last[2] else ""
         if last and time.time() - last[0] < 15:
-            state = f"<span class='now'>Open now, by {html.escape(last[1])}</span>"
+            state = f"<span class='now'>Open now. {let_in or 'Opened by '}{html.escape(last[1])}</span>"
         elif last:
-            state = f"Last opened {time.strftime('%H:%M', time.localtime(last[0]))} by <b>{html.escape(last[1])}</b>"
+            state = (f"Last opened {time.strftime('%H:%M', time.localtime(last[0]))}: "
+                     f"{let_in}<b>{html.escape(last[1])}</b>")
         else:
             state = "Locked"
         rows.append((i, door, state))
@@ -444,12 +551,12 @@ def door_page(name, msg="", err=False):
     if len(rows) == 1:
         i, door, state = rows[0]
         body = (f"<p class='who'>Signed in as {html.escape(name)}</p><h1>{html.escape(door)}</h1>"
-                f"<p class='state'>{state}</p>{note}")
+                f"<p class='state'>{state}</p>{note}{search_block(q)}")
         foot = (f"<form method='post' action='/open/door'><input type='hidden' name='d' value='{i}'>"
                 "<button type='submit'>Open door</button></form>")
     else:
         body = f"<p class='who'>Signed in as {html.escape(name)}</p><h1>Open a door</h1>{note}" + "".join(
-            f"<p class='state'>{html.escape(door)}: {state}</p>" for _, door, state in rows)
+            f"<p class='state'>{html.escape(door)}: {state}</p>" for _, door, state in rows) + search_block(q)
         foot = "".join(f"<form class='door' method='post' action='/open/door'><input type='hidden' name='d' "
                        f"value='{i}'><button type='submit'>Open {html.escape(door)}</button></form>"
                        for i, door, _ in rows)
@@ -526,6 +633,16 @@ class Handler(BaseHTTPRequestHandler):
         if not who:
             return self._go("/open")
         doors = entry_doors()
+        if self.path.startswith("/open/member"):
+            code = (form.get("c") or [""])[0].upper()
+            m = next((m for m in (_read_json(ROSTER_FILE, {}) or {}).get("members") or []
+                      if (m.get("code") or "").upper() == code), None)
+            if not m or not doors:
+                return self._go("/open")
+            if open_door(doors[0], who, {"code": m["code"], "name": m.get("name") or m["code"]}):
+                return self._go("/open")
+            return self._html(door_page(who, "The door terminal didn't answer. Check it has power and is on the "
+                                             "Wi-Fi, or use the exit button.", err=True))
         try:
             term = doors[int((form.get("d") or ["0"])[0])]
         except (ValueError, IndexError):
@@ -571,7 +688,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._go("/open", [("Set-Cookie", "gp_staff=; Max-Age=0; Path=/open; HttpOnly; SameSite=Strict")])
         if self.path.startswith("/open"):
             who = session_name(self.headers.get("Cookie"))
-            return self._html(door_page(who) if who else pin_page())
+            q = (urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query).get("q") or [""])[0][:60]
+            return self._html(door_page(who, q=q) if who else pin_page())
         self.send_response(200)
         self.end_headers()
         self.wfile.write(b"GymPulse AI door bridge is running")
@@ -589,6 +707,8 @@ def main():
     if CFG["mode"] != "remote":
         threading.Thread(target=sync_loop, daemon=True).start()
     threading.Thread(target=send_loop, daemon=True).start()        # entries and staff openings
+    if CFG.get("public_key"):
+        threading.Thread(target=command_loop, daemon=True).start()  # "Open door and check in" from GymPulse AI
     if staff_list():
         log.info("Staff can open the door at http://<this computer's IP>:%s/open on the gym's Wi-Fi", port)
     log.info("GymPulse AI door bridge (%s mode) listening on port %s for %d terminal(s)", CFG["mode"], port,

@@ -63,12 +63,20 @@ Only for members who agreed (GymPulse AI → Door access → Face and fingerprin
 New members appear on the terminal by themselves within a few minutes of being added in GymPulse AI.
 Cards linked to a member in GymPulse AI are copied to the terminal too.
 
-## Step 6: Open the door from a phone (works with no internet)
+## Step 6: Let members in from GymPulse AI (with internet)
+On any member's profile, staff and the owner see **Open door and check in** while the bridge is running.
+The door opens within a few seconds and the member is checked in. The door log shows "Let in by" and the
+staff member's name. Members never see this button.
+
+## Step 7: Open the door from a phone (works with no internet)
 For a guest, a delivery, or a member whose face won't read.
 1. Connect the phone to the **gym's Wi-Fi**.
 2. Open `http://<the computer's IP address>:8099/open`, for example `http://192.168.1.20:8099/open`.
    Add it to the home screen so it's one tap next time.
 3. Enter your staff PIN, then tap **Open door**.
+4. To let a member in and check them in, type their name under **Let a member in** and tap **Let in**.
+   Their status shows next to their name (paid until, or expired). The list comes from the gym computer,
+   so it works offline too.
 
 The phone stays signed in for 12 hours. Tap **Lock this phone** to sign out.
 After 5 wrong PINs, the page waits 5 minutes.

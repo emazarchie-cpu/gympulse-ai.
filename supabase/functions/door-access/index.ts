@@ -12,7 +12,8 @@
 //   ?key=...&action=roster   -> every current member's code, card, name and paid-until date
 //   POST ?key=...&action=record  {"events": [{"code": "...", "door": "...", "allowed": true, "at": "<ISO time>"}]}
 //                             -> logs entries the terminal already decided, including ones held while offline
-//                                an event with "staff": "<name>" instead of "code" logs a door opened by staff When the member is let in and
+//                                an event with "staff": "<name>" instead of "code" logs a door opened by staff;
+//                                "by": "<name>" on a member's entry means staff let them in (offline phone page) When the member is let in and
 // the gym has saved a door opener link, this function also calls that link to release the lock.
 // Deploy with JWT verification OFF (controllers can't send a Supabase login):
 // .github/workflows/deploy-door-access.yml.
@@ -65,6 +66,7 @@ async function record(key: string) {
       ? await sb.rpc("door_staff_open", { p_device_key: key, p_staff: String(e.staff), p_door: door, p_at: at })
       : await sb.rpc("door_record", {
           p_device_key: key, p_code: String(e.code ?? ""), p_door: door, p_allowed: e.allowed === true, p_at: at,
+          p_by: e.by ? String(e.by) : null,
         });
     if (error) {
       console.error("door_record failed", error.message);
