@@ -1300,7 +1300,7 @@ def apply_theme(theme):
 # another gym's records even by mistake. Row Level Security in the database
 # (sql/phase1_foundation.sql) is the second, server-side lock.
 GYM_SCOPED_TABLES = {"members", "member_activity", "retention_actions", "checkins",
-                     "classes", "trainers", "messages", "reminder_log", "payments"}
+                     "classes", "trainers", "messages", "reminder_log", "payments", "prospects"}
 
 
 def _current_gym():

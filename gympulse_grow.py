@@ -21,13 +21,13 @@ import gympulse_workspaces as gw
 SQL_HINT = "Run sql/phase5_growth.sql in Supabase to switch this on."
 
 GROUPS = {
-    "Renewals & messages": ["Collect renewals", "Automatic messages", "Gym updates"],
+    "Renewals & messages": ["Collect renewals", "Balances owed", "Automatic messages", "Gym updates"],
     "Engagement": ["Happiness", "Celebrate", "Loyalty", "Challenges", "Progress", "Class invites"],
-    "New & leaving": ["New members", "Freeze", "Why they left"],
+    "New & leaving": ["Prospects", "New members", "Cancellations", "Freeze", "Why they left"],
     "Growth": ["Referrals", "HMO", "Corporate", "Season planner"],
     "Team & reports": ["Team", "Monthly report"],
 }
-SECTIONS = ["Collect renewals", "Automatic messages", "Gym updates", "Happiness", "Celebrate", "Loyalty", "New members", "Class invites", "Freeze", "Why they left", "Progress",
+SECTIONS = ["Collect renewals", "Balances owed", "Prospects", "Cancellations", "Automatic messages", "Gym updates", "Happiness", "Celebrate", "Loyalty", "New members", "Class invites", "Freeze", "Why they left", "Progress",
             "Referrals", "HMO", "Challenges", "Corporate", "Team", "Season planner", "Monthly report"]
 
 
@@ -1954,6 +1954,10 @@ def render_grow(supabase, gym_id, assess_fn, owner_id):
     st.session_state["_grow_last"] = section
     if section == "Collect renewals":
         render_collect(supabase, gym_id, owner_id)
+    elif section in ("Prospects", "Cancellations", "Balances owed"):
+        import gympulse_frontdesk as gfd
+        {"Prospects": gfd.render_prospects, "Cancellations": gfd.render_cancellations,
+         "Balances owed": gfd.render_balances}[section](supabase, gym_id)
     elif section == "Automatic messages":
         import gympulse_loyalty as gl
         gl.render_auto(supabase, gym_id, owner_id)

@@ -293,6 +293,11 @@ def render_command_centre(supabase, gym_id, assess_fn, greeting, user_name, busi
         <div class="cc-meta">{source}<span class="gp-tag">{_plural(len(roster), 'member')} tracked</span></div>
         </div></div>""")
 
+    try:                                          # today at a glance: visits, new, prospects, leaving, owed
+        import gympulse_frontdesk as gfd
+        gfd.render_today(supabase, gym_id)
+    except Exception:
+        pass
     flash = st.session_state.pop("cc_flash", None)
     if flash:
         getattr(st, flash[0], st.info)(flash[1])
