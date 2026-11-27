@@ -181,6 +181,57 @@ def _sent_refs(supabase, gym_id, since_days=120):
         return None, []
 
 
+def _door_refused_today(supabase, gym_id, today):
+    """Members stopped at the door today because their membership expired (door access, phase 45)."""
+    try:
+        import gympulse_door as gdoor
+        cfg = gdoor.config(supabase, gym_id) or {}
+        if not cfg.get("renew_message", True):
+            return set()
+        start = pd.Timestamp(today).tz_localize(gw.APP_TZ).tz_convert("UTC").isoformat()
+        rows = (supabase.table("door_events").select("member_id, reason").eq("gym_id", gym_id)
+                .eq("allowed", False).gte("at", start).limit(2000).execute().data or [])
+    except Exception:
+        return set()
+    return {r["member_id"] for r in rows if r.get("member_id")
+            and str(r.get("reason") or "").startswith("Membership expired")}
+
+
+def door_due(supabase, gym_id, profile=None, today=None, sent_info=None, members=None, ck=None, out_so_far=()):
+    """Renewal messages for members stopped at the door today because their plan expired: once a day each,
+    with their own pay link. Not for HMO or company members, or anyone already messaged today."""
+    import gympulse_grow as gg
+    import gympulse_memberpay as gmp
+    today = today or gw.today_local()
+    refused = _door_refused_today(supabase, gym_id, today)
+    if not refused:
+        return []
+    sent, sent_rows = sent_info if sent_info is not None else _sent_refs(supabase, gym_id)
+    if sent is None:
+        return None
+    today_iso = today.isoformat()
+    had_today = {r["member_id"] for r in sent_rows if str(r.get("sent_at") or "")[:10] == today_iso}
+    had_today |= {o[1]["id"] for o in out_so_far if o[0] == "renewal"}
+    members = gg._members(supabase, gym_id) if members is None else members
+    if members.empty:
+        return []
+    ck = gg._checkins(supabase, gym_id, 120) if ck is None else ck
+    pay = dict(_settings(profile).get("collect") or {})
+    out = []
+    for _, m in members[members["id"].isin(refused)].iterrows():
+        md = dict(m)
+        end = m["end"] if gg._has_date(m.get("end")) else None
+        ref = f"door:{today_iso}"
+        if (end is None or end >= today or gw.is_hmo(md) or gw.is_company(md) or m["id"] in had_today
+                or (m["id"], "renewal", ref) in sent):
+            continue
+        plan, amount = gg.plan_price(m)
+        subject, body = gg.renewal_email(m["full_name"], amount, plan, end, pay, gg.member_story(md, ck))
+        out.append(("renewal", md, ref, subject, body,
+                    gg.renewal_buttons(gmp.with_member_link(pay, gym_id, m["id"]))))
+    return out
+
+
 def due_messages(supabase, gym_id, profile=None, today=None):
     """Every automatic message due today: (kind, member dict, ref, subject, body, buttons)."""
     import gympulse_grow as gg
@@ -302,6 +353,7 @@ def due_messages(supabase, gym_id, profile=None, today=None):
                     if (r["member_id"], "reward", ref) not in sent:
                         subject, body = reward_letter(r, r["ready"], cfg)
                         out.append(("reward", by_id[r["member_id"]], ref, subject, body, None))
+    out += door_due(supabase, gym_id, profile, today, (sent, sent_rows), members, ck, out) or []
     # At most one automatic email per member per day: renewal first, then we missed you,
     # then reward. The others stay due and go out on a later day.
     order = {"renewal": 0, "hmo_cover": 0, "missed": 1, "week1": 2, "welcome": 3, "milestone": 4, "level": 5, "reward": 6,
@@ -423,10 +475,11 @@ def _log(supabase, gym_id, member_id, kind, ref, status):
         pass
 
 
-def send_due(supabase, gym_id, profile=None, dry_run=False, log=print):
-    """Send today's automatic messages for one gym. Returns (sent, skipped, failed)."""
+def send_due(supabase, gym_id, profile=None, dry_run=False, log=print, door_only=False):
+    """Send today's automatic messages for one gym (door_only: just the renewal messages for members
+    stopped at the door). Returns (sent, skipped, failed)."""
     import gympulse_campaigns as gcamp
-    due = due_messages(supabase, gym_id, profile)
+    due = door_due(supabase, gym_id, profile) if door_only else due_messages(supabase, gym_id, profile)
     if due is None:
         log("  auto_messages table missing: run sql/phase9_loyalty.sql")
         return 0, 0, 0

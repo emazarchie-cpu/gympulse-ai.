@@ -38,7 +38,7 @@ def config(supabase, gym_id):
         return None
     r = rows[0] if rows else {}
     return {"enabled": r.get("enabled", True) is not False, "grace_days": int(r.get("grace_days") or 0),
-            "opener_url": r.get("opener_url") or ""}
+            "opener_url": r.get("opener_url") or "", "renew_message": r.get("renew_message", True) is not False}
 
 
 def screen_url(key):
@@ -160,6 +160,10 @@ def render_settings(supabase, gym_id):
                            placeholder="https://… the link that releases your lock",
                            help="When a member is let in, GymPulse calls this link to open the door. Smart relays "
                                 "(for example Shelly) give you one in their app. Must start with https://.")
+    renew = st.toggle("Send the renewal message to members stopped because their plan expired",
+                      value=cfg["renew_message"], key="door_renew",
+                      help="Within about 10 minutes, by WhatsApp and/or email (as set in Grow → Automatic "
+                           "messages), with their pay link. Once a day at most.")
     if st.button("Save door settings", type="primary", key="door_save"):
         if opener.strip() and not opener.strip().lower().startswith("https://"):
             st.error("The door opener link must start with https://.")
@@ -167,6 +171,7 @@ def render_settings(supabase, gym_id):
             try:
                 supabase.table("door_config").upsert({"gym_id": gym_id, "enabled": bool(enabled),
                                                       "grace_days": int(grace), "opener_url": opener.strip() or None,
+                                                      "renew_message": bool(renew),
                                                       "updated_at": datetime.utcnow().isoformat() + "Z"},
                                                      on_conflict="gym_id").execute()
                 st.success("Door settings saved.")
