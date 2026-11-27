@@ -1,0 +1,51 @@
+# Deploys the door access link (supabase/functions/door-access) to Supabase,
+# with JWT verification off (controllers can't send a Supabase login; each link carries the gym's
+# device key, checked by door_check in sql/phase45_door_access.sql).
+# Needs the SUPABASE_ACCESS_TOKEN and SUPABASE_URL repository secrets (already used by the
+# WhatsApp webhook). Runs from the Actions tab, and by itself when the function changes on main.
+name: Deploy door access
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "supabase/functions/door-access/**"
+
+concurrency:
+  group: deploy-door-access
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Find the project
+        id: project
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          [ -n "$SUPABASE_ACCESS_TOKEN" ] || { echo "::error::Add the SUPABASE_ACCESS_TOKEN repository secret first."; exit 1; }
+          REF=$(echo "$SUPABASE_URL" | sed -E 's#^https?://([a-z0-9]+)\.supabase\.co.*#\1#')
+          if [ -z "$REF" ] || [ "$REF" = "$SUPABASE_URL" ]; then
+            echo "::error::SUPABASE_URL secret is missing or not a supabase.co address."
+            exit 1
+          fi
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+      - name: Deploy the function
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          REF="${{ steps.project.outputs.ref }}"
+          supabase functions deploy door-access --yes --no-verify-jwt --use-api --project-ref "$REF" \
+            || supabase functions deploy door-access --yes --no-verify-jwt --project-ref "$REF"
+      - name: Check it answers
+        run: |
+          sleep 5
+          curl -sS "https://${{ steps.project.outputs.ref }}.supabase.co/functions/v1/door-access"; echo

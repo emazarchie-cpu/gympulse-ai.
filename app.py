@@ -1064,6 +1064,12 @@ if "supabase_client" not in st.session_state:
 
 supabase = st.session_state.supabase_client
 gag.remember_ref_param()                # ?ref=AGENT-CODE from an agent's link, for the sign-up form
+# Door screen: a tablet at the gym entrance (usegympulseai.com/?door=<device key>)
+if st.query_params.get("door"):
+    import gympulse_door as gdoor
+    gd.apply()
+    gdoor.render_screen(supabase, str(st.query_params.get("door")))
+    st.stop()
 _trainer_token = st.query_params.get("trainer")
 if _trainer_token:
     gd.apply()
