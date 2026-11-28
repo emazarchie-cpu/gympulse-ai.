@@ -1299,7 +1299,7 @@ def apply_theme(theme):
 # limited to the signed-in owner's gym here, in one place, so no screen can touch
 # another gym's records even by mistake. Row Level Security in the database
 # (sql/phase1_foundation.sql) is the second, server-side lock.
-GYM_SCOPED_TABLES = {"members", "member_activity", "retention_actions", "checkins",
+GYM_SCOPED_TABLES = {"shop_products", "shop_sales", "members", "member_activity", "retention_actions", "checkins",
                      "classes", "trainers", "messages", "reminder_log", "payments", "prospects"}
 
 
@@ -5410,10 +5410,18 @@ def render_checkin(supabase, gym_id):
         ("Visits, 30 days", month_visits, "white", "One per member per day"),
     ])
 
-    tab_in, tab_alert, tab_log, tab_cls, tab_imp = st.tabs(
-        ["Check in", "Drop-off alerts", "Today's log", "Classes", "Import history"])
+    tab_in, tab_alert, tab_log, tab_cls, tab_shop, tab_imp = st.tabs(
+        ["Check in", "Drop-off alerts", "Today's log", "Classes", "Shop", "Import history"])
     with tab_imp:
         render_checkin_import(supabase, gym_id, members, ck)
+    with tab_shop:
+        try:
+            import gympulse_shop as gshop
+            gshop.render_shop(supabase, gym_id, members)
+        except Exception as error:
+            st.error("The shop could not load.")
+            with st.expander("Technical details"):
+                st.code(str(error))
 
     with tab_in:
         today_classes = [c for c in classes if c["_start"].date() == now.date()]
