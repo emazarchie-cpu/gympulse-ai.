@@ -236,6 +236,11 @@ def render_cancellations(supabase, gym_id):
     flash = st.session_state.pop("cn_flash", None)
     if flash:
         st.success(flash)
+    import gympulse_saveoffer as gso
+    import gympulse_team as gteam
+    prof = st.session_state.get("user_profile") or {}
+    if not gteam.is_staff():
+        gso.render_settings(supabase, prof)
     members, _ = gw.fetch_members(supabase, gym_id, archived=False, include_photo=False)
     with st.expander("Record a cancellation notice", expanded=not pending, icon=":material/edit_note:"):
         if members.empty:
@@ -283,6 +288,8 @@ def render_cancellations(supabase, gym_id):
                 _close_notice(supabase, r["id"], "saved")
                 st.session_state["cn_flash"] = f"Great, {r['full_name']} is staying."
                 st.rerun()
+            gso.render_staff_offer(supabase, gym_id, r["id"], r["full_name"], prof,
+                                   gteam.staff_name() if gteam.is_staff() else gw._text(prof.get("full_name"), "Owner"))
             if c2.button("They left", key=f"cn_l_{r['id']}", use_container_width=True):
                 _close_notice(supabase, r["id"], "left")
                 st.session_state["cn_flash"] = (f"Noted. Record why {r['full_name']} left in Why they left, and "
