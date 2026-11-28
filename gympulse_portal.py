@@ -749,6 +749,11 @@ def render_portal(supabase, token):
             _messages(sc, m, gym_name)
         with tabs[4]:
             _details(sc, m, gym_name)
+            try:
+                import gympulse_saveoffer as gso
+                gso.render_member_cancel(sc, m, gym_name, prof)
+            except Exception:
+                pass
 
 
 def _activity(sc, m):

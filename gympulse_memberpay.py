@@ -208,7 +208,16 @@ def _member(sc, member_id):
         .limit(1).execute().data or []
     m.update(act[0] if act else {})
     plan = gw.plan_name(m.get("membership_type"))
-    return m, (plan, round(float(m.get("monthly_fee") or 0) * gw.PLAN_MONTHS[plan], 2))
+    amount = round(float(m.get("monthly_fee") or 0) * gw.PLAN_MONTHS[plan], 2)
+    try:                                                   # a "discount to stay" the member accepted
+        import gympulse_saveoffer as gso
+        offer = gso.pending(sc, member_id)
+    except Exception:
+        offer = None
+    if offer and amount > 0:
+        m["_offer"] = offer
+        amount = round(max(0.0, amount - float(offer.get("discount") or 0)), 2)
+    return m, (plan, amount)
 
 
 def _gym_name(sc, gym_id):
@@ -290,7 +299,14 @@ def apply(reference, sc=None):
     start_day = end_now if end_now and end_now >= today else today
     grev.record_payment(sc, m["gym_id"], m["id"], m.get("full_name") or "Member", paid, plan, start_day,
                         method="Paystack (online)", current_end=end_now, act=True,
-                        note=f"Paid online, Paystack {reference}")
+                        note=f"Paid online, Paystack {reference}"
+                             + (f" ({int(m['_offer']['percent'])}% discount to stay)" if m.get("_offer") else ""))
+    if m.get("_offer"):
+        try:
+            import gympulse_saveoffer as gso
+            gso.mark_used(sc, m["_offer"]["id"], reference)    # the discount is used once
+        except Exception:
+            pass
     info["until"] = start_day + timedelta(days=gw.PLAN_DAYS[plan])
     auth = d.get("authorization") or {}
     if md.get("auto_renew") and auth.get("reusable") and auth.get("authorization_code"):
@@ -388,6 +404,9 @@ def render_pay(token):
                 return
         gw._md(f'<div style="font-size:30px;font-weight:700;margin:10px 0 4px">₦{amount:,.0f}</div>'
                f'<div class="bk-small">{gw.plan_phrase(plan).capitalize()} plan · paid to {gw._esc(gym)}</div>')
+        if m.get("_offer"):
+            st.caption(f"Includes your {int(m['_offer']['percent'])}% discount for staying "
+                       f"(₦{float(m['_offer']['discount']):,.0f} off).")
         with st.form("mp_form", border=False):
             email = st.text_input("Email for your receipt", value=gw._text(m.get("email")),
                                   placeholder="you@example.com")

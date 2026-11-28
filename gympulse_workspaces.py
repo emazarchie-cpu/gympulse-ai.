@@ -2657,6 +2657,8 @@ def render_member_profile(supabase, gym_id, member_id, assess_fn):
         try:
             import gympulse_frontdesk as gfd
             gfd.render_health(supabase, gym_id, member_id)
+            import gympulse_saveoffer as gso
+            gso.render_profile_note(supabase, gym_id, member_id)
         except Exception:
             pass
         try:
