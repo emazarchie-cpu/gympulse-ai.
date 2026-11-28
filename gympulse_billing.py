@@ -1001,6 +1001,11 @@ def reconcile_paystack(sc, days=3, log=print):
     since = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%dT00:00:00Z")
     r = _paystack("GET", "/transaction", params={"status": "success", "from": since, "perPage": 100})
     done = {x["ref"] for x in sc.table("billing_events").select("ref").eq("kind", "paystack").execute().data or []}
+    try:                                                  # QR shop orders already recorded
+        shop_done = {x["pay_ref"] for x in sc.table("shop_sales").select("pay_ref").gte("created_at", since)
+                     .not_.is_("pay_ref", "null").execute().data or []}
+    except Exception:
+        shop_done = set()
     n = 0
     for t in r.get("data") or []:
         md = t.get("metadata") or {}
@@ -1015,6 +1020,14 @@ def reconcile_paystack(sc, days=3, log=print):
                 ok, msg, _ = gmp.apply(t.get("reference"), sc)
                 log(f"  member {t.get('reference')}: {msg}")
                 n += ok
+            continue
+        if md.get("source") == "gympulse_shop":            # a QR shop order (gympulse_shopqr): recorded once
+            if t.get("reference") in shop_done:
+                continue
+            import gympulse_shopqr as gsq
+            ok, msg, _ = gsq.apply(t.get("reference"), sc)
+            if ok:
+                n += 1
             continue
         if md.get("source") != "gympulse" or f"paystack:{t.get('reference')}" in done:
             continue

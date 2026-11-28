@@ -18,7 +18,8 @@ import gympulse_workspaces as gw
 SQL_HINT = "The shop needs a one-time setup: run sql/phase50_shop.sql in Supabase."
 CATEGORIES = {"drink": "Drink", "supplement": "Supplement", "food": "Snack", "merch": "Merchandise",
               "day_pass": "Day pass", "other": "Other"}
-METHODS = {"cash": "Cash", "transfer": "Transfer", "pos": "POS card", "account": "Add to their balance"}
+METHODS = {"cash": "Cash", "transfer": "Transfer", "pos": "POS card", "account": "Add to their balance",
+           "online": "Paid online (QR)"}
 
 
 def _naira(x):
@@ -94,6 +95,11 @@ def render_shop(supabase, gym_id, members):
         ("Day passes today", sum(int(s.get("day_passes") or 0) for s in live), "white", "Walk-ins who paid"),
         ("Running low", len(low), "amber" if low else "white", ", ".join(p["name"] for p in low[:3]) or "Stock is fine"),
     ])
+    try:
+        import gympulse_shopqr as gsq
+        gsq.render_orders(supabase, gym_id)               # paid QR orders waiting at the desk
+    except Exception:
+        pass
     view = st.segmented_control("Shop view", ["Sell", "Today's sales", "Products"], default="Sell",
                                 key="shop_view", label_visibility="collapsed") or "Sell"
     if view == "Sell":
@@ -268,9 +274,9 @@ def _render_today(sales):
     live = [s for s in sales if not s.get("voided")]
     by = {m: sum(float(s["total"]) for s in live if s["method"] == m) for m in METHODS}
     st.markdown("**Close the day**")
-    c = st.columns(4)
+    c = st.columns(len(METHODS))
     for col, m in zip(c, METHODS):
-        col.metric(METHODS[m] if m != "account" else "On balances", _naira(by[m]))
+        col.metric({"account": "On balances", "online": "Paid online"}.get(m, METHODS[m]), _naira(by[m]))
     counted = st.number_input("Cash counted in the drawer (₦)", min_value=0, step=500, value=None,
                               placeholder="Count the cash, then type it here", key="shop_counted")
     if counted is not None:
@@ -291,6 +297,13 @@ def _render_today(sales):
 
 
 def _render_products(supabase, gym_id, products):
+    try:
+        import gympulse_shopqr as gsq
+        code = (supabase.table("gyms").select("join_code").eq("id", gym_id).limit(1).execute().data
+                or [{}])[0].get("join_code")
+        gsq.render_setup(supabase, gym_id, code)
+    except Exception:
+        pass
     with st.expander("Add a product", expanded=not products):
         with st.form("shop_add", clear_on_submit=True):
             c1, c2 = st.columns([2, 1])

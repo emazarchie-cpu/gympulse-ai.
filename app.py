@@ -1121,6 +1121,20 @@ if st.query_params.get("guide"):
     gtr.render_guide(supabase, st.query_params.get("guide"))
     st.stop()
 
+# Order and pay by QR code at the gym's shop (?shop=<code>); Paystack sends them back to ?shop_done=1
+if st.query_params.get("shop") or st.query_params.get("shop_done"):
+    import gympulse_shopqr as gsq
+    gonb.hold()
+    gd.apply()
+    try:
+        if st.query_params.get("shop_done"):
+            gsq.render_done(dict(st.query_params))
+        else:
+            gsq.render_public(st.query_params.get("shop"))
+    finally:
+        gonb.done()
+    st.stop()
+
 # A member renews online from their own link (?pay=...), and Paystack sends them back to ?pay_done=1
 if st.query_params.get("pay") or st.query_params.get("pay_done"):
     import gympulse_memberpay as gmp
