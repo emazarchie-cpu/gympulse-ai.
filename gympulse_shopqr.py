@@ -30,8 +30,62 @@ import gympulse_workspaces as gw
 SHOP_PARAM, DONE_PARAM = "shop", "shop_done"
 
 
-def shop_link(code):
-    return f"{gw.APP_URL}/?{SHOP_PARAM}={code}"
+# One QR code per kind of payment, plus the all-in-one code (no "for")
+KINDS = {"shop": ("Shop", "For the fridge or counter: drinks, supplements and merch"),
+         "walkin": ("Walk-in day pass", "For the door: visitors pay for a day pass"),
+         "renew": ("Renew membership", "For the front desk: members renew their plan"),
+         "balance": ("Pay balance", "For the front desk: members pay what they owe")}
+
+
+def print_card(url, label, gym):
+    """A printable card (PNG, 1200 x 1650): gym name, what it's for, the QR code, and how to pay."""
+    import io
+    import os
+    import qrcode
+    from PIL import Image, ImageDraw, ImageFont
+    here = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "fonts")
+
+    def font(bold, size):
+        try:
+            return ImageFont.truetype(os.path.join(here, f"InstrumentSans-{'Bold' if bold else 'Regular'}.ttf"), size)
+        except OSError:
+            return ImageFont.load_default(size)
+    navy, lime, grey = (11, 18, 32), (190, 242, 100), (90, 98, 112)
+    W, H = 1200, 1650
+    img = Image.new("RGB", (W, H), "white")
+    d = ImageDraw.Draw(img)
+    d.text((100, 110), gw._text(gym, "")[:40], font=font(False, 44), fill=grey)
+    big = font(True, 96)
+    words, lines, cur = label.split(), [], ""
+    for w in words:                                   # wrap the label to the card width
+        t = (cur + " " + w).strip()
+        if d.textlength(t, font=big) > W - 200 and cur:
+            lines.append(cur)
+            cur = w
+        else:
+            cur = t
+    lines.append(cur)
+    y = 180
+    for ln in lines[:2]:
+        d.text((100, y), ln, font=big, fill=navy)
+        y += 110
+    qr = qrcode.make(url, box_size=20, border=1).convert("RGB")
+    side = 820
+    qr = qr.resize((side, side), Image.NEAREST)
+    img.paste(qr, ((W - side) // 2, y + 50))
+    y += 50 + side + 50
+    d.text((100, y), "Open your phone camera and point it here.", font=font(False, 44), fill=navy)
+    d.text((100, y + 64), "Transfer, card or USSD, secured by Paystack.", font=font(False, 36), fill=grey)
+    d.rectangle((0, H - 120, W, H), fill=navy)
+    d.text((100, H - 88), "Scan to pay", font=font(True, 48), fill=lime)
+    d.text((W - 100, H - 80), "GymPulse AI", font=font(False, 34), fill=(200, 205, 215), anchor="ra")
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def shop_link(code, kind=None):
+    return f"{gw.APP_URL}/?{SHOP_PARAM}={code}" + (f"&for={kind}" if kind in KINDS else "")
 
 
 def _naira(x):
@@ -102,14 +156,20 @@ def render_public(code):
                    '<div class="bk-sub">Please pay at the front desk.</div>')
             return
         gym = g.get("business_name") or "the gym"
-        gw._md(f'<div class="bk-title">Pay {gw._esc(gym)}</div>'
+        kind = st.query_params.get("for")
+        kind = kind if kind in KINDS else None
+        title = {None: f"Pay {gym}", "shop": f"Shop at {gym}", "walkin": f"Day pass at {gym}",
+                 "renew": f"Renew at {gym}", "balance": f"Pay your balance at {gym}"}[kind]
+        gw._md(f'<div class="bk-title">{gw._esc(title)}</div>'
                '<div class="bk-sub">Pay on your phone. The front desk sees it straight away.</div>')
-        what = st.segmented_control("What are you paying for?", CHOICES, default=CHOICES[0], key="sq_what") \
-            or CHOICES[0]
-        if what == CHOICES[0]:
-            _render_buy(sc, g, gmp)
+        if kind is None:
+            what = st.segmented_control("What are you paying for?", CHOICES, default=CHOICES[0], key="sq_what") \
+                or CHOICES[0]
+            kind = {CHOICES[0]: "all", CHOICES[1]: "renew", CHOICES[2]: "balance"}[what]
+        if kind in ("all", "shop", "walkin"):
+            _render_buy(sc, g, gmp, kind)
         else:
-            _render_member_pay(sc, g, gmp, renew=what == CHOICES[1])
+            _render_member_pay(sc, g, gmp, renew=kind == "renew")
         st.caption("Pay by bank transfer, card or USSD, secured by Paystack. The money goes straight to the gym.")
 
 
@@ -151,10 +211,15 @@ def _render_member_pay(sc, g, gmp, renew):
         _go(url) if url else st.error(msg)
 
 
-def _render_buy(sc, g, gmp):
+def _render_buy(sc, g, gmp, kind="all"):
     products = [p for p in _products(sc, g["id"]) if p.get("stock") is None or int(p["stock"]) > 0]
+    if kind == "walkin":
+        products = [p for p in products if p.get("category") == "day_pass"]
+    elif kind == "shop":
+        products = [p for p in products if p.get("category") != "day_pass"]
     if not products:
-        st.caption("Nothing is available to buy right now.")
+        st.caption("Day passes aren't set up yet. Please pay at the front desk." if kind == "walkin"
+                   else "Nothing is available to buy right now.")
         return
     cart = st.session_state.setdefault("sq_cart", {})
     for p in products:
@@ -167,7 +232,8 @@ def _render_buy(sc, g, gmp):
     by_id = {p["id"]: p for p in products}
     total = sum(float(by_id[pid]["price"]) * q for pid, q in chosen.items() if pid in by_id)
     name = st.text_input("Your name (so the front desk knows it's you)", key="sq_name")
-    phone = st.text_input("Phone (optional)", key="sq_phone")
+    phone = st.text_input("Phone" + ("" if kind == "walkin" else " (optional)"), key="sq_phone",
+                          help="So the gym can welcome you back." if kind == "walkin" else None)
     if st.button(f"Pay {_naira(total)}" if chosen else "Choose something first", type="primary",
                  use_container_width=True, disabled=not chosen, key="sq_pay"):
         acc = gmp.gym_account(sc, g["id"])
@@ -340,6 +406,25 @@ def render_setup(supabase, gym_id, code):
                                   "Paying by QR " + ("switched off." if on else "switched on."))
                 st.rerun()
         if on:
-            url = shop_link(code)
-            st.code(url, language=None)
-            st.image(gsign._qr_png(url), caption="Print this for the counter: scan to pay", width=220)
+            gym_name = gw._text(prof.get("business_name"), "")
+            st.markdown("**A QR code for each kind of payment.** Print each one and put it where people pay "
+                        "for that thing.")
+            cols = st.columns(2)
+            for i, (k, (label, where)) in enumerate(KINDS.items()):
+                with cols[i % 2].container(border=True):
+                    url = shop_link(code, k)
+                    st.markdown(f"**{label}**")
+                    st.caption(where)
+                    st.image(gsign._qr_png(url), width=160)
+                    st.download_button("Download to print", print_card(url, label, gym_name), f"QR {label}.png",
+                                       "image/png",
+                                       key=f"sq_dl_{k}", use_container_width=True)
+            with st.container(border=True):
+                url = shop_link(code)
+                st.markdown("**All in one**")
+                st.caption("One code for everything: the customer chooses Shop, Renew or Pay balance.")
+                st.image(gsign._qr_png(url), width=160)
+                st.download_button("Download to print", print_card(url, "Pay the gym", gym_name),
+                                   "QR All payments.png", "image/png",
+                                   key="sq_dl_all")
+                st.code(url, language=None)
