@@ -6,6 +6,7 @@ A walk-in who buys a day pass and leaves a phone number becomes a prospect, so s
 
 Database: sql/phase50_shop.sql (shop_products, shop_sales, shop_sell()).
 """
+import time
 from datetime import datetime, timedelta, timezone
 from urllib.parse import quote
 
@@ -103,79 +104,161 @@ def render_shop(supabase, gym_id, members):
         _render_products(supabase, gym_id, products)
 
 
+TILE_CSS = """<style>
+.st-key-shop_tiles button { min-height: 64px !important; justify-content: flex-start !important; text-align: left !important; }
+.st-key-shop_tiles button p { font-size: 16px !important; line-height: 1.25 !important; }
+.st-key-shop_pay button { min-height: 56px !important; }
+.st-key-shop_pay button p { font-size: 17px !important; font-weight: 600 !important; }
+@media (max-width: 640px) {   /* phones: two products per row, in order */
+  .st-key-shop_tiles [data-testid="stHorizontalBlock"] { flex-wrap: wrap !important; gap: 8px !important; }
+  .st-key-shop_tiles [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
+      flex: 1 1 calc(50% - 8px) !important; min-width: calc(50% - 8px) !important; width: calc(50% - 8px) !important; }
+}
+</style>"""
+
+
+def _add(pid, n=1):
+    cart = st.session_state.setdefault("shop_cart", {})
+    cart[pid] = max(0, cart.get(pid, 0) + n)
+    if not cart[pid]:
+        cart.pop(pid)
+
+
+def _match(products, text):
+    """A scanned barcode (exact) or a typed name (best match)."""
+    t = (text or "").strip().lower()
+    if not t:
+        return None
+    for p in products:
+        if str(p.get("barcode") or "").strip().lower() == t:
+            return p
+    starts = [p for p in products if p["name"].lower().startswith(t)]
+    has = [p for p in products if t in p["name"].lower()]
+    pick = starts or has
+    return pick[0] if len(pick) >= 1 else None
+
+
+def _record(supabase, gym_id, cart, by_id, method, member_id=None, buyer="", phone=""):
+    items = [{"product_id": pid, "qty": q} for pid, q in cart.items() if q > 0]
+    try:
+        res = supabase.rpc("shop_sell", {"p_gym_id": gym_id, "p_member_id": member_id,
+                                         "p_buyer_name": buyer or None, "p_buyer_phone": phone or None,
+                                         "p_items": items, "p_method": method, "p_staff": _who()}).execute().data
+    except Exception as error:
+        _flash(f"Could not record the sale: {getattr(error, 'message', None) or error}", "error")
+        return
+    res = res[0] if isinstance(res, list) and res else res
+    if not (isinstance(res, dict) and res.get("ok")):
+        _flash((res or {}).get("error") or "Could not record the sale.", "error")
+        return
+    lines = [f"{q} × {by_id[pid]['name']}" for pid, q in cart.items() if pid in by_id]
+    summary = f"Sold {', '.join(lines)}: {_naira(res.get('total'))}, {METHODS[method].lower()}."
+    if method == "account":
+        summary += " Added to their balance."
+    if res.get("day_passes") and not member_id and phone:
+        summary += " They're in Prospects for a follow-up."
+    st.session_state["shop_last"] = (res.get("sale_id"), summary, time.time())
+    st.session_state["shop_receipt"] = (phone, buyer, lines, float(res.get("total") or 0), method)
+    st.session_state["shop_cart"] = {}
+    st.session_state["shop_gen"] = st.session_state.get("shop_gen", 0) + 1
+    gw.bump_data_version(gym_id)
+
+
 def _render_sell(supabase, gym_id, members, products):
     if not products:
         st.info("Add what you sell first, such as water, energy drinks and a day pass, under Products.")
         return
-    gen = st.session_state.get("shop_gen", 0)               # a new set of keys after each sale clears the form
-    who = st.segmented_control("Who is buying?", ["A member", "Walk-in"], default="A member",
-                               key=f"shop_who_{gen}") or "A member"
+    gw._md(TILE_CSS)
+    by_id = {p["id"]: p for p in products}
+    cart = {pid: q for pid, q in st.session_state.setdefault("shop_cart", {}).items() if pid in by_id}
+    st.session_state["shop_cart"] = cart
+
+    last = st.session_state.get("shop_last")              # the sale just recorded, with Undo for 5 minutes
+    if last and time.time() - last[2] < 300:
+        c1, c2 = st.columns([4, 1], vertical_alignment="center")
+        c1.success(last[1])
+        if c2.button("Undo", key="shop_undo", use_container_width=True):
+            try:
+                r = supabase.rpc("shop_void", {"p_sale_id": last[0]}).execute().data
+                r = r[0] if isinstance(r, list) and r else r
+                ok = isinstance(r, dict) and r.get("ok")
+            except Exception:
+                ok = False
+            st.session_state.pop("shop_last", None)
+            st.session_state.pop("shop_receipt", None)
+            gw.bump_data_version(gym_id)
+            _flash("Sale undone. The stock is back." if ok else "Could not undo that sale.",
+                   "success" if ok else "error")
+            st.rerun()
+        rec = st.session_state.get("shop_receipt")
+        if rec and rec[0]:
+            phone_r, buyer_r, lines, amount, method = rec
+            d = gw.whatsapp_digits(phone_r)
+            gym = gw._text((st.session_state.get("user_profile") or {}).get("business_name"), "the gym")
+            text = (f"Hi {str(buyer_r or '').split(' ')[0] or 'there'}, thank you for your purchase at {gym}: "
+                    f"{', '.join(lines)}. Total {_naira(amount)} ({METHODS[method].lower()}).")
+            if d and len(d) >= 10:
+                st.link_button("Send the receipt on WhatsApp", f"https://wa.me/{d}?text={quote(text)}")
+
+    with st.form("shop_scan", clear_on_submit=True, border=False):
+        c1, c2 = st.columns([5, 1], vertical_alignment="bottom")
+        code = c1.text_input("Scan or type", placeholder="Scan, or type a product",
+                             label_visibility="collapsed", key="shop_scan_box")
+        go = c2.form_submit_button("Add", use_container_width=True)
+    if go and code:
+        p = _match(products, code)
+        if p:
+            _add(p["id"])
+            st.rerun()
+        st.warning(f"Nothing matches \"{code}\". Add its barcode to the product under Products.")
+
+    with st.container(key="shop_tiles"):
+        for i, p in enumerate(products):
+            if i % 4 == 0:
+                cols = st.columns(4)                      # rows of 4 on a computer, 2 on a phone
+            q = cart.get(p["id"], 0)
+            stock = p.get("stock")
+            out = stock is not None and int(stock) - q <= 0
+            label = f"{p['name']}  \n{_naira(p['price'])}" + (f"  ×{q}" if q else "")
+            cols[i % 4].button(label, key=f"tile_{p['id']}", on_click=_add, args=(p["id"],),
+                               use_container_width=True, type="primary" if q else "secondary", disabled=out,
+                               help=("Out of stock" if out else None))
+
+    total = sum(float(by_id[pid]["price"]) * q for pid, q in cart.items())
+    if not cart:
+        st.caption("Tap a product (or scan it) to start a sale.")
+        return
+    c1, c2 = st.columns([4, 1], vertical_alignment="center")
+    c1.markdown("**" + ", ".join(f"{q} × {by_id[pid]['name']}" for pid, q in cart.items()) + f"**  \n{_naira(total)}")
+    if c2.button("Clear", key="shop_clear", use_container_width=True):
+        st.session_state["shop_cart"] = {}
+        st.rerun()
+
+    gen = st.session_state.get("shop_gen", 0)
     member_id, buyer, phone = None, "", ""
-    if who == "A member":
+    with st.expander("More options: a member, or a walk-in's name and phone"):
         opts = {r["id"]: f'{r["full_name"]} ({gw.member_code(r["id"])})' for _, r in members.iterrows()}
-        member_id = st.selectbox("Member", list(opts), format_func=lambda i: opts[i], index=None,
-                                 placeholder="Type a name or member code", key=f"shop_member_{gen}")
+        member_id = st.selectbox("Member (to add it to their balance or send a receipt)", list(opts),
+                                 format_func=lambda i: opts[i], index=None, placeholder="Type a name or member code",
+                                 key=f"shop_member_{gen}")
         if member_id:
             row = members[members["id"] == member_id].iloc[0]
             buyer, phone = row["full_name"], row.get("phone") or ""
-    else:
-        c1, c2 = st.columns(2)
-        buyer = c1.text_input("Name (optional)", key=f"shop_buyer_{gen}")
-        phone = c2.text_input("Phone (optional)", key=f"shop_phone_{gen}",
-                              help="For a day pass, we add them to Prospects so someone follows up.")
+        else:
+            c1, c2 = st.columns(2)
+            buyer = c1.text_input("Walk-in name", key=f"shop_buyer_{gen}")
+            phone = c2.text_input("Walk-in phone", key=f"shop_phone_{gen}",
+                                  help="With a day pass, we add them to Prospects so someone follows up.")
 
-    st.markdown("**Items**")
-    qty, total = {}, 0.0
-    for p in products:
-        stock = p.get("stock")
-        note = "" if stock is None else (f"{stock} left" if int(stock) > 0 else "Out of stock")
-        c1, c2 = st.columns([3, 1.2], vertical_alignment="center")
-        c1.markdown(f"**{p['name']}**  \n{_naira(p['price'])}{', ' + note if note else ''}")
-        q = c2.number_input(p["name"], min_value=0, max_value=99, step=1, value=0,
-                            key=f"shop_q_{p['id']}_{gen}", label_visibility="collapsed")
-        if q:
-            qty[p["id"]] = int(q)
-            total += float(p["price"]) * int(q)
-
-    methods = ["cash", "transfer", "pos"] + (["account"] if member_id else [])
-    method = st.segmented_control("Paid by", methods, format_func=lambda m: METHODS[m], default="cash",
-                                  key=f"shop_method_{gen}_{bool(member_id)}") or "cash"
-    if st.button(f"Record sale  {_naira(total)}" if qty else "Record sale", type="primary", disabled=not qty,
-                 key=f"shop_go_{gen}", use_container_width=True):
-        items = [{"product_id": pid, "qty": q} for pid, q in qty.items()]
-        try:
-            res = supabase.rpc("shop_sell", {"p_gym_id": gym_id, "p_member_id": member_id,
-                                             "p_buyer_name": buyer or None, "p_buyer_phone": phone or None,
-                                             "p_items": items, "p_method": method, "p_staff": _who()}).execute().data
-        except Exception as error:
-            st.error(f"Could not record the sale: {getattr(error, 'message', None) or error}")
-            return
-        res = res[0] if isinstance(res, list) and res else res
-        if not (isinstance(res, dict) and res.get("ok")):
-            st.error((res or {}).get("error") or "Could not record the sale.")
-            return
-        gw.bump_data_version(gym_id)
-        st.session_state["shop_gen"] = gen + 1
-        lines = [f"{q} × {next(p['name'] for p in products if p['id'] == pid)}" for pid, q in qty.items()]
-        msg = f"Sale recorded: {', '.join(lines)}, {_naira(res.get('total'))} by {METHODS[method].lower()}."
-        if method == "account":
-            msg += " Added to their balance (see Balances owed)."
-        if res.get("day_passes") and not member_id and phone:
-            msg += " They're in Prospects for a follow-up tomorrow."
-        _flash(msg)
-        st.session_state["shop_receipt"] = (phone, buyer, lines, float(res.get("total") or 0), method)
-        st.rerun()
-
-    rec = st.session_state.get("shop_receipt")
-    if rec and rec[0]:
-        phone, buyer, lines, amount, method = rec
-        d = gw.whatsapp_digits(phone)
-        gym = gw._text((st.session_state.get("user_profile") or {}).get("business_name"), "the gym")
-        text = (f"Hi {str(buyer or '').split(' ')[0] or 'there'}, thank you for your purchase at {gym}: "
-                f"{', '.join(lines)}. Total {_naira(amount)} ({METHODS[method].lower()}).")
-        if d and len(d) >= 10:
-            st.link_button("Send the receipt on WhatsApp", f"https://wa.me/{d}?text={quote(text)}",
-                           icon=":material/receipt_long:")
+    with st.container(key="shop_pay"):
+        methods = ["cash", "transfer", "pos"] + (["account"] if member_id else [])
+        cols = st.columns(len(methods))
+        for col, m in zip(cols, methods):
+            label = f"Cash {_naira(total)}" if m == "cash" else METHODS[m]
+            if col.button(label, key=f"pay_{m}", type="primary" if m == "cash" else "secondary",
+                          use_container_width=True):
+                _record(supabase, gym_id, cart, by_id, m, member_id, buyer, phone)
+                st.rerun()
 
 
 def _render_today(sales):
@@ -219,6 +302,8 @@ def _render_products(supabase, gym_id, products):
                                     placeholder="Leave empty if you don't count it",
                                     help="Leave empty for things you don't count, such as a day pass.")
             low = c5.number_input("Warn me at", min_value=0, step=1, value=5)
+            code = st.text_input("Barcode (optional)", placeholder="Click here, then scan the product with your scanner",
+                                 help="With a USB barcode scanner, scanning the product at Sell adds it to the sale.")
             if st.form_submit_button("Add product", type="primary"):
                 if not name.strip() or price is None:
                     st.error("Add a name and a price.")
@@ -227,7 +312,7 @@ def _render_products(supabase, gym_id, products):
                         supabase.table("shop_products").insert({
                             "gym_id": gym_id, "name": name.strip()[:60], "category": cat, "price": float(price),
                             "stock": None if (stock is None or cat == "day_pass") else int(stock),
-                            "low_stock_at": int(low)}).execute()
+                            "low_stock_at": int(low), "barcode": code.strip() or None}).execute()
                         gw.bump_data_version(gym_id)
                         _flash(f"{name.strip()} added.")
                         st.rerun()
@@ -238,7 +323,8 @@ def _render_products(supabase, gym_id, products):
     st.caption("Change a price or the stock count, or untick Selling to hide a product. Then press Save changes.")
     df = pd.DataFrame([{"id": p["id"], "Product": p["name"], "Type": CATEGORIES.get(p["category"], "Other"),
                         "Price (₦)": float(p["price"]), "In stock": p.get("stock"),
-                        "Warn at": int(p.get("low_stock_at") or 0), "Selling": bool(p.get("active"))}
+                        "Warn at": int(p.get("low_stock_at") or 0), "Barcode": p.get("barcode") or "",
+                        "Selling": bool(p.get("active"))}
                        for p in products])
     edited = st.data_editor(
         df, hide_index=True, use_container_width=True, key="shop_editor",
@@ -248,7 +334,8 @@ def _render_products(supabase, gym_id, products):
                        "Price (₦)": st.column_config.NumberColumn(min_value=0, step=50, format="%d"),
                        "In stock": st.column_config.NumberColumn(min_value=0, step=1, format="%d",
                                                                  help="Empty means not counted."),
-                       "Warn at": st.column_config.NumberColumn(min_value=0, step=1, format="%d")})
+                       "Warn at": st.column_config.NumberColumn(min_value=0, step=1, format="%d"),
+                       "Barcode": st.column_config.TextColumn(help="Click the cell and scan the product.")})
     if st.button("Save changes", key="shop_save"):
         changed = 0
         for (_, a), (_, b) in zip(df.iterrows(), edited.iterrows()):
@@ -260,6 +347,8 @@ def _render_products(supabase, gym_id, products):
                 patch["stock"] = None if pd.isna(sb) else int(sb)
             if int(b["Warn at"] or 0) != int(a["Warn at"]):
                 patch["low_stock_at"] = int(b["Warn at"] or 0)
+            if str(b["Barcode"] or "").strip() != str(a["Barcode"] or "").strip():
+                patch["barcode"] = str(b["Barcode"] or "").strip() or None
             if bool(b["Selling"]) != bool(a["Selling"]):
                 patch["active"] = bool(b["Selling"])
             if patch:
