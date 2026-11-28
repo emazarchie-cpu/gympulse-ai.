@@ -1093,6 +1093,13 @@ if st.query_params.get("me") or st.query_params.get("member"):
         gportal.render_login(supabase)
     st.stop()
 
+# Public class timetable for the gym's website (?timetable=<join code>, no sign-in)
+if st.query_params.get("timetable"):
+    import gympulse_signup as gsign
+    gd.apply()
+    gsign.render_timetable(supabase, st.query_params.get("timetable"))
+    st.stop()
+
 # Public member sign-up page (the gym's link or QR code, no sign-in)
 if st.query_params.get("join"):
     import gympulse_signup as gsign

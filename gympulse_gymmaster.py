@@ -231,6 +231,7 @@ def build_rows(df, cols, plan_map, existing, stats=None):
         row = {"action": "Update" if member_id else "New", "member_id": member_id, "name": name,
                "email": email, "phone": phone, "plan": plan, "fee": fee, "end": end, "start": start,
                "age": age, "goal": get(r, "goal"), "last_visit": last_visit, "membership": mname,
+               "dob": dob if (dob and age) else None,
                "member_no": get(r, "member_no"), "weight": weight, "height": height, "price": price,
                "visits_30": int(min(v30, 60)) if v30 is not None else None,
                "trainer": "" if get(r, "trainer").lower() in NO_WORDS | YES_WORDS else get(r, "trainer"),
@@ -348,6 +349,8 @@ def _member_fields(r, today):
         d["has_pt"] = bool(r.get("has_pt"))
     if r.get("pt_trainer_id"):
         d["pt_trainer_id"] = r["pt_trainer_id"]
+    if r.get("dob"):
+        d["date_of_birth"] = r["dob"].isoformat()      # for birthday wishes (sql/phase51)
     return d
 
 

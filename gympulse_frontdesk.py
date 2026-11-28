@@ -403,3 +403,99 @@ def render_today(supabase, gym_id):
                 ("Leaving", str(len(pending)), "red" if pending else "white", "cancellation notices"),
                 ("Owed", _naira(total), "amber" if total else "white",
                  f"{len(owing)} member{'s' if len(owing) != 1 else ''}")])
+
+
+# ================================================================== account statement (member profile)
+METHOD_LABEL = {"cash": "Cash", "transfer": "Transfer", "pos": "POS card", "account": "On their balance",
+                "paystack": "Online (Paystack)", "card": "Card", "Balance": "Balance payment"}
+
+
+def statement_rows(supabase, gym_id, member_id):
+    """Every payment and shop purchase for one member, newest first: (rows, balance_owed, balance_note)."""
+    import gympulse_revenue as grev
+    rows = []
+    pay = grev.load_payments(supabase, gym_id)
+    if pay is not None and not pay.empty:
+        for _, p in pay[pay["member_id"] == member_id].iterrows():
+            what = gw._text(p.get("note"), "") or (f"Membership: {p['plan']}" if gw._text(p.get("plan"), "")
+                                                   else "Membership payment")
+            if str(p.get("kind")) == "other" and gw._text(p.get("note"), "") == "Balance payment":
+                what = "Paid towards balance"
+            rows.append({"date": pd.Timestamp(p["paid_on"]), "what": what, "amount": float(p["amount"] or 0),
+                         "how": METHOD_LABEL.get(str(p.get("method") or ""), gw._text(p.get("method"), "")),
+                         "type": "Payment"})
+    try:
+        shop = (supabase.table("shop_sales").select("created_at, items, total, method, voided")
+                .eq("gym_id", gym_id).eq("member_id", member_id).order("created_at", desc=True).limit(300)
+                .execute().data or [])
+    except Exception:
+        shop = []
+    for s in shop:
+        if s.get("voided"):
+            continue
+        items = ", ".join(f"{i.get('qty')} × {i.get('name')}" for i in (s.get("items") or []))
+        rows.append({"date": pd.Timestamp(s["created_at"]).tz_convert(gw.APP_TZ).tz_localize(None).normalize(),
+                     "what": f"Shop: {items}", "amount": float(s.get("total") or 0),
+                     "how": METHOD_LABEL.get(s.get("method"), s.get("method")),
+                     "type": "Charge on balance" if s.get("method") == "account" else "Shop purchase"})
+    try:
+        b = (supabase.table("members").select("balance_owed, balance_note").eq("id", member_id).limit(1)
+             .execute().data or [{}])[0]
+    except Exception:
+        b = {}
+    rows.sort(key=lambda r: r["date"], reverse=True)
+    return rows, float(b.get("balance_owed") or 0), gw._text(b.get("balance_note"), "")
+
+
+def render_statement(supabase, gym_id, member_id, name, phone=""):
+    rows, owed, note = statement_rows(supabase, gym_id, member_id)
+    year_ago = pd.Timestamp(gw.today_local()) - pd.Timedelta(days=365)
+    paid = sum(r["amount"] for r in rows if r["type"] == "Payment" and r["date"] >= year_ago)
+    shop = sum(r["amount"] for r in rows if r["type"] != "Payment" and r["date"] >= year_ago)
+    gw.kpi_row([("Paid, last 12 months", _naira(paid), "lime", "Membership and balance payments"),
+                ("Shop, last 12 months", _naira(shop), "white", "Drinks, supplements, day passes"),
+                ("Owes now", _naira(owed), "red" if owed > 0 else "white", note or "Nothing owed")])
+    if not rows:
+        st.caption("No payments or purchases recorded for this member yet.")
+        return
+    gw.table([{"Date": f"{r['date']:%d %b %Y}", "What": r["what"], "Amount": _naira(r["amount"]),
+               "How": r["how"] or "", "Type": r["type"]} for r in rows[:200]], wide=("What",))
+    csv = pd.DataFrame([{"Date": f"{r['date']:%Y-%m-%d}", "What": r["what"], "Amount (NGN)": round(r["amount"], 2),
+                         "How": r["how"], "Type": r["type"]} for r in rows]).to_csv(index=False)
+    c1, c2 = st.columns(2)
+    c1.download_button("Download statement (CSV)", csv, f"Statement {name}.csv", "text/csv",
+                       use_container_width=True, key=f"stmt_dl_{member_id}")
+    lines = [f"{r['date']:%d %b}: {r['what']}, {_naira(r['amount'])}" for r in rows[:8]]
+    text = (f"Hi {name.split(' ')[0]}, here is your account at {_gym_name()}:\n" + "\n".join(lines)
+            + (f"\nBalance owed: {_naira(owed)}." if owed > 0 else "\nYou owe nothing. Thank you!"))
+    link = _wa(phone, text)
+    if link:
+        c2.link_button("Send it on WhatsApp", link, use_container_width=True)
+
+
+# ================================================================== health answers (member profile)
+def render_health(supabase, gym_id, member_id):
+    """What the member chose to tell the gym about their health at sign-up (only stored with consent)."""
+    try:
+        h = (supabase.table("members").select("health_notes, health_cleared, health_consent_at")
+             .eq("id", member_id).eq("gym_id", gym_id).limit(1).execute().data or [{}])[0]
+    except Exception:
+        return
+    if not h.get("health_consent_at"):
+        return
+    doctor = {True: "No doctor's restriction", False: "A doctor advised care with exercise"}.get(h.get("health_cleared"),
+                                                                                             "Not answered")
+    when = pd.Timestamp(h["health_consent_at"]).tz_convert(gw.APP_TZ)
+    with st.container(border=True):
+        st.markdown(f"**Health:** {doctor}. {gw._text(h.get('health_notes'), 'No conditions or injuries listed.')}")
+        c1, c2 = st.columns([3, 1], vertical_alignment="center")
+        c1.caption(f"Shared by the member with consent on {when:%d %b %Y}. Only your team can see this.")
+        if c2.button("Delete", key=f"health_del_{member_id}", help="If the member asks for it to be deleted."):
+            try:
+                supabase.table("members").update({"health_notes": None, "health_cleared": None,
+                                                  "health_consent_at": None}).eq("id", member_id) \
+                    .eq("gym_id", gym_id).execute()
+                st.session_state["profile_flash"] = "Health answers deleted."
+                st.rerun()
+            except Exception as error:
+                st.error(f"Could not delete: {error}")
