@@ -1021,6 +1021,13 @@ def reconcile_paystack(sc, days=3, log=print):
                 log(f"  member {t.get('reference')}: {msg}")
                 n += ok
             continue
+        if md.get("source") == "gympulse_balance":         # a balance paid by the counter QR (gympulse_shopqr)
+            if f"balance:{t.get('reference')}" not in done:
+                import gympulse_memberpay as gmp
+                ok, msg, _ = gmp.apply(t.get("reference"), sc)
+                log(f"  balance {t.get('reference')}: {msg}")
+                n += ok
+            continue
         if md.get("source") == "gympulse_shop":            # a QR shop order (gympulse_shopqr): recorded once
             if t.get("reference") in shop_done:
                 continue

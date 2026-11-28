@@ -19,6 +19,7 @@ Each Paystack payment is applied once (billing_events ref "member:<reference>").
 import hashlib
 import hmac
 import time
+import json
 import uuid
 from datetime import date, datetime, timedelta, timezone
 from urllib.parse import quote as url_quote
@@ -272,6 +273,13 @@ def apply(reference, sc=None):
     if not r.get("status") or d.get("status") != "success":
         return False, "That payment hasn't gone through yet. If money left your account, it will show shortly.", {}
     md = d.get("metadata") or {}
+    if isinstance(md, str):
+        try:
+            md = json.loads(md)
+        except ValueError:
+            md = {}
+    if md.get("source") == "gympulse_balance" and md.get("member_id"):
+        return _apply_balance(sc, d, md, reference)
     if md.get("source") != "gympulse_member" or not md.get("member_id"):
         return False, "That payment isn't for a gym membership.", {}
     m, (plan, expected) = _member(sc, md["member_id"])
@@ -317,6 +325,49 @@ def apply(reference, sc=None):
                                              "since": today.isoformat()})
         info["auto"] = True
     return True, f"Payment received. Your membership is active until {info['until']:%d %B %Y}.", info
+
+
+# ------------------------------------------------------------------ paying off a balance owed (counter QR)
+def start_balance(sc, m, amount):
+    """Open a Paystack payment towards what this member owes. Returns (url or None, message)."""
+    acc = gym_account(sc, m["gym_id"])
+    if not acc:
+        return None, "This gym doesn't take online payments yet. Please pay at the front desk."
+    ref = f"gb-{str(m['id'])[:8]}-{uuid.uuid4().hex[:12]}"
+    r = _paystack("POST", "/transaction/initialize", json={
+        "email": _email_for(m), "amount": int(round(float(amount) * 100)), "currency": "NGN", "reference": ref,
+        "subaccount": acc["subaccount"], "bearer": "subaccount",
+        "callback_url": f"{gw.APP_URL}/?{DONE_PARAM}=1",
+        "metadata": {"source": "gympulse_balance", "gym_id": m["gym_id"], "member_id": m["id"]}})
+    if not r.get("status"):
+        return None, "We couldn't open the payment page. Please try again in a minute."
+    return (r.get("data") or {}).get("authorization_url"), ""
+
+
+def _apply_balance(sc, d, md, reference):
+    """A verified balance payment: take it off what the member owes and save the payment (once)."""
+    rows = sc.table("members").select("id, gym_id, full_name, balance_owed").eq("id", md["member_id"]) \
+        .limit(1).execute().data or []
+    if not rows:
+        return False, "We couldn't find that member. The gym will confirm your payment.", {}
+    m = rows[0]
+    info = {"gym": _gym_name(sc, m["gym_id"]), "first": (gw._text(m.get("full_name")).split() or ["there"])[0]}
+    try:
+        sc.table("billing_events").insert({"gym_id": m["gym_id"], "kind": "paystack",
+                                           "ref": f"balance:{reference}"}).execute()
+    except Exception:
+        return True, "Payment received. It has been taken off your balance.", info     # already applied
+    paid = (d.get("amount") or 0) / 100
+    left = round(max(0.0, float(m.get("balance_owed") or 0) - paid), 2)
+    sc.table("members").update({"balance_owed": left}).eq("id", m["id"]).execute()
+    try:
+        sc.table("payments").insert({"gym_id": m["gym_id"], "member_id": m["id"], "amount": float(paid),
+                                     "paid_on": gw.today_local().isoformat(), "kind": "other",
+                                     "method": "Paystack (online)", "note": "Balance payment"}).execute()
+    except Exception:
+        pass
+    return True, ("Payment received. Your balance is fully paid." if left == 0
+                  else f"Payment received. You still owe ₦{left:,.0f}."), info
 
 
 # ------------------------------------------------------------------ automatic card renewals (daily job)
