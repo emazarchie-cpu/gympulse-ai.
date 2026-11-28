@@ -4192,6 +4192,11 @@ def render_payments(supabase, gym_id, assess_fn):
     flash = st.session_state.pop("pay_flash", None)
     if flash:
         st.success(flash)
+    try:                                       # renewals and balances paid by QR or link today
+        import gympulse_shopqr as gsq
+        gsq.render_paid_online(supabase, gym_id)
+    except Exception:
+        pass
 
     try:
         roster, _ = load_roster(supabase, gym_id, assess_fn)

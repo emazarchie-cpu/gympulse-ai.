@@ -334,6 +334,11 @@ def render_balances(supabase, gym_id):
     flash = st.session_state.pop("bal_flash", None)
     if flash:
         st.success(flash)
+    try:                                       # balances paid by QR today
+        import gympulse_shopqr as gsq
+        gsq.render_paid_online(supabase, gym_id, "balance")
+    except Exception:
+        pass
     total = sum(float(r["balance_owed"]) for r in owing)
     gw.kpi_row([("Owed to you", _naira(total), "amber", f"{len(owing)} member{'s' if len(owing) != 1 else ''}")])
     members, _ = gw.fetch_members(supabase, gym_id, archived=False, include_photo=False)

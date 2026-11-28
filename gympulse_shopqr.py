@@ -4,7 +4,7 @@ One QR code at the counter covers every payment. The customer chooses what they'
   Buy something       the shop (below)
   Renew my membership they type their phone number; the renewal is paid and recorded by gympulse_memberpay
   Pay what I owe      the same, towards their balance owed (gympulse_memberpay._apply_balance)
-Staff only check the "Paid online today" list in Check-in → Shop.
+Staff check: shop orders in Check-in → Shop, renewals in Payments & Renewals, balances in Balances owed.
 
 Shop orders:
 
@@ -317,14 +317,20 @@ def pending_orders(supabase, gym_id):
         return []
 
 
-def paid_online_today(supabase, gym_id):
-    """Today's renewals and balance payments made online, newest first: [{name, what, amount}]."""
+def paid_online_today(supabase, gym_id, kind=None):
+    """Today's online member payments, newest first: [{name, what, amount}].
+    kind: "renew" (renewals only), "balance" (balance payments only) or None (both)."""
     try:
         pays = (supabase.table("payments").select("member_id, amount, plan, note, kind")
                 .eq("gym_id", gym_id).eq("method", "Paystack (online)").eq("paid_on", gw.today_local().isoformat())
                 .order("created_at", desc=True).limit(50).execute().data or [])
     except Exception:
         return []
+    is_bal = lambda p: gw._text(p.get("note"), "") == "Balance payment"
+    if kind == "renew":
+        pays = [p for p in pays if not is_bal(p)]
+    elif kind == "balance":
+        pays = [p for p in pays if is_bal(p)]
     if not pays:
         return []
     ids = list({p["member_id"] for p in pays if p.get("member_id")})
@@ -333,27 +339,38 @@ def paid_online_today(supabase, gym_id):
                  .in_("id", ids).execute().data or []}
     except Exception:
         names = {}
-    out = []
-    for p in pays:
-        bal = gw._text(p.get("note"), "") == "Balance payment"
-        out.append({"name": names.get(p.get("member_id"), "A member"),
-                    "what": "paid towards their balance" if bal
-                    else f"renewed ({gw._text(p.get('plan'), 'membership')})",
-                    "amount": p.get("amount")})
-    return out
+    return [{"name": names.get(p.get("member_id"), "A member"),
+             "what": "paid towards their balance" if is_bal(p)
+             else f"renewed ({gw._text(p.get('plan'), 'membership')})",
+             "amount": p.get("amount")} for p in pays]
+
+
+def render_paid_online(supabase, gym_id, kind=None):
+    """Member payments made by QR or payment link today, already recorded. Refreshes every 10 seconds.
+    Shown on Payments & Renewals (renewals and balances) and Balances owed (balances)."""
+    @st.fragment(run_every=10)
+    def _paid():
+        paid = paid_online_today(supabase, gym_id, kind)
+        if not paid:
+            return
+        with st.container(border=True, key=f"sq_paid_{kind or 'all'}"):
+            st.markdown(f"**Paid online today ({len(paid)})**")
+            st.caption("Already recorded. Nothing to do.")
+            for p in paid:
+                st.markdown(f"{gw._esc(p['name'])} {gw._esc(p['what'])}, {_naira(p['amount'])}",
+                            unsafe_allow_html=True)
+    _paid()
 
 
 def render_orders(supabase, gym_id):
-    """Everything paid by QR today. Shop orders wait for Handed over. Refreshes by itself every 10 seconds."""
+    """Shop and day-pass orders paid by QR, waiting to be handed over. Refreshes every 10 seconds."""
     @st.fragment(run_every=10)
     def _orders():
         rows = pending_orders(supabase, gym_id)
-        paid = paid_online_today(supabase, gym_id)
-        if not rows and not paid:
+        if not rows:
             return
         with st.container(border=True, key="sq_feed"):
-            if rows:
-                st.markdown(f"**Paid online, to hand over ({len(rows)})**")
+            st.markdown(f"**Paid online, to hand over ({len(rows)})**")
             for r in sorted(rows, key=lambda x: x.get("order_no") or 0):
                 items = ", ".join(f"{i.get('qty')} × {i.get('name')}" for i in (r.get("items") or []))
                 c1, c2 = st.columns([4, 1.3], vertical_alignment="center")
@@ -365,12 +382,6 @@ def render_orders(supabase, gym_id):
                         .eq("id", r["id"]).eq("gym_id", gym_id).execute()
                     gw.bump_data_version(gym_id)
                     st.rerun()
-            if paid:
-                st.markdown(f"**Paid online today ({len(paid)})**")
-                st.caption("Already recorded. Nothing to do.")
-                for p in paid:
-                    st.markdown(f"{gw._esc(p['name'])} {gw._esc(p['what'])}, {_naira(p['amount'])}",
-                                unsafe_allow_html=True)
     _orders()
 
 
@@ -385,7 +396,8 @@ def render_setup(supabase, gym_id, code):
     with st.expander("Pay by QR code (shop, renewals and balances)"):
         st.caption("Print one QR code for the counter. Customers scan it and pay for shop items, day passes, their "
                    "membership renewal or what they owe, by transfer, card or USSD through Paystack. Every payment "
-                   "records itself and shows at the top of this tab. Paystack's fee is taken from each payment, as "
+                   "records itself: shop orders show at the top of this tab, renewals on Payments & Renewals and "
+                   "balance payments in Balances owed. Paystack's fee is taken from each payment, as "
                    "with online renewals.")
         try:
             sc = gmp._service()
