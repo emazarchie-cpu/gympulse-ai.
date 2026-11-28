@@ -119,7 +119,7 @@ const menu = (page, label) => async () => {
   for (const t of ["Engagement", "New & leaving", "Growth", "Team & reports", "Renewals & messages"])
     await step(page, `Grow tab ${t}`, tab(page, t));
   await step(page, "Owner (tabs)", nav(page, "Owner"));
-  for (const t of ["Team & access", "Trainers", "Monthly report", "Subscription & billing", "Business insights"])
+  for (const t of ["Member lists", "Team & access", "Trainers", "Monthly report", "Subscription & billing", "Business insights"])
     await step(page, `Owner tab ${t}`, tab(page, t));
   await browser.close();
 })();

@@ -1467,6 +1467,7 @@ MEMBER_PROFILE_LIGHT = ["membership_end", "last_renewed_on", "last_payment"]
 MEMBER_PT = ["has_pt", "pt_trainer_id"]          # sql/phase34_personal_training.sql
 MEMBER_HMO = ["hmo_provider", "hmo_valid_until"]  # sql/phase28_referrals_hmo.sql
 MEMBER_COMPANY = ["company_id"]                   # sql/phase5_growth.sql (corporate plans)
+MEMBER_DOB = ["date_of_birth"]                     # sql/phase51_birthdays_health.sql
 NO_TRAINER_PLAYS = {"Trainer intro", "Free PT session"}   # pointless for someone who already has a trainer
 
 def fetch_all(query, page=1000, cap=50000):
@@ -1483,7 +1484,8 @@ def fetch_all(query, page=1000, cap=50000):
 
 def _fetch_members_uncached(supabase, gym_id, archived=None, include_photo=True):
     profile = MEMBER_PROFILE if include_photo else MEMBER_PROFILE_LIGHT
-    attempts = [MEMBER_BASE + MEMBER_SUSPEND + profile + MEMBER_PT + MEMBER_HMO + MEMBER_COMPANY,
+    attempts = [MEMBER_BASE + MEMBER_SUSPEND + profile + MEMBER_PT + MEMBER_HMO + MEMBER_COMPANY + MEMBER_DOB,
+                MEMBER_BASE + MEMBER_SUSPEND + profile + MEMBER_PT + MEMBER_HMO + MEMBER_COMPANY,
                 MEMBER_BASE + MEMBER_SUSPEND + profile + MEMBER_PT + MEMBER_HMO,
                 MEMBER_BASE + MEMBER_SUSPEND + profile + MEMBER_PT,
                 MEMBER_BASE + MEMBER_SUSPEND + profile,
@@ -2639,10 +2641,24 @@ def render_member_profile(supabase, gym_id, member_id, assess_fn):
             bump_data_version()
             st.rerun()
 
-    tab_overview, tab_plan, tab_photo, tab_ck, tab_edit = st.tabs(
-        ["Overview", "Membership", "Photo", "Check-in", "Edit details"])
+    tab_overview, tab_plan, tab_acct, tab_photo, tab_ck, tab_edit = st.tabs(
+        ["Overview", "Membership", "Account", "Photo", "Check-in", "Edit details"])
+
+    with tab_acct:
+        try:
+            import gympulse_frontdesk as gfd
+            gfd.render_statement(supabase, gym_id, member_id, name, phone or "")
+        except Exception as error:
+            st.error("The account statement could not load.")
+            with st.expander("Technical details"):
+                st.code(str(error))
 
     with tab_overview:
+        try:
+            import gympulse_frontdesk as gfd
+            gfd.render_health(supabase, gym_id, member_id)
+        except Exception:
+            pass
         try:
             import gympulse_waiver as gwv
             gwv.render_status(supabase, gym_id, member_id,
@@ -2879,6 +2895,10 @@ def render_member_profile(supabase, gym_id, member_id, assess_fn):
             new_height = g3.number_input("Height (cm)", min_value=50.0, max_value=260.0,
                                          value=float(min(max(_num(m["height_cm"], 170.0), 50.0), 260.0)),
                                          step=0.5)
+            dob_now = pd.to_datetime(m.get("date_of_birth"), errors="coerce") if "date_of_birth" in m else pd.NaT
+            new_dob = st.date_input("Date of birth (optional, for birthday wishes)",
+                                    value=None if pd.isna(dob_now) else dob_now.date(), format="DD/MM/YYYY",
+                                    min_value=date(1920, 1, 1), max_value=today_local(), key=f"dob_{member_id}")
             goal_options = GOALS if goal in GOALS or not goal else [goal] + GOALS
             new_goal = st.selectbox(
                 "Fitness goal", goal_options,
@@ -2890,7 +2910,7 @@ def render_member_profile(supabase, gym_id, member_id, assess_fn):
                 st.error("Please enter the member's full name.")
             else:
                 try:
-                    (supabase.table("members").update({
+                    patch = {
                         "full_name": new_name.strip(),
                         "email": new_email.strip() or None,
                         "phone": new_phone.strip() or None,
@@ -2898,7 +2918,16 @@ def render_member_profile(supabase, gym_id, member_id, assess_fn):
                         "weight_kg": float(new_weight),
                         "height_cm": float(new_height),
                         "fitness_goal": new_goal,
-                    }).eq("id", member_id).eq("gym_id", gym_id).execute())
+                    }
+                    if new_dob is not None:
+                        t = today_local()
+                        patch["date_of_birth"] = new_dob.isoformat()
+                        years = t.year - new_dob.year - ((t.month, t.day) < (new_dob.month, new_dob.day))
+                        if 16 <= years <= 120:
+                            patch["age"] = years           # the age follows the date of birth
+                    elif "date_of_birth" in m and not pd.isna(dob_now):
+                        patch["date_of_birth"] = None
+                    (supabase.table("members").update(patch).eq("id", member_id).eq("gym_id", gym_id).execute())
                     pt_note = save_pt(supabase, gym_id, member_id, new_pt, new_trainer)
                 except Exception as error:
                     st.error(f"Could not save the changes: {error}")

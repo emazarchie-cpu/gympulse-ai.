@@ -11,6 +11,8 @@ import io
 import secrets
 
 import pandas as pd
+from datetime import date
+
 import streamlit as st
 
 import gympulse_workspaces as gw
@@ -71,8 +73,18 @@ def render_public(supabase, code):
             c3, c4 = st.columns(2)
             goal = c3.selectbox("Your main goal", GOALS, index=2)
             age = c4.number_input("Age (optional)", min_value=0, max_value=110, value=0, step=1)
+            dob = st.date_input("Date of birth (optional, so we can wish you a happy birthday)", value=None,
+                                format="DD/MM/YYYY", min_value=date(1920, 1, 1), max_value=date.today())
             photo = st.file_uploader("Your photo (optional, helps the front desk greet you)",
                                      type=["jpg", "jpeg", "png", "webp", "heic", "heif"])
+            st.markdown("**Your health (optional)**")
+            st.caption("This helps the trainers keep you safe. Skip it if you prefer.")
+            doctor = st.radio("Has a doctor told you not to exercise, or to exercise only with care?",
+                              ["No", "Yes", "Rather not say"], index=2, horizontal=True)
+            health = st.text_area("Any health conditions or injuries the trainers should know about?",
+                                  placeholder="e.g. old knee injury, asthma", max_chars=1000)
+            health_ok = st.checkbox(f"I agree that {gym} can keep my health answers to keep me safe while I train. "
+                                    "Only the gym's staff can see them, and I can ask for them to be deleted.")
             consent = st.checkbox(f"I agree that {gym} can store my details and contact me about my membership. "
                                   "They are kept private, never sold, and I can ask for them to be deleted.")
             go = st.form_submit_button("Join", type="primary", use_container_width=True)
@@ -93,9 +105,19 @@ def render_public(supabase, code):
                         pic = gw.process_photo(photo.getvalue())
                     except Exception:
                         pic = None
+                answered = bool(health.strip()) or doctor != "Rather not say"
+                extra = {"p_photo": pic, "p_dob": dob.isoformat() if dob else None,
+                         # health answers are sent only with the member's consent (NDPA: sensitive data)
+                         "p_health_notes": health.strip() if (health_ok and answered) else None,
+                         "p_health_cleared": ({"No": True, "Yes": False}.get(doctor) if health_ok else None),
+                         "p_health_consent": bool(health_ok and answered)}
                 rows, problem = [], ""
                 try:
-                    if pic:
+                    rows = supabase.rpc("gp_member_join", {**args, **extra}).execute().data or []
+                except Exception:
+                    rows = []                    # newest step not set up yet: fall back to the older ones
+                try:
+                    if not rows and pic:
                         rows = supabase.rpc("gp_member_join", {**args, "p_photo": pic}).execute().data or []
                 except Exception:
                     rows = []                    # photo step not set up yet: join without it
@@ -206,7 +228,56 @@ def render_owner(supabase, gym_id):
         png = _qr_png(url)
         st.image(png, caption="Print this for your front desk", use_container_width=True)
         rp.download_link("Download QR code", png, "gympulse-member-signup-qr.png", "image/png", "join_qr")
+    _render_website(g["join_code"], on)
     _render_signups(supabase, gym_id)
+
+
+def timetable_link(code):
+    return f"{gw.APP_URL}/?timetable={code}"
+
+
+def _render_website(code, on):
+    """Ready-made code for the gym's own website: the join form and the class timetable."""
+    with st.expander("Put it on your website"):
+        st.caption("Copy a block below and paste it into your website builder (for example an \"HTML\" or "
+                   "\"Embed code\" box in WordPress, Wix or Squarespace). Or just link to the page.")
+        join, table = link_for(code), timetable_link(code)
+        st.markdown("**Join form**")
+        st.code(f'<iframe src="{join}&embed=true" width="100%" height="1100" style="border:0" '
+                'title="Join our gym"></iframe>', language="html", wrap_lines=True)
+        st.markdown("**Class timetable** (the next 14 days, updated by itself when you add classes)")
+        st.code(f'<iframe src="{table}&embed=true" width="100%" height="800" style="border:0" '
+                'title="Class timetable"></iframe>', language="html", wrap_lines=True)
+        st.markdown(f"Or link to the pages: [join form]({join}), [class timetable]({table}).")
+        if not on:
+            st.warning("Your sign-up link is switched off, so both pages show that they aren't active.")
+
+
+def render_timetable(supabase, code):
+    """Public: the gym's classes for the next 14 days (names and times only). ?timetable=<join code>"""
+    try:
+        res = supabase.rpc("gp_public_timetable", {"p_code": str(code)}).execute().data
+    except Exception:
+        res = None
+    res = res[0] if isinstance(res, list) and res else res
+    if not (isinstance(res, dict) and res.get("ok")):
+        gw._md('<div class="bk-title">Timetable not available</div>'
+               '<div class="bk-sub">This timetable link isn\'t active. Please ask the gym for the latest one.</div>')
+        return
+    gym = res.get("gym") or "Our gym"
+    gw._md(f'<div class="bk-title">{gw._esc(gym)} classes</div>'
+           '<div class="bk-sub">The next two weeks. Times are Lagos time.</div>')
+    classes = res.get("classes") or []
+    if not classes:
+        st.caption("No classes are scheduled for the next two weeks yet. Check back soon.")
+    by_day = {}
+    for c in classes:
+        t = pd.Timestamp(c["starts_at"]).tz_convert(gw.APP_TZ)
+        by_day.setdefault(t.date(), []).append((t, c.get("name") or "Class"))
+    for day, items in by_day.items():
+        st.markdown(f"**{day:%A %d %B}**")
+        gw.table([{"Time": f"{t:%H:%M}", "Class": n} for t, n in items])
+    st.link_button("Join the gym", link_for(code), type="primary")
 
 
 def _ago(stamp):

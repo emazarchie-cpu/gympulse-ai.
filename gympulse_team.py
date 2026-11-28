@@ -314,7 +314,8 @@ def render_team(supabase, gym_id):
 
 
 # ------------------------------------------------------------------ the Owner page
-OWNER_SECTIONS = ["Business insights", "Team & access", "Trainers", "Monthly report", "Subscription & billing"]
+OWNER_SECTIONS = ["Business insights", "Member lists", "Team & access", "Trainers", "Monthly report",
+                  "Subscription & billing"]
 
 
 def render_owner_hub(supabase, gym_id, assess_fn, owner_id):
@@ -353,6 +354,9 @@ def render_owner_hub(supabase, gym_id, assess_fn, owner_id):
         gptw.render_owner_view(supabase, gym_id)
     elif section == "Monthly report":
         gg.render_monthly(supabase, gym_id, assess_fn, owner_id)
+    elif section == "Member lists":
+        import gympulse_lists as glists
+        glists.render_lists(supabase, gym_id, assess_fn)
     else:
         s = gbill.state(gbill.subscription(supabase, gym_id))
         sub = gbill.subscription(supabase, gym_id) or {}

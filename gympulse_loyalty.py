@@ -57,13 +57,15 @@ AUTO_DEFAULTS = {
     "welcome": {"on": False},
     "progress": {"on": False},
     "milestone": {"on": False},
+    "birthday": {"on": False},
     "level": {"on": False},
     "pulse": {"on": False, "freq": "quarter"},
     "daily_cap": 80,
 }
 
 
-AUTO_KINDS = ("renewal", "missed", "week1", "welcome", "milestone", "level", "reward", "progress", "pulse")
+AUTO_KINDS = ("renewal", "missed", "week1", "welcome", "milestone", "birthday", "level", "reward", "progress",
+              "pulse")
 
 
 def _settings(profile=None):
@@ -323,6 +325,19 @@ def due_messages(supabase, gym_id, profile=None, today=None):
                 ref = f"progress:{last_month_start:%Y-%m}"
                 if (m["id"], "progress", ref) not in sent:
                     out.append(("progress", md, ref) + progress_letter(md, n_last, n_prev, last_month_start))
+    if auto["birthday"]["on"] and "date_of_birth" in members.columns:
+        for _, m in members.iterrows():
+            dob = pd.to_datetime(m.get("date_of_birth"), errors="coerce")
+            end = m["end"] if gg._has_date(m.get("end")) else None
+            if pd.isna(dob) or (end is not None and (today - end).days > 60):
+                continue                                    # long-gone members don't get a birthday email
+            month, day = int(dob.month), int(dob.day)
+            if month == 2 and day == 29 and not (today.year % 4 == 0 and (today.year % 100 or today.year % 400 == 0)):
+                day = 28                                    # leap-day birthdays: 28 Feb in other years
+            if (today.month, today.day) == (month, day):
+                ref = f"birthday:{today.year}"
+                if (m["id"], "birthday", ref) not in sent:
+                    out.append(("birthday", dict(m), ref) + birthday_letter(dict(m)))
     if auto["milestone"]["on"]:
         import gympulse_celebrate as gc
         ck_all = gg._checkins(supabase, gym_id, 1500)
@@ -366,8 +381,8 @@ def due_messages(supabase, gym_id, profile=None, today=None):
     out += door_due(supabase, gym_id, profile, today, (sent, sent_rows), members, ck, out) or []
     # At most one automatic email per member per day: renewal first, then we missed you,
     # then reward. The others stay due and go out on a later day.
-    order = {"renewal": 0, "hmo_cover": 0, "missed": 1, "week1": 2, "welcome": 3, "milestone": 4, "level": 5, "reward": 6,
-             "progress": 7, "pulse": 8}
+    order = {"renewal": 0, "hmo_cover": 0, "birthday": 1, "missed": 2, "week1": 3, "welcome": 4, "milestone": 5,
+             "level": 6, "reward": 7, "progress": 8, "pulse": 9}
     picked, seen = [], set(had_today)
     for item in sorted(out, key=lambda x: order[x[0]]):
         if item[1]["id"] not in seen:
@@ -437,6 +452,19 @@ def level_letter(row, level, nxt):
                "That's our top level. Thank you for being one of our most committed members!\n\n")
             + f"{owner}\n{biz}")
     return f"{first}, you're now {level['name']} at {biz}!", body, None
+
+
+def birthday_letter(m):
+    """On the member's birthday. Warm and short, with nothing to buy."""
+    import gympulse_grow as gg
+    biz, owner = gg._biz()
+    first = gg._first(m.get("full_name"))
+    subject = f"Happy birthday, {first}!"
+    body = (f"Hi {first},\n\nHappy birthday from all of us at {biz}! We hope you have a great day.\n\n"
+            "Thank you for training with us. Come in this week and tell the front desk it's your birthday: "
+            "we'd love to say it in person.\n\n"
+            f"Best wishes,\n{owner}\n{biz}")
+    return subject, body, None
 
 
 def welcome_letter(m, visits):
@@ -739,6 +767,8 @@ def render_auto(supabase, gym_id, owner_id):
                               help="Sent in the first week of the month, only to members who came 4 or more times.")
             rw_on = st.toggle("Gift earned (loyalty must be on)", value=auto["reward"]["on"])
             lv_on = st.toggle("New loyalty level (levels must be on)", value=auto["level"]["on"])
+            bd_on = st.toggle("Birthday wishes (on the day)", value=auto["birthday"]["on"],
+                              help="For members with a date of birth on their profile. Sent by email.")
         with g4.container(border=True):
             st.markdown("##### :material/sentiment_satisfied: Feedback")
             hp_on = st.toggle("Happiness check (one tap)", value=auto["pulse"]["on"],
@@ -756,6 +786,7 @@ def render_auto(supabase, gym_id, owner_id):
                 "missed": {"on": bool(m_on), "days": int(m_days), "pause": bool(pause_on)},
                 "welcome": {"on": bool(w_on)}, "progress": {"on": bool(pr_on)},
                 "week1": {"on": bool(wk_on)}, "milestone": {"on": bool(ms_on)}, "level": {"on": bool(lv_on)},
+                "birthday": {"on": bool(bd_on)},
                 "pulse": {"on": bool(hp_on), "freq": hp_freq},
                 "reward": {"on": bool(rw_on)}, "daily_cap": int(cap)},
                 "chase": {"on": bool(ch_on), "wait": int(ch_wait)}}, "Automatic messages saved.")
@@ -771,7 +802,8 @@ def render_auto(supabase, gym_id, owner_id):
         return
     label = {"renewal": "Renew reminder", "hmo_cover": "HMO cover ending", "missed": "We missed you", "reward": "Gift earned",
              "welcome": "New member check-in", "progress": "Monthly progress", "update": "Gym update",
-             "week1": "First week", "milestone": "Milestone", "level": "Level up", "pulse": "Happiness check"}
+             "week1": "First week", "milestone": "Milestone", "level": "Level up", "pulse": "Happiness check",
+             "birthday": "Birthday"}
     import gympulse_whatsapp as gwa
     wcfg = gwa.wa_settings()
     wa_on = wcfg["mode"] != "email" and gwa.ready()
