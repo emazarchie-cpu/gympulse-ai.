@@ -438,55 +438,111 @@ def session_name(cookie_header):
 
 
 PAGE_CSS = """
-:root{--bg:#0E1A2B;--ink:#E8EDF3;--muted:#8C9AAD;--line:#22324A;--lime:#C6F432;--red:#FF6B5E}
-*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--ink)}
-body{font:17px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100dvh;
-display:flex;flex-direction:column;padding:28px 20px calc(20px + env(safe-area-inset-bottom))}
-main{flex:1;max-width:520px;width:100%}
-.who{color:var(--muted);font-size:15px;margin:0 0 40px}
-h1{font-size:40px;line-height:1.05;letter-spacing:-.02em;font-weight:600;margin:0 0 10px}
-.state{color:var(--muted);margin:0 0 28px}.state b{color:var(--ink);font-weight:600}
-.err{color:var(--red);margin:0 0 20px}.ok{color:var(--lime);margin:0 0 20px}.state .now{color:var(--lime)}
-label{display:block;color:var(--muted);font-size:15px;margin:0 0 8px}
-input{width:100%;font:600 28px/1 system-ui,sans-serif;letter-spacing:.3em;padding:16px;border-radius:10px;
-border:1px solid var(--line);background:#0A1422;color:var(--ink)}
-input:focus,button:focus-visible,a:focus-visible{outline:3px solid var(--lime);outline-offset:2px}
-.foot{max-width:520px;width:100%;display:grid;gap:12px}
-button{width:100%;border:0;border-radius:14px;font:700 22px/1 system-ui,sans-serif;padding:30px 20px;
-background:var(--lime);color:#0E1A2B;cursor:pointer}
-button:active{transform:scale(.985)}
-.door+.door{margin-top:12px}
-.quiet{color:var(--muted);font-size:15px;text-decoration:none;justify-self:start;padding:8px 0}
-.find{margin:8px 0 12px}.find input{font:500 18px/1.2 system-ui,sans-serif;letter-spacing:0;padding:14px}
-.hit{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
-.hit div{flex:1;min-width:0;display:grid}.hit span{color:var(--muted);font-size:15px}.hit .warn{color:var(--red)}
-.letin{width:auto;padding:14px 18px;font-size:17px;border-radius:10px;background:transparent;color:var(--lime);
-border:1.5px solid var(--lime)}
-.hint{color:var(--muted);font-size:14px;margin:12px 0 0}
-@media (prefers-reduced-motion:reduce){button:active{transform:none}}
+:root{--navy:#10213F;--panel:#162A4D;--key:#1D3561;--keyon:#27447A;--line:#294069;--ink:#EEF1F6;--mute:#9DAAC2;
+--dim:#7385A4;--lime:#C5F04A;--red:#FF8B7E}
+*{box-sizing:border-box}html,body{margin:0;background:var(--navy);color:var(--ink)}
+body{font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100dvh;display:flex;
+flex-direction:column;align-items:center;padding:max(14px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-left))
+calc(18px + env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-right));-webkit-tap-highlight-color:transparent}
+.col{width:100%;max-width:440px;display:flex;flex-direction:column;flex:1}
+.bar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:6px 0 18px;
+border-bottom:1px solid var(--line);font-size:15px}
+.bar b{font-weight:600}.bar span{color:var(--mute)}.bar a{color:var(--mute);text-decoration:none;margin-left:12px;
+padding:8px 0;border-bottom:1px solid var(--line)}
+.err{color:var(--red);margin:14px 0 0}
+input{font-family:inherit}
+button,a,input{outline-offset:2px}button:focus-visible,a:focus-visible,input:focus-visible{outline:3px solid var(--lime)}
+/* PIN keypad */
+.pinhead{padding:36px 0 20px}.pinhead p{margin:0;color:var(--mute)}
+.pinhead h1{font-size:26px;font-weight:600;letter-spacing:-.01em;margin:0 0 6px}
+.dots{display:flex;gap:14px;height:22px;align-items:center;margin:8px 0 26px}
+.dots i{width:14px;height:14px;border-radius:50%;border:2px solid var(--dim)}.dots i.on{background:var(--ink);
+border-color:var(--ink)}
+#pin{position:absolute;left:-9999px}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:auto}
+.pad button{height:68px;border:0;border-radius:12px;background:var(--key);color:var(--ink);font-family:inherit;font-size:26px;font-weight:500;line-height:1;
+font-variant-numeric:tabular-nums;cursor:pointer}
+.pad button:active{background:var(--keyon)}
+.pad .fn{font-size:16px;font-weight:500;color:var(--mute);background:transparent}
+.pad .go{background:var(--ink);color:var(--navy);font-size:17px;font-weight:700}
+.nojs{display:none}
+/* Door */
+.state{padding:28px 0 22px}.state small{display:block;color:var(--mute);font-size:14px;margin-bottom:4px}
+.state div{font-size:28px;font-weight:600;letter-spacing:-.01em;line-height:1.15}
+.state div.open{color:var(--lime)}.state div em{font-style:normal;color:var(--mute);font-weight:400;font-size:17px;
+display:block;margin-top:4px}
+.hold{position:relative;width:100%;height:76px;border:0;border-radius:14px;background:var(--lime);color:var(--navy);
+font-family:inherit;font-size:20px;font-weight:700;line-height:1;cursor:pointer;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none}
+.hold span{position:relative;z-index:1}.hold small{display:block;font-size:13px;font-weight:500;margin-top:6px;
+opacity:.75;position:relative;z-index:1}
+.hold i{position:absolute;inset:0;background:#E3FA9A;transform:scaleX(0);transform-origin:left;transition:none}
+.hold.go i{transform:scaleX(1);transition:transform .55s linear}
+.find{margin:30px 0 0}.find label{display:block;color:var(--mute);font-size:14px;margin-bottom:8px}
+.find input{width:100%;font-size:17px;padding:14px;border-radius:10px;border:1px solid var(--line);
+background:var(--panel);color:var(--ink)}
+.hit{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--line)}
+.hit div{flex:1;min-width:0;display:grid}.hit b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hit span{color:var(--mute);font-size:14px}.hit .warn{color:var(--red)}
+.letin{flex:none;height:44px;padding:0 16px;border-radius:10px;border:1px solid var(--line);background:var(--panel);
+color:var(--ink);font-family:inherit;font-size:15px;font-weight:600;line-height:1;cursor:pointer}
+.hint{color:var(--dim);font-size:13px;margin:12px 0 0}
+.none{color:var(--mute);margin:14px 0 0}
+.doors{display:grid;gap:10px}
+@media (prefers-reduced-motion:reduce){.hold.go i{transition:none}}
+"""
+
+PAGE_JS = """
+document.querySelectorAll('.nojs').forEach(function(e){e.style.display='none'});
+var pin=document.getElementById('pin'),dotbox=document.querySelector('.dots');
+function draw(){if(!dotbox)return;var n=pin.value.length,h='';for(var i=0;i<Math.max(4,n);i++){h+='<i'+(i<n?' class="on"':'')+'></i>'}dotbox.innerHTML=h}
+document.querySelectorAll('.pad [data-k]').forEach(function(b){b.addEventListener('click',function(){
+ var k=b.dataset.k;if(k==='c'){pin.value=''}else if(k==='go'){if(pin.value.length>=4)pin.form.submit();return}
+ else if(pin.value.length<8){pin.value+=k}draw()})});
+if(pin){document.addEventListener('keydown',function(e){if(/^[0-9]$/.test(e.key)&&pin.value.length<8){pin.value+=e.key;draw()}
+ else if(e.key==='Backspace'){pin.value=pin.value.slice(0,-1);draw()}else if(e.key==='Enter'&&pin.value.length>=4){pin.form.submit()}})}
+document.querySelectorAll('.hold').forEach(function(b){var t;
+ function start(e){e.preventDefault();b.classList.add('go');t=setTimeout(function(){b.form.submit()},550)}
+ function stop(){clearTimeout(t);b.classList.remove('go')}
+ b.addEventListener('pointerdown',start);['pointerup','pointerleave','pointercancel'].forEach(function(n){b.addEventListener(n,stop)});
+ b.addEventListener('click',function(e){e.preventDefault()});
+ b.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();b.form.submit()}})});
 """
 
 
-def page(body, foot=""):
+def page(body):
     return ("<!doctype html><html lang='en'><head><meta charset='utf-8'>"
             "<meta name='viewport' content='width=device-width,initial-scale=1,viewport-fit=cover'>"
-            "<meta name='robots' content='noindex'><title>Open door</title>"
-            f"<style>{PAGE_CSS}</style></head><body><main>{body}</main>"
-            f"<div class='foot'>{foot}</div></body></html>").encode("utf-8")
+            "<meta name='robots' content='noindex'><meta name='theme-color' content='#10213F'>"
+            "<title>Open door</title>"
+            f"<style>{PAGE_CSS}</style></head><body><div class='col'>{body}</div>"
+            f"<script>{PAGE_JS}</script></body></html>").encode("utf-8")
+
+
+def _door_names():
+    names = [t.get("door", "Main door") for t in entry_doors()]
+    return names[0] if len(names) == 1 else "Gym doors"
 
 
 def pin_page(msg="", err=True):
+    head = f"<div class='bar'><b>{html.escape(_door_names())}</b><span>Staff only</span></div>"
     if not staff_list():
-        return page("<p class='who'>GymPulse AI</p><h1>Open door</h1>"
-                    "<p class='err'>No staff PIN is set yet. Add one under staff in bridge_config.json on "
-                    "the gym computer, then restart the bridge.</p>")
-    note = f"<p class='{'err' if err else 'ok'}'>{html.escape(msg)}</p>" if msg else ""
-    body = ("<p class='who'>GymPulse AI</p><h1>Open door</h1>"
-            "<p class='state'>Works on the gym's Wi-Fi, even when the internet is down.</p>" + note +
-            "<form id='f' method='post' action='/open/pin'><label for='pin'>Staff PIN</label>"
-            "<input id='pin' name='pin' type='password' inputmode='numeric' autocomplete='off' "
-            "pattern='[0-9]*' maxlength='8' required autofocus></form>")
-    return page(body, "<button form='f' type='submit'>Unlock</button>")
+        return page(head + "<div class='pinhead'><h1>No staff PIN yet</h1><p>Add one under staff in "
+                    "bridge_config.json on the gym computer, then restart the bridge.</p></div>")
+    note = f"<p class='err'>{html.escape(msg)}</p>" if msg else ""
+    keys = "".join(f"<button type='button' data-k='{k}'>{k}</button>" for k in "123456789")
+    body = (head + "<div class='pinhead'><h1>Enter your PIN</h1><p>Works on the gym's Wi-Fi, even when the "
+            "internet is down.</p>" + note + "</div>"
+            "<form method='post' action='/open/pin'>"
+            "<input id='pin' name='pin' type='password' inputmode='numeric' autocomplete='off' maxlength='8' "
+            "aria-label='Staff PIN'>"
+            "<div class='dots' aria-hidden='true'>" + "<i></i>" * 4 + "</div>"
+            "<div class='pad'>" + keys +
+            "<button type='button' class='fn' data-k='c'>Clear</button><button type='button' data-k='0'>0</button>"
+            "<button type='button' class='go' data-k='go'>Enter</button></div>"
+            "<noscript><p class='hint'>Type your PIN with the keyboard, then press Enter.</p>"
+            "<style>#pin{position:static;width:100%;font-size:24px;padding:12px;margin:0 0 12px}</style></noscript>"
+            "</form>")
+    return page(body)
 
 
 def _status(m, today):
@@ -520,7 +576,7 @@ def search_block(q):
     if q:
         hits = find_members(q)
         if not hits:
-            out.append("<p class='state'>No member found. Check the spelling, or add them in GymPulse AI.</p>")
+            out.append("<p class='none'>No member found. Check the spelling, or add them in GymPulse AI.</p>")
         for m in hits:
             label, ok = _status(m, today)
             out.append("<form class='hit' method='post' action='/open/member'>"
@@ -534,33 +590,30 @@ def search_block(q):
 
 
 def door_page(name, msg="", err=False, q=""):
-    rows = []
-    for i, t in enumerate(entry_doors()):
+    doors = entry_doors()
+    head = (f"<div class='bar'><b>{html.escape(_door_names())}</b><span>{html.escape(name)}"
+            "<a href='/open/lock'>Lock</a></span></div>")
+    states = []
+    for t in doors:
         door = t.get("door", "Main door")
         last = LAST_OPEN.get(door)
-        let_in = f"{html.escape(last[2])} let in by " if last and last[2] else ""
+        who = (f"{html.escape(last[2])}, let in by {html.escape(last[1])}" if last and last[2]
+               else f"by {html.escape(last[1])}" if last else "")
         if last and time.time() - last[0] < 15:
-            state = f"<span class='now'>Open now. {let_in or 'Opened by '}{html.escape(last[1])}</span>"
+            states.append((door, f"<div class='open'>Open<em>{who}, just now</em></div>"))
         elif last:
-            state = (f"Last opened {time.strftime('%H:%M', time.localtime(last[0]))}: "
-                     f"{let_in}<b>{html.escape(last[1])}</b>")
+            states.append((door, f"<div>Locked<em>Last opened {time.strftime('%H:%M', time.localtime(last[0]))}, "
+                                 f"{who}</em></div>"))
         else:
-            state = "Locked"
-        rows.append((i, door, state))
-    note = f"<p class='{'err' if err else 'ok'}'>{html.escape(msg)}</p>" if msg else ""
-    if len(rows) == 1:
-        i, door, state = rows[0]
-        body = (f"<p class='who'>Signed in as {html.escape(name)}</p><h1>{html.escape(door)}</h1>"
-                f"<p class='state'>{state}</p>{note}{search_block(q)}")
-        foot = (f"<form method='post' action='/open/door'><input type='hidden' name='d' value='{i}'>"
-                "<button type='submit'>Open door</button></form>")
-    else:
-        body = f"<p class='who'>Signed in as {html.escape(name)}</p><h1>Open a door</h1>{note}" + "".join(
-            f"<p class='state'>{html.escape(door)}: {state}</p>" for _, door, state in rows) + search_block(q)
-        foot = "".join(f"<form class='door' method='post' action='/open/door'><input type='hidden' name='d' "
-                       f"value='{i}'><button type='submit'>Open {html.escape(door)}</button></form>"
-                       for i, door, _ in rows)
-    return page(body, foot + "<a class='quiet' href='/open/lock'>Lock this phone</a>")
+            states.append((door, "<div>Locked</div>"))
+    note = f"<p class='err'>{html.escape(msg)}</p>" if msg else ""
+    state_html = "".join(f"<div class='state'>{'' if len(states) == 1 else '<small>' + html.escape(d) + '</small>'}"
+                         f"{st_}</div>" for d, st_ in states)
+    holds = "".join(f"<form method='post' action='/open/door'><input type='hidden' name='d' value='{i}'>"
+                    f"<button class='hold' type='submit'><i></i><span>Hold to open"
+                    f"{'' if len(doors) == 1 else ' ' + html.escape(t.get('door', 'Main door'))}</span>"
+                    "</button></form>" for i, t in enumerate(doors))
+    return page(head + state_html + note + f"<div class='doors'>{holds}</div>" + search_block(q))
 
 
 def handle(term, ev):
